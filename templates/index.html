@@ -3,21 +3,32 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Patrimoine Familial</title>
+  <title>Financy</title>
   <link rel="stylesheet" href="/static/style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
   <nav class="navbar">
-    <div class="nav-brand">&#9670; Patrimoine Familial</div>
+    <div class="nav-brand">&#9670; Financy</div>
     <div class="nav-tabs">
       <button class="tab-btn active" data-tab="synthese">Synthèse</button>
       <button class="tab-btn" data-tab="positions">Positions</button>
       <button class="tab-btn" data-tab="flux">Flux</button>
       <button class="tab-btn" data-tab="entites">Entités</button>
-      <button class="tab-btn" data-tab="referentiel">Référentiel</button>
-      <button class="tab-btn" data-tab="import">Import / Export</button>
+    </div>
+    <div class="nav-actions" style="margin-left:auto;display:flex;gap:.375rem;align-items:center">
+      <div class="settings-menu" id="settings-menu">
+        <button class="settings-toggle" id="settings-toggle" title="Paramètres">&#9881;</button>
+        <div class="settings-dropdown hidden" id="settings-dropdown">
+          <button class="settings-item" data-tab="referentiel">&#9881; Référentiel</button>
+          <button class="settings-item" data-tab="import">&#8645; Import / Export</button>
+        </div>
+      </div>
+      <button class="theme-toggle" id="theme-toggle" title="Basculer clair/sombre">&#9790;</button>
+      {% if has_auth %}
+      <a href="/logout" class="btn btn-secondary btn-sm" style="font-size:12px;padding:.25rem .75rem">Déconnexion</a>
+      {% endif %}
     </div>
   </nav>
 
@@ -27,9 +38,12 @@
     <div id="tab-synthese" class="tab-content">
       <div class="page-header">
         <h1>Synthèse</h1>
-        <div class="date-selector">
-          <label>Date</label>
-          <select id="synthese-date-select"></select>
+        <div style="display:flex;align-items:center;gap:.75rem">
+          <div class="date-selector">
+            <label>Date</label>
+            <select id="synthese-date-select"></select>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btn-print" title="Imprimer la synthèse" onclick="window.print()">&#128424; Imprimer</button>
         </div>
       </div>
 
@@ -161,17 +175,13 @@
         <div class="tree-toolbar">
           <input type="search" id="pos-tree-search" class="tree-search-input" placeholder="Rechercher…">
           <span class="tree-toolbar-sep"></span>
-          <span class="tree-toolbar-label">Tout :</span>
-          <button class="btn btn-secondary btn-sm" id="pos-tree-expand">Déplier</button>
-          <button class="btn btn-secondary btn-sm" id="pos-tree-collapse">Replier</button>
-          <span class="tree-toolbar-sep"></span>
-          <span class="tree-toolbar-label">Établissements :</span>
-          <button class="btn btn-secondary btn-sm" id="pos-etabl-expand">Déplier</button>
-          <button class="btn btn-secondary btn-sm" id="pos-etabl-collapse">Replier</button>
-          <span class="tree-toolbar-sep"></span>
-          <span class="tree-toolbar-label">Enveloppes :</span>
-          <button class="btn btn-secondary btn-sm" id="pos-env-expand">Déplier</button>
-          <button class="btn btn-secondary btn-sm" id="pos-env-collapse">Replier</button>
+          <div class="tree-depth-bar">
+            <span class="tree-toolbar-label">Profondeur :</span>
+            <button class="tree-depth-btn" data-depth="owner" title="Personnes seulement">Personne</button>
+            <button class="tree-depth-btn" data-depth="etabl" title="Jusqu'aux établissements">Établ.</button>
+            <button class="tree-depth-btn" data-depth="env" title="Jusqu'aux enveloppes">Env.</button>
+            <button class="tree-depth-btn active" data-depth="all" title="Jusqu'aux positions">Position</button>
+          </div>
         </div>
         <div id="positions-tree-body"></div>
       </div>
