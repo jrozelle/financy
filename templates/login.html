@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connexion — Financy</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body { display:flex; align-items:center; justify-content:center; min-height:100vh; background:var(--bg); }
+    .login-card { background:#fff; padding:2.5rem; border-radius:12px; box-shadow:0 4px 24px rgba(0,0,0,.08); max-width:360px; width:100%; }
+    .login-card h1 { font-size:1.5rem; margin-bottom:1.5rem; text-align:center; }
+    .login-card input[type="password"] { width:100%; padding:.625rem .875rem; border:1px solid var(--border); border-radius:6px; font-size:14px; margin-bottom:1rem; }
+    .login-card button { width:100%; padding:.625rem; font-size:14px; }
+    .login-error { color:var(--danger); font-size:13px; margin-bottom:1rem; text-align:center; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <h1>&#9670; Financy</h1>
+    {% if error %}
+      <div class="login-error">{{ error }}</div>
+    {% endif %}
+    <form method="POST" action="/login">
+      <input type="password" name="password" placeholder="Mot de passe" autofocus required>
+      <button type="submit" class="btn btn-primary">Se connecter</button>
+    </form>
+  </div>
+</body>
+</html>

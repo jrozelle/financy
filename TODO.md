@@ -89,9 +89,6 @@ Référentiel :
 - [x] 🟡 Édition inline dans la vue arborescente (modifier la valeur sans ouvrir le modal complet)
 - [ ] 🟡 Flux liés à une catégorie (croiser flux et positions : "versé X sur PEA, vaut Y aujourd'hui")
 - [x] 🔵 Alertes configurables ("prévenir si Actions < 30%", "si cash > 20 000 €") → localStorage, évaluation dans Synthèse, config dans Référentiel
-- [ ] 🔵 Projection / simulation ("500 €/mois sur PEA pendant 10 ans")
-- [ ] 🔵 Snapshot automatique programmé (dupliquer le dernier snapshot chaque mois sans action manuelle)
-- [ ] 🔵 Multi-devises (positions crypto / étrangères avec conversion manuelle ou automatique)
 
 
 --- UX contextuelle ---
@@ -100,11 +97,77 @@ Référentiel :
 - [x] 🟠 Bouton "+" contextuel dans l'arborescence Positions : au niveau owner → pré-remplit propriétaire ; au niveau établissement → pré-remplit owner + établissement + entité si applicable ; au niveau enveloppe → pré-remplit owner + établissement + enveloppe
 - [x] 🟡 Toast de confirmation après sauvegarde position / flux / entité
 - [ ] 🟡 Vérification orphelins à la suppression d'enveloppe ou de catégorie dans le Référentiel
-- [ ] 🟡 Performance filtrée par personne (cohérence avec vue personne dans Synthèse)
+- [x] 🟡 Performance filtrée par personne (cohérence avec vue personne dans Synthèse) — flux et gains filtrés par owner
+
+
+--- Sécurité ---
+
+- [x] 🔴 Auth basique : mot de passe via variable d'env (FINANCY_PASSWORD) + session Flask, page de login, bouton déconnexion
+- [ ] 🔴 Protection CSRF sur les POST/PUT/DELETE (Flask-WTF ou token custom)
+- [x] 🟠 Validation des inputs côté serveur (types numériques, dates ISO, longueur max, pourcentages)
+
+
+--- Code backend ---
+
+- [ ] 🟠 Découper app.py (~950 lignes) en modules : models.py, routes/ (blueprints), referential.py
+- [ ] 🟡 Supprimer le référentiel hardcodé — le transformer en seed d'init, ne garder que la lecture DB
+- [ ] 🟡 Utiliser flask.g + teardown_appcontext pour une connexion DB par requête (pattern Flask standard)
+- [ ] 🟡 Endpoint /api/backup : copie de patrimoine.db avec timestamp
+- [ ] 🟡 Externaliser config dans des variables d'env (DB_PATH, port, mot de passe) via .env
+- [ ] 🟡 Ajouter du logging minimal (import, reset, erreurs)
+
+
+--- Code frontend ---
+
+- [ ] 🔴 Découper app.js (~2 660 lignes) en modules ES (state.js, api.js, tabs/*.js, charts.js, utils.js) avec <script type="module">
+- [ ] 🟠 Audit XSS : vérifier que esc() est utilisé partout dans innerHTML / insertAdjacentHTML
+- [x] 🟠 Migrer allocation cible de localStorage vers DB (table config) — API /api/targets GET/PUT, migration automatique au boot
+- [x] 🟡 Migrer alertes de localStorage vers DB — API /api/alerts GET/PUT, migration automatique au boot
+- [ ] 🟡 Wrapper apiFetch() centralisé : gestion d'erreurs réseau, toast d'erreur, retry
+- [ ] 🟡 Copier Chart.js en local dans /static/vendor/ pour fonctionnement offline
+
+
+--- UX ---
+
+- [x] 🔴 Confirmation avant suppression (position, flux, entité, reset DB) : modal confirmDialog() custom avec détails de l'élément
+- [x] 🟠 Dark mode avec toggle + support prefers-color-scheme — variables CSS, toggle dans navbar, persistance localStorage
+- [x] 🟠 Navigation mobile : onglets scrollables horizontalement, navbar wrappée, touch-friendly
+- [x] 🟠 Icône engrenage (⚙) dans la navbar : menu Paramètres regroupant Référentiel + Import/Export (libérer les onglets principaux)
+- [x] 🟠 Expand/collapse arborescence : revoir l'UX (comportement, ergonomie, feedback visuel)
+- [x] 🟠 Renommer l'app "Patrimoine Familial" en "Financy" (titre, navbar, login, README)
+- [x] 🟠 CSS delta dette : couleurs inversées (hausse = rouge, baisse = vert)
+- [x] 🟠 Barre de profondeur arborescence : remonter d'un niveau (Personne → Établ. → Env. → Position), ordre logique progressif
+- [x] 🟠 Persister le choix vue arborescente / tableau en localStorage
+- [ ] 🟠 Raccourcis clavier : Ctrl+N nouvelle position, Échap fermer modals, flèches naviguer entre snapshots
+- [ ] 🟡 Spinner / skeleton pendant les appels API (surtout synthèse)
+- [x] 🟡 Colonne % du total dans le tableau "Par personne"
+- [ ] 🟡 Recherche globale : filtre positions + flux + entités simultanément
+- [ ] 🟡 Date picker amélioré : saisie libre sur desktop, picker natif sur mobile
+
+
+--- Features ---
+
+- [x] 🟠 Variation entre snapshots : delta affiché sous chaque KPI (net avec %, gross, dette, mobilisable) via /api/synthese
+- [x] 🟠 Export PDF / impression : bouton "Imprimer" dans Synthèse + CSS @media print (masque nav, boutons, onglets inactifs)
+- [ ] 🟠 TRI (Taux de Rendement Interne) par enveloppe en croisant flux et valorisations
+- [ ] 🟡 Objectif patrimoine : jauge de progression vers un montant cible dans la synthèse
+- [ ] 🟡 Notes sur les snapshots : annoter un snapshot ("achat RP", "krach mars 2025")
+- [ ] 🟡 Comparaison N / N-1 : variation YoY automatique dans la synthèse
+- [ ] 🔵 Vue timeline : frise chronologique des événements patrimoniaux
+- [ ] 🔵 Projection / simulation ("500 €/mois sur PEA pendant 10 ans")
+- [ ] 🔵 Snapshot automatique programmé (dupliquer le dernier snapshot chaque mois)
+- [ ] 🔵 Multi-devises (positions crypto / étrangères avec conversion manuelle ou automatique)
+
+
+--- Qualité / DevOps ---
+
+- [ ] 🟠 Tests unitaires Python (pytest) sur compute_position() et get_entity_map()
+- [ ] 🟠 Tester et finaliser le Dockerfile
+- [ ] 🟡 Migrations DB : table schema_version + scripts de migration séquentiels
+- [ ] import : tester avec le vrai fichier rempli et valider les chiffres
 
 
 --- Backlog / docs ---
 
-- [ ] faire la doc du projet (README)
-- [ ] import : tester avec le vrai fichier rempli et valider les chiffres
-- [ ] Dockerfile à tester
+- [x] faire la doc du projet (README)
+- [x] tri croissant / décroissant au clic sur les en-têtes de colonnes (Positions, Flux, Entités)

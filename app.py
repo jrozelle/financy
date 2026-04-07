@@ -1,13 +1,89 @@
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template, session, redirect, url_for
+from functools import wraps
 import sqlite3
 import json
 import os
+import re
 from datetime import datetime
 from contextlib import contextmanager
 from io import BytesIO
 
 app = Flask(__name__)
 DB_PATH = os.path.join(os.path.dirname(__file__), 'patrimoine.db')
+app.secret_key = os.environ.get('SECRET_KEY', os.urandom(32))
+
+# ─── Authentification ─────────────────────────────────────────────────────────
+
+AUTH_PASSWORD = os.environ.get('FINANCY_PASSWORD')  # None = pas d'auth
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if AUTH_PASSWORD and not session.get('authenticated'):
+            if request.is_json or request.path.startswith('/api/'):
+                return jsonify({'error': 'Non authentifié'}), 401
+            return redirect(url_for('login_page'))
+        return f(*args, **kwargs)
+    return decorated
+
+@app.route('/login', methods=['GET', 'POST'])
+def login_page():
+    if not AUTH_PASSWORD:
+        return redirect(url_for('index'))
+    if request.method == 'POST':
+        if request.form.get('password') == AUTH_PASSWORD:
+            session['authenticated'] = True
+            return redirect(url_for('index'))
+        return render_template('login.html', error='Mot de passe incorrect.')
+    return render_template('login.html', error=None)
+
+@app.route('/logout')
+def logout():
+    session.pop('authenticated', None)
+    return redirect(url_for('login_page'))
+
+
+# ─── Validation ───────────────────────────────────────────────────────────────
+
+def validate_date(s):
+    """Vérifie que la chaîne est une date ISO valide (YYYY-MM-DD)."""
+    if not s or not isinstance(s, str):
+        return False
+    if not re.match(r'^\d{4}-\d{2}-\d{2}$', s):
+        return False
+    try:
+        datetime.strptime(s, '%Y-%m-%d')
+        return True
+    except ValueError:
+        return False
+
+def validate_number(v, allow_negative=False):
+    """Vérifie que v est un nombre valide."""
+    if v is None:
+        return True
+    try:
+        n = float(v)
+        if not allow_negative and n < 0:
+            return False
+        return True
+    except (ValueError, TypeError):
+        return False
+
+def validate_string(s, max_length=500):
+    """Vérifie que s est une chaîne non vide et raisonnable."""
+    if s is None:
+        return True
+    return isinstance(s, str) and len(s) <= max_length
+
+def validate_pct(v):
+    """Vérifie que v est un pourcentage entre 0 et 1."""
+    if v is None:
+        return True
+    try:
+        n = float(v)
+        return 0 <= n <= 1.0001  # petite marge pour les arrondis
+    except (ValueError, TypeError):
+        return False
 
 # ─── Référentiels ────────────────────────────────────────────────────────────
 
@@ -229,11 +305,13 @@ def get_entity_map(conn, date=None):
 # ─── Routes API ──────────────────────────────────────────────────────────────
 
 @app.route('/')
+@login_required
 def index():
-    return render_template('index.html')
+    return render_template('index.html', has_auth=bool(AUTH_PASSWORD))
 
 
 @app.route('/api/config')
+@login_required
 def get_config():
     with get_db() as conn:
         entity_names = [r['name'] for r in
@@ -254,6 +332,7 @@ def get_config():
 
 
 @app.route('/api/dates')
+@login_required
 def get_dates():
     with get_db() as conn:
         rows = conn.execute(
@@ -265,6 +344,7 @@ def get_dates():
 # — Positions —
 
 @app.route('/api/positions', methods=['GET'])
+@login_required
 def get_positions():
     date = request.args.get('date')
     with get_db() as conn:
@@ -282,8 +362,19 @@ def get_positions():
 
 
 @app.route('/api/positions', methods=['POST'])
+@login_required
 def add_position():
     d = request.json
+    if not d or not validate_date(d.get('date')):
+        return jsonify({'error': 'Date invalide (format AAAA-MM-JJ attendu)'}), 400
+    if not validate_string(d.get('owner'), 100) or not d.get('owner'):
+        return jsonify({'error': 'Propriétaire requis'}), 400
+    if not validate_string(d.get('category'), 100) or not d.get('category'):
+        return jsonify({'error': 'Catégorie requise'}), 400
+    if not validate_number(d.get('value')) or not validate_number(d.get('debt')):
+        return jsonify({'error': 'Valeur / dette invalide'}), 400
+    if not validate_pct(d.get('ownership_pct')) or not validate_pct(d.get('debt_pct')):
+        return jsonify({'error': '% propriété ou dette invalide (0-100)'}), 400
     with get_db() as conn:
         entity = d.get('entity')
         stored_value = 0 if entity else d.get('value', 0)
@@ -309,8 +400,15 @@ def add_position():
 
 
 @app.route('/api/positions/<int:pid>', methods=['PUT'])
+@login_required
 def update_position(pid):
     d = request.json
+    if not d or not validate_date(d.get('date')):
+        return jsonify({'error': 'Date invalide'}), 400
+    if not validate_number(d.get('value')) or not validate_number(d.get('debt')):
+        return jsonify({'error': 'Valeur / dette invalide'}), 400
+    if not validate_pct(d.get('ownership_pct')) or not validate_pct(d.get('debt_pct')):
+        return jsonify({'error': '% invalide'}), 400
     with get_db() as conn:
         entity = d.get('entity')
         stored_value = 0 if entity else d.get('value', 0)
@@ -337,6 +435,7 @@ def update_position(pid):
 
 
 @app.route('/api/positions/<int:pid>', methods=['DELETE'])
+@login_required
 def delete_position(pid):
     with get_db() as conn:
         conn.execute('DELETE FROM positions WHERE id=?', (pid,))
@@ -346,6 +445,7 @@ def delete_position(pid):
 # — Flux —
 
 @app.route('/api/flux', methods=['GET'])
+@login_required
 def get_flux():
     date_from = request.args.get('date_from')
     date_to   = request.args.get('date_to')
@@ -361,8 +461,15 @@ def get_flux():
 
 
 @app.route('/api/flux', methods=['POST'])
+@login_required
 def add_flux():
     d = request.json
+    if not d or not validate_date(d.get('date')):
+        return jsonify({'error': 'Date invalide'}), 400
+    if not d.get('owner'):
+        return jsonify({'error': 'Propriétaire requis'}), 400
+    if not validate_number(d.get('amount'), allow_negative=True) or d.get('amount') is None:
+        return jsonify({'error': 'Montant invalide'}), 400
     with get_db() as conn:
         cur = conn.execute(
             'INSERT INTO flux (date, owner, envelope, type, amount, notes) VALUES (?,?,?,?,?,?)',
@@ -374,8 +481,13 @@ def add_flux():
 
 
 @app.route('/api/flux/<int:fid>', methods=['PUT'])
+@login_required
 def update_flux(fid):
     d = request.json
+    if not d or not validate_date(d.get('date')):
+        return jsonify({'error': 'Date invalide'}), 400
+    if not validate_number(d.get('amount'), allow_negative=True):
+        return jsonify({'error': 'Montant invalide'}), 400
     with get_db() as conn:
         conn.execute(
             'UPDATE flux SET date=?, owner=?, envelope=?, type=?, amount=?, notes=? WHERE id=?',
@@ -387,6 +499,7 @@ def update_flux(fid):
 
 
 @app.route('/api/flux/<int:fid>', methods=['DELETE'])
+@login_required
 def delete_flux(fid):
     with get_db() as conn:
         conn.execute('DELETE FROM flux WHERE id=?', (fid,))
@@ -396,6 +509,7 @@ def delete_flux(fid):
 # — Synthèse —
 
 @app.route('/api/synthese')
+@login_required
 def get_synthese():
     date = request.args.get('date')
     with get_db() as conn:
@@ -457,6 +571,33 @@ def get_synthese():
         if debt > 1.02:
             entity_warnings.append({'entity': r['entity'], 'total_pct': round(debt * 100), 'type': 'debt'})
 
+    # ── Variation par rapport au snapshot précédent ──
+    variation = None
+    with get_db() as conn2:
+        prev_row = conn2.execute(
+            'SELECT DISTINCT date FROM positions WHERE date < ? ORDER BY date DESC LIMIT 1',
+            (date,)
+        ).fetchone()
+    if prev_row:
+        prev_date = prev_row['date']
+        with get_db() as conn2:
+            prev_rows      = conn2.execute('SELECT * FROM positions WHERE date=?', (prev_date,)).fetchall()
+            prev_entity_map = get_entity_map(conn2, prev_date)
+            prev_ref        = load_referential(conn2)
+        prev_positions = [compute_position(dict(r), prev_entity_map, prev_ref) for r in prev_rows]
+        prev_net   = sum(p['net_attributed'] for p in prev_positions)
+        prev_gross = sum(p['gross_attributed'] for p in prev_positions)
+        prev_debt  = sum(p['debt_attributed'] for p in prev_positions)
+        prev_mob   = sum(p['mobilizable_value'] for p in prev_positions)
+        variation = {
+            'prev_date':  prev_date,
+            'net_delta':   family['net'] - prev_net,
+            'net_pct':     ((family['net'] - prev_net) / abs(prev_net) * 100) if prev_net != 0 else None,
+            'gross_delta': family['gross'] - prev_gross,
+            'debt_delta':  family['debt'] - prev_debt,
+            'mob_delta':   sum(t['mobilizable'] for t in totals_by_owner.values()) - prev_mob,
+        }
+
     return jsonify({
         'date':                    date,
         'family':                  family,
@@ -464,10 +605,12 @@ def get_synthese():
         'totals_by_category':      totals_by_category,
         'mobilizable_by_liquidity': mobilizable_by_liquidity,
         'entity_warnings':         entity_warnings,
+        'variation':               variation,
     })
 
 
 @app.route('/api/historique')
+@login_required
 def get_historique():
     group_by = request.args.get('group_by')  # 'envelope' | 'category' | None
     owner    = request.args.get('owner')
@@ -508,6 +651,7 @@ def get_historique():
 # — Entités —
 
 @app.route('/api/entities', methods=['GET'])
+@login_required
 def get_entities():
     with get_db() as conn:
         rows = conn.execute('SELECT * FROM entities ORDER BY name').fetchall()
@@ -520,8 +664,13 @@ def get_entities():
 
 
 @app.route('/api/entities', methods=['POST'])
+@login_required
 def add_entity():
     d = request.json
+    if not d or not d.get('name') or not validate_string(d.get('name'), 200):
+        return jsonify({'error': 'Nom requis'}), 400
+    if not validate_number(d.get('gross_assets')) or not validate_number(d.get('debt')):
+        return jsonify({'error': 'Valeurs numériques invalides'}), 400
     today = datetime.now().strftime('%Y-%m-%d')
     gross = d.get('gross_assets', 0)
     debt  = d.get('debt', 0)
@@ -544,8 +693,13 @@ def add_entity():
 
 
 @app.route('/api/entities/<int:eid>', methods=['PUT'])
+@login_required
 def update_entity(eid):
     d = request.json
+    if not d or not d.get('name'):
+        return jsonify({'error': 'Nom requis'}), 400
+    if not validate_number(d.get('gross_assets')) or not validate_number(d.get('debt')):
+        return jsonify({'error': 'Valeurs numériques invalides'}), 400
     today = datetime.now().strftime('%Y-%m-%d')
     gross = d.get('gross_assets', 0)
     debt  = d.get('debt', 0)
@@ -568,6 +722,7 @@ def update_entity(eid):
 
 
 @app.route('/api/entities/<int:eid>', methods=['DELETE'])
+@login_required
 def delete_entity(eid):
     with get_db() as conn:
         name = conn.execute('SELECT name FROM entities WHERE id=?', (eid,)).fetchone()
@@ -580,6 +735,7 @@ def delete_entity(eid):
 # — Import Excel —
 
 @app.route('/api/import', methods=['POST'])
+@login_required
 def import_xlsx():
     if 'file' not in request.files:
         return jsonify({'error': 'Aucun fichier reçu'}), 400
@@ -718,6 +874,7 @@ def import_xlsx():
 # — Snapshot update —
 
 @app.route('/api/positions/<int:pid>/snapshot-update', methods=['POST'])
+@login_required
 def snapshot_update(pid):
     """
     Crée un nouveau snapshot à target_date en copiant toutes les positions
@@ -790,6 +947,7 @@ def snapshot_update(pid):
 # — Reset —
 
 @app.route('/api/import-json', methods=['POST'])
+@login_required
 def import_json():
     data = request.json
     if not data:
@@ -860,6 +1018,7 @@ def import_json():
 
 
 @app.route('/api/entity-snapshots')
+@login_required
 def get_entity_snapshots():
     entity_name = request.args.get('entity')
     with get_db() as conn:
@@ -876,6 +1035,7 @@ def get_entity_snapshots():
 
 
 @app.route('/api/entity-snapshots/<int:sid>', methods=['DELETE'])
+@login_required
 def delete_entity_snapshot(sid):
     with get_db() as conn:
         conn.execute('DELETE FROM entity_snapshots WHERE id=?', (sid,))
@@ -883,6 +1043,7 @@ def delete_entity_snapshot(sid):
 
 
 @app.route('/api/reset', methods=['POST'])
+@login_required
 def reset_db():
     with get_db() as conn:
         conn.executescript(
@@ -895,6 +1056,7 @@ def reset_db():
 # — Export JSON —
 
 @app.route('/api/export')
+@login_required
 def export_data():
     with get_db() as conn:
         positions = [dict(r) for r in conn.execute(
@@ -919,7 +1081,66 @@ def export_data():
 
 # — Référentiel —
 
+# — Allocation cible (persistance DB) —
+
+@app.route('/api/targets', methods=['GET'])
+@login_required
+def get_targets():
+    with get_db() as conn:
+        row = conn.execute("SELECT value FROM config WHERE key='allocation_targets'").fetchone()
+    if row:
+        try:
+            return jsonify(json.loads(row['value']))
+        except Exception:
+            pass
+    return jsonify({})
+
+
+@app.route('/api/targets', methods=['PUT'])
+@login_required
+def save_targets():
+    data = request.json
+    if not isinstance(data, dict):
+        return jsonify({'error': 'Objet JSON attendu'}), 400
+    with get_db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO config (key, value) VALUES ('allocation_targets', ?)",
+            (json.dumps(data),)
+        )
+    return jsonify({'ok': True})
+
+
+# — Alertes (persistance DB) —
+
+@app.route('/api/alerts', methods=['GET'])
+@login_required
+def get_alerts():
+    with get_db() as conn:
+        row = conn.execute("SELECT value FROM config WHERE key='user_alerts'").fetchone()
+    if row:
+        try:
+            return jsonify(json.loads(row['value']))
+        except Exception:
+            pass
+    return jsonify([])
+
+
+@app.route('/api/alerts', methods=['PUT'])
+@login_required
+def save_alerts_api():
+    data = request.json
+    if not isinstance(data, list):
+        return jsonify({'error': 'Tableau JSON attendu'}), 400
+    with get_db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO config (key, value) VALUES ('user_alerts', ?)",
+            (json.dumps(data),)
+        )
+    return jsonify({'ok': True})
+
+
 @app.route('/api/referential', methods=['GET'])
+@login_required
 def get_referential_api():
     with get_db() as conn:
         ref = load_referential(conn)
@@ -927,6 +1148,7 @@ def get_referential_api():
 
 
 @app.route('/api/referential', methods=['PUT'])
+@login_required
 def save_referential():
     data = request.json
     required = ['owners', 'categories', 'category_mobilizable', 'envelope_meta']

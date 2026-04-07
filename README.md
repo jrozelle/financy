@@ -1,4 +1,4 @@
-# Patrimoine Familial
+# Financy
 
 Application web de suivi patrimonial familial — Flask + SQLite + vanilla JS.
 

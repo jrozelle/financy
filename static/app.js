@@ -14,7 +14,7 @@ const S = {
   historique:    [],
   entities:        [],
   entitySnapshots: [],
-  positionsView:   'table',   // 'table' | 'tree'
+  positionsView:   localStorage.getItem('financy_positionsView') || 'table',   // 'table' | 'tree'
   currentTab:      'synthese',
   editPosId:       null,
   editFluxId:      null,
@@ -59,6 +59,56 @@ const liqBadge = liq => {
 };
 
 const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+const fmtDelta = (n, dec = 0) => {
+  if (n == null || n === 0) return '';
+  const sign = n > 0 ? '+' : '';
+  return sign + new Intl.NumberFormat('fr-FR', {
+    minimumFractionDigits: dec,
+    maximumFractionDigits: dec,
+  }).format(n) + '\u202f\u20ac';
+};
+
+function kpiDelta(variation, deltaKey, pctKey = null, { invert = false } = {}) {
+  if (!variation) return '';
+  const delta = variation[deltaKey];
+  if (delta == null || delta === 0) return '';
+  const positive = invert ? delta < 0 : delta > 0;
+  const cls = positive ? 'kpi-delta-pos' : 'kpi-delta-neg';
+  const arrow = delta > 0 ? '\u25b2' : '\u25bc';
+  let pctStr = '';
+  if (pctKey && variation[pctKey] != null) {
+    const pct = variation[pctKey];
+    pctStr = ` (${pct > 0 ? '+' : ''}${pct.toFixed(1)}\u202f%)`;
+  }
+  return `<div class="${cls}">${arrow} ${fmtDelta(delta)}${pctStr}</div>`;
+}
+
+// ─── Confirm dialog ──────────────────────────────────────────────────────
+
+function confirmDialog(title, message, { confirmText = 'Supprimer', danger = true } = {}) {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.innerHTML = `
+      <div class="confirm-dialog">
+        <h3>${esc(title)}</h3>
+        <p>${message}</p>
+        <div class="confirm-actions">
+          <button class="btn btn-secondary confirm-cancel">Annuler</button>
+          <button class="btn ${danger ? 'btn-danger' : 'btn-primary'} confirm-ok">${esc(confirmText)}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    const cleanup = (result) => { overlay.remove(); resolve(result); };
+    overlay.querySelector('.confirm-cancel').addEventListener('click', () => cleanup(false));
+    overlay.querySelector('.confirm-ok').addEventListener('click',     () => cleanup(true));
+    overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(false); });
+    // Focus le bouton annuler pour éviter les suppressions accidentelles
+    overlay.querySelector('.confirm-cancel').focus();
+  });
+}
 
 // ─── Toast ────────────────────────────────────────────────────────────────
 
@@ -140,8 +190,30 @@ async function init() {
   buildSelects();
   wireEvents();
   wireDrilldownEvents();
-  await Promise.all([refreshDates(), loadEntities(), loadHistorique()]);
+  // Précharger targets et alertes depuis la DB
+  await Promise.all([refreshDates(), loadEntities(), loadHistorique(), loadTargets(), loadUserAlertsAsync()]);
+  // Migration automatique : si localStorage a des données et pas la DB, pousser vers la DB
+  await migrateLocalStorageToDB();
   await switchTab('synthese');
+}
+
+async function migrateLocalStorageToDB() {
+  // Targets
+  const lsTargets = localStorage.getItem('patrimoine_targets');
+  if (lsTargets && (!_targetsCache || Object.keys(_targetsCache).length === 0)) {
+    try {
+      const parsed = JSON.parse(lsTargets);
+      if (Object.keys(parsed).length > 0) await saveTargets(parsed);
+    } catch {}
+  }
+  // Alerts
+  const lsAlerts = localStorage.getItem('patrimoine_alerts');
+  if (lsAlerts && (!_alertsCache || _alertsCache.length === 0)) {
+    try {
+      const parsed = JSON.parse(lsAlerts);
+      if (parsed.length > 0) await saveUserAlerts(parsed);
+    } catch {}
+  }
 }
 
 function buildSelects() {
@@ -220,13 +292,51 @@ function wireEvents() {
   // Positions tree search
   document.getElementById('pos-tree-search').addEventListener('input', e => treeFilter('positions-tree-body', e.target.value));
 
-  // Positions tree expand/collapse
-  document.getElementById('pos-tree-expand').addEventListener('click',    () => treeExpandCollapse('positions-tree-body', true));
-  document.getElementById('pos-tree-collapse').addEventListener('click',   () => treeExpandCollapse('positions-tree-body', false));
-  document.getElementById('pos-etabl-expand').addEventListener('click',   () => treeExpandCollapse('positions-tree-body', true,  'tree-etabl'));
-  document.getElementById('pos-etabl-collapse').addEventListener('click',  () => treeExpandCollapse('positions-tree-body', false, 'tree-etabl'));
-  document.getElementById('pos-env-expand').addEventListener('click',     () => treeExpandCollapse('positions-tree-body', true,  'tree-env'));
-  document.getElementById('pos-env-collapse').addEventListener('click',    () => treeExpandCollapse('positions-tree-body', false, 'tree-env'));
+  // Positions tree depth bar (expand/collapse)
+  const depthBar = document.querySelector('.tree-depth-bar');
+  if (depthBar) depthBar.addEventListener('click', e => {
+    const btn = e.target.closest('.tree-depth-btn');
+    if (!btn) return;
+    const depth = btn.dataset.depth;
+    const cid = 'positions-tree-body';
+    const container = document.getElementById(cid);
+    if (!container) return;
+
+    // Update active state
+    depthBar.querySelectorAll('.tree-depth-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    // Collapse everything first, then expand to the requested depth
+    treeExpandCollapse(cid, false);
+    const levels = ['tree-owner', 'tree-etabl', 'tree-env'];
+    const depthIndex = { owner: 0, etabl: 1, env: 2, all: 3 }[depth] ?? 3;
+    for (let i = 0; i < Math.min(depthIndex, levels.length); i++) {
+      treeExpandCollapse(cid, true, levels[i]);
+    }
+    if (depthIndex >= levels.length) {
+      treeExpandCollapse(cid, true);
+    }
+  });
+
+  // Settings gear menu
+  const settingsToggle = document.getElementById('settings-toggle');
+  const settingsDropdown = document.getElementById('settings-dropdown');
+  if (settingsToggle && settingsDropdown) {
+    settingsToggle.addEventListener('click', e => {
+      e.stopPropagation();
+      settingsDropdown.classList.toggle('hidden');
+    });
+    settingsDropdown.addEventListener('click', e => {
+      const item = e.target.closest('.settings-item');
+      if (!item) return;
+      switchTab(item.dataset.tab);
+    });
+    document.addEventListener('click', e => {
+      if (!e.target.closest('#settings-menu')) {
+        settingsDropdown.classList.add('hidden');
+      }
+    });
+  }
 
   // Synthèse — évolution groupée
   document.getElementById('synthese-history-group').addEventListener('change', renderSyntheseHistory);
@@ -326,7 +436,12 @@ async function switchTab(tab) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
   document.getElementById(`tab-${tab}`).classList.remove('hidden');
-  document.querySelector(`.tab-btn[data-tab="${tab}"]`).classList.add('active');
+  const mainBtn = document.querySelector(`.nav-tabs .tab-btn[data-tab="${tab}"]`);
+  if (mainBtn) mainBtn.classList.add('active');
+
+  // Close settings dropdown when switching tabs
+  const dd = document.getElementById('settings-dropdown');
+  if (dd) dd.classList.add('hidden');
 
   if (tab === 'synthese')    await loadSynthese();
   if (tab === 'positions')   await loadPositions();
@@ -391,10 +506,10 @@ function renderSynthese() {
         net:   totals_by_owner[owner]?.net        || 0,
         mob:   totals_by_owner[owner]?.mobilizable|| 0 };
 
-  document.getElementById('kpi-net').textContent         = fmt(kpi.net);
-  document.getElementById('kpi-gross').textContent       = fmt(kpi.gross);
-  document.getElementById('kpi-debt').textContent        = fmt(kpi.debt);
-  document.getElementById('kpi-mobilizable').textContent = fmt(kpi.mob);
+  document.getElementById('kpi-net').innerHTML         = fmt(kpi.net) + kpiDelta(syn.variation, 'net_delta', 'net_pct');
+  document.getElementById('kpi-gross').innerHTML       = fmt(kpi.gross) + kpiDelta(syn.variation, 'gross_delta');
+  document.getElementById('kpi-debt').innerHTML        = fmt(kpi.debt) + kpiDelta(syn.variation, 'debt_delta', null, { invert: true });
+  document.getElementById('kpi-mobilizable').innerHTML = fmt(kpi.mob) + kpiDelta(syn.variation, 'mob_delta');
 
   // Adapter les libellés KPI selon le filtre personne
   document.getElementById('kpi-net-label').textContent   = isFamily ? 'Patrimoine net famille' : `Patrimoine net — ${owner}`;
@@ -438,8 +553,10 @@ function renderSynthese() {
 
 function renderOwnersTable(byOwner, family, totalMob) {
   const activeOwner = S.syntheseOwner;
+  const familyNet = family.net || 0;
   const rows = S.config.owners.map(o => {
     const t = byOwner[o] || { gross: 0, debt: 0, net: 0, mobilizable: 0 };
+    const pct = familyNet !== 0 ? ((t.net / familyNet) * 100).toFixed(1) : '—';
     const highlight = (activeOwner !== 'Famille' && activeOwner === o)
       ? ' style="background:var(--primary-light);font-weight:700"' : '';
     return `<tr class="clickable" data-dd-owner="${esc(o)}"${highlight}>
@@ -447,6 +564,7 @@ function renderOwnersTable(byOwner, family, totalMob) {
       <td>${fmt(t.gross)}</td>
       <td class="${t.debt > 0 ? 'neg' : ''}">${t.debt > 0 ? fmt(t.debt) : '—'}</td>
       <td class="${t.net < 0 ? 'neg' : 'pos'}">${fmt(t.net)}</td>
+      <td style="text-align:right;font-size:12px;color:var(--text-muted)">${pct !== '—' ? pct + '\u202f%' : '—'}</td>
       <td>${fmt(t.mobilizable)}</td>
     </tr>`;
   }).join('');
@@ -454,7 +572,7 @@ function renderOwnersTable(byOwner, family, totalMob) {
   document.getElementById('owners-table').innerHTML = `
     <table class="owners-table">
       <thead><tr>
-        <th>Personne</th><th>Actifs</th><th>Dettes</th><th>Net</th><th>Mobilisable</th>
+        <th>Personne</th><th>Actifs</th><th>Dettes</th><th>Net</th><th>% du total</th><th>Mobilisable</th>
       </tr></thead>
       <tbody>${rows}</tbody>
       <tfoot><tr class="total-row clickable" data-dd-owner="Famille">
@@ -462,6 +580,7 @@ function renderOwnersTable(byOwner, family, totalMob) {
         <td>${fmt(family.gross)}</td>
         <td class="${family.debt > 0 ? 'neg' : ''}">${family.debt > 0 ? fmt(family.debt) : '—'}</td>
         <td class="${family.net < 0 ? 'neg' : 'pos'}">${fmt(family.net)}</td>
+        <td style="text-align:right;font-size:12px;color:var(--text-muted)">100\u202f%</td>
         <td>${fmt(totalMob)}</td>
       </tr></tfoot>
     </table>`;
@@ -726,9 +845,35 @@ function evalUserAlerts() {
   }).join('');
 }
 
-const ALERTS_KEY = 'patrimoine_alerts';
-function loadUserAlerts()  { try { return JSON.parse(localStorage.getItem(ALERTS_KEY)) || []; } catch { return []; } }
-function saveUserAlerts(a) { localStorage.setItem(ALERTS_KEY, JSON.stringify(a)); }
+// ─── Alertes (DB-backed) ─────────────────────────────────────────────────
+
+let _alertsCache = null;
+
+async function loadUserAlertsAsync() {
+  if (_alertsCache !== null) return _alertsCache;
+  try {
+    _alertsCache = await api('GET', '/api/alerts');
+    if (!Array.isArray(_alertsCache)) _alertsCache = [];
+  } catch {
+    try { _alertsCache = JSON.parse(localStorage.getItem('patrimoine_alerts')) || []; } catch { _alertsCache = []; }
+  }
+  return _alertsCache;
+}
+
+function loadUserAlerts() {
+  // Retour synchrone du cache (chargé à l'init)
+  return _alertsCache || [];
+}
+
+async function saveUserAlerts(a) {
+  _alertsCache = a;
+  try {
+    await api('PUT', '/api/alerts', a);
+    localStorage.removeItem('patrimoine_alerts');
+  } catch {
+    localStorage.setItem('patrimoine_alerts', JSON.stringify(a));
+  }
+}
 
 function renderEntitiesSynthese() {
   const card = document.getElementById('entities-synthese-card');
@@ -893,6 +1038,7 @@ function renderPosViewToggle() {
     const btn = e.target.closest('.view-toggle-btn');
     if (!btn) return;
     S.positionsView = btn.dataset.view;
+    localStorage.setItem('financy_positionsView', S.positionsView);
     renderPositions();
   });
   // Insérer dans la barre d'actions, après le bouton dupliquer
@@ -1389,8 +1535,11 @@ async function savePosition(e) {
 }
 
 async function deletePosition(id) {
-  if (!confirm('Supprimer cette position ?')) return;
+  const pos = S.positions.find(p => p.id === id);
+  const label = pos ? `${pos.category} — ${pos.owner}` : `Position #${id}`;
+  if (!await confirmDialog('Supprimer la position ?', `<strong>${esc(label)}</strong><br>Cette action est irréversible.`)) return;
   await api('DELETE', `/api/positions/${id}`);
+  toast('Position supprimée');
   await loadPositions();
   await loadSynthese();
   await loadHistorique();
@@ -1546,8 +1695,11 @@ async function saveFlux(e) {
 }
 
 async function deleteFlux(id) {
-  if (!confirm('Supprimer ce flux ?')) return;
+  const f = S.flux.find(x => x.id === id);
+  const label = f ? `${f.type || 'Flux'} — ${fmt(f.amount)} (${f.owner})` : `Flux #${id}`;
+  if (!await confirmDialog('Supprimer ce flux ?', `<strong>${esc(label)}</strong><br>Cette action est irréversible.`)) return;
   await api('DELETE', `/api/flux/${id}`);
+  toast('Flux supprimé');
   await loadFlux();
 }
 
@@ -1591,7 +1743,7 @@ async function importJson() {
 
     // Restaurer les allocations cibles si présentes
     if (data.allocation_targets && typeof data.allocation_targets === 'object') {
-      saveTargets(data.allocation_targets);
+      await saveTargets(data.allocation_targets);
     }
 
     const result = await api('POST', '/api/import-json', data);
@@ -1615,7 +1767,11 @@ function showJsonImportResult(msg, ok) {
 }
 
 async function resetDb() {
-  if (!confirm('Vider TOUTE la base ?\n\nPositions, flux et entités seront supprimés définitivement.')) return;
+  if (!await confirmDialog(
+    'Vider TOUTE la base ?',
+    'Positions, flux et entités seront supprimés <strong>définitivement</strong>.<br>Faites un export JSON avant si vous souhaitez conserver vos données.',
+    { confirmText: 'Tout supprimer', danger: true }
+  )) return;
   await api('POST', '/api/reset');
   S.dates = []; S.syntheseDate = null; S.positionsDate = null;
   S.positions = []; S.flux = []; S.entities = []; S.historique = [];
@@ -1631,7 +1787,7 @@ async function resetDb() {
 
 async function exportJson() {
   const data = await api('GET', '/api/export');
-  data.allocation_targets = loadTargets();  // inclure les cibles localStorage
+  data.allocation_targets = await loadTargets();
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
@@ -1649,33 +1805,50 @@ function closeModal(id) {
 
 // ─── Allocation cible ─────────────────────────────────────────────────────
 
-const TARGETS_KEY = 'patrimoine_targets';
+// ─── Allocation cible (DB-backed) ────────────────────────────────────────
 
-function loadTargets() {
-  try { return JSON.parse(localStorage.getItem(TARGETS_KEY)) || {}; } catch { return {}; }
+let _targetsCache = null;
+
+async function loadTargets() {
+  if (_targetsCache !== null) return _targetsCache;
+  try {
+    _targetsCache = await api('GET', '/api/targets');
+  } catch {
+    // Fallback localStorage pour migration
+    try { _targetsCache = JSON.parse(localStorage.getItem('patrimoine_targets')) || {}; } catch { _targetsCache = {}; }
+  }
+  return _targetsCache;
 }
 
-function saveTargets(targets) {
-  localStorage.setItem(TARGETS_KEY, JSON.stringify(targets));
+async function saveTargets(targets) {
+  _targetsCache = targets;
+  try {
+    await api('PUT', '/api/targets', targets);
+    // Nettoyer localStorage après migration réussie
+    localStorage.removeItem('patrimoine_targets');
+  } catch {
+    // Fallback localStorage
+    localStorage.setItem('patrimoine_targets', JSON.stringify(targets));
+  }
 }
 
 function wireTargetsEvents() {
   document.getElementById('btn-edit-targets').addEventListener('click', openTargetsModal);
-  document.getElementById('btn-save-targets').addEventListener('click', () => {
+  document.getElementById('btn-save-targets').addEventListener('click', async () => {
     const targets = {};
     document.querySelectorAll('.target-input').forEach(inp => {
       const val = parseFloat(inp.value);
       if (!isNaN(val) && val > 0) targets[inp.dataset.cat] = val;
     });
-    saveTargets(targets);
+    await saveTargets(targets);
     closeModal('targets-modal');
     renderAllocationTargets();
   });
   document.getElementById('targets-modal-overlay').addEventListener('click', () => closeModal('targets-modal'));
 }
 
-function openTargetsModal() {
-  const targets = loadTargets();
+async function openTargetsModal() {
+  const targets = await loadTargets();
   document.getElementById('targets-form-grid').innerHTML =
     S.config.categories.map(cat => `
       <div class="target-row">
@@ -1687,14 +1860,14 @@ function openTargetsModal() {
   document.getElementById('targets-modal').classList.remove('hidden');
 }
 
-function renderAllocationTargets() {
+async function renderAllocationTargets() {
   const syn = S.synthese;
   if (!syn?.totals_by_category) {
     document.getElementById('allocation-targets').innerHTML =
       '<p class="text-muted" style="font-size:13px">Aucune donnée.</p>';
     return;
   }
-  const targets  = loadTargets();
+  const targets  = await loadTargets();
   const owner    = S.syntheseOwner;
   const isFamily = owner === 'Famille';
   const totalNet = isFamily
@@ -1752,40 +1925,52 @@ async function renderPerf() {
     return;
   }
 
+  const owner    = S.syntheseOwner;
+  const isFamily = owner === 'Famille';
+
+  const netOf = h => isFamily ? h.family_net : (h.by_owner?.[owner] || 0);
+
   const last  = hist[hist.length - 1];
   const first = hist[0];
   const prev  = hist[hist.length - 2];
 
-  const variation = (curr, ref) => ref.family_net !== 0
-    ? ((curr.family_net - ref.family_net) / Math.abs(ref.family_net)) * 100
+  const lastNet  = netOf(last);
+  const firstNet = netOf(first);
+  const prevNet  = netOf(prev);
+
+  const variation = (curr, ref) => ref !== 0
+    ? ((curr - ref) / Math.abs(ref)) * 100
     : null;
 
   // Flux filtrés sur la plage premier→dernier snapshot
   let fluxTotal = 0;
   try {
     const flux = await api('GET', `/api/flux?date_from=${first.date}&date_to=${last.date}`);
-    fluxTotal = flux.reduce((s, f) => s + (f.amount || 0), 0);
+    const filtered = isFamily ? flux : flux.filter(f => f.owner === owner);
+    fluxTotal = filtered.reduce((s, f) => s + (f.amount || 0), 0);
   } catch {}
 
-  const totalGain = last.family_net - first.family_net - fluxTotal;
-  const varLast   = variation(last, prev);
-  const varTotal  = variation(last, first);
+  const totalGain = lastNet - firstNet - fluxTotal;
+  const varLast   = variation(lastNet, prevNet);
+  const varTotal  = variation(lastNet, firstNet);
+
+  const perfLabel = isFamily ? '' : ` — ${owner}`;
 
   el.innerHTML = `<div class="perf-grid">
     <div class="perf-row">
-      <span class="perf-label">${fmtDate(prev.date)} → ${fmtDate(last.date)}</span>
+      <span class="perf-label">${fmtDate(prev.date)} → ${fmtDate(last.date)}${perfLabel}</span>
       <span class="perf-val ${varLast >= 0 ? 'pos' : 'neg'}">${varLast != null ? (varLast > 0 ? '+' : '') + varLast.toFixed(2) + ' %' : '—'}</span>
     </div>
     <div class="perf-row">
-      <span class="perf-label">Depuis le début (${fmtDate(first.date)})</span>
+      <span class="perf-label">Depuis le début (${fmtDate(first.date)})${perfLabel}</span>
       <span class="perf-val ${varTotal >= 0 ? 'pos' : 'neg'}">${varTotal != null ? (varTotal > 0 ? '+' : '') + varTotal.toFixed(2) + ' %' : '—'}</span>
     </div>
     <div class="perf-row">
-      <span class="perf-label">Gain / perte hors flux</span>
+      <span class="perf-label">Gain / perte hors flux${perfLabel}</span>
       <span class="perf-val ${totalGain >= 0 ? 'pos' : 'neg'}">${(totalGain >= 0 ? '+' : '') + fmt(totalGain)}</span>
     </div>
     <div class="perf-row">
-      <span class="perf-label">Flux cumulés (${fmtDate(first.date)} → ${fmtDate(last.date)})</span>
+      <span class="perf-label">Flux cumulés (${fmtDate(first.date)} → ${fmtDate(last.date)})${perfLabel}</span>
       <span class="perf-val">${fmt(fluxTotal)}</span>
     </div>
   </div>`;
@@ -2225,7 +2410,7 @@ function showEntitySnapshots(entityName) {
   document.getElementById('snap-hist-table').addEventListener('click', async ev => {
     const btn = ev.target.closest('[data-action="del-snap"]');
     if (!btn) return;
-    if (!confirm('Supprimer cette valorisation historique ?')) return;
+    if (!await confirmDialog('Supprimer cette valorisation ?', 'Cette entrée historique sera supprimée définitivement.')) return;
     await api('DELETE', `/api/entity-snapshots/${btn.dataset.sid}`);
     S.entitySnapshots = S.entitySnapshots.filter(s => s.id !== parseInt(btn.dataset.sid));
     showEntitySnapshots(entityName); // refresh panel
@@ -2299,8 +2484,13 @@ async function saveEntity(e) {
 
 async function deleteEntity(id) {
   const e = S.entities.find(x => x.id === id);
-  if (!confirm(`Supprimer l'entité "${e?.name}" ?\nLes positions liées ne seront pas supprimées.`)) return;
+  const name = e?.name || `Entité #${id}`;
+  if (!await confirmDialog(
+    `Supprimer l'entité ?`,
+    `<strong>${esc(name)}</strong><br>Les positions liées ne seront pas supprimées, mais ne pourront plus résoudre la valeur de cette entité.`
+  )) return;
   await api('DELETE', `/api/entities/${id}`);
+  toast('Entité supprimée');
   await loadEntities();
   refreshEntitySelect();
 }
@@ -2638,7 +2828,11 @@ async function saveReferential() {
 }
 
 async function resetReferential() {
-  if (!confirm('Remettre le référentiel aux valeurs par défaut ?')) return;
+  if (!await confirmDialog(
+    'Réinitialiser le référentiel ?',
+    'Toutes vos personnalisations (propriétaires, catégories, enveloppes) seront remplacées par les valeurs par défaut.',
+    { confirmText: 'Réinitialiser', danger: true }
+  )) return;
   await api('PUT', '/api/referential', {
     owners: ['Julien', 'Perrine', 'Adriel', 'Aloïs'],
     categories: ['Cash & dépôts','Monétaire','Obligations','Actions','Immobilier','SCPI','Fond Euro','Produits Structurés','Crypto','Objets de valeur','Autre'],
@@ -2654,6 +2848,35 @@ async function resetReferential() {
   renderReferential();
 }
 
+// ─── Dark mode ────────────────────────────────────────────────────────────
+
+function initTheme() {
+  const saved = localStorage.getItem('financy_theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const theme = saved || (prefersDark ? 'dark' : 'light');
+  applyTheme(theme);
+
+  document.getElementById('theme-toggle')?.addEventListener('click', () => {
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    localStorage.setItem('financy_theme', next);
+  });
+}
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.textContent = theme === 'dark' ? '\u2600' : '\u263E';
+}
+
+// Appliquer immédiatement pour éviter le flash
+(function() {
+  const saved = localStorage.getItem('financy_theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.dataset.theme = saved || (prefersDark ? 'dark' : 'light');
+})();
+
 // ─── Boot ─────────────────────────────────────────────────────────────────
 
+initTheme();
 init().catch(err => console.error('Init error:', err));
