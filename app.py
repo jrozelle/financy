@@ -4,6 +4,7 @@ import sqlite3
 import json
 import os
 import re
+import secrets
 from datetime import datetime
 from contextlib import contextmanager
 from io import BytesIO
@@ -41,6 +42,24 @@ def login_page():
 def logout():
     session.pop('authenticated', None)
     return redirect(url_for('login_page'))
+
+
+# ─── CSRF Protection ────────────────────────────────────────────────────────
+
+@app.before_request
+def ensure_csrf_token():
+    if 'csrf_token' not in session:
+        session['csrf_token'] = secrets.token_hex(32)
+
+def csrf_protect(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if request.method in ('POST', 'PUT', 'DELETE'):
+            token = request.headers.get('X-CSRF-Token', '')
+            if not token or token != session.get('csrf_token'):
+                return jsonify({'error': 'CSRF token invalide'}), 403
+        return f(*args, **kwargs)
+    return decorated
 
 
 # ─── Validation ───────────────────────────────────────────────────────────────
@@ -307,7 +326,13 @@ def get_entity_map(conn, date=None):
 @app.route('/')
 @login_required
 def index():
-    return render_template('index.html', has_auth=bool(AUTH_PASSWORD))
+    return render_template('index.html', has_auth=bool(AUTH_PASSWORD), csrf_token=session.get('csrf_token', ''))
+
+
+@app.route('/api/csrf-token')
+@login_required
+def get_csrf_token():
+    return jsonify({'token': session.get('csrf_token', '')})
 
 
 @app.route('/api/config')
@@ -363,6 +388,7 @@ def get_positions():
 
 @app.route('/api/positions', methods=['POST'])
 @login_required
+@csrf_protect
 def add_position():
     d = request.json
     if not d or not validate_date(d.get('date')):
@@ -401,6 +427,7 @@ def add_position():
 
 @app.route('/api/positions/<int:pid>', methods=['PUT'])
 @login_required
+@csrf_protect
 def update_position(pid):
     d = request.json
     if not d or not validate_date(d.get('date')):
@@ -436,6 +463,7 @@ def update_position(pid):
 
 @app.route('/api/positions/<int:pid>', methods=['DELETE'])
 @login_required
+@csrf_protect
 def delete_position(pid):
     with get_db() as conn:
         conn.execute('DELETE FROM positions WHERE id=?', (pid,))
@@ -462,6 +490,7 @@ def get_flux():
 
 @app.route('/api/flux', methods=['POST'])
 @login_required
+@csrf_protect
 def add_flux():
     d = request.json
     if not d or not validate_date(d.get('date')):
@@ -482,6 +511,7 @@ def add_flux():
 
 @app.route('/api/flux/<int:fid>', methods=['PUT'])
 @login_required
+@csrf_protect
 def update_flux(fid):
     d = request.json
     if not d or not validate_date(d.get('date')):
@@ -500,6 +530,7 @@ def update_flux(fid):
 
 @app.route('/api/flux/<int:fid>', methods=['DELETE'])
 @login_required
+@csrf_protect
 def delete_flux(fid):
     with get_db() as conn:
         conn.execute('DELETE FROM flux WHERE id=?', (fid,))
@@ -665,6 +696,7 @@ def get_entities():
 
 @app.route('/api/entities', methods=['POST'])
 @login_required
+@csrf_protect
 def add_entity():
     d = request.json
     if not d or not d.get('name') or not validate_string(d.get('name'), 200):
@@ -694,6 +726,7 @@ def add_entity():
 
 @app.route('/api/entities/<int:eid>', methods=['PUT'])
 @login_required
+@csrf_protect
 def update_entity(eid):
     d = request.json
     if not d or not d.get('name'):
@@ -723,6 +756,7 @@ def update_entity(eid):
 
 @app.route('/api/entities/<int:eid>', methods=['DELETE'])
 @login_required
+@csrf_protect
 def delete_entity(eid):
     with get_db() as conn:
         name = conn.execute('SELECT name FROM entities WHERE id=?', (eid,)).fetchone()
@@ -736,6 +770,7 @@ def delete_entity(eid):
 
 @app.route('/api/import', methods=['POST'])
 @login_required
+@csrf_protect
 def import_xlsx():
     if 'file' not in request.files:
         return jsonify({'error': 'Aucun fichier reçu'}), 400
@@ -875,6 +910,7 @@ def import_xlsx():
 
 @app.route('/api/positions/<int:pid>/snapshot-update', methods=['POST'])
 @login_required
+@csrf_protect
 def snapshot_update(pid):
     """
     Crée un nouveau snapshot à target_date en copiant toutes les positions
@@ -948,6 +984,7 @@ def snapshot_update(pid):
 
 @app.route('/api/import-json', methods=['POST'])
 @login_required
+@csrf_protect
 def import_json():
     data = request.json
     if not data:
@@ -1036,6 +1073,7 @@ def get_entity_snapshots():
 
 @app.route('/api/entity-snapshots/<int:sid>', methods=['DELETE'])
 @login_required
+@csrf_protect
 def delete_entity_snapshot(sid):
     with get_db() as conn:
         conn.execute('DELETE FROM entity_snapshots WHERE id=?', (sid,))
@@ -1044,6 +1082,7 @@ def delete_entity_snapshot(sid):
 
 @app.route('/api/reset', methods=['POST'])
 @login_required
+@csrf_protect
 def reset_db():
     with get_db() as conn:
         conn.executescript(
@@ -1098,6 +1137,7 @@ def get_targets():
 
 @app.route('/api/targets', methods=['PUT'])
 @login_required
+@csrf_protect
 def save_targets():
     data = request.json
     if not isinstance(data, dict):
@@ -1127,6 +1167,7 @@ def get_alerts():
 
 @app.route('/api/alerts', methods=['PUT'])
 @login_required
+@csrf_protect
 def save_alerts_api():
     data = request.json
     if not isinstance(data, list):
@@ -1149,6 +1190,7 @@ def get_referential_api():
 
 @app.route('/api/referential', methods=['PUT'])
 @login_required
+@csrf_protect
 def save_referential():
     data = request.json
     required = ['owners', 'categories', 'category_mobilizable', 'envelope_meta']

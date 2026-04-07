@@ -17,6 +17,13 @@
   --radius:        8px;
   --shadow:        0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
   --shadow-md:     0 4px 6px -1px rgba(0,0,0,.1), 0 2px 4px -2px rgba(0,0,0,.1);
+  --chart-1:  #2563eb;  --chart-2:  #7c3aed;  --chart-3:  #db2777;
+  --chart-4:  #dc2626;  --chart-5:  #ea580c;  --chart-6:  #d97706;
+  --chart-7:  #65a30d;  --chart-8:  #16a34a;  --chart-9:  #0891b2;
+  --chart-10: #0284c7;  --chart-11: #4f46e5;
+  --chart-border: #ffffff;
+  --chart-family: #111827;
+  --chart-family-bg: rgba(17,24,39,.06);
   color-scheme: light dark;
 }
 
@@ -38,6 +45,14 @@
   --card-hover:    #263548;
   --shadow:        0 1px 3px rgba(0,0,0,.3);
   --shadow-md:     0 4px 6px -1px rgba(0,0,0,.4);
+  /* Catppuccin Mocha */
+  --chart-1:  #89b4fa;  --chart-2:  #cba6f7;  --chart-3:  #f5c2e7;
+  --chart-4:  #eba0ac;  --chart-5:  #fab387;  --chart-6:  #f9e2af;
+  --chart-7:  #a6e3a1;  --chart-8:  #94e2d5;  --chart-9:  #89dceb;
+  --chart-10: #74c7ec;  --chart-11: #b4befe;
+  --chart-border: #313244;
+  --chart-family: #cdd6f4;
+  --chart-family-bg: rgba(205,214,244,.08);
 }
 
 /* ── Reset ─────────────────────────────────────────────────────────────── */
