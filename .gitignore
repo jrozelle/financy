@@ -1,0 +1,32 @@
+# Base de données — NE JAMAIS POUSSER
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+venv/
+.venv/
+env/
+*.egg-info/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE / outils
+.claude/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Données personnelles / imports
+*.xlsx
+*.csv
+
+# Logs
+*.log

@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Patrimoine Familial</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-brand">&#9670; Patrimoine Familial</div>
+    <div class="nav-tabs">
+      <button class="tab-btn active" data-tab="synthese">Synthèse</button>
+      <button class="tab-btn" data-tab="positions">Positions</button>
+      <button class="tab-btn" data-tab="flux">Flux</button>
+      <button class="tab-btn" data-tab="entites">Entités</button>
+      <button class="tab-btn" data-tab="referentiel">Référentiel</button>
+      <button class="tab-btn" data-tab="import">Import / Export</button>
+    </div>
+  </nav>
+
+  <main>
+
+    <!-- ── SYNTHÈSE ─────────────────────────────────────────────────────── -->
+    <div id="tab-synthese" class="tab-content">
+      <div class="page-header">
+        <h1>Synthèse</h1>
+        <div class="date-selector">
+          <label>Date</label>
+          <select id="synthese-date-select"></select>
+        </div>
+      </div>
+
+      <div class="analyse-person-tabs" id="synthese-person-tabs" style="margin-bottom:1rem"></div>
+
+      <div id="entity-warnings-bar"></div>
+
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label" id="kpi-net-label">Patrimoine net famille</div>
+          <div class="kpi-value" id="kpi-net">—</div>
+        </div>
+        <div class="kpi-card kpi-gross">
+          <div class="kpi-label" id="kpi-gross-label">Actifs bruts</div>
+          <div class="kpi-value" id="kpi-gross">—</div>
+        </div>
+        <div class="kpi-card kpi-debt">
+          <div class="kpi-label" id="kpi-debt-label">Dettes</div>
+          <div class="kpi-value" id="kpi-debt">—</div>
+        </div>
+        <div class="kpi-card kpi-mobilizable">
+          <div class="kpi-label" id="kpi-mob-label">Mobilisable</div>
+          <div class="kpi-value" id="kpi-mobilizable">—</div>
+        </div>
+      </div>
+
+      <div class="charts-row">
+        <div class="card">
+          <h2>Par catégorie</h2>
+          <div class="chart-wrap"><canvas id="category-chart"></canvas></div>
+        </div>
+        <div class="card">
+          <h2>Par enveloppe</h2>
+          <div class="chart-wrap"><canvas id="synthese-env-chart"></canvas></div>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:1.25rem">
+        <h2>Par personne</h2>
+        <div id="owners-table"></div>
+      </div>
+
+      <div class="card">
+        <h2>Historique patrimoine net</h2>
+        <div class="chart-wrap-wide"><canvas id="history-chart"></canvas></div>
+      </div>
+
+      <div class="card" id="synthese-history-detail-card">
+        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:.875rem">
+          <h2 style="margin:0">Évolution par</h2>
+          <select id="synthese-history-group" class="filter-select" style="width:auto">
+            <option value="category">Catégorie</option>
+            <option value="envelope">Enveloppe</option>
+          </select>
+        </div>
+        <div class="chart-wrap-wide"><canvas id="synthese-history-detail-chart"></canvas></div>
+      </div>
+
+      <div class="charts-row">
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.875rem">
+            <h2 style="margin:0">Allocation cible vs réelle</h2>
+            <button class="btn btn-secondary btn-sm" id="btn-edit-targets">Modifier cibles</button>
+          </div>
+          <div id="allocation-targets"></div>
+        </div>
+        <div class="card">
+          <h2>Performance</h2>
+          <div id="perf-section"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Mobilisable par liquidité</h2>
+        <div id="liquidity-bars"></div>
+      </div>
+
+      <div class="card" id="entities-synthese-card" style="display:none">
+        <h2>Entités (SCI / Indivision)</h2>
+        <div id="entities-synthese"></div>
+      </div>
+    </div>
+
+    <!-- ── POSITIONS ────────────────────────────────────────────────────── -->
+    <div id="tab-positions" class="tab-content hidden">
+      <div class="page-header">
+        <h1>Positions</h1>
+        <div class="header-actions">
+          <div class="date-selector">
+            <label>Snapshot</label>
+            <select id="positions-date-select"></select>
+          </div>
+          <button class="btn btn-secondary" id="btn-duplicate">Dupliquer snapshot</button>
+          <button class="btn btn-primary" id="btn-add-position">+ Ajouter</button>
+        </div>
+      </div>
+      <div class="filters-bar" id="positions-filters">
+        <select id="filter-owner" class="filter-select">
+          <option value="">Toutes les personnes</option>
+        </select>
+        <select id="filter-envelope" class="filter-select">
+          <option value="">Toutes les enveloppes</option>
+        </select>
+        <select id="filter-establishment" class="filter-select">
+          <option value="">Tous les établissements</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" id="btn-clear-filters">Effacer filtres</button>
+      </div>
+      <div id="positions-table-wrap" class="card card-table">
+        <table class="data-table" id="positions-table">
+          <thead id="positions-thead">
+            <tr>
+              <th data-sort="owner">Propriétaire</th>
+              <th data-sort="category">Catégorie</th>
+              <th data-sort="envelope">Enveloppe</th>
+              <th data-sort="establishment">Établissement / Entité</th>
+              <th class="num" data-sort="gross_attributed">Actif attribué</th>
+              <th class="num" data-sort="debt_attributed">Dette attribuée</th>
+              <th class="num" data-sort="net_attributed">Net attribué</th>
+              <th data-sort="liquidity">Liquidité</th>
+              <th class="num" data-sort="mobilizable_value">Mobilisable</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="positions-tbody"></tbody>
+          <tfoot id="positions-tfoot"></tfoot>
+        </table>
+      </div>
+      <div id="positions-tree-wrap" class="card" style="display:none">
+        <div class="tree-toolbar">
+          <input type="search" id="pos-tree-search" class="tree-search-input" placeholder="Rechercher…">
+          <span class="tree-toolbar-sep"></span>
+          <span class="tree-toolbar-label">Tout :</span>
+          <button class="btn btn-secondary btn-sm" id="pos-tree-expand">Déplier</button>
+          <button class="btn btn-secondary btn-sm" id="pos-tree-collapse">Replier</button>
+          <span class="tree-toolbar-sep"></span>
+          <span class="tree-toolbar-label">Établissements :</span>
+          <button class="btn btn-secondary btn-sm" id="pos-etabl-expand">Déplier</button>
+          <button class="btn btn-secondary btn-sm" id="pos-etabl-collapse">Replier</button>
+          <span class="tree-toolbar-sep"></span>
+          <span class="tree-toolbar-label">Enveloppes :</span>
+          <button class="btn btn-secondary btn-sm" id="pos-env-expand">Déplier</button>
+          <button class="btn btn-secondary btn-sm" id="pos-env-collapse">Replier</button>
+        </div>
+        <div id="positions-tree-body"></div>
+      </div>
+    </div>
+
+    <!-- ── FLUX ─────────────────────────────────────────────────────────── -->
+    <div id="tab-flux" class="tab-content hidden">
+      <div class="page-header">
+        <h1>Flux externes</h1>
+        <button class="btn btn-primary" id="btn-add-flux">+ Ajouter</button>
+      </div>
+      <div class="filters-bar">
+        <select id="flux-filter-owner" class="filter-select"><option value="">Toutes les personnes</option></select>
+        <select id="flux-filter-type"  class="filter-select"><option value="">Tous les types</option></select>
+        <select id="flux-filter-year"  class="filter-select"><option value="">Toutes les années</option></select>
+        <button class="btn btn-secondary btn-sm" id="btn-clear-flux-filters">Effacer filtres</button>
+      </div>
+      <div class="card card-table">
+        <table class="data-table">
+          <thead id="flux-thead">
+            <tr>
+              <th data-sort="date">Date</th>
+              <th data-sort="owner">Propriétaire</th>
+              <th data-sort="envelope">Enveloppe</th>
+              <th data-sort="type">Type</th>
+              <th class="num" data-sort="amount">Montant</th>
+              <th>Notes</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="flux-tbody"></tbody>
+          <tfoot id="flux-tfoot"></tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── ENTITÉS ──────────────────────────────────────────────────────── -->
+    <div id="tab-entites" class="tab-content hidden">
+      <div class="page-header">
+        <h1>Entités (SCI / Indivision)</h1>
+        <button class="btn btn-primary" id="btn-add-entity">+ Ajouter</button>
+      </div>
+      <div class="card card-table">
+        <table class="data-table">
+          <thead id="entities-thead">
+            <tr>
+              <th data-sort="name">Nom</th>
+              <th data-sort="type">Type</th>
+              <th data-sort="valuation_mode">Valorisation</th>
+              <th class="num" data-sort="gross_assets">Actif brut</th>
+              <th class="num" data-sort="debt">Dette</th>
+              <th class="num" data-sort="net_assets">Actif net</th>
+              <th>Détenteurs (dernier snapshot)</th>
+              <th>Commentaire</th>
+              <th>Historique</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="entities-tbody"></tbody>
+        </table>
+      </div>
+      <div class="card" style="max-width:680px">
+        <h2>Comment utiliser les entités ?</h2>
+        <p class="text-muted" style="font-size:13px;line-height:1.7">
+          Crée ici une SCI ou indivision avec sa valeur globale et sa dette.<br>
+          Ensuite dans <strong>Positions</strong>, sélectionne l'entité et renseigne
+          le <strong>% de propriété</strong> de chaque personne.<br>
+          Le net attribué = <em>(Actif brut × % propriété) – (Dette × % dette)</em>.
+        </p>
+      </div>
+    </div>
+
+    <!-- ── RÉFÉRENTIEL ───────────────────────────────────────────────────── -->
+    <div id="tab-referentiel" class="tab-content hidden">
+      <div class="page-header">
+        <h1>Référentiel</h1>
+        <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
+          <div id="ref-save-status" style="font-size:13px"></div>
+          <button class="btn btn-secondary" id="btn-reset-referential">Réinitialiser</button>
+          <button class="btn btn-primary"   id="btn-save-referential">Enregistrer le référentiel</button>
+        </div>
+      </div>
+      <p class="text-muted" style="margin-bottom:1.25rem;font-size:13px">
+        Modifiez les listes et valeurs utilisées dans toute l'application. Les changements prennent effet après enregistrement.
+      </p>
+
+      <div class="two-col">
+        <div class="card">
+          <h2>Propriétaires</h2>
+          <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
+            Personnes dont les patrimoines sont suivis. Une suppression n'efface pas les positions existantes.
+          </p>
+          <div id="ref-owners-chips"></div>
+        </div>
+        <div class="card">
+          <h2>Types d'entités</h2>
+          <div id="ref-entity-types" style="margin-bottom:1.25rem"></div>
+          <h2>Modes de valorisation <span class="text-muted" style="font-size:11px;font-weight:400">(label documentaire)</span></h2>
+          <div id="ref-valuation-modes" style="margin-bottom:1.25rem"></div>
+          <h2>Types de flux</h2>
+          <div id="ref-flux-types"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Catégories d'actifs &amp; mobilisabilité</h2>
+        <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
+          Le % mobilisable est appliqué au net attribué positif pour estimer la liquidité disponible par catégorie.
+        </p>
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead><tr>
+              <th>Catégorie</th>
+              <th class="num">% Mobilisable</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="ref-categories-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Alertes</h2>
+        <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
+          Affichées dans Synthèse quand le seuil est franchi. Stockées localement dans votre navigateur.
+        </p>
+        <div id="ref-alerts-list" style="margin-bottom:.75rem"></div>
+        <button class="btn btn-secondary btn-sm" id="btn-add-alert">+ Ajouter une alerte</button>
+      </div>
+
+      <div class="card">
+        <h2>Enveloppes &amp; liquidité</h2>
+        <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
+          La liquidité détermine la classe d'horizon de disponibilité. La friction indique les contraintes de sortie (fiscale, frais, décote probable…).
+        </p>
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead><tr>
+              <th>Enveloppe</th>
+              <th>Liquidité</th>
+              <th>Friction</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="ref-envelopes-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── IMPORT / EXPORT ──────────────────────────────────────────────── -->
+    <div id="tab-import" class="tab-content hidden">
+      <div class="page-header"><h1>Import / Export</h1></div>
+      <div class="two-col">
+
+        <div class="card">
+          <h2>Importer depuis Excel</h2>
+          <p class="text-muted" style="margin-bottom:1rem">
+            Importe les onglets <strong>Positions</strong> et <strong>Flux</strong>
+            depuis ton fichier <code>.xlsx</code>.<br>
+            Les données existantes ne sont pas effacées.
+          </p>
+          <div class="form-group">
+            <label>Fichier .xlsx</label>
+            <input type="file" id="import-file" accept=".xlsx">
+          </div>
+          <button class="btn btn-primary" id="btn-import" style="margin-top:.75rem">Importer</button>
+          <div id="import-result" style="margin-top:1rem"></div>
+        </div>
+
+        <div class="card">
+          <h2>Importer depuis JSON</h2>
+          <p class="text-muted" style="margin-bottom:1rem">
+            Restaure un export JSON précédent. Les positions déjà présentes ne sont pas dupliquées.<br>
+            Les allocations cibles sont restaurées si incluses.
+          </p>
+          <div class="form-group">
+            <label>Fichier .json</label>
+            <input type="file" id="import-json-file" accept=".json">
+          </div>
+          <button class="btn btn-primary" id="btn-import-json" style="margin-top:.75rem">Importer JSON</button>
+          <div id="import-json-result" style="margin-top:1rem"></div>
+        </div>
+
+        <div class="card">
+          <h2>Exporter en JSON</h2>
+          <p class="text-muted" style="margin-bottom:1rem">
+            Télécharge toutes tes données (positions, flux, entités, cibles) en JSON.<br>
+            Utile pour backup ou migration.
+          </p>
+          <button class="btn btn-secondary" id="btn-export">Télécharger patrimoine.json</button>
+        </div>
+
+        <div class="card" style="border: 1px solid #fca5a5">
+          <h2 style="color:var(--danger)">Zone dangereuse</h2>
+          <p class="text-muted" style="margin-bottom:1rem">
+            Supprime toutes les positions, flux et entités.<br>
+            <strong>Irréversible</strong> — fais un export JSON avant.
+          </p>
+          <button class="btn" style="background:var(--danger);color:#fff;border-color:var(--danger)" id="btn-reset">Vider la base</button>
+          <div id="reset-result" style="margin-top:.75rem"></div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ── MODAL ALLOCATION CIBLE ──────────────────────────────────────────── -->
+  <div id="targets-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-overlay" id="targets-modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Allocation cible par catégorie</h2>
+        <button class="modal-close" data-close="targets-modal">&#10005;</button>
+      </div>
+      <p class="text-muted" style="font-size:13px;margin-bottom:1rem">
+        Renseigne un % cible pour chaque catégorie (le total n'a pas besoin de faire 100 %).
+      </p>
+      <div id="targets-form-grid" class="targets-grid"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" data-close="targets-modal">Annuler</button>
+        <button type="button" class="btn btn-primary" id="btn-save-targets">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SIDE PANEL DRILL-DOWN ───────────────────────────────────────────── -->
+  <div id="drilldown-panel" class="drilldown hidden">
+    <div class="drilldown-overlay" id="drilldown-overlay"></div>
+    <div class="drilldown-content">
+      <div class="drilldown-header">
+        <div>
+          <div class="drilldown-subtitle" id="dd-subtitle"></div>
+          <h2 id="dd-title"></h2>
+          <div class="drilldown-amount" id="dd-amount"></div>
+        </div>
+        <button class="modal-close" id="dd-close">&#10005;</button>
+      </div>
+      <div id="dd-body"></div>
+    </div>
+  </div>
+
+  <!-- ── MODAL POSITION ──────────────────────────────────────────────────── -->
+  <div id="position-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-overlay" id="position-modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="position-modal-title">Ajouter une position</h2>
+        <button class="modal-close" data-close="position-modal">&#10005;</button>
+      </div>
+      <form id="position-form">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Date *</label>
+            <input type="date" id="pos-date" required>
+          </div>
+          <div class="form-group">
+            <label>Propriétaire *</label>
+            <select id="pos-owner" required></select>
+          </div>
+          <div class="form-group">
+            <label>Catégorie *</label>
+            <select id="pos-category" required></select>
+          </div>
+          <div class="form-group">
+            <label>Enveloppe</label>
+            <select id="pos-envelope"></select>
+          </div>
+          <div class="form-group">
+            <label>Établissement</label>
+            <input type="text" id="pos-establishment" placeholder="ex : Boursorama">
+          </div>
+          <div class="form-group">
+            <label>Entité (SCI / indivision)</label>
+            <select id="pos-entity-select"></select>
+          </div>
+          <div class="form-group"><!-- spacer --></div>
+          <div class="form-group">
+            <label>Valeur brute (€)</label>
+            <input type="number" id="pos-value" step="0.01" min="0" value="0">
+          </div>
+          <div class="form-group">
+            <label>Dette restante (€)</label>
+            <input type="number" id="pos-debt" step="0.01" min="0" value="0">
+          </div>
+          <div id="pos-pct-fields" style="display:none">
+          <div class="form-group">
+            <label>% propriété (0–100)</label>
+            <input type="number" id="pos-ownership" step="1" min="0" max="100" value="100">
+          </div>
+          <div class="form-group">
+            <label>% dette (0–100)</label>
+            <input type="number" id="pos-debt-pct" step="1" min="0" max="100" value="100">
+          </div>
+          </div>
+          <div class="form-group full-span">
+            <label>Notes</label>
+            <input type="text" id="pos-notes">
+          </div>
+          <div class="form-group full-span" id="pos-mob-override-row">
+            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+              <input type="checkbox" id="pos-mob-override-check">
+              Surcharger la mobilisabilité pour cette ligne
+            </label>
+            <div id="pos-mob-override-field" style="display:none;margin-top:.4rem">
+              <input type="number" id="pos-mob-override-pct" step="1" min="0" max="100" value="100" style="width:90px">
+              <span style="font-size:13px;color:var(--text-muted);margin-left:.4rem">% mobilisable (remplace le défaut de la catégorie)</span>
+            </div>
+          </div>
+        </div>
+        <div class="computed-info" id="pos-computed-info"></div>
+        <div id="pos-snapshot-option" class="snapshot-option hidden">
+          <label class="snapshot-label">
+            <input type="checkbox" id="pos-snapshot-check" checked>
+            Créer un nouveau snapshot au
+            <input type="date" id="pos-snapshot-date" style="border:1px solid var(--border);border-radius:4px;padding:.2rem .4rem;font-size:13px">
+            en copiant toutes les autres positions
+          </label>
+          <div class="snapshot-hint">Le snapshot d'origine reste intact.</div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" data-close="position-modal">Annuler</button>
+          <button type="submit" class="btn btn-primary">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── MODAL FLUX ───────────────────────────────────────────────────────── -->
+  <div id="flux-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-overlay" id="flux-modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="flux-modal-title">Ajouter un flux</h2>
+        <button class="modal-close" data-close="flux-modal">&#10005;</button>
+      </div>
+      <form id="flux-form">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Date *</label>
+            <input type="date" id="flux-date" required>
+          </div>
+          <div class="form-group">
+            <label>Propriétaire *</label>
+            <select id="flux-owner" required></select>
+          </div>
+          <div class="form-group">
+            <label>Enveloppe</label>
+            <select id="flux-envelope"></select>
+          </div>
+          <div class="form-group">
+            <label>Type</label>
+            <select id="flux-type"></select>
+          </div>
+          <div class="form-group full-span">
+            <label>Montant (€) * — positif = apport, négatif = sortie</label>
+            <input type="number" id="flux-amount" step="0.01" required placeholder="ex : 5000 ou -1200">
+          </div>
+          <div class="form-group full-span">
+            <label>Notes</label>
+            <input type="text" id="flux-notes">
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" data-close="flux-modal">Annuler</button>
+          <button type="submit" class="btn btn-primary">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── MODAL ENTITÉ ────────────────────────────────────────────────────── -->
+  <div id="entity-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-overlay" id="entity-modal-overlay"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="entity-modal-title">Ajouter une entité</h2>
+        <button class="modal-close" data-close="entity-modal">&#10005;</button>
+      </div>
+      <form id="entity-form">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Nom *</label>
+            <input type="text" id="ent-name" required placeholder="ex : SCI Famille Dupont">
+          </div>
+          <div class="form-group">
+            <label>Type</label>
+            <select id="ent-type"></select>
+          </div>
+          <div class="form-group">
+            <label>Mode de valorisation</label>
+            <select id="ent-valuation"></select>
+          </div>
+          <div class="form-group">
+            <!-- spacer -->
+          </div>
+          <div class="form-group">
+            <label>Actif brut (€)</label>
+            <input type="number" id="ent-gross" step="0.01" min="0" value="0">
+          </div>
+          <div class="form-group">
+            <label>Dette (€)</label>
+            <input type="number" id="ent-debt" step="0.01" min="0" value="0">
+          </div>
+          <div class="form-group full-span">
+            <label>Commentaire</label>
+            <input type="text" id="ent-comment">
+          </div>
+        </div>
+        <div class="computed-info" id="ent-computed-info"></div>
+        <div id="ent-retro-warning" style="display:none;margin-top:.75rem;padding:.625rem 1rem;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;font-size:12.5px;color:#166534">
+          ✓ La nouvelle valorisation sera enregistrée à la date d'aujourd'hui. Les snapshots passés conservent leurs valeurs d'origine — l'historique reste intact.
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" data-close="entity-modal">Annuler</button>
+          <button type="submit" class="btn btn-primary">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
