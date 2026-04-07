@@ -103,7 +103,7 @@ Référentiel :
 --- Sécurité ---
 
 - [x] 🔴 Auth basique : mot de passe via variable d'env (FINANCY_PASSWORD) + session Flask, page de login, bouton déconnexion
-- [ ] 🔴 Protection CSRF sur les POST/PUT/DELETE (Flask-WTF ou token custom)
+- [x] 🔴 Protection CSRF sur les POST/PUT/DELETE (Flask-WTF ou token custom)
 - [x] 🟠 Validation des inputs côté serveur (types numériques, dates ISO, longueur max, pourcentages)
 
 
@@ -119,7 +119,7 @@ Référentiel :
 
 --- Code frontend ---
 
-- [ ] 🔴 Découper app.js (~2 660 lignes) en modules ES (state.js, api.js, tabs/*.js, charts.js, utils.js) avec <script type="module">
+- [x] 🔴 Découper app.js (~2 660 lignes) en modules ES (state.js, api.js, tabs/*.js, charts.js, utils.js) avec <script type="module">
 - [ ] 🟠 Audit XSS : vérifier que esc() est utilisé partout dans innerHTML / insertAdjacentHTML
 - [x] 🟠 Migrer allocation cible de localStorage vers DB (table config) — API /api/targets GET/PUT, migration automatique au boot
 - [x] 🟡 Migrer alertes de localStorage vers DB — API /api/alerts GET/PUT, migration automatique au boot
@@ -138,6 +138,8 @@ Référentiel :
 - [x] 🟠 CSS delta dette : couleurs inversées (hausse = rouge, baisse = vert)
 - [x] 🟠 Barre de profondeur arborescence : remonter d'un niveau (Personne → Établ. → Env. → Position), ordre logique progressif
 - [x] 🟠 Persister le choix vue arborescente / tableau en localStorage
+- [x] 🟠 Revoir la palette de couleurs des graphes (surtout dark mode) — s'inspirer de Catppuccin Mocha
+- [ ] 🟠 Synthèse : harmoniser les couleurs du tableau entités (retirer le rouge sur la dette ou ajouter du vert sur les totaux positifs)
 - [ ] 🟠 Raccourcis clavier : Ctrl+N nouvelle position, Échap fermer modals, flèches naviguer entre snapshots
 - [ ] 🟡 Spinner / skeleton pendant les appels API (surtout synthèse)
 - [x] 🟡 Colonne % du total dans le tableau "Par personne"

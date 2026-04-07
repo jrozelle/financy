@@ -175,6 +175,10 @@ function updateSortIndicators(theadId, stateKey) {
 
 async function api(method, path, body = null) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (method !== 'GET') {
+    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+    if (csrfMeta) opts.headers['X-CSRF-Token'] = csrfMeta.content;
+  }
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(path, opts);
   if (res.status === 204) return null;
@@ -1711,8 +1715,11 @@ async function importXlsx() {
 
   const fd = new FormData();
   fd.append('file', file);
+  const importHeaders = {};
+  const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+  if (csrfMeta) importHeaders['X-CSRF-Token'] = csrfMeta.content;
   try {
-    const res  = await fetch('/api/import', { method: 'POST', body: fd });
+    const res  = await fetch('/api/import', { method: 'POST', body: fd, headers: importHeaders });
     const data = await res.json();
     if (res.ok) {
       const parts = [`✓ ${data.imported} position(s)`];
