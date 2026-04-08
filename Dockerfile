@@ -16,4 +16,4 @@ EXPOSE 5017
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5017/login')" || exit 1
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5017", "--workers", "2", "--timeout", "120", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5017", "--workers", "1", "--threads", "2", "--timeout", "120", "app:app"]
