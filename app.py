@@ -233,4 +233,5 @@ if __name__ == '__main__':
     debug = os.environ.get('FLASK_ENV') != 'production'
     init_db()
     logger.info('Base initialisée — http://localhost:%d (debug=%s)', port, debug)
-    app.run(debug=debug, port=port)
+    host = os.environ.get('HOST', '0.0.0.0')
+    app.run(host=host, debug=debug, port=port)
