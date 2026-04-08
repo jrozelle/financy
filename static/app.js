@@ -2841,7 +2841,7 @@ async function resetReferential() {
     { confirmText: 'Réinitialiser', danger: true }
   )) return;
   await api('PUT', '/api/referential', {
-    owners: ['Julien', 'Perrine', 'Adriel', 'Aloïs'],
+    owners: ['Personne 1', 'Personne 2', 'Personne 3', 'Personne 4'],
     categories: ['Cash & dépôts','Monétaire','Obligations','Actions','Immobilier','SCPI','Fond Euro','Produits Structurés','Crypto','Objets de valeur','Autre'],
     category_mobilizable: {'Cash & dépôts':1,'Monétaire':.95,'Obligations':.95,'Actions':.9,'Immobilier':0,'SCPI':0,'Fond Euro':.95,'Produits Structurés':0,'Crypto':.9,'Objets de valeur':0,'Autre':.8},
     envelope_meta: {'Compte courant':{liquidity:'J0–J1',friction:'Aucune'},'Livret A':{liquidity:'J2–J7',friction:'Fiscale'},'LDDS':{liquidity:'J0–J1',friction:'Aucune'},'Livret Bourso+':{liquidity:'J0–J1',friction:'Aucune'},'PEL/CEL':{liquidity:'J8–J30',friction:'Frais'},'PEA':{liquidity:'J2–J7',friction:'Fiscale'},'CTO':{liquidity:'J2–J7',friction:'Fiscale'},'Assurance-vie':{liquidity:'J8–J30',friction:'Mixte'},'PER':{liquidity:'Bloqué',friction:'Fiscale'},'Crypto':{liquidity:'J0–J1',friction:'Décote probable'},'Immobilier':{liquidity:'30J+',friction:'Mixte'},'SCI':{liquidity:'30J+',friction:'Mixte'},'Autre':{liquidity:'30J+',friction:'Mixte'}},

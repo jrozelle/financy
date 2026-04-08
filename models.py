@@ -65,7 +65,7 @@ def validate_pct(v):
 
 # ─── Référentiels ────────────────────────────────────────────────────────────
 
-OWNERS = ['Julien', 'Perrine', 'Adriel', 'Aloïs']
+OWNERS = ['Personne 1', 'Personne 2', 'Personne 3', 'Personne 4']
 
 CATEGORIES = [
     'Cash & dépôts', 'Monétaire', 'Obligations', 'Actions',
