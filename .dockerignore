@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.gitignore
+.claude/
+.vscode/
+.idea/
+*.db
+!demo.db
+*.xlsx
+*.csv
+*.log
+.DS_Store
+.env
+README.md
+TODO.md

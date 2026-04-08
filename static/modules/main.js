@@ -253,6 +253,46 @@ function wireEvents() {
   });
   document.getElementById('position-modal-overlay').addEventListener('click', () => closeModal('position-modal'));
   document.getElementById('flux-modal-overlay').addEventListener('click', () => closeModal('flux-modal'));
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', e => {
+    // Ignore shortcuts when typing in an input/textarea/select
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+      if (e.key === 'Escape') document.activeElement.blur();
+      return;
+    }
+
+    // Escape — close any open modal or confirm dialog
+    if (e.key === 'Escape') {
+      const confirm = document.querySelector('.confirm-overlay');
+      if (confirm) { confirm.querySelector('.confirm-cancel')?.click(); return; }
+      for (const id of ['position-modal', 'flux-modal', 'entity-modal', 'targets-modal']) {
+        const m = document.getElementById(id);
+        if (m && !m.classList.contains('hidden')) { closeModal(id); return; }
+      }
+    }
+
+    // Ctrl+N / Cmd+N — new position
+    if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+      e.preventDefault();
+      if (S.currentTab !== 'positions') switchTab('positions');
+      openPosModal();
+    }
+
+    // Arrow Left/Right — navigate between snapshots
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      const selectId = S.currentTab === 'positions' ? 'positions-date-select' : 'synthese-date-select';
+      const sel = document.getElementById(selectId);
+      if (!sel || sel.options.length < 2) return;
+      const idx = sel.selectedIndex;
+      const next = e.key === 'ArrowLeft' ? idx + 1 : idx - 1; // left = older, right = newer
+      if (next >= 0 && next < sel.options.length) {
+        sel.selectedIndex = next;
+        sel.dispatchEvent(new Event('change'));
+      }
+    }
+  });
 }
 
 // ─── Dark mode ────────────────────────────────────────────────────────────

@@ -120,7 +120,7 @@ Référentiel :
 --- Code frontend ---
 
 - [x] 🔴 Découper app.js (~2 660 lignes) en modules ES (state.js, api.js, tabs/*.js, charts.js, utils.js) avec <script type="module">
-- [ ] 🟠 Audit XSS : vérifier que esc() est utilisé partout dans innerHTML / insertAdjacentHTML
+- [x] 🟠 Audit XSS : vérifier que esc() est utilisé partout dans innerHTML / insertAdjacentHTML
 - [x] 🟠 Migrer allocation cible de localStorage vers DB (table config) — API /api/targets GET/PUT, migration automatique au boot
 - [x] 🟡 Migrer alertes de localStorage vers DB — API /api/alerts GET/PUT, migration automatique au boot
 - [ ] 🟡 Wrapper apiFetch() centralisé : gestion d'erreurs réseau, toast d'erreur, retry
@@ -139,8 +139,8 @@ Référentiel :
 - [x] 🟠 Barre de profondeur arborescence : remonter d'un niveau (Personne → Établ. → Env. → Position), ordre logique progressif
 - [x] 🟠 Persister le choix vue arborescente / tableau en localStorage
 - [x] 🟠 Revoir la palette de couleurs des graphes (surtout dark mode) — s'inspirer de Catppuccin Mocha
-- [ ] 🟠 Synthèse : harmoniser les couleurs du tableau entités (retirer le rouge sur la dette ou ajouter du vert sur les totaux positifs)
-- [ ] 🟠 Raccourcis clavier : Ctrl+N nouvelle position, Échap fermer modals, flèches naviguer entre snapshots
+- [x] 🟠 Synthèse : harmoniser les couleurs du tableau entités (retirer le rouge sur la dette ou ajouter du vert sur les totaux positifs)
+- [x] 🟠 Raccourcis clavier : Ctrl+N nouvelle position, Échap fermer modals, flèches naviguer entre snapshots
 - [ ] 🟡 Spinner / skeleton pendant les appels API (surtout synthèse)
 - [x] 🟡 Colonne % du total dans le tableau "Par personne"
 - [ ] 🟡 Recherche globale : filtre positions + flux + entités simultanément
@@ -151,7 +151,7 @@ Référentiel :
 
 - [x] 🟠 Variation entre snapshots : delta affiché sous chaque KPI (net avec %, gross, dette, mobilisable) via /api/synthese
 - [x] 🟠 Export PDF / impression : bouton "Imprimer" dans Synthèse + CSS @media print (masque nav, boutons, onglets inactifs)
-- [ ] 🟠 TRI (Taux de Rendement Interne) par enveloppe en croisant flux et valorisations
+- [x] 🟠 TRI (Taux de Rendement Interne) par enveloppe en croisant flux et valorisations
 - [ ] 🟡 Objectif patrimoine : jauge de progression vers un montant cible dans la synthèse
 - [ ] 🟡 Notes sur les snapshots : annoter un snapshot ("achat RP", "krach mars 2025")
 - [ ] 🟡 Comparaison N / N-1 : variation YoY automatique dans la synthèse
@@ -163,8 +163,8 @@ Référentiel :
 
 --- Qualité / DevOps ---
 
-- [ ] 🟠 Tests unitaires Python (pytest) sur compute_position() et get_entity_map()
-- [ ] 🟠 Tester et finaliser le Dockerfile
+- [x] 🟠 Tests unitaires Python (pytest) sur compute_position() et get_entity_map()
+- [x] 🟠 Tester et finaliser le Dockerfile
 - [x] 🟡 DB de démo : fichier demo.db pré-rempli dans le repo (données 100% fictives et anonymisées, prénoms inventés, montants réalistes, multi-personnes, entités, flux, plusieurs snapshots) + bouton dans les Paramètres pour basculer entre DB réelle et DB démo à chaud
 - [ ] 🟡 Migrations DB : table schema_version + scripts de migration séquentiels
 - [ ] import : tester avec le vrai fichier rempli et valider les chiffres
