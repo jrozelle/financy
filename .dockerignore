@@ -3,7 +3,6 @@
 .env
 .env.example
 *.md
-demo.db
 tests/
 __pycache__
 *.pyc
