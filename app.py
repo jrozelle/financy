@@ -226,12 +226,15 @@ def security_headers(response):
     return response
 
 
-# ─── Démarrage ───────────────────────────────────────────────────────────────
+# ─── Initialisation DB (nécessaire pour Gunicorn et dev) ─────────────────────
+
+init_db()
+
+# ─── Démarrage (dev uniquement, Gunicorn utilise app:app directement) ────────
 
 if __name__ == '__main__':
     port = _env_int('PORT', 5017, min_val=1, max_val=65535)
     debug = os.environ.get('FLASK_ENV') != 'production'
-    init_db()
-    logger.info('Base initialisée — http://localhost:%d (debug=%s)', port, debug)
     host = os.environ.get('HOST', '0.0.0.0')
+    logger.info('Base initialisée — http://localhost:%d (debug=%s)', port, debug)
     app.run(host=host, debug=debug, port=port)
