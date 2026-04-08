@@ -1,5 +1,6 @@
 # Base de données — NE JAMAIS POUSSER
 *.db
+!demo.db
 *.sqlite
 *.sqlite3
 

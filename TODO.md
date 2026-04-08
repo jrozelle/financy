@@ -165,6 +165,7 @@ Référentiel :
 
 - [ ] 🟠 Tests unitaires Python (pytest) sur compute_position() et get_entity_map()
 - [ ] 🟠 Tester et finaliser le Dockerfile
+- [x] 🟡 DB de démo : fichier demo.db pré-rempli dans le repo (données 100% fictives et anonymisées, prénoms inventés, montants réalistes, multi-personnes, entités, flux, plusieurs snapshots) + bouton dans les Paramètres pour basculer entre DB réelle et DB démo à chaud
 - [ ] 🟡 Migrations DB : table schema_version + scripts de migration séquentiels
 - [ ] import : tester avec le vrai fichier rempli et valider les chiffres
 
