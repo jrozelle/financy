@@ -36,7 +36,7 @@ export const fmtDelta = (n, dec = 0) => {
   }).format(n) + '\u202f\u20ac';
 };
 
-export function kpiDelta(variation, deltaKey, pctKey = null, { invert = false } = {}) {
+export function kpiDelta(variation, deltaKey, pctKey = null, { invert = false, label = null } = {}) {
   if (!variation) return '';
   const delta = variation[deltaKey];
   if (delta == null || delta === 0) return '';
@@ -48,7 +48,8 @@ export function kpiDelta(variation, deltaKey, pctKey = null, { invert = false } 
     const pct = variation[pctKey];
     pctStr = ` (${pct > 0 ? '+' : ''}${pct.toFixed(1)}\u202f%)`;
   }
-  return `<div class="${cls}">${arrow} ${fmtDelta(delta)}${pctStr}</div>`;
+  const labelStr = label ? `<span class="kpi-delta-label">${label}</span> ` : '';
+  return `<div class="${cls}">${labelStr}${arrow} ${fmtDelta(delta)}${pctStr}</div>`;
 }
 
 export const today = () => new Date().toISOString().slice(0, 10);
@@ -143,6 +144,15 @@ export function doughnutConfig(labels, data) {
 }
 
 export const liqText = l => l ? `Liq. ${l}` : '';
+
+/**
+ * Destroy a Chart.js instance safely and return null (for re-assignment).
+ * Usage: myChart = destroyChart(myChart);
+ */
+export function destroyChart(chart) {
+  if (chart) chart.destroy();
+  return null;
+}
 
 // ─── Tree utilities ────────────────────────────────────────────────────────
 

@@ -1,10 +1,11 @@
 import { S, catChart, histChart, syntheseEnvChart, syntheseHistChart,
          setCatChart, setHistChart, setSyntheseEnvChart, setSyntheseHistChart } from '../state.js';
-import { fmt, fmtDate, esc, kpiDelta, liqBadge, getColors, doughnutConfig, chartBorderColor, chartFamilyColors } from '../utils.js';
+import { fmt, fmtDate, esc, kpiDelta, liqBadge, getColors, doughnutConfig, chartBorderColor, chartFamilyColors, destroyChart } from '../utils.js';
 import { api } from '../api.js';
 import { drilldownPositions } from '../drilldown.js';
 import { loadUserAlerts } from '../alerts.js';
 import { renderAllocationTargets } from '../targets.js';
+import { toast, promptDialog } from '../dialogs.js';
 
 export async function loadSynthese() {
   if (!S.syntheseDate && S.dates.length) S.syntheseDate = S.dates[0];
@@ -12,6 +13,7 @@ export async function loadSynthese() {
   const [syn, positions] = await Promise.all([
     api('GET', `/api/synthese?date=${S.syntheseDate}`),
     api('GET', `/api/positions?date=${S.syntheseDate}`),
+    loadWealthTarget(),
   ]);
   syn._positions_cache = {};
   for (const o of S.config.owners) {
@@ -58,10 +60,18 @@ export function renderSynthese() {
         net:   totals_by_owner[owner]?.net        || 0,
         mob:   totals_by_owner[owner]?.mobilizable|| 0 };
 
-  document.getElementById('kpi-net').innerHTML         = fmt(kpi.net) + kpiDelta(syn.variation, 'net_delta', 'net_pct');
-  document.getElementById('kpi-gross').innerHTML       = fmt(kpi.gross) + kpiDelta(syn.variation, 'gross_delta');
-  document.getElementById('kpi-debt').innerHTML        = fmt(kpi.debt) + kpiDelta(syn.variation, 'debt_delta', null, { invert: true });
-  document.getElementById('kpi-mobilizable').innerHTML = fmt(kpi.mob) + kpiDelta(syn.variation, 'mob_delta');
+  // Variation vs précédent + YoY
+  const varHtml = (field, pctField, opts) => {
+    let html = kpiDelta(syn.variation, field, pctField, opts);
+    if (syn.yoy_variation) {
+      html += kpiDelta(syn.yoy_variation, field, pctField, { ...opts, label: 'N-1' });
+    }
+    return html;
+  };
+  document.getElementById('kpi-net').innerHTML         = fmt(kpi.net) + varHtml('net_delta', 'net_pct');
+  document.getElementById('kpi-gross').innerHTML       = fmt(kpi.gross) + varHtml('gross_delta');
+  document.getElementById('kpi-debt').innerHTML        = fmt(kpi.debt) + varHtml('debt_delta', null, { invert: true });
+  document.getElementById('kpi-mobilizable').innerHTML = fmt(kpi.mob) + varHtml('mob_delta');
 
   document.getElementById('kpi-net-label').textContent   = isFamily ? 'Patrimoine net famille' : `Patrimoine net — ${owner}`;
   document.getElementById('kpi-gross-label').textContent = isFamily ? 'Actifs bruts' : `Actifs bruts — ${owner}`;
@@ -97,6 +107,8 @@ export function renderSynthese() {
   renderAllocationTargets();
   renderPerf();
   renderTRI();
+  renderSnapshotNote(syn);
+  renderWealthTarget(kpi.net);
 }
 
 function renderOwnersTable(byOwner, family, totalMob) {
@@ -148,7 +160,7 @@ function renderCatChart(byCat) {
   const cats = Object.keys(byCat).filter(c => byCat[c].net > 0);
   const vals = cats.map(c => byCat[c].net);
 
-  if (catChart) catChart.destroy();
+  destroyChart(catChart);
   const ctx = document.getElementById('category-chart').getContext('2d');
   setCatChart(new Chart(ctx, {
     type: 'doughnut',
@@ -210,9 +222,52 @@ function renderEnvChart(posCache, owner) {
   const labels = Object.keys(byEnv).filter(k => byEnv[k] > 0);
   const vals   = labels.map(k => byEnv[k]);
 
-  if (syntheseEnvChart) syntheseEnvChart.destroy();
+  destroyChart(syntheseEnvChart);
   const ctx = document.getElementById('synthese-env-chart').getContext('2d');
-  setSyntheseEnvChart(new Chart(ctx, doughnutConfig(labels, vals)));
+  const colors = getColors();
+  setSyntheseEnvChart(new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: vals,
+        backgroundColor: colors.slice(0, labels.length),
+        borderWidth: 2,
+        borderColor: chartBorderColor(),
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      onClick: (_, elements) => {
+        if (!elements.length) return;
+        const env = labels[elements[0].index];
+        const envPos = positions.filter(p => (p.envelope || 'Autre') === env);
+        drilldownPositions(envPos, env, 'Enveloppe', { showOwner: true });
+      },
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { font: { size: 11 }, padding: 10, boxWidth: 12 },
+          onClick: (e, item) => {
+            const env = labels[item.index];
+            const envPos = positions.filter(p => (p.envelope || 'Autre') === env);
+            drilldownPositions(envPos, env, 'Enveloppe', { showOwner: true });
+          },
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+              const pct = ((ctx.parsed / total) * 100).toFixed(1);
+              return ` ${new Intl.NumberFormat('fr-FR').format(Math.round(ctx.parsed))}\u202f€  (${pct}%)`;
+            },
+            afterLabel: () => 'Cliquer pour détailler',
+          },
+        },
+      },
+    },
+  }));
 }
 
 export async function renderSyntheseHistory() {
@@ -242,7 +297,7 @@ export async function renderSyntheseHistory() {
     fill: true,
   }));
 
-  if (syntheseHistChart) syntheseHistChart.destroy();
+  destroyChart(syntheseHistChart);
   setSyntheseHistChart(new Chart(
     document.getElementById('synthese-history-detail-chart').getContext('2d'),
     {
@@ -251,6 +306,20 @@ export async function renderSyntheseHistory() {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        onClick: (_, elements) => {
+          if (!elements.length) return;
+          const el = elements[0];
+          const dateLabel = history[el.index]?.date;
+          const group = groupList[el.datasetIndex];
+          if (!dateLabel || !group) return;
+          api('GET', `/api/positions?date=${dateLabel}`).then(positions => {
+            let filtered = owner ? positions.filter(p => p.owner === owner) : positions;
+            if (groupBy === 'category')      filtered = filtered.filter(p => p.category === group);
+            else if (groupBy === 'envelope')  filtered = filtered.filter(p => (p.envelope || 'Autre') === group);
+            else if (groupBy === 'owner')     filtered = filtered.filter(p => p.owner === group);
+            drilldownPositions(filtered, `${group} — ${fmtDate(dateLabel)}`, `Évolution par ${groupBy}`, { showOwner: groupBy !== 'owner' });
+          });
+        },
         scales: {
           x: { stacked: true, ticks: { font: { size: 11 } } },
           y: { stacked: true, ticks: {
@@ -262,6 +331,7 @@ export async function renderSyntheseHistory() {
           legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 8, boxWidth: 12 } },
           tooltip: { callbacks: {
             label: ctx => ` ${ctx.dataset.label} : ${new Intl.NumberFormat('fr-FR').format(ctx.raw)}\u202f€`,
+            afterBody: () => 'Cliquer pour détailler',
           }},
         },
       },
@@ -307,7 +377,7 @@ function renderHistChart(filterOwner = 'Famille') {
     }];
   }
 
-  if (histChart) histChart.destroy();
+  destroyChart(histChart);
   const ctx = document.getElementById('history-chart').getContext('2d');
   setHistChart(new Chart(ctx, {
     type: 'line',
@@ -316,12 +386,28 @@ function renderHistChart(filterOwner = 'Famille') {
       responsive: true,
       maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
+      onClick: (_, elements) => {
+        if (!elements.length) return;
+        const idx = elements[0].index;
+        const h = S.historique[idx];
+        if (!h) return;
+        // If clicked on an owner line, drill down that owner; otherwise show all
+        const dsIdx = elements[0].datasetIndex;
+        const clickedLabel = datasets[dsIdx]?.label;
+        const isOwnerLine = clickedLabel && clickedLabel !== 'Famille' && S.config.owners.includes(clickedLabel);
+        api('GET', `/api/positions?date=${h.date}`).then(positions => {
+          const filtered = isOwnerLine ? positions.filter(p => p.owner === clickedLabel) : positions;
+          const title = isOwnerLine ? clickedLabel : 'Famille';
+          drilldownPositions(filtered, `${title} — ${fmtDate(h.date)}`, 'Composition à cette date', { showOwner: !isOwnerLine });
+        });
+      },
       plugins: {
         legend: { labels: { font: { size: 11 }, boxWidth: 12 } },
         tooltip: {
           callbacks: {
             label: ctx =>
               ` ${ctx.dataset.label} : ${new Intl.NumberFormat('fr-FR').format(Math.round(ctx.parsed.y))}\u202f€`,
+            afterBody: () => 'Cliquer pour voir la composition',
           },
         },
       },
@@ -492,7 +578,7 @@ export async function renderPerf() {
     const flux = await api('GET', `/api/flux?date_from=${first.date}&date_to=${last.date}`);
     const filtered = isFamily ? flux : flux.filter(f => f.owner === owner);
     fluxTotal = filtered.reduce((s, f) => s + (f.amount || 0), 0);
-  } catch {}
+  } catch { /* api() already shows toast on GET failure; continue with fluxTotal=0 */ }
 
   const totalGain = lastNet - firstNet - fluxTotal;
   const varLast   = variation(lastNet, prevNet);
@@ -519,6 +605,120 @@ export async function renderPerf() {
     </div>
   </div>`;
 }
+
+// ─── Snapshot notes ──────────────────────────────────────────────────────
+
+function renderSnapshotNote(syn) {
+  const bar = document.getElementById('snapshot-note-bar');
+  if (!bar) return;
+  const note = syn.snapshot_note;
+  const date = syn.date;
+
+  if (!note) {
+    bar.style.display = 'none';
+    bar.innerHTML = '';
+  } else {
+    bar.style.display = '';
+    bar.innerHTML = `<div class="snapshot-note">
+      <span class="snapshot-note-icon">&#128221;</span>
+      <span class="snapshot-note-text">${esc(note)}</span>
+      <button class="btn-icon" id="btn-edit-snapshot-note" title="Modifier la note">&#9998;</button>
+    </div>`;
+    bar.querySelector('#btn-edit-snapshot-note')?.addEventListener('click', () => openSnapshotNoteEditor(date, note));
+  }
+
+  // Add/edit button in date selector area
+  let noteBtn = document.getElementById('btn-add-snapshot-note');
+  if (!noteBtn) {
+    const header = document.querySelector('#tab-synthese .page-header > div');
+    if (header) {
+      noteBtn = document.createElement('button');
+      noteBtn.id = 'btn-add-snapshot-note';
+      noteBtn.className = 'btn btn-secondary btn-sm';
+      noteBtn.title = 'Annoter ce snapshot';
+      noteBtn.textContent = note ? '\u{1F4DD}' : '+ Note';
+      header.appendChild(noteBtn);
+    }
+  }
+  if (noteBtn) {
+    noteBtn.textContent = note ? '\u{1F4DD}' : '+ Note';
+    noteBtn.onclick = () => openSnapshotNoteEditor(date, note || '');
+  }
+}
+
+async function openSnapshotNoteEditor(date, currentNote) {
+  const note = await promptDialog(`Note pour le snapshot du ${fmtDate(date)}`, {
+    defaultValue: currentNote || '', placeholder: 'Ex: achat RP, krach mars 2025…', confirmText: 'Enregistrer'
+  });
+  if (note === null) return; // cancelled
+  await api('PUT', '/api/snapshot-notes', { date, notes: note });
+  if (S.synthese) S.synthese.snapshot_note = note || null;
+  renderSnapshotNote(S.synthese);
+  toast(note ? 'Note enregistrée' : 'Note supprimée');
+}
+
+// ─── Wealth target gauge ─────────────────────────────────────────────────
+
+let _wealthTarget = null;
+
+export async function loadWealthTarget() {
+  try {
+    const data = await api('GET', '/api/wealth-target');
+    _wealthTarget = data?.target || null;
+  } catch { _wealthTarget = null; }
+}
+
+function renderWealthTarget(currentNet) {
+  const bar = document.getElementById('wealth-target-bar');
+  if (!bar) return;
+
+  if (!_wealthTarget) {
+    bar.style.display = 'none';
+    bar.innerHTML = `<div class="wealth-target-empty">
+      <button class="btn btn-secondary btn-sm" id="btn-set-wealth-target">Définir un objectif patrimoine</button>
+    </div>`;
+    bar.style.display = '';
+    bar.querySelector('#btn-set-wealth-target')?.addEventListener('click', openWealthTargetEditor);
+    return;
+  }
+
+  const target = _wealthTarget;
+  const pct = target > 0 ? Math.min((currentNet / target) * 100, 100) : 0;
+  const cls = pct >= 100 ? 'pos' : '';
+
+  bar.style.display = '';
+  bar.innerHTML = `<div class="wealth-target-card card" style="padding:.75rem 1rem">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.375rem">
+      <span style="font-size:13px;font-weight:600">Objectif patrimoine net</span>
+      <span style="display:flex;gap:.5rem;align-items:center">
+        <span class="text-muted" style="font-size:12px">${fmt(currentNet)} / ${fmt(target)}</span>
+        <span class="${cls}" style="font-weight:700;font-size:13px">${pct.toFixed(1)}\u202f%</span>
+        <button class="btn-icon" id="btn-edit-wealth-target" title="Modifier l'objectif" style="font-size:14px">&#9998;</button>
+      </span>
+    </div>
+    <div class="wealth-progress-bg">
+      <div class="wealth-progress-bar ${pct >= 100 ? 'complete' : ''}" style="width:${pct.toFixed(1)}%"></div>
+    </div>
+  </div>`;
+  bar.querySelector('#btn-edit-wealth-target')?.addEventListener('click', openWealthTargetEditor);
+}
+
+async function openWealthTargetEditor() {
+  const current = _wealthTarget ? String(_wealthTarget) : '';
+  const val = await promptDialog('Objectif patrimoine net (€)', {
+    defaultValue: current, placeholder: 'Laisser vide pour supprimer', confirmText: 'Enregistrer'
+  });
+  if (val === null) return;
+  const target = val.trim() ? parseFloat(val.replace(/\s/g, '').replace(',', '.')) : null;
+  if (val.trim() && (isNaN(target) || target <= 0)) { toast('Montant invalide', 'error'); return; }
+  await api('PUT', '/api/wealth-target', { target });
+  _wealthTarget = target;
+  const kpiNet = S.synthese?.family?.net || 0;
+  renderWealthTarget(kpiNet);
+  toast(target ? 'Objectif enregistré' : 'Objectif supprimé');
+}
+
+// ─── TRI ─────────────────────────────────────────────────────────────────
 
 async function renderTRI() {
   const el = document.getElementById('tri-section');

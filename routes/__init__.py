@@ -4,6 +4,7 @@ from .synthese import synthese_bp
 from .entities import entities_bp
 from .import_export import import_export_bp
 from .referential import referential_bp
+from .tools import tools_bp
 
 all_blueprints = [
     positions_bp,
@@ -12,4 +13,5 @@ all_blueprints = [
     entities_bp,
     import_export_bp,
     referential_bp,
+    tools_bp,
 ]

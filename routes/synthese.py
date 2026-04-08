@@ -1,7 +1,8 @@
+import json
 from flask import Blueprint, jsonify, request
 from datetime import datetime
 from models import (get_db, compute_position, get_entity_map, load_referential)
-from auth import login_required
+from auth import login_required, csrf_protect
 
 synthese_bp = Blueprint('synthese', __name__)
 
@@ -29,8 +30,14 @@ def get_synthese():
 
     positions = [compute_position(dict(r), entity_map, ref) for r in rows]
 
+    # Derive owners from actual data, preserving ref order for known ones
+    ref_owners = ref['owners']
+    data_owners = sorted(set(p['owner'] for p in positions))
+    owners = [o for o in ref_owners if o in data_owners] + \
+             [o for o in data_owners if o not in ref_owners]
+
     totals_by_owner = {}
-    for owner in ref['owners']:
+    for owner in owners:
         ops = [p for p in positions if p['owner'] == owner]
         totals_by_owner[owner] = {
             'gross':       sum(p['gross_attributed'] for p in ops),
@@ -46,7 +53,7 @@ def get_synthese():
             totals_by_category[cat] = {
                 'net':      sum(p['net_attributed'] for p in ops),
                 'by_owner': {o: sum(p['net_attributed'] for p in ops if p['owner'] == o)
-                             for o in ref['owners']},
+                             for o in owners},
             }
 
     mobilizable_by_liquidity = {
@@ -69,7 +76,32 @@ def get_synthese():
         if debt > 1.02:
             entity_warnings.append({'entity': r['entity'], 'total_pct': round(debt * 100), 'type': 'debt'})
 
-    # ── Variation par rapport au snapshot précédent ──
+    # ── Helper : calculer les totaux d'un snapshot ──
+    def _snapshot_totals(snap_date):
+        with get_db() as c:
+            snap_rows      = c.execute('SELECT * FROM positions WHERE date=?', (snap_date,)).fetchall()
+            snap_entity_map = get_entity_map(c, snap_date)
+            snap_ref        = load_referential(c)
+        snap_positions = [compute_position(dict(r), snap_entity_map, snap_ref) for r in snap_rows]
+        return {
+            'net':   sum(p['net_attributed'] for p in snap_positions),
+            'gross': sum(p['gross_attributed'] for p in snap_positions),
+            'debt':  sum(p['debt_attributed'] for p in snap_positions),
+            'mob':   sum(p['mobilizable_value'] for p in snap_positions),
+        }
+
+    def _build_variation(totals, prev_date_str):
+        cur_mob = sum(t['mobilizable'] for t in totals_by_owner.values())
+        return {
+            'prev_date':   prev_date_str,
+            'net_delta':   family['net'] - totals['net'],
+            'net_pct':     ((family['net'] - totals['net']) / abs(totals['net']) * 100) if totals['net'] != 0 else None,
+            'gross_delta': family['gross'] - totals['gross'],
+            'debt_delta':  family['debt'] - totals['debt'],
+            'mob_delta':   cur_mob - totals['mob'],
+        }
+
+    # ── Variation vs snapshot précédent ──
     variation = None
     with get_db() as conn2:
         prev_row = conn2.execute(
@@ -77,24 +109,34 @@ def get_synthese():
             (date,)
         ).fetchone()
     if prev_row:
-        prev_date = prev_row['date']
+        variation = _build_variation(_snapshot_totals(prev_row['date']), prev_row['date'])
+
+    # ── Variation N / N-1 (Year-over-Year) ──
+    yoy_variation = None
+    try:
+        from datetime import date as _date
+        d = _date.fromisoformat(date)
+        # Handle leap year: 2024-02-29 → 2023-02-28
+        try:
+            year_ago = d.replace(year=d.year - 1).isoformat()
+        except ValueError:
+            year_ago = d.replace(year=d.year - 1, day=d.day - 1).isoformat()
         with get_db() as conn2:
-            prev_rows      = conn2.execute('SELECT * FROM positions WHERE date=?', (prev_date,)).fetchall()
-            prev_entity_map = get_entity_map(conn2, prev_date)
-            prev_ref        = load_referential(conn2)
-        prev_positions = [compute_position(dict(r), prev_entity_map, prev_ref) for r in prev_rows]
-        prev_net   = sum(p['net_attributed'] for p in prev_positions)
-        prev_gross = sum(p['gross_attributed'] for p in prev_positions)
-        prev_debt  = sum(p['debt_attributed'] for p in prev_positions)
-        prev_mob   = sum(p['mobilizable_value'] for p in prev_positions)
-        variation = {
-            'prev_date':  prev_date,
-            'net_delta':   family['net'] - prev_net,
-            'net_pct':     ((family['net'] - prev_net) / abs(prev_net) * 100) if prev_net != 0 else None,
-            'gross_delta': family['gross'] - prev_gross,
-            'debt_delta':  family['debt'] - prev_debt,
-            'mob_delta':   sum(t['mobilizable'] for t in totals_by_owner.values()) - prev_mob,
-        }
+            yoy_row = conn2.execute(
+                'SELECT DISTINCT date FROM positions WHERE date <= ? ORDER BY date DESC LIMIT 1',
+                (year_ago,)
+            ).fetchone()
+        if yoy_row and yoy_row['date'] != date:
+            yoy_variation = _build_variation(_snapshot_totals(yoy_row['date']), yoy_row['date'])
+    except Exception:
+        pass
+
+    # ── Note du snapshot ──
+    snapshot_note = None
+    with get_db() as conn2:
+        note_row = conn2.execute('SELECT notes FROM snapshot_notes WHERE date=?', (date,)).fetchone()
+        if note_row:
+            snapshot_note = note_row['notes']
 
     return jsonify({
         'date':                    date,
@@ -104,6 +146,8 @@ def get_synthese():
         'mobilizable_by_liquidity': mobilizable_by_liquidity,
         'entity_warnings':         entity_warnings,
         'variation':               variation,
+        'yoy_variation':           yoy_variation,
+        'snapshot_note':           snapshot_note,
     })
 
 
@@ -124,11 +168,12 @@ def get_historique():
             positions  = [compute_position(dict(r), entity_map, ref) for r in rows]
             if owner:
                 positions = [p for p in positions if p['owner'] == owner]
+            snap_owners = sorted(set(p['owner'] for p in positions))
             entry = {
                 'date':       date,
                 'family_net': sum(p['net_attributed'] for p in positions),
                 'by_owner':   {o: sum(p['net_attributed'] for p in positions if p['owner'] == o)
-                              for o in ref['owners']},
+                              for o in snap_owners},
             }
             if group_by == 'envelope':
                 by_env = {}
@@ -276,3 +321,67 @@ def get_tri():
         result['_global'] = tri_global
 
     return jsonify({'date': last_date, 'first_date': first_date, 'tri': result})
+
+
+# ─── Notes de snapshot ────────────────────────────────────────────────────
+
+@synthese_bp.route('/api/snapshot-notes', methods=['GET'])
+@login_required
+def get_snapshot_notes():
+    date = request.args.get('date')
+    with get_db() as conn:
+        if date:
+            row = conn.execute('SELECT notes FROM snapshot_notes WHERE date=?', (date,)).fetchone()
+            return jsonify({'date': date, 'notes': row['notes'] if row else None})
+        rows = conn.execute('SELECT date, notes FROM snapshot_notes ORDER BY date DESC').fetchall()
+        return jsonify({r['date']: r['notes'] for r in rows})
+
+
+@synthese_bp.route('/api/snapshot-notes', methods=['PUT'])
+@login_required
+@csrf_protect
+def save_snapshot_note():
+    d = request.json
+    date = d.get('date')
+    notes = (d.get('notes') or '').strip()
+    if not date:
+        return jsonify({'error': 'Date requise'}), 400
+    with get_db() as conn:
+        if notes:
+            conn.execute(
+                'INSERT OR REPLACE INTO snapshot_notes (date, notes) VALUES (?, ?)',
+                (date, notes)
+            )
+        else:
+            conn.execute('DELETE FROM snapshot_notes WHERE date=?', (date,))
+    return jsonify({'ok': True})
+
+
+# ─── Objectif patrimoine ──────────────────────────────────────────────────
+
+@synthese_bp.route('/api/wealth-target', methods=['GET'])
+@login_required
+def get_wealth_target():
+    with get_db() as conn:
+        row = conn.execute("SELECT value FROM config WHERE key='wealth_target'").fetchone()
+    if row:
+        try:
+            return jsonify(json.loads(row['value']))
+        except Exception:
+            pass
+    return jsonify({'target': None})
+
+
+@synthese_bp.route('/api/wealth-target', methods=['PUT'])
+@login_required
+@csrf_protect
+def save_wealth_target():
+    d = request.json
+    if not isinstance(d, dict):
+        return jsonify({'error': 'Objet JSON attendu'}), 400
+    with get_db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO config (key, value) VALUES ('wealth_target', ?)",
+            (json.dumps(d),)
+        )
+    return jsonify({'ok': True})

@@ -34,7 +34,7 @@ function renderRefOwners() {
     </div>`;
 
   el.querySelectorAll('.chip-del[data-section="owners"]').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const owner = S.referential.owners[parseInt(btn.dataset.index)];
       const posCount = S.positions.filter(p => p.owner === owner).length;
       const fluxCount = S.flux.filter(f => f.owner === owner).length;
@@ -42,7 +42,9 @@ function renderRefOwners() {
         const lines = [];
         if (posCount)  lines.push(`${posCount} position(s)`);
         if (fluxCount) lines.push(`${fluxCount} flux`);
-        if (!confirm(`"${owner}" est référencé(e) dans ${lines.join(' et ')}.\nCes données ne seront pas supprimées, mais la personne n'apparaîtra plus dans les filtres.\n\nContinuer ?`)) return;
+        if (!await confirmDialog('Supprimer la personne ?',
+          `<strong>${esc(owner)}</strong> est référencé(e) dans ${lines.join(' et ')}.<br>Ces données ne seront pas supprimées, mais la personne n'apparaîtra plus dans les filtres.`,
+          { confirmText: 'Supprimer', danger: true })) return;
       }
       S.referential.owners.splice(parseInt(btn.dataset.index), 1);
       renderRefOwners();
@@ -105,9 +107,21 @@ function renderRefCategories() {
     });
   });
   el.querySelectorAll('.btn-icon.del[data-section="categories"]').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const i = parseInt(btn.dataset.index);
       const cat = S.referential.categories[i];
+      const posCount = S.positions.filter(p => p.category === cat).length;
+      const fluxCount = S.flux.filter(f => f.category === cat).length;
+      if (posCount || fluxCount) {
+        const lines = [];
+        if (posCount)  lines.push(`${posCount} position(s)`);
+        if (fluxCount) lines.push(`${fluxCount} flux`);
+        if (!await confirmDialog(
+          `Supprimer la catégorie "${cat}" ?`,
+          `Elle est utilisée dans ${lines.join(' et ')}.<br>Ces données ne seront pas supprimées, mais la catégorie n'apparaîtra plus dans les filtres.`,
+          { confirmText: 'Supprimer quand même', danger: true }
+        )) return;
+      }
       S.referential.categories.splice(i, 1);
       delete S.referential.category_mobilizable[cat];
       renderRefCategories();
@@ -181,8 +195,21 @@ function renderRefEnvelopes() {
     });
   });
   el.querySelectorAll('.btn-icon.del[data-section="envelopes"]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      delete S.referential.envelope_meta[btn.dataset.env];
+    btn.addEventListener('click', async () => {
+      const env = btn.dataset.env;
+      const posCount = S.positions.filter(p => p.envelope === env).length;
+      const fluxCount = S.flux.filter(f => f.envelope === env).length;
+      if (posCount || fluxCount) {
+        const lines = [];
+        if (posCount)  lines.push(`${posCount} position(s)`);
+        if (fluxCount) lines.push(`${fluxCount} flux`);
+        if (!await confirmDialog(
+          `Supprimer l'enveloppe "${env}" ?`,
+          `Elle est utilisée dans ${lines.join(' et ')}.<br>Ces données ne seront pas supprimées, mais l'enveloppe n'apparaîtra plus dans les filtres.`,
+          { confirmText: 'Supprimer quand même', danger: true }
+        )) return;
+      }
+      delete S.referential.envelope_meta[env];
       renderRefEnvelopes();
     });
   });
@@ -302,6 +329,7 @@ export async function saveReferential() {
     S.config = await api('GET', '/api/config');
     buildSelects();
     refreshEntitySelect();
+    updateSavedRef();
     const status = document.getElementById('ref-save-status');
     if (status) {
       status.textContent = '✓ Référentiel enregistré.';
@@ -316,23 +344,83 @@ export async function saveReferential() {
   }
 }
 
-export async function resetReferential() {
-  if (!await confirmDialog(
-    'Réinitialiser le référentiel ?',
-    'Toutes vos personnalisations (propriétaires, catégories, enveloppes) seront remplacées par les valeurs par défaut.',
-    { confirmText: 'Réinitialiser', danger: true }
-  )) return;
-  await api('PUT', '/api/referential', {
-    owners: ['Personne 1', 'Personne 2', 'Personne 3', 'Personne 4'],
-    categories: ['Cash & dépôts','Monétaire','Obligations','Actions','Immobilier','SCPI','Fond Euro','Produits Structurés','Crypto','Objets de valeur','Autre'],
-    category_mobilizable: {'Cash & dépôts':1,'Monétaire':.95,'Obligations':.95,'Actions':.9,'Immobilier':0,'SCPI':0,'Fond Euro':.95,'Produits Structurés':0,'Crypto':.9,'Objets de valeur':0,'Autre':.8},
-    envelope_meta: {'Compte courant':{liquidity:'J0–J1',friction:'Aucune'},'Livret A':{liquidity:'J2–J7',friction:'Fiscale'},'LDDS':{liquidity:'J0–J1',friction:'Aucune'},'Livret Bourso+':{liquidity:'J0–J1',friction:'Aucune'},'PEL/CEL':{liquidity:'J8–J30',friction:'Frais'},'PEA':{liquidity:'J2–J7',friction:'Fiscale'},'CTO':{liquidity:'J2–J7',friction:'Fiscale'},'Assurance-vie':{liquidity:'J8–J30',friction:'Mixte'},'PER':{liquidity:'Bloqué',friction:'Fiscale'},'Crypto':{liquidity:'J0–J1',friction:'Décote probable'},'Immobilier':{liquidity:'30J+',friction:'Mixte'},'SCI':{liquidity:'30J+',friction:'Mixte'},'Autre':{liquidity:'30J+',friction:'Mixte'}},
-    entity_types: ['SCI','Indivision','Holding','Autre'],
-    valuation_modes: ['Valeur de marché',"Prix d'acquisition",'Valeur fiscale','Autre'],
-    flux_types: ['Versement','Retrait','Dividende/Intérêt','Frais','Autre'],
-  });
-  S.referential = await api('GET', '/api/referential');
-  S.config = await api('GET', '/api/config');
-  buildSelects();
-  renderReferential();
+let _templates = null;
+let _savedRef = null;
+
+export async function initTemplateSelect() {
+  const sel = document.getElementById('ref-template-select');
+  if (!sel) return;
+  try {
+    _templates = await api('GET', '/api/referential/templates');
+    _savedRef = await api('GET', '/api/referential');
+    rebuildTemplateOptions();
+    sel.addEventListener('change', onTemplateChange);
+  } catch { /* api() shows toast on failure; template select stays empty */ }
+}
+
+function rebuildTemplateOptions() {
+  const sel = document.getElementById('ref-template-select');
+  if (!sel || !_templates) return;
+  sel.innerHTML = '<option value="">Parcourir les modèles…</option>' +
+    `<option value="__saved__">Mon référentiel (enregistré)</option>` +
+    Object.keys(_templates).map(name =>
+      `<option value="${esc(name)}">${esc(name)}</option>`
+    ).join('');
+}
+
+async function onTemplateChange() {
+  const sel = document.getElementById('ref-template-select');
+  const name = sel.value;
+  if (!name) return;
+
+  const preview = document.getElementById('ref-template-preview');
+
+  if (name === '__saved__') {
+    // Recharger le référentiel enregistré en DB (annuler les modifs en cours)
+    S.referential = await api('GET', '/api/referential');
+    _savedRef = { ...S.referential };
+    renderReferential();
+    if (preview) preview.style.display = 'none';
+    sel.value = '';
+    return;
+  }
+
+  const tpl = _templates[name];
+  if (!tpl) return;
+
+  // Afficher un aperçu avant de charger
+  if (preview) {
+    const owners = (tpl.owners || []).join(', ');
+    const cats = (tpl.categories || []).join(', ');
+    const envs = Object.keys(tpl.envelope_meta || {}).join(', ');
+    preview.style.display = '';
+    preview.innerHTML = `
+      <div class="template-preview">
+        <div><strong>Propriétaires :</strong> ${esc(owners)}</div>
+        <div><strong>Catégories :</strong> ${esc(cats)}</div>
+        <div><strong>Enveloppes :</strong> ${esc(envs)}</div>
+        <div style="margin-top:.5rem;display:flex;gap:.5rem">
+          <button class="btn btn-primary btn-sm" id="btn-apply-template">Appliquer ce modèle</button>
+          <button class="btn btn-secondary btn-sm" id="btn-cancel-template">Annuler</button>
+        </div>
+      </div>`;
+    preview.querySelector('#btn-apply-template').addEventListener('click', async () => {
+      await api('PUT', '/api/referential', tpl);
+      S.referential = await api('GET', '/api/referential');
+      _savedRef = { ...S.referential };
+      S.config = await api('GET', '/api/config');
+      buildSelects();
+      renderReferential();
+      preview.style.display = 'none';
+      sel.value = '';
+    });
+    preview.querySelector('#btn-cancel-template').addEventListener('click', () => {
+      preview.style.display = 'none';
+      sel.value = '';
+    });
+  }
+}
+
+export function updateSavedRef() {
+  if (S.referential) _savedRef = { ...S.referential };
 }

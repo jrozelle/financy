@@ -1,6 +1,6 @@
 import json
 from flask import Blueprint, jsonify, request
-from models import get_db, load_referential
+from models import get_db, load_referential, REFERENTIAL_TEMPLATES
 from auth import login_required, csrf_protect
 
 referential_bp = Blueprint('referential', __name__)
@@ -89,6 +89,12 @@ def save_alerts_api():
 
 # — Référentiel —
 
+@referential_bp.route('/api/referential/templates', methods=['GET'])
+@login_required
+def get_templates():
+    return jsonify({name: tpl for name, tpl in REFERENTIAL_TEMPLATES.items()})
+
+
 @referential_bp.route('/api/referential', methods=['GET'])
 @login_required
 def get_referential_api():
@@ -115,3 +121,40 @@ def save_referential():
             (json.dumps(data),)
         )
     return jsonify({'ok': True})
+
+
+@referential_bp.route('/api/referential/orphans', methods=['GET'])
+@login_required
+def check_orphans():
+    """Vérifie les positions/flux orphelins si une catégorie ou enveloppe est supprimée."""
+    with get_db() as conn:
+        ref = load_referential(conn)
+        categories = set(ref['categories'])
+        envelopes  = set(ref.get('envelope_meta', {}).keys())
+
+        orphans = {}
+
+        # Catégories utilisées dans positions mais absentes du référentiel
+        cat_rows = conn.execute(
+            'SELECT DISTINCT category FROM positions WHERE category IS NOT NULL'
+        ).fetchall()
+        for r in cat_rows:
+            cat = r['category']
+            if cat and cat not in categories:
+                cnt = conn.execute('SELECT COUNT(*) as c FROM positions WHERE category=?', (cat,)).fetchone()['c']
+                orphans.setdefault('categories', {})[cat] = cnt
+
+        # Enveloppes utilisées dans positions/flux mais absentes du référentiel
+        env_rows = conn.execute(
+            'SELECT DISTINCT envelope FROM positions WHERE envelope IS NOT NULL '
+            'UNION SELECT DISTINCT envelope FROM flux WHERE envelope IS NOT NULL'
+        ).fetchall()
+        for r in env_rows:
+            env = r['envelope']
+            if env and env not in envelopes:
+                pos_cnt = conn.execute('SELECT COUNT(*) as c FROM positions WHERE envelope=?', (env,)).fetchone()['c']
+                flux_cnt = conn.execute('SELECT COUNT(*) as c FROM flux WHERE envelope=?', (env,)).fetchone()['c']
+                if pos_cnt or flux_cnt:
+                    orphans.setdefault('envelopes', {})[env] = {'positions': pos_cnt, 'flux': flux_cnt}
+
+    return jsonify(orphans)

@@ -6,7 +6,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+RUN useradd -r -s /bin/false financy && \
+    chown -R financy:financy /app
+USER financy
+
 ENV FLASK_ENV=production
-EXPOSE 5000
+ENV PORT=5017
+EXPOSE 5017
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5017/login')" || exit 1
 
 CMD ["python", "app.py"]

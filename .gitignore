@@ -25,6 +25,12 @@ env/
 *.swp
 *.swo
 
+# Environnement
+.env
+
+# Backups
+backups/
+
 # Données personnelles / imports
 *.xlsx
 *.csv

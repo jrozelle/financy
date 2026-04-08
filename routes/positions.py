@@ -49,6 +49,8 @@ def add_position():
         return jsonify({'error': 'Valeur / dette invalide'}), 400
     if not validate_pct(d.get('ownership_pct')) or not validate_pct(d.get('debt_pct')):
         return jsonify({'error': '% propriété ou dette invalide (0-100)'}), 400
+    if not validate_string(d.get('notes'), 2000):
+        return jsonify({'error': 'Notes trop longues (2000 car. max)'}), 400
     with get_db() as conn:
         entity = d.get('entity')
         stored_value = 0 if entity else d.get('value', 0)
@@ -84,6 +86,8 @@ def update_position(pid):
         return jsonify({'error': 'Valeur / dette invalide'}), 400
     if not validate_pct(d.get('ownership_pct')) or not validate_pct(d.get('debt_pct')):
         return jsonify({'error': '% invalide'}), 400
+    if not validate_string(d.get('notes'), 2000):
+        return jsonify({'error': 'Notes trop longues (2000 car. max)'}), 400
     with get_db() as conn:
         entity = d.get('entity')
         stored_value = 0 if entity else d.get('value', 0)
@@ -129,10 +133,23 @@ def snapshot_update(pid):
 
     if not source_date or not target_date or not new_values:
         return jsonify({'error': 'source_date, target_date et position requis'}), 400
+    if not validate_date(source_date) or not validate_date(target_date):
+        return jsonify({'error': 'Dates invalides'}), 400
+    if source_date == target_date:
+        return jsonify({'error': 'Les dates source et cible doivent être différentes'}), 400
+    if not new_values.get('owner') or not new_values.get('category'):
+        return jsonify({'error': 'Propriétaire et catégorie requis'}), 400
+    if not validate_pct(new_values.get('ownership_pct')) or not validate_pct(new_values.get('debt_pct')):
+        return jsonify({'error': '% propriété ou dette invalide'}), 400
+    if not validate_string(new_values.get('notes'), 2000):
+        return jsonify({'error': 'Notes trop longues'}), 400
 
     with get_db() as conn:
         entity_map = get_entity_map(conn, target_date)
         ref        = load_referential(conn)
+
+        # Acquire write lock immediately to prevent race conditions
+        conn.execute('BEGIN IMMEDIATE')
 
         source_rows = conn.execute(
             'SELECT * FROM positions WHERE date=?', (source_date,)
