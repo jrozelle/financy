@@ -496,6 +496,14 @@ input[type="file"] {
 .perf-label { color: var(--text-muted); }
 .perf-val   { font-weight: 700; font-size: 15px; }
 
+/* ── TRI ───────────────────────────────────────────────────────────────── */
+.tri-grid { display: grid; gap: 0; }
+.tri-row  { display: flex; justify-content: space-between; align-items: baseline; padding: .35rem 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.tri-row:last-child { border-bottom: none; }
+.tri-global { font-weight: 700; font-size: 14px; padding: .5rem 0; }
+.tri-label { color: var(--text-muted); }
+.tri-val   { font-weight: 600; font-size: 14px; }
+
 /* ── Drill-down panel ────────────────────────────────────────────────────── */
 .drilldown {
   position: fixed;

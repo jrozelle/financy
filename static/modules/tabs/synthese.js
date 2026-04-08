@@ -96,6 +96,7 @@ export function renderSynthese() {
   renderEntitiesSynthese();
   renderAllocationTargets();
   renderPerf();
+  renderTRI();
 }
 
 function renderOwnersTable(byOwner, family, totalMob) {
@@ -432,8 +433,8 @@ function renderEntitiesSynthese() {
           <td><strong>${esc(e.name)}</strong></td>
           <td>${esc(e.type || '—')}</td>
           <td style="text-align:right">${fmt(e.gross_assets)}</td>
-          <td style="text-align:right" class="${e.debt > 0 ? 'neg' : ''}">${e.debt > 0 ? fmt(e.debt) : '—'}</td>
-          <td style="text-align:right;font-weight:600">${fmt(e.net_assets)}</td>
+          <td style="text-align:right">${e.debt > 0 ? fmt(e.debt) : '—'}</td>
+          <td style="text-align:right;font-weight:600" class="${e.net_assets >= 0 ? 'pos' : 'neg'}">${fmt(e.net_assets)}</td>
           <td style="text-align:right">
             ${fmt(familyNet)}
             <span style="font-size:11px;color:var(--text-muted);margin-left:4px">${familyPct !== '—' ? familyPct + '%' : ''}</span>
@@ -517,4 +518,46 @@ export async function renderPerf() {
       <span class="perf-val">${fmt(fluxTotal)}</span>
     </div>
   </div>`;
+}
+
+async function renderTRI() {
+  const el = document.getElementById('tri-section');
+  if (!el) return;
+  const owner = S.syntheseOwner;
+  const isFamily = owner === 'Famille';
+  const url = isFamily ? '/api/tri' : `/api/tri?owner=${encodeURIComponent(owner)}`;
+
+  try {
+    const data = await api('GET', url);
+    if (!data.tri || Object.keys(data.tri).length === 0) {
+      el.innerHTML = '<p class="text-muted" style="font-size:13px">Pas assez de données (min. 2 snapshots + flux).</p>';
+      return;
+    }
+    const globalTri = data.tri._global;
+    const envs = Object.entries(data.tri)
+      .filter(([k]) => k !== '_global')
+      .sort((a, b) => b[1] - a[1]);
+
+    let html = '<div class="tri-grid">';
+    if (globalTri != null) {
+      const cls = globalTri >= 0 ? 'pos' : 'neg';
+      const label = isFamily ? 'TRI global' : `TRI global — ${esc(owner)}`;
+      html += `<div class="tri-row tri-global">
+        <span class="tri-label">${label}</span>
+        <span class="tri-val ${cls}">${globalTri > 0 ? '+' : ''}${globalTri.toFixed(2)}\u202f%</span>
+      </div>`;
+    }
+    html += `<div class="tri-period text-muted" style="font-size:12px;margin-bottom:.5rem">${fmtDate(data.first_date)} → ${fmtDate(data.date)}</div>`;
+    for (const [env, tri] of envs) {
+      const cls = tri >= 0 ? 'pos' : 'neg';
+      html += `<div class="tri-row">
+        <span class="tri-label">${esc(env)}</span>
+        <span class="tri-val ${cls}">${tri > 0 ? '+' : ''}${tri.toFixed(2)}\u202f%</span>
+      </div>`;
+    }
+    html += '</div>';
+    el.innerHTML = html;
+  } catch {
+    el.innerHTML = '<p class="text-muted" style="font-size:13px">Erreur lors du calcul du TRI.</p>';
+  }
 }
