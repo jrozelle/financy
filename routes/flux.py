@@ -10,14 +10,19 @@ flux_bp = Blueprint('flux', __name__)
 def get_flux():
     date_from = request.args.get('date_from')
     date_to   = request.args.get('date_to')
+    limit     = request.args.get('limit', type=int)
+    offset    = request.args.get('offset', 0, type=int)
     with get_db() as conn:
         if date_from and date_to:
-            rows = conn.execute(
-                'SELECT * FROM flux WHERE date >= ? AND date <= ? ORDER BY date DESC',
-                (date_from, date_to)
-            ).fetchall()
+            query = 'SELECT * FROM flux WHERE date >= ? AND date <= ? ORDER BY date DESC'
+            params = [date_from, date_to]
         else:
-            rows = conn.execute('SELECT * FROM flux ORDER BY date DESC').fetchall()
+            query = 'SELECT * FROM flux ORDER BY date DESC'
+            params = []
+        if limit is not None:
+            query += ' LIMIT ? OFFSET ?'
+            params += [limit, offset]
+        rows = conn.execute(query, params).fetchall()
     return jsonify([dict(r) for r in rows])
 
 

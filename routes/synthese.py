@@ -292,6 +292,14 @@ def get_tri():
         if owner:
             flux_list = [f for f in flux_list if f['owner'] == owner]
 
+        # Flux hors plage — avertissement
+        excluded_query = 'SELECT COUNT(*) as cnt FROM flux WHERE date <= ? OR date > ?'
+        excluded_params = [first_date, last_date]
+        if owner:
+            excluded_query += ' AND owner = ?'
+            excluded_params.append(owner)
+        excluded_count = conn.execute(excluded_query, excluded_params).fetchone()['cnt']
+
     all_envs = set(initial_by_env.keys()) | set(current_by_env.keys())
 
     result = {}
@@ -320,7 +328,10 @@ def get_tri():
     if tri_global is not None:
         result['_global'] = tri_global
 
-    return jsonify({'date': last_date, 'first_date': first_date, 'tri': result})
+    resp = {'date': last_date, 'first_date': first_date, 'tri': result}
+    if excluded_count > 0:
+        resp['excluded_flux'] = excluded_count
+    return jsonify(resp)
 
 
 # ─── Notes de snapshot ────────────────────────────────────────────────────

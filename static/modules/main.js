@@ -1,7 +1,7 @@
 import { S } from './state.js';
 import { fmtDate, treeFilter, treeExpandCollapse, treeToggleRow } from './utils.js';
 import { api, buildSelects } from './api.js';
-import { closeModal } from './dialogs.js';
+import { closeModal, trapModalFocus } from './dialogs.js';
 import { wireDrilldownEvents, drilldownHistory } from './drilldown.js';
 import { wireTargetsEvents } from './targets.js';
 import { loadUserAlertsAsync, saveUserAlerts } from './alerts.js';
@@ -316,6 +316,9 @@ function wireEvents() {
   });
   document.getElementById('position-modal-overlay').addEventListener('click', () => closeModal('position-modal'));
   document.getElementById('flux-modal-overlay').addEventListener('click', () => closeModal('flux-modal'));
+
+  // Focus traps on static modals
+  ['position-modal', 'flux-modal', 'entity-modal', 'targets-modal'].forEach(trapModalFocus);
 
   // Keyboard shortcuts
   document.addEventListener('keydown', e => {

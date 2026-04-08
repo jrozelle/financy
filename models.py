@@ -319,6 +319,8 @@ MIGRATIONS = [
 
 
 def init_db():
+    import logging
+    logger = logging.getLogger(__name__)
     with get_db() as conn:
         # Créer la table de versionnement
         conn.execute('''
@@ -331,8 +333,14 @@ def init_db():
 
         for version, migrate_fn in MIGRATIONS:
             if version > current:
-                migrate_fn(conn)
-                _set_schema_version(conn, version)
+                try:
+                    migrate_fn(conn)
+                    _set_schema_version(conn, version)
+                    logger.info('Migration %d applied successfully', version)
+                except Exception:
+                    conn.rollback()
+                    logger.exception('Migration %d failed — rolled back', version)
+                    raise
 
         # Pour les DB existantes sans schema_version, s'assurer qu'on enregistre la version max
         if current == 0 and MIGRATIONS:

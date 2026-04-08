@@ -11,8 +11,15 @@ entities_bp = Blueprint('entities', __name__)
 @entities_bp.route('/api/entities', methods=['GET'])
 @login_required
 def get_entities():
+    limit  = request.args.get('limit', type=int)
+    offset = request.args.get('offset', 0, type=int)
     with get_db() as conn:
-        rows = conn.execute('SELECT * FROM entities ORDER BY name').fetchall()
+        query = 'SELECT * FROM entities ORDER BY name'
+        params = []
+        if limit is not None:
+            query += ' LIMIT ? OFFSET ?'
+            params = [limit, offset]
+        rows = conn.execute(query, params).fetchall()
     result = []
     for r in rows:
         e = dict(r)

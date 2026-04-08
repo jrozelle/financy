@@ -7,7 +7,8 @@ export async function loadUserAlertsAsync() {
     let data = await api('GET', '/api/alerts');
     if (!Array.isArray(data)) data = [];
     setAlertsCache(data);
-  } catch {
+  } catch (err) {
+    console.warn('[alerts] API load failed, falling back to localStorage:', err);
     try { setAlertsCache(JSON.parse(localStorage.getItem('patrimoine_alerts')) || []); } catch { setAlertsCache([]); }
   }
   return _alertsCache;
@@ -22,7 +23,8 @@ export async function saveUserAlerts(a) {
   try {
     await api('PUT', '/api/alerts', a);
     localStorage.removeItem('patrimoine_alerts');
-  } catch {
+  } catch (err) {
+    console.warn('[alerts] API save failed, falling back to localStorage:', err);
     localStorage.setItem('patrimoine_alerts', JSON.stringify(a));
   }
 }

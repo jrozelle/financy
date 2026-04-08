@@ -7,7 +7,8 @@ export async function loadTargets() {
   if (_targetsCache !== null) return _targetsCache;
   try {
     setTargetsCache(await api('GET', '/api/targets'));
-  } catch {
+  } catch (err) {
+    console.warn('[targets] API load failed, falling back to localStorage:', err);
     try { setTargetsCache(JSON.parse(localStorage.getItem('patrimoine_targets')) || {}); } catch { setTargetsCache({}); }
   }
   return _targetsCache;
@@ -18,7 +19,8 @@ export async function saveTargets(targets) {
   try {
     await api('PUT', '/api/targets', targets);
     localStorage.removeItem('patrimoine_targets');
-  } catch {
+  } catch (err) {
+    console.warn('[targets] API save failed, falling back to localStorage:', err);
     localStorage.setItem('patrimoine_targets', JSON.stringify(targets));
   }
 }
