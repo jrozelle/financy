@@ -6,7 +6,7 @@ from models import init_db, set_demo_mode, DEMO_DB_PATH
 from routes import all_blueprints
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', os.urandom(32))
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-fallback-change-me-in-production')
 
 
 # ─── Auth routes ──────────────────────────────────────────────────────────────

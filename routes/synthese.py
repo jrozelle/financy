@@ -1,7 +1,6 @@
 from flask import Blueprint, jsonify, request
 from datetime import datetime
-from models import (get_db, compute_position, get_entity_map, load_referential,
-                    OWNERS)
+from models import (get_db, compute_position, get_entity_map, load_referential)
 from auth import login_required
 
 synthese_bp = Blueprint('synthese', __name__)
@@ -47,7 +46,7 @@ def get_synthese():
             totals_by_category[cat] = {
                 'net':      sum(p['net_attributed'] for p in ops),
                 'by_owner': {o: sum(p['net_attributed'] for p in ops if p['owner'] == o)
-                             for o in OWNERS},
+                             for o in ref['owners']},
             }
 
     mobilizable_by_liquidity = {
