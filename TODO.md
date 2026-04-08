@@ -109,7 +109,7 @@ Référentiel :
 
 --- Code backend ---
 
-- [ ] 🟠 Découper app.py (~950 lignes) en modules : models.py, routes/ (blueprints), referential.py
+- [x] 🟠 Découper app.py (~950 lignes) en modules : models.py, routes/ (blueprints), referential.py
 - [ ] 🟡 Supprimer le référentiel hardcodé — le transformer en seed d'init, ne garder que la lecture DB
 - [ ] 🟡 Utiliser flask.g + teardown_appcontext pour une connexion DB par requête (pattern Flask standard)
 - [ ] 🟡 Endpoint /api/backup : copie de patrimoine.db avec timestamp
