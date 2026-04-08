@@ -246,7 +246,7 @@ class TestLoadReferential:
         custom = {'owners': ['Alice', 'Bob'], 'categories': ['Test']}
         with get_db() as conn:
             conn.execute(
-                "INSERT INTO config (key, value) VALUES ('referential', ?)",
+                "INSERT OR REPLACE INTO config (key, value) VALUES ('referential', ?)",
                 (json.dumps(custom),)
             )
         with get_db() as conn:

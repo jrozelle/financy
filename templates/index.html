@@ -6,7 +6,7 @@
   <meta name="csrf-token" content="{{ csrf_token }}">
   <title>Financy</title>
   <link rel="stylesheet" href="/static/style.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="/static/vendor/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -18,11 +18,17 @@
       <button class="tab-btn" data-tab="flux">Flux</button>
       <button class="tab-btn" data-tab="entites">Entités</button>
     </div>
-    <div class="nav-actions" style="margin-left:auto;display:flex;gap:.375rem;align-items:center">
+    <div class="global-search" id="global-search">
+      <span class="global-search-icon">&#128269;</span>
+      <input type="search" class="global-search-input" id="global-search-input" placeholder="Rechercher…" autocomplete="off">
+      <div class="search-results" id="search-results"></div>
+    </div>
+    <div class="nav-actions" style="display:flex;gap:.375rem;align-items:center">
       <div class="settings-menu" id="settings-menu">
         <button class="settings-toggle" id="settings-toggle" title="Paramètres">&#9881;</button>
         <div class="settings-dropdown hidden" id="settings-dropdown">
           <button class="settings-item" data-tab="referentiel">&#9881; Référentiel</button>
+          <button class="settings-item" data-tab="tools">&#128295; Outils</button>
           <button class="settings-item" data-tab="import">&#8645; Import / Export</button>
         </div>
       </div>
@@ -52,6 +58,8 @@
 
       <div id="entity-warnings-bar"></div>
 
+      <div id="snapshot-note-bar" style="display:none;margin-bottom:1rem"></div>
+      <div id="wealth-target-bar" style="margin-bottom:1rem;display:none"></div>
       <div class="kpi-grid">
         <div class="kpi-card">
           <div class="kpi-label" id="kpi-net-label">Patrimoine net famille</div>
@@ -104,25 +112,27 @@
 
       <div class="charts-row">
         <div class="card">
+          <h2>Performance</h2>
+          <div id="perf-section"></div>
+        </div>
+        <div class="card">
+          <h2>Mobilisable par liquidité</h2>
+          <div id="liquidity-bars"></div>
+        </div>
+      </div>
+
+      <div class="charts-row">
+        <div class="card">
+          <h2>TRI par enveloppe</h2>
+          <div id="tri-section"></div>
+        </div>
+        <div class="card">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.875rem">
             <h2 style="margin:0">Allocation cible vs réelle</h2>
             <button class="btn btn-secondary btn-sm" id="btn-edit-targets">Modifier cibles</button>
           </div>
           <div id="allocation-targets"></div>
         </div>
-        <div class="card">
-          <h2>Performance</h2>
-          <div id="perf-section"></div>
-        </div>
-        <div class="card">
-          <h2>TRI par enveloppe</h2>
-          <div id="tri-section"></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>Mobilisable par liquidité</h2>
-        <div id="liquidity-bars"></div>
       </div>
 
       <div class="card" id="entities-synthese-card" style="display:none">
@@ -201,6 +211,7 @@
       <div class="filters-bar">
         <select id="flux-filter-owner" class="filter-select"><option value="">Toutes les personnes</option></select>
         <select id="flux-filter-type"  class="filter-select"><option value="">Tous les types</option></select>
+        <select id="flux-filter-category" class="filter-select"><option value="">Toutes les catégories</option></select>
         <select id="flux-filter-year"  class="filter-select"><option value="">Toutes les années</option></select>
         <button class="btn btn-secondary btn-sm" id="btn-clear-flux-filters">Effacer filtres</button>
       </div>
@@ -211,6 +222,7 @@
               <th data-sort="date">Date</th>
               <th data-sort="owner">Propriétaire</th>
               <th data-sort="envelope">Enveloppe</th>
+              <th data-sort="category">Catégorie</th>
               <th data-sort="type">Type</th>
               <th class="num" data-sort="amount">Montant</th>
               <th>Notes</th>
@@ -265,13 +277,16 @@
         <h1>Référentiel</h1>
         <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
           <div id="ref-save-status" style="font-size:13px"></div>
-          <button class="btn btn-secondary" id="btn-reset-referential">Réinitialiser</button>
-          <button class="btn btn-primary"   id="btn-save-referential">Enregistrer le référentiel</button>
+          <select id="ref-template-select" class="filter-select" style="width:auto">
+            <option value="">Charger un modèle…</option>
+          </select>
+          <button class="btn btn-primary" id="btn-save-referential">Enregistrer le référentiel</button>
         </div>
       </div>
       <p class="text-muted" style="margin-bottom:1.25rem;font-size:13px">
         Modifiez les listes et valeurs utilisées dans toute l'application. Les changements prennent effet après enregistrement.
       </p>
+      <div id="ref-template-preview" class="card" style="display:none;margin-bottom:1.25rem;border:2px solid var(--primary);background:var(--primary-light)"></div>
 
       <div class="two-col">
         <div class="card">
@@ -336,6 +351,56 @@
       </div>
     </div>
 
+    <!-- ── OUTILS ──────────────────────────────────────────────────────── -->
+    <div id="tab-tools" class="tab-content hidden">
+      <div class="page-header"><h1>Outils</h1></div>
+
+      <div class="card">
+        <h2>Timeline patrimoniale</h2>
+        <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
+          Frise chronologique des snapshots, flux et événements.
+        </p>
+        <div id="timeline-body"></div>
+      </div>
+
+      <div class="card">
+        <h2>Projection / Simulation</h2>
+        <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
+          Simulez l'évolution d'un capital avec un versement mensuel régulier.
+        </p>
+        <form id="simulation-form">
+          <div class="form-grid" style="margin-bottom:1rem">
+            <div class="form-group">
+              <label>Capital initial (€)</label>
+              <input type="number" id="sim-initial" value="10000" min="0" step="100">
+            </div>
+            <div class="form-group">
+              <label>Versement mensuel (€)</label>
+              <input type="number" id="sim-monthly" value="500" min="0" step="50">
+            </div>
+            <div class="form-group">
+              <label>Rendement annuel (%)</label>
+              <input type="number" id="sim-rate" value="5" min="-20" max="50" step="0.5">
+            </div>
+            <div class="form-group">
+              <label>Durée (années)</label>
+              <input type="number" id="sim-years" value="10" min="1" max="50">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary">Simuler</button>
+        </form>
+        <div id="simulation-result" style="margin-top:1.25rem"></div>
+      </div>
+
+      <div class="card">
+        <h2>Snapshot automatique</h2>
+        <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
+          Duplique le dernier snapshot à la date du jour. Utile pour garder un historique régulier sans modifier manuellement les positions.
+        </p>
+        <button class="btn btn-secondary" id="btn-auto-snapshot">Créer un snapshot aujourd'hui</button>
+      </div>
+    </div>
+
     <!-- ── IMPORT / EXPORT ──────────────────────────────────────────────── -->
     <div id="tab-import" class="tab-content hidden">
       <div class="page-header"><h1>Import / Export</h1></div>
@@ -391,6 +456,15 @@
           </label>
         </div>
 
+        <div class="card">
+          <h2>Sauvegarder la base</h2>
+          <p class="text-muted" style="margin-bottom:1rem">
+            Crée une copie horodatée de la base de données dans le dossier <code>backups/</code>.
+          </p>
+          <button class="btn btn-secondary" id="btn-backup">Créer un backup</button>
+          <div id="backup-result" style="margin-top:.75rem"></div>
+        </div>
+
         <div class="card" style="border: 1px solid #fca5a5">
           <h2 style="color:var(--danger)">Zone dangereuse</h2>
           <p class="text-muted" style="margin-bottom:1rem">
@@ -430,7 +504,8 @@
     <div class="drilldown-overlay" id="drilldown-overlay"></div>
     <div class="drilldown-content">
       <div class="drilldown-header">
-        <div>
+        <button class="dd-back hidden" id="dd-back" title="Retour">&#8592;</button>
+        <div style="flex:1;min-width:0">
           <div class="drilldown-subtitle" id="dd-subtitle"></div>
           <h2 id="dd-title"></h2>
           <div class="drilldown-amount" id="dd-amount"></div>
@@ -453,7 +528,7 @@
         <div class="form-grid">
           <div class="form-group">
             <label>Date *</label>
-            <input type="date" id="pos-date" required>
+            <input type="date" id="pos-date" required placeholder="AAAA-MM-JJ" title="Format : AAAA-MM-JJ">
           </div>
           <div class="form-group">
             <label>Propriétaire *</label>
@@ -539,7 +614,7 @@
         <div class="form-grid">
           <div class="form-group">
             <label>Date *</label>
-            <input type="date" id="flux-date" required>
+            <input type="date" id="flux-date" required placeholder="AAAA-MM-JJ" title="Format : AAAA-MM-JJ">
           </div>
           <div class="form-group">
             <label>Propriétaire *</label>
@@ -552,6 +627,10 @@
           <div class="form-group">
             <label>Type</label>
             <select id="flux-type"></select>
+          </div>
+          <div class="form-group">
+            <label>Catégorie</label>
+            <select id="flux-category"></select>
           </div>
           <div class="form-group full-span">
             <label>Montant (€) * — positif = apport, négatif = sortie</label>

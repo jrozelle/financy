@@ -1,9 +1,11 @@
 import { S } from '../state.js';
-import { fmt, fmtDate, esc, sortArr, updateSortIndicators, today } from '../utils.js';
+import { fmt, fmtDate, esc, sortArr, updateSortIndicators, today, getColors, chartBorderColor, destroyChart } from '../utils.js';
 import { api, refreshEntitySelect } from '../api.js';
 import { confirmDialog, toast, closeModal } from '../dialogs.js';
 import { switchTab } from '../main.js';
 import { openPosModal } from './positions.js';
+
+let _entityTimelineChart = null;
 
 export async function loadEntities() {
   const lastDate = S.dates[0];
@@ -105,7 +107,9 @@ function showEntitySnapshots(entityName) {
   document.getElementById('dd-subtitle').textContent = 'Entité';
   document.getElementById('dd-title').textContent = entityName;
   document.getElementById('dd-amount').textContent = entity ? fmt(entity.net_assets) + ' (actuel)' : '';
+  const showChart = snaps.length >= 2;
   document.getElementById('dd-body').innerHTML = `
+    ${showChart ? '<div style="position:relative;height:200px;margin-bottom:1rem"><canvas id="entity-timeline-canvas"></canvas></div>' : ''}
     <p style="font-size:13px;color:var(--text-muted);margin-bottom:.75rem">
       Chaque modification de valeur crée une entrée datée. L'historique est utilisé pour reconstituer la valorisation aux dates passées.
     </p>
@@ -121,6 +125,8 @@ function showEntitySnapshots(entityName) {
         <tbody>${rows}</tbody>
       </table>
     </div>`;
+
+  if (showChart) renderEntityTimeline(snaps);
 
   document.getElementById('snap-hist-table').addEventListener('click', async ev => {
     const btn = ev.target.closest('[data-action="del-snap"]');
@@ -192,8 +198,67 @@ export async function saveEntity(e) {
     await loadEntities();
     refreshEntitySelect();
   } catch (err) {
-    alert(`Erreur : ${err.message}`);
+    toast(`Erreur : ${err.message}`, 'error');
   }
+}
+
+function renderEntityTimeline(snaps) {
+  const canvas = document.getElementById('entity-timeline-canvas');
+  if (!canvas) return;
+  _entityTimelineChart = destroyChart(_entityTimelineChart);
+
+  const sorted = [...snaps].sort((a, b) => a.date.localeCompare(b.date));
+  const labels = sorted.map(s => fmtDate(s.date));
+  const netData = sorted.map(s => (s.gross_assets || 0) - (s.debt || 0));
+  const grossData = sorted.map(s => s.gross_assets || 0);
+  const colors = getColors();
+  const border = chartBorderColor();
+
+  _entityTimelineChart = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Actif net',
+          data: netData,
+          borderColor: colors[0],
+          backgroundColor: colors[0] + '22',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 4,
+          borderWidth: 2,
+        },
+        {
+          label: 'Actif brut',
+          data: grossData,
+          borderColor: colors[1],
+          borderDash: [5, 3],
+          tension: 0.3,
+          pointRadius: 3,
+          borderWidth: 1.5,
+          fill: false,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } },
+      },
+      scales: {
+        y: {
+          ticks: {
+            callback: v => new Intl.NumberFormat('fr-FR', { notation: 'compact' }).format(v) + ' €',
+            font: { size: 11 },
+          },
+          grid: { color: border },
+        },
+        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+      },
+    },
+  });
 }
 
 export async function deleteEntity(id) {
@@ -201,9 +266,24 @@ export async function deleteEntity(id) {
   const name = e?.name || `Entité #${id}`;
   if (!await confirmDialog(
     `Supprimer l'entité ?`,
-    `<strong>${esc(name)}</strong><br>Les positions liées ne seront pas supprimées, mais ne pourront plus résoudre la valeur de cette entité.`
+    `<strong>${esc(name)}</strong><br>Les positions liées perdront leur référence entité.`
   )) return;
-  await api('DELETE', `/api/entities/${id}`);
+
+  try {
+    await api('DELETE', `/api/entities/${id}`, null, { silent: true });
+  } catch (err) {
+    // 409: positions linked — ask for force confirmation
+    if (err.message.includes('position(s) liée(s)')) {
+      if (!await confirmDialog(
+        'Positions liées',
+        `${esc(err.message)}<br><br>La référence entité sera retirée de ces positions. Continuer ?`
+      )) return;
+      await api('DELETE', `/api/entities/${id}?force=1`);
+    } else {
+      toast(err.message, 'error');
+      return;
+    }
+  }
   toast('Entité supprimée');
   await loadEntities();
   refreshEntitySelect();

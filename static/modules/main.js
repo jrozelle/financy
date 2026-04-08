@@ -2,7 +2,7 @@ import { S } from './state.js';
 import { fmtDate, treeFilter, treeExpandCollapse, treeToggleRow } from './utils.js';
 import { api, buildSelects } from './api.js';
 import { closeModal } from './dialogs.js';
-import { wireDrilldownEvents } from './drilldown.js';
+import { wireDrilldownEvents, drilldownHistory } from './drilldown.js';
 import { wireTargetsEvents } from './targets.js';
 import { loadUserAlertsAsync, saveUserAlerts } from './alerts.js';
 import { loadTargets, saveTargets } from './targets.js';
@@ -13,8 +13,10 @@ import { loadPositions, renderPositions, clearFilters, openPosModal, duplicateSn
          onEntitySelectChange, updatePosInfo, savePosition, startInlineEdit, deletePosition } from './tabs/positions.js';
 import { loadFlux, renderFlux, openFluxModal, saveFlux } from './tabs/flux.js';
 import { loadEntities, renderEntities, openEntityModal, saveEntity, updateEntInfo } from './tabs/entities.js';
-import { importXlsx, importJson, exportJson, resetDb, initDemoToggle } from './tabs/import-export.js';
-import { loadReferential, saveReferential, resetReferential } from './tabs/referentiel.js';
+import { importXlsx, importJson, exportJson, resetDb, initDemoToggle, createBackup } from './tabs/import-export.js';
+import { loadReferential, saveReferential, initTemplateSelect } from './tabs/referentiel.js';
+import { loadTimeline, wireSimulation, triggerAutoSnapshot } from './tabs/tools.js';
+import { wireGlobalSearch } from './search.js';
 
 // ─── Init ─────────────────────────────────────────────────────────────────
 
@@ -23,6 +25,7 @@ async function init() {
   buildSelects();
   wireEvents();
   wireDrilldownEvents();
+  wireGlobalSearch(switchTab);
   await Promise.all([refreshDates(), loadEntities(), loadHistorique(), loadTargets(), loadUserAlertsAsync()]);
   await migrateLocalStorageToDB();
   await switchTab('synthese');
@@ -68,6 +71,28 @@ export function renderDateSelects() {
   if (S.positionsDate) document.getElementById('positions-date-select').value = S.positionsDate;
 }
 
+// ─── Loading spinner ──────────────────────────────────────────────────
+
+function showLoading(tabId) {
+  const el = document.getElementById(tabId);
+  if (!el) return;
+  let loader = el.querySelector('.tab-loading');
+  if (!loader) {
+    loader = document.createElement('div');
+    loader.className = 'tab-loading';
+    loader.innerHTML = '<div class="spinner"></div>';
+    el.prepend(loader);
+  }
+  loader.style.display = '';
+}
+
+function hideLoading(tabId) {
+  const el = document.getElementById(tabId);
+  if (!el) return;
+  const loader = el.querySelector('.tab-loading');
+  if (loader) loader.style.display = 'none';
+}
+
 // ─── Tabs ─────────────────────────────────────────────────────────────────
 
 export async function switchTab(tab) {
@@ -81,11 +106,18 @@ export async function switchTab(tab) {
   const dd = document.getElementById('settings-dropdown');
   if (dd) dd.classList.add('hidden');
 
-  if (tab === 'synthese')    await loadSynthese();
-  if (tab === 'positions')   await loadPositions();
-  if (tab === 'flux')        await loadFlux();
-  if (tab === 'entites')     await loadEntities();
-  if (tab === 'referentiel') await loadReferential();
+  const tabId = `tab-${tab}`;
+  showLoading(tabId);
+  try {
+    if (tab === 'synthese')    await loadSynthese();
+    if (tab === 'positions')   await loadPositions();
+    if (tab === 'flux')        await loadFlux();
+    if (tab === 'entites')     await loadEntities();
+    if (tab === 'referentiel') await loadReferential();
+    if (tab === 'tools')       await loadTimeline();
+  } finally {
+    hideLoading(tabId);
+  }
 }
 
 // ─── Events ───────────────────────────────────────────────────────────────
@@ -96,14 +128,16 @@ function wireEvents() {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
 
-  // Date selects
-  document.getElementById('synthese-date-select').addEventListener('change', e => {
+  // Date selects (with spinner)
+  document.getElementById('synthese-date-select').addEventListener('change', async e => {
     S.syntheseDate = e.target.value;
-    loadSynthese();
+    showLoading('tab-synthese');
+    try { await loadSynthese(); } finally { hideLoading('tab-synthese'); }
   });
-  document.getElementById('positions-date-select').addEventListener('change', e => {
+  document.getElementById('positions-date-select').addEventListener('change', async e => {
     S.positionsDate = e.target.value;
-    loadPositions();
+    showLoading('tab-positions');
+    try { await loadPositions(); } finally { hideLoading('tab-positions'); }
   });
 
   // Positions buttons
@@ -129,6 +163,26 @@ function wireEvents() {
           entity:        btn.dataset.entity        || undefined,
         });
       }
+      if (btn.dataset.action === 'history-pos') {
+        drilldownHistory({
+          subtitle: 'Évolution position',
+          title: S.positions.find(p => p.id === parseInt(btn.dataset.id))?.category || '',
+          filters: { position_id: btn.dataset.id },
+        });
+      }
+      if (btn.dataset.action === 'history-env') {
+        const f = { owner: btn.dataset.owner, envelope: btn.dataset.envelope };
+        if (btn.dataset.establishment) f.establishment = btn.dataset.establishment;
+        if (btn.dataset.entity) f.entity = btn.dataset.entity;
+        drilldownHistory({ subtitle: 'Évolution enveloppe', title: btn.dataset.envelope, filters: f });
+      }
+      if (btn.dataset.action === 'history-etabl') {
+        const f = { owner: btn.dataset.owner };
+        if (btn.dataset.establishment) f.establishment = btn.dataset.establishment;
+        if (btn.dataset.entity) f.entity = btn.dataset.entity;
+        const label = btn.dataset.establishment || btn.dataset.entity || '';
+        drilldownHistory({ subtitle: 'Évolution établissement', title: label, filters: f });
+      }
       return;
     }
     const amt = ev.target.closest('.tree-inline-amount');
@@ -140,8 +194,12 @@ function wireEvents() {
     document.getElementById('pos-snapshot-date').style.visibility = e.target.checked ? '' : 'hidden';
   });
 
-  // Positions tree search
-  document.getElementById('pos-tree-search').addEventListener('input', e => treeFilter('positions-tree-body', e.target.value));
+  // Positions tree search (debounced)
+  let _treeSearchTimer = null;
+  document.getElementById('pos-tree-search').addEventListener('input', e => {
+    clearTimeout(_treeSearchTimer);
+    _treeSearchTimer = setTimeout(() => treeFilter('positions-tree-body', e.target.value), 150);
+  });
 
   // Positions tree depth bar
   const depthBar = document.querySelector('.tree-depth-bar');
@@ -192,13 +250,13 @@ function wireEvents() {
 
   // Flux buttons
   document.getElementById('btn-add-flux').addEventListener('click', () => openFluxModal());
-  ['flux-filter-owner','flux-filter-type','flux-filter-year'].forEach(id => {
+  ['flux-filter-owner','flux-filter-type','flux-filter-category','flux-filter-year'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('change', renderFlux);
   });
   const btnClearFlux = document.getElementById('btn-clear-flux-filters');
   if (btnClearFlux) btnClearFlux.addEventListener('click', () => {
-    ['flux-filter-owner','flux-filter-type','flux-filter-year'].forEach(id => {
+    ['flux-filter-owner','flux-filter-type','flux-filter-category','flux-filter-year'].forEach(id => {
       document.getElementById(id).value = '';
     });
     renderFlux();
@@ -220,6 +278,7 @@ function wireEvents() {
   document.getElementById('btn-import-json').addEventListener('click', importJson);
   document.getElementById('btn-export').addEventListener('click', exportJson);
   document.getElementById('btn-reset').addEventListener('click', resetDb);
+  document.getElementById('btn-backup')?.addEventListener('click', createBackup);
 
   // Tri des tableaux
   wireSortableTable('positions-thead', 'positions', renderPositions);
@@ -228,7 +287,11 @@ function wireEvents() {
 
   // Référentiel
   document.getElementById('btn-save-referential')?.addEventListener('click', saveReferential);
-  document.getElementById('btn-reset-referential')?.addEventListener('click', resetReferential);
+  initTemplateSelect();
+
+  // Tools
+  wireSimulation();
+  document.getElementById('btn-auto-snapshot')?.addEventListener('click', triggerAutoSnapshot);
 
   // Position form
   document.getElementById('position-form').addEventListener('submit', savePosition);
@@ -278,6 +341,13 @@ function wireEvents() {
       e.preventDefault();
       if (S.currentTab !== 'positions') switchTab('positions');
       openPosModal();
+    }
+
+    // / — focus global search
+    if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      document.getElementById('global-search-input')?.focus();
+      return;
     }
 
     // Arrow Left/Right — navigate between snapshots

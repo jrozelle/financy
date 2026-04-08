@@ -1,8 +1,14 @@
+import logging
 from flask import Blueprint, jsonify, request
 from datetime import datetime
 from io import BytesIO
-from models import get_db
+from models import get_db, validate_date, validate_number, validate_pct, validate_string
 from auth import login_required, csrf_protect
+
+MAX_IMPORT_ROWS = 10000
+MAX_NOTE_LENGTH = 2000
+
+logger = logging.getLogger('financy')
 
 import_export_bp = Blueprint('import_export', __name__)
 
@@ -21,11 +27,38 @@ def import_xlsx():
         import openpyxl
         wb = openpyxl.load_workbook(BytesIO(file.read()), data_only=True)
         imported = 0
+        skipped = 0
+
+        def _parse_date(val):
+            if isinstance(val, datetime):
+                return val.strftime('%Y-%m-%d')
+            s = str(val)[:10] if val else None
+            return s if s and validate_date(s) else None
+
+        def _safe_float(val, default=0):
+            if val is None:
+                return default
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                return default
+
+        def _safe_pct(val, default=1.0):
+            f = _safe_float(val, default)
+            return max(0.0, min(f, 1.0))
+
+        def _safe_str(val, max_len=500):
+            if val is None:
+                return None
+            s = str(val)[:max_len]
+            return s
 
         with get_db() as conn:
             # Positions
             ws = wb['Positions']
-            for row in ws.iter_rows(min_row=2, values_only=True):
+            for i, row in enumerate(ws.iter_rows(min_row=2, values_only=True)):
+                if i >= MAX_IMPORT_ROWS:
+                    break
                 if len(row) < 7:
                     continue
                 date_val, owner, category = row[0], row[1], row[2]
@@ -36,30 +69,36 @@ def import_xlsx():
                 ownership_pct_raw = row[10] if len(row) > 10 else None
                 debt_pct_raw      = row[11] if len(row) > 11 else None
 
-                if not date_val or not owner:
+                date_str = _parse_date(date_val)
+                if not date_str or not owner:
+                    skipped += 1
                     continue
                 if value is None and debt is None and envelope is None and not entity:
                     continue
 
+                owner    = _safe_str(owner, 100)
+                category = _safe_str(category, 100) or ''
+                envelope = _safe_str(envelope, 100)
+                establishment = _safe_str(establishment, 200)
+                notes    = _safe_str(notes, MAX_NOTE_LENGTH)
+                entity   = _safe_str(entity, 200)
+
                 if entity:
                     value = 0
                     debt  = 0
-                    ownership_pct = ownership_pct_raw if ownership_pct_raw is not None else 1.0
-                    debt_pct = debt_pct_raw if debt_pct_raw is not None else ownership_pct
+                    ownership_pct = _safe_pct(ownership_pct_raw, 1.0)
+                    debt_pct = _safe_pct(debt_pct_raw, ownership_pct)
                 else:
-                    ownership_pct = ownership_pct_raw if ownership_pct_raw is not None else 1.0
-                    debt_pct      = debt_pct_raw      if debt_pct_raw      is not None else 1.0
-
-                if isinstance(date_val, datetime):
-                    date_str = date_val.strftime('%Y-%m-%d')
-                else:
-                    date_str = str(date_val)[:10]
+                    value = _safe_float(value, 0)
+                    debt  = _safe_float(debt, 0)
+                    ownership_pct = _safe_pct(ownership_pct_raw, 1.0)
+                    debt_pct      = _safe_pct(debt_pct_raw, 1.0)
 
                 existing = conn.execute(
                     '''SELECT id FROM positions
                        WHERE date=? AND owner=? AND category=?
                          AND COALESCE(envelope,'')=? AND COALESCE(entity,'')=?''',
-                    (date_str, owner, category or '', envelope or '', entity or '')
+                    (date_str, owner, category, envelope or '', entity or '')
                 ).fetchone()
                 if existing:
                     continue
@@ -69,9 +108,9 @@ def import_xlsx():
                        (date, owner, category, envelope, establishment,
                         value, debt, notes, entity, ownership_pct, debt_pct)
                        VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
-                    (date_str, owner, category or '',
+                    (date_str, owner, category,
                      envelope, establishment,
-                     value or 0, debt or 0,
+                     value, debt,
                      notes, entity,
                      ownership_pct, debt_pct)
                 )
@@ -81,20 +120,20 @@ def import_xlsx():
             if 'Flux' in wb.sheetnames:
                 wf = wb['Flux']
                 flux_imported = 0
-                for row in wf.iter_rows(min_row=2, values_only=True):
+                for i, row in enumerate(wf.iter_rows(min_row=2, values_only=True)):
+                    if i >= MAX_IMPORT_ROWS:
+                        break
                     if len(row) < 5:
                         continue
                     date_val, owner, envelope, ftype, amount = row[0], row[1], row[2], row[3], row[4]
                     notes = row[5] if len(row) > 5 else None
-                    if not date_val or not owner or amount is None:
+                    date_str = _parse_date(date_val)
+                    if not date_str or not owner or amount is None:
                         continue
-                    if isinstance(date_val, datetime):
-                        date_str = date_val.strftime('%Y-%m-%d')
-                    else:
-                        date_str = str(date_val)[:10]
                     conn.execute(
                         'INSERT INTO flux (date, owner, envelope, type, amount, notes) VALUES (?,?,?,?,?,?)',
-                        (date_str, owner, envelope, ftype, amount, notes)
+                        (date_str, _safe_str(owner, 100), _safe_str(envelope, 100),
+                         _safe_str(ftype, 50), _safe_float(amount, 0), _safe_str(notes, MAX_NOTE_LENGTH))
                     )
                     flux_imported += 1
 
@@ -102,17 +141,20 @@ def import_xlsx():
             entities_imported = 0
             if 'Entites' in wb.sheetnames:
                 we = wb['Entites']
-                for row in we.iter_rows(min_row=2, values_only=True):
+                for i, row in enumerate(we.iter_rows(min_row=2, values_only=True)):
+                    if i >= 1000:
+                        break
                     if len(row) < 2:
                         continue
                     name = row[0]
                     if not name:
                         continue
-                    etype          = row[1] if len(row) > 1 else None
-                    valuation_mode = row[2] if len(row) > 2 else None
-                    gross_assets   = row[3] if len(row) > 3 else 0
-                    debt           = row[4] if len(row) > 4 else 0
-                    comment        = row[6] if len(row) > 6 else None
+                    name           = _safe_str(name, 200)
+                    etype          = _safe_str(row[1], 50) if len(row) > 1 else None
+                    valuation_mode = _safe_str(row[2], 50) if len(row) > 2 else None
+                    gross_assets   = _safe_float(row[3] if len(row) > 3 else 0)
+                    debt           = _safe_float(row[4] if len(row) > 4 else 0)
+                    comment        = _safe_str(row[6], MAX_NOTE_LENGTH) if len(row) > 6 else None
                     existing = conn.execute(
                         'SELECT id FROM entities WHERE name=?', (name,)
                     ).fetchone()
@@ -120,26 +162,28 @@ def import_xlsx():
                         conn.execute(
                             '''UPDATE entities SET type=?, valuation_mode=?,
                                gross_assets=?, debt=?, comment=? WHERE name=?''',
-                            (etype, valuation_mode, gross_assets or 0, debt or 0, comment, name)
+                            (etype, valuation_mode, gross_assets, debt, comment, name)
                         )
                     else:
                         conn.execute(
                             '''INSERT INTO entities (name, type, valuation_mode, gross_assets, debt, comment)
                                VALUES (?,?,?,?,?,?)''',
-                            (name, etype, valuation_mode, gross_assets or 0, debt or 0, comment)
+                            (name, etype, valuation_mode, gross_assets, debt, comment)
                         )
                     today = datetime.now().strftime('%Y-%m-%d')
                     conn.execute(
                         '''INSERT OR REPLACE INTO entity_snapshots (entity_name, date, gross_assets, debt)
                            VALUES (?,?,?,?)''',
-                        (name, today, gross_assets or 0, debt or 0)
+                        (name, today, gross_assets, debt)
                     )
                     entities_imported += 1
 
-        return jsonify({'imported': imported, 'entities': entities_imported})
+        logger.info('Import XLSX: %d positions, %d entités, %d skipped', imported, entities_imported, skipped)
+        return jsonify({'imported': imported, 'entities': entities_imported, 'skipped': skipped})
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        logger.error('Import XLSX failed: %s', e, exc_info=True)
+        return jsonify({'error': "Échec de l'import — vérifiez le format du fichier."}), 400
 
 
 @import_export_bp.route('/api/import-json', methods=['POST'])
@@ -149,64 +193,109 @@ def import_json():
     data = request.json
     if not data:
         return jsonify({'error': 'Corps JSON manquant'}), 400
+    if not isinstance(data, dict):
+        return jsonify({'error': 'Objet JSON attendu'}), 400
 
-    imported = {'positions': 0, 'flux': 0, 'entities': 0, 'entity_snapshots': 0}
+    imported = {'positions': 0, 'flux': 0, 'entities': 0, 'entity_snapshots': 0, 'skipped': 0}
+
+    def _clamp_pct(v, default=1.0):
+        try:
+            f = float(v) if v is not None else default
+        except (ValueError, TypeError):
+            return default
+        return max(0.0, min(f, 1.0))
+
+    def _safe_num(v, default=0):
+        try:
+            return float(v) if v is not None else default
+        except (ValueError, TypeError):
+            return default
+
+    def _trunc(v, max_len):
+        if v is None:
+            return None
+        return str(v)[:max_len]
 
     with get_db() as conn:
-        for e in data.get('entities', []):
-            name = e.get('name')
+        for e in data.get('entities', [])[:1000]:
+            name = _trunc(e.get('name'), 200)
             if not name:
                 continue
             existing = conn.execute('SELECT id FROM entities WHERE name=?', (name,)).fetchone()
             if existing:
                 conn.execute(
                     'UPDATE entities SET type=?, valuation_mode=?, gross_assets=?, debt=?, comment=? WHERE name=?',
-                    (e.get('type'), e.get('valuation_mode'), e.get('gross_assets', 0), e.get('debt', 0), e.get('comment'), name)
+                    (_trunc(e.get('type'), 50), _trunc(e.get('valuation_mode'), 50),
+                     _safe_num(e.get('gross_assets')), _safe_num(e.get('debt')),
+                     _trunc(e.get('comment'), MAX_NOTE_LENGTH), name)
                 )
             else:
                 conn.execute(
                     'INSERT INTO entities (name, type, valuation_mode, gross_assets, debt, comment) VALUES (?,?,?,?,?,?)',
-                    (name, e.get('type'), e.get('valuation_mode'), e.get('gross_assets', 0), e.get('debt', 0), e.get('comment'))
+                    (name, _trunc(e.get('type'), 50), _trunc(e.get('valuation_mode'), 50),
+                     _safe_num(e.get('gross_assets')), _safe_num(e.get('debt')),
+                     _trunc(e.get('comment'), MAX_NOTE_LENGTH))
                 )
             imported['entities'] += 1
 
-        for s in data.get('entity_snapshots', []):
-            if not s.get('entity_name') or not s.get('date'):
+        for s in data.get('entity_snapshots', [])[:MAX_IMPORT_ROWS]:
+            ename = _trunc(s.get('entity_name'), 200)
+            sdate = s.get('date')
+            if not ename or not validate_date(sdate):
+                imported['skipped'] += 1
                 continue
             conn.execute(
                 'INSERT OR REPLACE INTO entity_snapshots (entity_name, date, gross_assets, debt) VALUES (?,?,?,?)',
-                (s['entity_name'], s['date'], s.get('gross_assets', 0), s.get('debt', 0))
+                (ename, sdate, _safe_num(s.get('gross_assets')), _safe_num(s.get('debt')))
             )
             imported['entity_snapshots'] += 1
 
-        for p in data.get('positions', []):
-            if not p.get('date') or not p.get('owner'):
+        for p in data.get('positions', [])[:MAX_IMPORT_ROWS]:
+            pdate = p.get('date')
+            owner = _trunc(p.get('owner'), 100)
+            if not validate_date(pdate) or not owner:
+                imported['skipped'] += 1
                 continue
             existing = conn.execute(
                 '''SELECT id FROM positions WHERE date=? AND owner=? AND category=?
                    AND COALESCE(envelope,'')=? AND COALESCE(entity,'')=?''',
-                (p['date'], p['owner'], p.get('category', ''), p.get('envelope') or '', p.get('entity') or '')
+                (pdate, owner, _trunc(p.get('category'), 100) or '', p.get('envelope') or '', p.get('entity') or '')
             ).fetchone()
             if existing:
                 continue
             conn.execute(
                 '''INSERT INTO positions (date, owner, category, envelope, establishment,
                    value, debt, notes, entity, ownership_pct, debt_pct) VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
-                (p['date'], p['owner'], p.get('category', ''), p.get('envelope'), p.get('establishment'),
-                 p.get('value', 0), p.get('debt', 0), p.get('notes'), p.get('entity'),
-                 p.get('ownership_pct', 1.0), p.get('debt_pct', 1.0))
+                (pdate, owner, _trunc(p.get('category'), 100) or '',
+                 _trunc(p.get('envelope'), 100), _trunc(p.get('establishment'), 200),
+                 _safe_num(p.get('value')), _safe_num(p.get('debt')),
+                 _trunc(p.get('notes'), MAX_NOTE_LENGTH), _trunc(p.get('entity'), 200),
+                 _clamp_pct(p.get('ownership_pct')), _clamp_pct(p.get('debt_pct')))
             )
             imported['positions'] += 1
 
-        for f in data.get('flux', []):
-            if not f.get('date') or not f.get('owner') or f.get('amount') is None:
+        for f in data.get('flux', [])[:MAX_IMPORT_ROWS]:
+            fdate = f.get('date')
+            fowner = _trunc(f.get('owner'), 100)
+            if not validate_date(fdate) or not fowner or f.get('amount') is None:
+                imported['skipped'] += 1
                 continue
             conn.execute(
-                'INSERT INTO flux (date, owner, envelope, type, amount, notes) VALUES (?,?,?,?,?,?)',
-                (f['date'], f['owner'], f.get('envelope'), f.get('type'), f['amount'], f.get('notes'))
+                'INSERT INTO flux (date, owner, envelope, type, amount, notes, category) VALUES (?,?,?,?,?,?,?)',
+                (fdate, fowner, _trunc(f.get('envelope'), 100), _trunc(f.get('type'), 50),
+                 _safe_num(f.get('amount')), _trunc(f.get('notes'), MAX_NOTE_LENGTH),
+                 _trunc(f.get('category'), 100))
             )
             imported['flux'] += 1
 
+        for date, notes in data.get('snapshot_notes', {}).items():
+            if validate_date(date) and notes:
+                conn.execute(
+                    'INSERT OR REPLACE INTO snapshot_notes (date, notes) VALUES (?, ?)',
+                    (date, str(notes)[:MAX_NOTE_LENGTH])
+                )
+
+    logger.info('Import JSON: %s', imported)
     return jsonify(imported)
 
 
@@ -226,11 +315,15 @@ def export_data():
         entity_snapshots = [dict(r) for r in conn.execute(
             'SELECT * FROM entity_snapshots ORDER BY entity_name, date'
         ).fetchall()]
+        snapshot_notes = {r['date']: r['notes'] for r in conn.execute(
+            'SELECT date, notes FROM snapshot_notes ORDER BY date'
+        ).fetchall()}
     return jsonify({
         'positions': positions,
         'flux': flux,
         'entities': entities,
         'entity_snapshots': entity_snapshots,
+        'snapshot_notes': snapshot_notes,
     })
 
 
@@ -241,6 +334,8 @@ def reset_db():
     with get_db() as conn:
         conn.executescript(
             'DELETE FROM positions; DELETE FROM flux; '
-            'DELETE FROM entities; DELETE FROM entity_snapshots;'
+            'DELETE FROM entities; DELETE FROM entity_snapshots; '
+            'DELETE FROM snapshot_notes;'
         )
+    logger.warning('Database reset — all data deleted')
     return jsonify({'ok': True})

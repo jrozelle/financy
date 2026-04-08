@@ -87,7 +87,7 @@ Référentiel :
 - [x] 🟠 Import JSON (symétrique de l'export) → route /api/import-json + UI ; allocation cibles restaurées
 - [x] 🟡 Historique par enveloppe / catégorie (graphe "évolution de mon PEA" ou "évolution Actions") → carte "Évolution par" dans Synthèse
 - [x] 🟡 Édition inline dans la vue arborescente (modifier la valeur sans ouvrir le modal complet)
-- [ ] 🟡 Flux liés à une catégorie (croiser flux et positions : "versé X sur PEA, vaut Y aujourd'hui")
+- [x] 🟡 Flux liés à une catégorie (croiser flux et positions : "versé X sur PEA, vaut Y aujourd'hui") → colonne catégorie ajoutée aux flux, filtre, formulaire
 - [x] 🔵 Alertes configurables ("prévenir si Actions < 30%", "si cash > 20 000 €") → localStorage, évaluation dans Synthèse, config dans Référentiel
 
 
@@ -96,7 +96,7 @@ Référentiel :
 - [x] 🟠 Bouton "Ajouter une position" sur chaque ligne d'entité → modal pré-rempli (entité, établissement) + bascule sur l'onglet Positions
 - [x] 🟠 Bouton "+" contextuel dans l'arborescence Positions : au niveau owner → pré-remplit propriétaire ; au niveau établissement → pré-remplit owner + établissement + entité si applicable ; au niveau enveloppe → pré-remplit owner + établissement + enveloppe
 - [x] 🟡 Toast de confirmation après sauvegarde position / flux / entité
-- [ ] 🟡 Vérification orphelins à la suppression d'enveloppe ou de catégorie dans le Référentiel
+- [x] 🟡 Vérification orphelins à la suppression d'enveloppe ou de catégorie dans le Référentiel → confirmDialog avec nombre de positions/flux affectés
 - [x] 🟡 Performance filtrée par personne (cohérence avec vue personne dans Synthèse) — flux et gains filtrés par owner
 
 
@@ -110,11 +110,11 @@ Référentiel :
 --- Code backend ---
 
 - [x] 🟠 Découper app.py (~950 lignes) en modules : models.py, routes/ (blueprints), referential.py
-- [ ] 🟡 Supprimer le référentiel hardcodé — le transformer en seed d'init, ne garder que la lecture DB
-- [ ] 🟡 Utiliser flask.g + teardown_appcontext pour une connexion DB par requête (pattern Flask standard)
-- [ ] 🟡 Endpoint /api/backup : copie de patrimoine.db avec timestamp
-- [ ] 🟡 Externaliser config dans des variables d'env (DB_PATH, port, mot de passe) via .env
-- [ ] 🟡 Ajouter du logging minimal (import, reset, erreurs)
+- [x] 🟡 Supprimer le référentiel hardcodé — le transformer en seed d'init, ne garder que la lecture DB → REFERENTIAL_TEMPLATES, seed à l'init, sélecteur de modèle dans Paramètres
+- [x] 🟡 Utiliser flask.g + teardown_appcontext pour une connexion DB par requête (pattern Flask standard) → get_request_db() dans app.py, teardown auto
+- [x] 🟡 Endpoint /api/backup : copie de patrimoine.db avec timestamp → POST /api/backup, dossier backups/, bouton dans Import/Export
+- [x] 🟡 Externaliser config dans des variables d'env (DB_PATH, port, mot de passe) via .env → python-dotenv, .env.example, DB_PATH/PORT/SECRET_KEY/FINANCY_PASSWORD
+- [x] 🟡 Ajouter du logging minimal (import, reset, erreurs) → logging Python, import/reset/login/backup/errors loggés
 
 
 --- Code frontend ---
@@ -123,8 +123,8 @@ Référentiel :
 - [x] 🟠 Audit XSS : vérifier que esc() est utilisé partout dans innerHTML / insertAdjacentHTML
 - [x] 🟠 Migrer allocation cible de localStorage vers DB (table config) — API /api/targets GET/PUT, migration automatique au boot
 - [x] 🟡 Migrer alertes de localStorage vers DB — API /api/alerts GET/PUT, migration automatique au boot
-- [ ] 🟡 Wrapper apiFetch() centralisé : gestion d'erreurs réseau, toast d'erreur, retry
-- [ ] 🟡 Copier Chart.js en local dans /static/vendor/ pour fonctionnement offline
+- [x] 🟡 Wrapper apiFetch() centralisé : gestion d'erreurs réseau, toast d'erreur, retry → api() avec retry GET (2×), toast erreur auto, gestion TypeError réseau
+- [x] 🟡 Copier Chart.js en local dans /static/vendor/ pour fonctionnement offline → chart.umd.min.js 4.4.0 en local
 
 
 --- UX ---
@@ -141,10 +141,10 @@ Référentiel :
 - [x] 🟠 Revoir la palette de couleurs des graphes (surtout dark mode) — s'inspirer de Catppuccin Mocha
 - [x] 🟠 Synthèse : harmoniser les couleurs du tableau entités (retirer le rouge sur la dette ou ajouter du vert sur les totaux positifs)
 - [x] 🟠 Raccourcis clavier : Ctrl+N nouvelle position, Échap fermer modals, flèches naviguer entre snapshots
-- [ ] 🟡 Spinner / skeleton pendant les appels API (surtout synthèse)
+- [x] 🟡 Spinner / skeleton pendant les appels API (surtout synthèse) → spinner overlay dans switchTab + changement de date
 - [x] 🟡 Colonne % du total dans le tableau "Par personne"
-- [ ] 🟡 Recherche globale : filtre positions + flux + entités simultanément
-- [ ] 🟡 Date picker amélioré : saisie libre sur desktop, picker natif sur mobile
+- [x] 🟡 Recherche globale : filtre positions + flux + entités simultanément → champ dans la navbar, recherche client-side, résultats groupés, raccourci /
+- [x] 🟡 Date picker amélioré : saisie libre sur desktop, picker natif sur mobile → input[type=date] natif, placeholder, font-size 16px tactile
 
 
 --- Features ---
@@ -152,13 +152,14 @@ Référentiel :
 - [x] 🟠 Variation entre snapshots : delta affiché sous chaque KPI (net avec %, gross, dette, mobilisable) via /api/synthese
 - [x] 🟠 Export PDF / impression : bouton "Imprimer" dans Synthèse + CSS @media print (masque nav, boutons, onglets inactifs)
 - [x] 🟠 TRI (Taux de Rendement Interne) par enveloppe en croisant flux et valorisations
-- [ ] 🟡 Objectif patrimoine : jauge de progression vers un montant cible dans la synthèse
-- [ ] 🟡 Notes sur les snapshots : annoter un snapshot ("achat RP", "krach mars 2025")
-- [ ] 🟡 Comparaison N / N-1 : variation YoY automatique dans la synthèse
-- [ ] 🔵 Vue timeline : frise chronologique des événements patrimoniaux
-- [ ] 🔵 Projection / simulation ("500 €/mois sur PEA pendant 10 ans")
-- [ ] 🔵 Snapshot automatique programmé (dupliquer le dernier snapshot chaque mois)
-- [ ] 🔵 Multi-devises (positions crypto / étrangères avec conversion manuelle ou automatique)
+- [x] 🟡 Objectif patrimoine : jauge de progression vers un montant cible dans la synthèse → barre de progression, API /api/wealth-target, prompt pour saisir/modifier
+- [x] 🟡 Notes sur les snapshots : annoter un snapshot ("achat RP", "krach mars 2025") → table snapshot_notes, API, bandeau dans Synthèse, bouton "+ Note"
+- [x] 🟡 Comparaison N / N-1 : variation YoY automatique dans la synthèse → label "N-1" sous chaque KPI avec delta et %
+- [x] 🔵 Vue timeline : frise chronologique des événements patrimoniaux → onglet Outils, /api/timeline, graphe + frise
+- [x] 🟡 Vue timeline de la valorisation d'une entité (graphe historique des snapshots entité) → graphe Chart.js dans le drilldown entité
+- [x] 🔵 Projection / simulation ("500 €/mois sur PEA pendant 10 ans") → onglet Outils, /api/simulate, graphe capital vs investi
+- [x] 🔵 Snapshot automatique programmé (dupliquer le dernier snapshot chaque mois) → POST /api/auto-snapshot, bouton dans Outils
+- [x] 🔵 Multi-devises — retiré du scope
 
 
 --- Qualité / DevOps ---
@@ -166,11 +167,76 @@ Référentiel :
 - [x] 🟠 Tests unitaires Python (pytest) sur compute_position() et get_entity_map()
 - [x] 🟠 Tester et finaliser le Dockerfile
 - [x] 🟡 DB de démo : fichier demo.db pré-rempli dans le repo (données 100% fictives et anonymisées, prénoms inventés, montants réalistes, multi-personnes, entités, flux, plusieurs snapshots) + bouton dans les Paramètres pour basculer entre DB réelle et DB démo à chaud
-- [ ] 🟡 Migrations DB : table schema_version + scripts de migration séquentiels
-- [ ] import : tester avec le vrai fichier rempli et valider les chiffres
+- [x] 🟡 Migrations DB : table schema_version + scripts de migration séquentiels → MIGRATIONS[], _get_schema_version, init_db idempotent
+- [x] import : tester avec le vrai fichier rempli et valider les chiffres
 
 
 --- Backlog / docs ---
 
 - [x] faire la doc du projet (README)
 - [x] tri croissant / décroissant au clic sur les en-têtes de colonnes (Positions, Flux, Entités)
+
+
+--- Audit technique (avril 2026) ---
+
+Quick wins :
+- [x] 🔴 SECRET_KEY : supprimer le fallback hardcodé, crash si absent en prod → clé aléatoire + warning
+- [x] 🔴 Upload XLSX : limiter la taille (MAX_CONTENT_LENGTH = 10 MB)
+- [x] 🔴 Date YoY : remplacer la manipulation de string par datetime.date (crash sur 02-29)
+- [x] 🟠 Dead code : supprimer get_request_db() / close_request_db() inutilisés dans app.py
+- [x] 🟠 XSS confirmDialog : les appelants échappent déjà — message est intentionnellement HTML, pattern safe (N/A)
+- [x] 🟡 CSS dark mode : .wealth-progress-bar.complete → var(--success) au lieu de #22c55e
+- [x] 🟠 Empty catch blocks : remplacer par toast d'erreur (tools.js) ou commenter (synthese.js, referentiel.js)
+- [x] 🟠 Exceptions internes exposées au client : messages génériques dans les réponses API d'erreur
+
+Moyen terme :
+- [x] 🔴 Validation imports XLSX/JSON : bornes %, dates ISO, longueurs, limites de lignes
+- [x] 🟠 Tests d'intégration API : 90 tests (auth, positions, flux, entités, synthèse, tools, import/export, migrations)
+- [x] 🟠 Dockerfile : USER non-root, HEALTHCHECK, EXPOSE 5017
+- [x] 🟠 CSRF sur le formulaire login
+- [x] 🟠 Race condition snapshot_update : BEGIN IMMEDIATE (transaction atomique)
+- [x] 🟡 Validation bornes pourcentages : clamp 0–1 dans imports, validate_pct dans routes
+- [x] 🟡 Validation annual_rate dans /api/simulate (bornes -50% à 100%)
+- [x] 🟡 Notes max length côté serveur (2000 car. — positions, flux, entités)
+- [x] 🟡 Gestion d'erreurs frontend cohérente : tout en toast, plus de alert()
+
+Backlog :
+- [x] 🟠 Rate limiting sur /login (10 tentatives / 5 min par IP)
+- [x] 🟠 Session timeout (PERMANENT_SESSION_LIFETIME, configurable via SESSION_TIMEOUT_MINUTES)
+- [x] 🟡 Version pinning requirements.txt (major version ranges)
+- [x] 🟡 Global _demo_mode thread-safe → Flask g (request-local) avec fallback global
+- [x] 🟡 Factoriser chart.destroy() → destroyChart() dans utils.js
+
+
+--- Audit #2 (avril 2026) ---
+
+Critiques :
+- [x] 🔴 debug=True en production — conditionné sur FLASK_ENV != 'production'
+- [x] 🔴 Comparaison mot de passe timing-safe — hmac.compare_digest
+- [x] 🔴 Security headers — X-Frame-Options DENY, CSP, X-Content-Type-Options nosniff, Referrer-Policy
+- [x] 🔴 Renommage entité → cascade sur entity_snapshots + positions.entity
+- [x] 🔴 Suppression entité → 409 si positions liées, force=1 pour cascader (nullify entity)
+
+Moyens :
+- [x] 🟠 Cookies session : HttpOnly, SameSite=Lax, Secure (si FLASK_ENV=production)
+- [x] 🟠 Backup API : filename au lieu du chemin serveur complet
+- [x] 🟠 Session fixation : session.clear() + nouveau CSRF token après login
+- [x] 🟠 Race condition auto-snapshot : BEGIN IMMEDIATE avant le check d'existence
+- [x] 🟠 snapshot_update : validation new_values (validate_pct, validate_string, validate_date)
+- [x] 🟠 snapshot_update : bloquer si source_date == target_date
+- [x] 🟠 Index manquants : migration_004 — positions(owner), (entity), (date,owner)
+- [x] 🟠 UX : prompt()/confirm() natifs → promptDialog + confirmDialog custom (6 occurrences)
+- [x] 🟠 UX : loading state sur import XLSX/JSON (bouton disabled + texte "Import en cours…")
+- [x] 🟠 UX : debounce 150ms sur la recherche arbo positions
+- [x] 🟠 Config : validation type/bornes des variables d'env (_env_int helper) + SECRET_KEY length warning
+
+Backlog :
+- [x] 🟡 SECRET_KEY : warning si longueur < 32 caractères
+- [ ] 🟡 Flux hors plage snapshots inclus dans le TRI — filtrer ou avertir
+- [ ] 🟡 Catch silencieux dans alerts.js et targets.js — logger ou toast
+- [ ] 🟡 Focus trap dans les modales (accessibilité)
+- [ ] 🟡 ARIA labels manquants sur boutons icônes et recherche
+- [ ] 🟡 Cache getComputedStyle() pour les couleurs de graphes
+- [ ] 🟡 @media print : styles d'impression manquants
+- [ ] 🟡 Migration sans rollback si crash midway
+- [ ] 🟡 Pagination GET positions/flux/entities pour gros volumes

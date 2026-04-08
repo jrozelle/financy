@@ -1,7 +1,7 @@
 import { S } from '../state.js';
 import { fmt, fmtDate, esc, liqBadge, sortArr, updateSortIndicators, today, wireTreeAccordion } from '../utils.js';
 import { api, refreshEntitySelect } from '../api.js';
-import { confirmDialog, toast, closeModal } from '../dialogs.js';
+import { confirmDialog, promptDialog, toast, closeModal } from '../dialogs.js';
 import { loadSynthese, loadHistorique } from './synthese.js';
 import { refreshDates } from '../main.js';
 
@@ -123,7 +123,7 @@ export function startInlineEdit(span) {
       });
       await loadPositions();
     } catch (err) {
-      alert(`Erreur : ${err.message}`);
+      toast(`Erreur : ${err.message}`, 'error');
       await loadPositions();
     }
   };
@@ -163,6 +163,8 @@ function renderPositionsTree(allPositions) {
         const etablNet   = ePoses.reduce((s, p) => s + (p.net_attributed || 0), 0);
         const isEntity   = etabl.startsWith('Entité : ');
         const etablIcon  = isEntity ? '🏢' : '🏦';
+        const etablEntityName = isEntity ? etabl.replace(/^Entité : /, '') : '';
+        const etablRealName   = isEntity ? '' : etabl;
 
         const byEnv = {};
         for (const p of ePoses) {
@@ -198,6 +200,7 @@ function renderPositionsTree(allPositions) {
                     <span class="tree-badges">${liqBadge(p.liquidity)}</span>
                     ${inlineVal}
                     <span class="tree-actions">
+                      <button class="btn-icon" data-action="history-pos" data-id="${p.id}" title="Évolution dans le temps">📈</button>
                       <button class="btn-icon edit" data-id="${p.id}" data-action="edit-pos">Éditer</button>
                       <button class="btn-icon del"  data-id="${p.id}" data-action="del-pos">Suppr.</button>
                     </span>
@@ -213,6 +216,10 @@ function renderPositionsTree(allPositions) {
                 <span class="tree-label">${esc(env)}${envDebtStr}</span>
                 <span class="tree-amount ${envNet < 0 ? 'neg' : ''}">${fmt(envNet)}</span>
                 <span class="tree-actions">
+                  <button class="btn-icon" data-action="history-env"
+                    data-owner="${esc(owner)}" data-envelope="${esc(env)}"
+                    ${isEntity ? `data-entity="${esc(etablEntityName)}"` : `data-establishment="${esc(etablRealName)}"`}
+                    title="Évolution dans le temps">📈</button>
                   <button class="btn-icon add" data-action="add-pos-ctx"
                     data-owner="${esc(owner)}"
                     data-establishment="${esc(envEtabl)}"
@@ -226,8 +233,6 @@ function renderPositionsTree(allPositions) {
 
         const etablDebt    = ePoses.reduce((s, p) => s + (p.debt_attributed || 0), 0);
         const etablDebtStr = etablDebt > 0 ? `<span style="color:var(--danger);font-size:11px;margin-left:.5rem">dette ${fmt(etablDebt)}</span>` : '';
-        const etablEntityName = isEntity ? etabl.replace(/^Entité : /, '') : '';
-        const etablRealName   = isEntity ? '' : etabl;
         return `
           <div class="tree-row tree-etabl" data-key="petabl-${esc(owner)}-${esc(etabl)}">
             <span class="tree-toggle">▾</span>
@@ -235,6 +240,10 @@ function renderPositionsTree(allPositions) {
             <span class="tree-label">${esc(etabl)}${etablDebtStr}</span>
             <span class="tree-amount ${etablNet < 0 ? 'neg' : ''}">${fmt(etablNet)}</span>
             <span class="tree-actions">
+              <button class="btn-icon" data-action="history-etabl"
+                data-owner="${esc(owner)}"
+                ${isEntity ? `data-entity="${esc(etablEntityName)}"` : `data-establishment="${esc(etablRealName)}"`}
+                title="Évolution dans le temps">📈</button>
               <button class="btn-icon add" data-action="add-pos-ctx"
                 data-owner="${esc(owner)}"
                 data-establishment="${esc(etablRealName)}"
@@ -345,13 +354,17 @@ function onPosTableClick(e) {
 
 export async function duplicateSnapshot() {
   if (!S.positionsDate) return;
-  const newDate = prompt('Nouvelle date pour le snapshot (format AAAA-MM-JJ) :');
+  const newDate = await promptDialog('Nouvelle date pour le snapshot', {
+    placeholder: 'AAAA-MM-JJ', defaultValue: today(), confirmText: 'Dupliquer'
+  });
   if (!newDate) return;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
-    alert('Format invalide. Utilisez AAAA-MM-JJ (ex: 2026-04-01)');
+    toast('Format invalide. Utilisez AAAA-MM-JJ (ex: 2026-04-01)', 'error');
     return;
   }
-  if (S.dates.includes(newDate) && !confirm(`Un snapshot du ${newDate} existe déjà. L'écraser ?`)) return;
+  if (S.dates.includes(newDate) && !await confirmDialog('Snapshot existant',
+    `Un snapshot du ${fmtDate(newDate)} existe déjà. L'écraser ?`,
+    { confirmText: 'Écraser', danger: true })) return;
   const src = await api('GET', `/api/positions?date=${S.positionsDate}`);
   await Promise.all(src.map(p => {
     const { id, created_at, net_value, gross_attributed, debt_attributed,
@@ -526,7 +539,9 @@ export async function savePosition(e) {
     if (useSnapshot && targetDate) {
       const sourceDate = S.positions.find(p => p.id === S.editPosId)?.date;
       if (targetDate !== sourceDate && S.dates.includes(targetDate) &&
-          !confirm(`Un snapshot du ${targetDate} existe déjà. Il sera remplacé par une copie du ${sourceDate} avec cette modification. Continuer ?`)) {
+          !await confirmDialog('Snapshot existant',
+            `Le snapshot du ${fmtDate(targetDate)} sera remplacé par une copie du ${fmtDate(sourceDate)} avec cette modification.`,
+            { confirmText: 'Remplacer', danger: true })) {
         return;
       }
       await api('POST', `/api/positions/${S.editPosId}/snapshot-update`, {

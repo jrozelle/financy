@@ -50,6 +50,8 @@ export async function importXlsx() {
 
   const fd = new FormData();
   fd.append('file', file);
+  const btn = document.getElementById('btn-import');
+  if (btn) { btn.disabled = true; btn.textContent = 'Import en cours…'; }
   try {
     const res  = await fetch('/api/import', {
       method: 'POST',
@@ -68,6 +70,8 @@ export async function importXlsx() {
     }
   } catch (err) {
     showImportResult(`Erreur : ${err.message}`, false);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Importer'; }
   }
 }
 
@@ -80,6 +84,8 @@ export async function importJson() {
   const file = document.getElementById('import-json-file').files[0];
   if (!file) { showJsonImportResult('Sélectionne un fichier .json.', false); return; }
 
+  const btn = document.getElementById('btn-import-json');
+  if (btn) { btn.disabled = true; btn.textContent = 'Import en cours…'; }
   try {
     const text = await file.text();
     const data = JSON.parse(text);
@@ -100,6 +106,8 @@ export async function importJson() {
     await loadEntities();
   } catch (err) {
     showJsonImportResult(`Erreur : ${err.message}`, false);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Importer'; }
   }
 }
 
@@ -125,6 +133,18 @@ export async function resetDb() {
   document.getElementById('reset-result').innerHTML =
     '<div class="alert alert-success">Base vidée. Vous pouvez réimporter.</div>';
   setTimeout(() => { document.getElementById('reset-result').innerHTML = ''; }, 4000);
+}
+
+export async function createBackup() {
+  try {
+    const result = await api('POST', '/api/backup');
+    document.getElementById('backup-result').innerHTML =
+      `<div class="alert alert-success">${esc('✓ Backup créé')} (${result.size_kb} Ko)</div>`;
+    toast('Backup créé');
+  } catch (err) {
+    document.getElementById('backup-result').innerHTML =
+      `<div class="alert alert-error">${esc('Erreur : ' + err.message)}</div>`;
+  }
 }
 
 export async function exportJson() {

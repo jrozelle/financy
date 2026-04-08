@@ -88,10 +88,15 @@ def create_db():
             type        TEXT,
             amount      REAL    NOT NULL,
             notes       TEXT,
+            category    TEXT,
             created_at  TEXT    DEFAULT CURRENT_TIMESTAMP
         );
         CREATE INDEX idx_positions_date ON positions(date);
         CREATE INDEX idx_flux_date      ON flux(date);
+        CREATE TABLE snapshot_notes (
+            date  TEXT PRIMARY KEY,
+            notes TEXT NOT NULL
+        );
         CREATE TABLE config (
             key   TEXT PRIMARY KEY,
             value TEXT NOT NULL
@@ -106,6 +111,11 @@ def create_db():
             UNIQUE(entity_name, date)
         );
         CREATE INDEX idx_entity_snap ON entity_snapshots(entity_name, date);
+        CREATE TABLE schema_version (
+            id      INTEGER PRIMARY KEY CHECK (id = 1),
+            version INTEGER NOT NULL DEFAULT 0
+        );
+        INSERT INTO schema_version (id, version) VALUES (1, 3);
     ''')
     return conn
 
@@ -237,33 +247,45 @@ def generate():
             )
 
     # ── Flux ──
+    # (date, owner, envelope, type, amount, notes, category)
     flux_data = []
     for si in range(len(snapshot_dates)):
         d = snapshot_dates[si]
-        # Versements réguliers
-        flux_data.append((d, 'Alice', 'PEA',          'Versement',          500, 'Versement mensuel PEA'))
-        flux_data.append((d, 'Alice', 'Assurance-vie', 'Versement',         200, 'Versement programmé AV'))
-        flux_data.append((d, 'Bob',   'CTO',           'Versement',         300, 'DCA actions US'))
-        flux_data.append((d, 'Bob',   'Assurance-vie',  'Versement',        150, 'Versement obligataire'))
-        # Dividendes / intérêts (2x par an)
+        flux_data.append((d, 'Alice', 'PEA',          'Versement',          500, 'Versement mensuel PEA', 'Actions'))
+        flux_data.append((d, 'Alice', 'Assurance-vie', 'Versement',         200, 'Versement programmé AV', 'Fond Euro'))
+        flux_data.append((d, 'Bob',   'CTO',           'Versement',         300, 'DCA actions US', 'Actions'))
+        flux_data.append((d, 'Bob',   'Assurance-vie',  'Versement',        150, 'Versement obligataire', 'Obligations'))
         if si % 2 == 1:
-            flux_data.append((d, 'Alice', 'PEA',       'Dividende/Intérêt', 320, 'Dividendes ETF'))
-            flux_data.append((d, 'Bob',   'CTO',       'Dividende/Intérêt', 180, 'Dividendes actions'))
-            flux_data.append((d, 'Alice', 'Livret A',  'Dividende/Intérêt',  85, 'Intérêts livret'))
-        # Frais annuels AV
+            flux_data.append((d, 'Alice', 'PEA',       'Dividende/Intérêt', 320, 'Dividendes ETF', 'Actions'))
+            flux_data.append((d, 'Bob',   'CTO',       'Dividende/Intérêt', 180, 'Dividendes actions', 'Actions'))
+            flux_data.append((d, 'Alice', 'Livret A',  'Dividende/Intérêt',  85, 'Intérêts livret', 'Cash & dépôts'))
         if si % 4 == 3:
-            flux_data.append((d, 'Alice', 'Assurance-vie', 'Frais', -120, 'Frais de gestion AV'))
-            flux_data.append((d, 'Bob',   'Assurance-vie', 'Frais',  -95, 'Frais de gestion AV'))
-        # Versements enfants (anniversaires)
+            flux_data.append((d, 'Alice', 'Assurance-vie', 'Frais', -120, 'Frais de gestion AV', 'Fond Euro'))
+            flux_data.append((d, 'Bob',   'Assurance-vie', 'Frais',  -95, 'Frais de gestion AV', 'Obligations'))
         if si % 4 == 0:
-            flux_data.append((d, 'Emma',  'Livret A',      'Versement', 200, 'Cadeau anniversaire'))
-            flux_data.append((d, 'Lucas', 'Livret A',      'Versement', 200, 'Cadeau anniversaire'))
+            flux_data.append((d, 'Emma',  'Livret A',      'Versement', 200, 'Cadeau anniversaire', 'Cash & dépôts'))
+            flux_data.append((d, 'Lucas', 'Livret A',      'Versement', 200, 'Cadeau anniversaire', 'Cash & dépôts'))
 
-    for date, owner, env, ftype, amount, notes in flux_data:
+    for date, owner, env, ftype, amount, notes, cat in flux_data:
         conn.execute(
-            'INSERT INTO flux (date, owner, envelope, type, amount, notes) VALUES (?,?,?,?,?,?)',
-            (date, owner, env, ftype, amount, notes)
+            'INSERT INTO flux (date, owner, envelope, type, amount, notes, category) VALUES (?,?,?,?,?,?,?)',
+            (date, owner, env, ftype, amount, notes, cat)
         )
+
+    # ── Notes de snapshots ──
+    snapshot_notes = {
+        snapshot_dates[0]: 'Situation initiale — début du suivi',
+        snapshot_dates[4]: 'Achat parts SCPI envisagé mais reporté',
+        snapshot_dates[-1]: 'Point annuel — bonne progression Actions',
+    }
+    for d, note in snapshot_notes.items():
+        conn.execute('INSERT INTO snapshot_notes (date, notes) VALUES (?, ?)', (d, note))
+
+    # ── Objectif patrimoine ──
+    conn.execute(
+        "INSERT INTO config (key, value) VALUES ('wealth_target', ?)",
+        (json.dumps({'target': 500000}),)
+    )
 
     # ── Allocation cible ──
     targets = {

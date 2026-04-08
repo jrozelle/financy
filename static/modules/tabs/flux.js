@@ -12,6 +12,7 @@ export async function loadFlux() {
 function populateFluxFilters() {
   const owners = [...new Set(S.flux.map(f => f.owner))].sort();
   const types  = [...new Set(S.flux.map(f => f.type).filter(Boolean))].sort();
+  const cats   = [...new Set(S.flux.map(f => f.category).filter(Boolean))].sort();
   const years  = [...new Set(S.flux.map(f => f.date?.slice(0, 4)).filter(Boolean))].sort().reverse();
 
   const sel = (id, placeholder, opts) => {
@@ -20,18 +21,21 @@ function populateFluxFilters() {
       `<option value="">${placeholder}</option>` +
       opts.map(o => `<option value="${esc(o)}"${o === cur ? ' selected' : ''}>${esc(o)}</option>`).join('');
   };
-  sel('flux-filter-owner', 'Toutes les personnes', owners);
-  sel('flux-filter-type',  'Tous les types',       types);
-  sel('flux-filter-year',  'Toutes les années',    years);
+  sel('flux-filter-owner',    'Toutes les personnes',  owners);
+  sel('flux-filter-type',     'Tous les types',        types);
+  sel('flux-filter-category', 'Toutes les catégories', cats);
+  sel('flux-filter-year',     'Toutes les années',     years);
 }
 
 function filteredFlux() {
   const owner = document.getElementById('flux-filter-owner')?.value;
   const type  = document.getElementById('flux-filter-type')?.value;
+  const cat   = document.getElementById('flux-filter-category')?.value;
   const year  = document.getElementById('flux-filter-year')?.value;
   return S.flux.filter(f =>
-    (!owner || f.owner === owner) &&
-    (!type  || f.type  === type)  &&
+    (!owner || f.owner    === owner) &&
+    (!type  || f.type     === type)  &&
+    (!cat   || f.category === cat)   &&
     (!year  || f.date?.startsWith(year))
   );
 }
@@ -43,7 +47,7 @@ export function renderFlux() {
   updateSortIndicators('flux-thead', 'flux');
 
   if (!flux.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Aucun flux enregistré.</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="8">Aucun flux enregistré.</td></tr>';
     if (tfoot) tfoot.innerHTML = '';
     return;
   }
@@ -52,6 +56,7 @@ export function renderFlux() {
       <td>${fmtDate(f.date)}</td>
       <td>${esc(f.owner)}</td>
       <td>${esc(f.envelope || '—')}</td>
+      <td>${esc(f.category || '—')}</td>
       <td>${esc(f.type || '—')}</td>
       <td class="num ${f.amount >= 0 ? 'pos' : 'neg'}">${f.amount >= 0 ? '+' : ''}${fmt(f.amount)}</td>
       <td>${esc(f.notes || '—')}</td>
@@ -73,7 +78,7 @@ export function renderFlux() {
   if (tfoot) {
     tfoot.innerHTML = `
       <tr>
-        <td colspan="4" style="font-size:11px;color:var(--text-muted)">
+        <td colspan="5" style="font-size:11px;color:var(--text-muted)">
           ${Object.entries(byType).map(([t, v]) =>
             `${esc(t)} : <strong class="${v >= 0 ? 'pos' : 'neg'}">${v >= 0 ? '+' : ''}${fmt(v)}</strong>`
           ).join(' &nbsp;·&nbsp; ')}
@@ -82,7 +87,7 @@ export function renderFlux() {
         <td colspan="2"></td>
       </tr>
       ${ownersActive.length > 1 ? `<tr>
-        <td colspan="4" style="font-size:11px;color:var(--text-muted)">
+        <td colspan="5" style="font-size:11px;color:var(--text-muted)">
           ${ownersActive.map(o =>
             `${esc(o)} : <strong class="${byOwner[o] >= 0 ? 'pos' : 'neg'}">${byOwner[o] >= 0 ? '+' : ''}${fmt(byOwner[o])}</strong>`
           ).join(' &nbsp;·&nbsp; ')}
@@ -111,19 +116,21 @@ export function openFluxModal(id = null) {
   if (id) {
     const f = S.flux.find(x => x.id === id);
     if (!f) return;
-    document.getElementById('flux-date').value    = f.date;
-    document.getElementById('flux-owner').value   = f.owner;
-    document.getElementById('flux-envelope').value= f.envelope || '';
-    document.getElementById('flux-type').value    = f.type || '';
-    document.getElementById('flux-amount').value  = f.amount;
-    document.getElementById('flux-notes').value   = f.notes || '';
+    document.getElementById('flux-date').value     = f.date;
+    document.getElementById('flux-owner').value    = f.owner;
+    document.getElementById('flux-envelope').value = f.envelope || '';
+    document.getElementById('flux-category').value = f.category || '';
+    document.getElementById('flux-type').value     = f.type || '';
+    document.getElementById('flux-amount').value   = f.amount;
+    document.getElementById('flux-notes').value    = f.notes || '';
   } else {
-    document.getElementById('flux-date').value    = today();
-    document.getElementById('flux-owner').value   = S.config.owners[0];
-    document.getElementById('flux-envelope').value= '';
-    document.getElementById('flux-type').value    = S.config.flux_types[0];
-    document.getElementById('flux-amount').value  = '';
-    document.getElementById('flux-notes').value   = '';
+    document.getElementById('flux-date').value     = today();
+    document.getElementById('flux-owner').value    = S.config.owners[0];
+    document.getElementById('flux-envelope').value = '';
+    document.getElementById('flux-category').value = '';
+    document.getElementById('flux-type').value     = S.config.flux_types[0];
+    document.getElementById('flux-amount').value   = '';
+    document.getElementById('flux-notes').value    = '';
   }
   document.getElementById('flux-modal').classList.remove('hidden');
   document.getElementById('flux-amount').focus();
@@ -135,6 +142,7 @@ export async function saveFlux(e) {
     date:     document.getElementById('flux-date').value,
     owner:    document.getElementById('flux-owner').value,
     envelope: document.getElementById('flux-envelope').value || null,
+    category: document.getElementById('flux-category').value || null,
     type:     document.getElementById('flux-type').value || null,
     amount:   parseFloat(document.getElementById('flux-amount').value),
     notes:    document.getElementById('flux-notes').value || null,
