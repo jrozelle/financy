@@ -1,8 +1,8 @@
 import os
 import secrets
 from flask import Flask, render_template, session, request, redirect, url_for, jsonify
-from auth import AUTH_PASSWORD, login_required
-from models import init_db
+from auth import AUTH_PASSWORD, login_required, csrf_protect
+from models import init_db, is_demo_mode, set_demo_mode, DEMO_DB_PATH
 from routes import all_blueprints
 
 app = Flask(__name__)
@@ -53,6 +53,27 @@ def index():
 @login_required
 def get_csrf_token():
     return jsonify({'token': session.get('csrf_token', '')})
+
+
+# ─── Demo mode ────────────────────────────────────────────────────────────────
+
+@app.route('/api/demo-mode', methods=['GET'])
+@login_required
+def get_demo_mode():
+    return jsonify({'demo': is_demo_mode(), 'available': os.path.exists(DEMO_DB_PATH)})
+
+
+@app.route('/api/demo-mode', methods=['PUT'])
+@login_required
+@csrf_protect
+def toggle_demo_mode():
+    data = request.json
+    if not isinstance(data, dict) or 'demo' not in data:
+        return jsonify({'error': 'Champ "demo" requis'}), 400
+    if data['demo'] and not os.path.exists(DEMO_DB_PATH):
+        return jsonify({'error': 'Fichier demo.db introuvable'}), 404
+    set_demo_mode(bool(data['demo']))
+    return jsonify({'demo': is_demo_mode()})
 
 
 # ─── Register blueprints ─────────────────────────────────────────────────────

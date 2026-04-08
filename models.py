@@ -5,7 +5,21 @@ import re
 from datetime import datetime
 from contextlib import contextmanager
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'patrimoine.db')
+_BASE_DIR = os.path.dirname(__file__)
+DB_PATH = os.path.join(_BASE_DIR, 'patrimoine.db')
+DEMO_DB_PATH = os.path.join(_BASE_DIR, 'demo.db')
+
+_demo_mode = False
+
+def is_demo_mode():
+    return _demo_mode
+
+def set_demo_mode(enabled):
+    global _demo_mode
+    _demo_mode = enabled
+
+def get_db_path():
+    return DEMO_DB_PATH if _demo_mode else DB_PATH
 
 # ─── Validation ───────────────────────────────────────────────────────────────
 
@@ -126,7 +140,7 @@ def load_referential(conn):
 
 @contextmanager
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(get_db_path())
     conn.row_factory = sqlite3.Row
     try:
         yield conn

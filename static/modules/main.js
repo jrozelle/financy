@@ -13,7 +13,7 @@ import { loadPositions, renderPositions, clearFilters, openPosModal, duplicateSn
          onEntitySelectChange, updatePosInfo, savePosition, startInlineEdit, deletePosition } from './tabs/positions.js';
 import { loadFlux, renderFlux, openFluxModal, saveFlux } from './tabs/flux.js';
 import { loadEntities, renderEntities, openEntityModal, saveEntity, updateEntInfo } from './tabs/entities.js';
-import { importXlsx, importJson, exportJson, resetDb } from './tabs/import-export.js';
+import { importXlsx, importJson, exportJson, resetDb, initDemoToggle } from './tabs/import-export.js';
 import { loadReferential, saveReferential, resetReferential } from './tabs/referentiel.js';
 
 // ─── Init ─────────────────────────────────────────────────────────────────
@@ -26,6 +26,14 @@ async function init() {
   await Promise.all([refreshDates(), loadEntities(), loadHistorique(), loadTargets(), loadUserAlertsAsync()]);
   await migrateLocalStorageToDB();
   await switchTab('synthese');
+  initDemoToggle();
+}
+
+export async function reloadAll() {
+  S.config = await api('GET', '/api/config');
+  buildSelects();
+  await Promise.all([refreshDates(), loadEntities(), loadHistorique(), loadTargets(), loadUserAlertsAsync()]);
+  await switchTab(S.currentTab || 'synthese');
 }
 
 async function migrateLocalStorageToDB() {

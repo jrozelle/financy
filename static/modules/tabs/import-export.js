@@ -3,11 +3,46 @@ import { esc, today } from '../utils.js';
 import { api, getCsrfToken } from '../api.js';
 import { confirmDialog, toast } from '../dialogs.js';
 import { loadTargets, saveTargets } from '../targets.js';
-import { refreshDates, renderDateSelects } from '../main.js';
+import { refreshDates, renderDateSelects, reloadAll } from '../main.js';
 import { loadHistorique } from './synthese.js';
 import { loadEntities, renderEntities } from './entities.js';
 import { renderFlux } from './flux.js';
 import { renderSynthese } from './synthese.js';
+
+// ─── Demo mode ───────────────────────────────────────────────────────────────
+
+export async function initDemoToggle() {
+  const toggle = document.getElementById('demo-toggle');
+  const status = document.getElementById('demo-status');
+  const card   = document.getElementById('demo-card');
+  if (!toggle || !status) return;
+
+  try {
+    const res = await api('GET', '/api/demo-mode');
+    if (!res.available) {
+      card.style.display = 'none';
+      return;
+    }
+    toggle.checked = res.demo;
+    status.textContent = res.demo ? 'Mode démo actif' : 'Données réelles';
+  } catch {
+    card.style.display = 'none';
+    return;
+  }
+
+  toggle.addEventListener('change', async () => {
+    const demo = toggle.checked;
+    try {
+      await api('PUT', '/api/demo-mode', { demo });
+      status.textContent = demo ? 'Mode démo actif' : 'Données réelles';
+      toast(demo ? 'Mode démo activé' : 'Retour aux données réelles');
+      await reloadAll();
+    } catch (err) {
+      toggle.checked = !demo;
+      toast('Erreur : ' + err.message);
+    }
+  });
+}
 
 export async function importXlsx() {
   const file = document.getElementById('import-file').files[0];
