@@ -208,6 +208,7 @@ def _xirr(cashflows):
     d0 = dates[0]
     days = [(d - d0).days / 365.25 for d in dates]
 
+    total = sum(abs(a) for a in amounts)
     rate = 0.1  # estimation initiale
     for _ in range(200):
         npv = sum(a / (1 + rate) ** t for a, t in zip(amounts, days))
@@ -215,12 +216,18 @@ def _xirr(cashflows):
         if abs(dnpv) < 1e-14:
             break
         new_rate = rate - npv / dnpv
+        # Borner pour éviter divergence Newton-Raphson
+        if new_rate < -0.99:
+            new_rate = -0.99
+        if new_rate > 10:
+            new_rate = 10  # 1000% max
         if abs(new_rate - rate) < 1e-9:
             return round(new_rate * 100, 2)
         rate = new_rate
-        if rate < -0.99:
-            rate = -0.99  # borne basse
-    return round(rate * 100, 2) if abs(npv) < 1 else None
+    # Vérifier convergence relative au total des flux
+    if total > 0 and abs(npv) / total < 1e-6:
+        return round(rate * 100, 2)
+    return None
 
 
 def _flux_to_cashflow(f):
