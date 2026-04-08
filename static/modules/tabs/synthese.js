@@ -180,7 +180,7 @@ function renderCatChart(byCat) {
         if (!elements.length) return;
         const cat = cats[elements[0].index];
         api('GET', `/api/positions?date=${S.syntheseDate}`).then(positions => {
-          drilldownPositions(positions.filter(p => p.category === cat), cat, 'Catégorie');
+          drilldownPositions(positions.filter(p => p.category === cat), cat, 'Catégorie', { showOwner: true });
         });
       },
       plugins: {
@@ -190,7 +190,7 @@ function renderCatChart(byCat) {
           onClick: (e, item, legend) => {
             const cat = cats[item.index];
             api('GET', `/api/positions?date=${S.syntheseDate}`).then(positions => {
-              drilldownPositions(positions.filter(p => p.category === cat), cat, 'Catégorie');
+              drilldownPositions(positions.filter(p => p.category === cat), cat, 'Catégorie', { showOwner: true });
             });
           },
         },
