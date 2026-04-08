@@ -195,9 +195,11 @@ def get_historique():
 
 def _xirr(cashflows):
     """
-    Calcule le XIRR (taux de rendement interne annualisé) par Newton-Raphson.
+    Calcule le XIRR (taux de rendement interne annualisé).
     cashflows : liste de (date_str 'YYYY-MM-DD', montant)
     Retourne le taux annuel en % ou None si non convergent.
+    Utilise Newton-Raphson avec plusieurs estimations initiales,
+    puis bisection en fallback.
     """
     if len(cashflows) < 2:
         return None
@@ -206,27 +208,57 @@ def _xirr(cashflows):
     if all(a >= 0 for a in amounts) or all(a <= 0 for a in amounts):
         return None  # pas de signe mixte → pas de TRI
     d0 = dates[0]
-    days = [(d - d0).days / 365.25 for d in dates]
-
+    years = [(d - d0).days / 365.25 for d in dates]
     total = sum(abs(a) for a in amounts)
-    rate = 0.1  # estimation initiale
-    for _ in range(200):
-        npv = sum(a / (1 + rate) ** t for a, t in zip(amounts, days))
-        dnpv = sum(-t * a / (1 + rate) ** (t + 1) for a, t in zip(amounts, days))
-        if abs(dnpv) < 1e-14:
-            break
-        new_rate = rate - npv / dnpv
-        # Borner pour éviter divergence Newton-Raphson
-        if new_rate < -0.99:
-            new_rate = -0.99
-        if new_rate > 10:
-            new_rate = 10  # 1000% max
-        if abs(new_rate - rate) < 1e-9:
-            return round(new_rate * 100, 2)
-        rate = new_rate
-    # Vérifier convergence relative au total des flux
-    if total > 0 and abs(npv) / total < 1e-6:
-        return round(rate * 100, 2)
+
+    def npv_at(rate):
+        return sum(a / (1 + rate) ** t for a, t in zip(amounts, years))
+
+    def dnpv_at(rate):
+        return sum(-t * a / (1 + rate) ** (t + 1) for a, t in zip(amounts, years))
+
+    def newton(guess):
+        rate = guess
+        for _ in range(300):
+            npv = npv_at(rate)
+            dnpv = dnpv_at(rate)
+            if abs(dnpv) < 1e-14:
+                break
+            new_rate = rate - npv / dnpv
+            if new_rate < -0.99:
+                new_rate = -0.99
+            if new_rate > 10:
+                new_rate = 10
+            if abs(new_rate - rate) < 1e-9:
+                if total > 0 and abs(npv_at(new_rate)) / total < 1e-6:
+                    return new_rate
+                return None
+            rate = new_rate
+        if total > 0 and abs(npv_at(rate)) / total < 1e-6:
+            return rate
+        return None
+
+    # Essayer plusieurs estimations initiales
+    for guess in [0.1, 0.0, -0.5, 0.5, -0.9, 1.0, 5.0]:
+        result = newton(guess)
+        if result is not None:
+            return round(result * 100, 2)
+
+    # Fallback : bisection entre -0.99 et 10
+    lo, hi = -0.99, 10.0
+    npv_lo, npv_hi = npv_at(lo), npv_at(hi)
+    if npv_lo * npv_hi > 0:
+        return None  # pas de racine dans l'intervalle
+    for _ in range(1000):
+        mid = (lo + hi) / 2
+        npv_mid = npv_at(mid)
+        if total > 0 and abs(npv_mid) / total < 1e-8:
+            return round(mid * 100, 2)
+        if npv_mid * npv_lo < 0:
+            hi = mid
+        else:
+            lo = mid
+            npv_lo = npv_mid
     return None
 
 
