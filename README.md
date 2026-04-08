@@ -1,41 +1,104 @@
 # Financy
 
-Application web de suivi patrimonial familial — Flask + SQLite + vanilla JS.
+Application web de suivi patrimonial familial — visualisez, analysez et pilotez votre patrimoine en famille.
 
 ## Fonctionnalités
 
-- **Synthèse** : KPI (actif brut, dette, net, mobilisable), graphiques par catégorie / enveloppe, historique, allocation cible vs réelle, performance, alertes configurables
-- **Positions** : vue tableau (triable, filtrable) et vue arborescente (propriétaire → établissement → enveloppe → catégorie) avec édition inline et boutons contextuels
-- **Flux** : versements, retraits, dividendes — filtrés et totalisés par type et personne
-- **Entités** : SCI, indivisions — versionnées avec historique de valorisation
-- **Référentiel** : propriétaires, catégories, enveloppes, mobilisabilité — tout configurable
+| Onglet | Description |
+|--------|-------------|
+| **Synthèse** | KPI (actif brut, dette, net, mobilisable), graphiques par catégorie / enveloppe, historique du patrimoine, allocation cible vs réelle, performance, alertes configurables |
+| **Positions** | Vue tableau (tri, filtre, recherche) et vue arborescente (propriétaire → établissement → enveloppe → catégorie) avec édition inline, snapshots datés et duplication |
+| **Flux** | Versements, retraits, dividendes — filtrés et totalisés par type et par personne |
+| **Entités** | SCI, indivisions — versionnées avec historique de valorisation et parts détenues |
+| **Référentiel** | Propriétaires, catégories, enveloppes, mobilisabilité — tout configurable |
+| **Import / Export** | Import XLSX ou JSON, export JSON, sauvegarde et restauration complète |
+| **Outils** | Simulation d'épargne, auto-snapshot |
 
-## Installation
+## Démarrage rapide
+
+### Installation locale
 
 ```bash
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate        # Windows : venv\Scripts\activate
 pip install -r requirements.txt
-python app.py
+cp .env.example .env            # optionnel — adapter les valeurs
+python3 app.py
 ```
 
-Ouvrir [http://localhost:5000](http://localhost:5000)
+Ouvrir [http://localhost:5017](http://localhost:5017).
 
-## Docker
+### Docker Compose (recommandé)
 
 ```bash
-docker build -t patrimoine .
-docker run -p 5000:5000 -v $(pwd)/data:/app/data patrimoine
+cp .env.example .env            # adapter les valeurs
+docker compose up -d
 ```
 
-> La base de données `patrimoine.db` est créée automatiquement au premier lancement. Elle n'est pas versionnée (`.gitignore`).
+L'application est accessible sur [http://localhost:5017](http://localhost:5017).
 
-## Import
+Pour reconstruire après une mise à jour :
 
-Un fichier Excel modèle (`Patrimoine_Familial_blank.xlsx`) est fourni. Il n'est pas inclus dans le repo — importez vos données via **Import / Export → Import XLSX** ou **Import JSON**.
+```bash
+docker compose up -d --build
+```
 
-## Stack
+La base de données est persistée dans `./data/` grâce au volume monté.
 
-- Backend : Python 3.12 / Flask 3 / SQLite
-- Frontend : HTML + CSS + JavaScript (vanilla, pas de framework)
-- Graphiques : Chart.js 4
+## Configuration
+
+Toutes les variables se définissent dans un fichier `.env` (voir `.env.example`) :
+
+| Variable | Défaut | Description |
+|----------|--------|-------------|
+| `FINANCY_PASSWORD` | *(vide — pas d'auth)* | Mot de passe d'accès à l'application |
+| `SECRET_KEY` | *(générée au démarrage)* | Clé secrète Flask pour les sessions (min. 32 caractères en production) |
+| `DB_PATH` | `patrimoine.db` | Chemin vers la base SQLite |
+| `PORT` | `5017` | Port d'écoute |
+| `SESSION_TIMEOUT_MINUTES` | `60` | Durée d'inactivité avant déconnexion |
+| `FLASK_ENV` | `development` | `production` désactive le debug et active les cookies Secure |
+
+## Import de données
+
+Un fichier Excel modèle vierge est inclus dans le dépôt : **`Patrimoine_Familial_blank.xlsx`**.
+
+Il contient 7 onglets pré-formatés :
+
+| Onglet | Contenu |
+|--------|---------|
+| README | Mode d'emploi |
+| Listes | Valeurs de référence (catégories, enveloppes…) |
+| Positions | Lignes de patrimoine |
+| Flux | Versements, retraits, dividendes |
+| Entites | SCI, indivisions |
+| Synthese | Snapshots patrimoniaux |
+| TCD | Tableau croisé dynamique |
+
+1. Téléchargez `Patrimoine_Familial_blank.xlsx`
+2. Remplissez les onglets avec vos données
+3. Dans l'application → **Import / Export** → **Import XLSX**
+
+L'import JSON est également disponible pour les sauvegardes existantes.
+
+## Sécurité
+
+- Authentification par mot de passe avec comparaison timing-safe
+- Rate limiting sur la page de login (10 tentatives / 5 min)
+- Sessions avec timeout configurable et régénération après login
+- En-têtes de sécurité (CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy)
+- Cookies HttpOnly / SameSite=Lax (+ Secure en production)
+- Validation et assainissement de toutes les entrées
+
+## Tests
+
+```bash
+pip install pytest
+python3 -m pytest tests/ -v
+```
+
+## Stack technique
+
+- **Backend** : Python 3.12 / Flask 3 / SQLite
+- **Frontend** : HTML + CSS + JavaScript vanilla (aucun framework)
+- **Graphiques** : Chart.js 4
+- **Conteneurisation** : Docker + Docker Compose

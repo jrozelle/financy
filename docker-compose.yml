@@ -1,0 +1,15 @@
+services:
+  financy:
+    build: .
+    container_name: financy
+    restart: unless-stopped
+    ports:
+      - "${PORT:-5017}:5017"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DB_PATH=/app/data/patrimoine.db
+      - FINANCY_PASSWORD=${FINANCY_PASSWORD:-}
+      - SECRET_KEY=${SECRET_KEY:-}
+      - SESSION_TIMEOUT_MINUTES=${SESSION_TIMEOUT_MINUTES:-60}
+      - FLASK_ENV=production
