@@ -977,12 +977,15 @@ input[type="file"] {
 }
 
 /* ── Timeline ─────────────────────────────────────────────────────────── */
+.timeline-wrapper {
+  max-height: 500px;
+  overflow-y: auto;
+}
 .timeline {
   position: relative;
   padding-left: 2rem;
+  margin-left: 1rem;
   border-left: 2px solid var(--border);
-  max-height: 500px;
-  overflow-y: auto;
 }
 .timeline-event {
   position: relative;
