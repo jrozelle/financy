@@ -23,7 +23,7 @@ function renderTimeline(events) {
   }
 
   // Frise visuelle
-  let html = '<div class="timeline">';
+  let html = '<div class="timeline-wrapper"><div class="timeline">';
   for (const ev of events) {
     const icon = ev.type === 'snapshot' ? '&#128200;' : ev.type === 'note' ? '&#128221;' : '&#128176;';
     const cls = `timeline-event timeline-${ev.type}`;
@@ -36,7 +36,7 @@ function renderTimeline(events) {
       </div>
     </div>`;
   }
-  html += '</div>';
+  html += '</div></div>';
 
   // Graphe net patrimoine (snapshots uniquement)
   const snapshots = events.filter(e => e.type === 'snapshot' && e.value != null);
