@@ -33,6 +33,7 @@ backups/
 
 # Données personnelles / imports
 *.xlsx
+!Patrimoine_Familial_blank.xlsx
 *.csv
 
 # Logs
