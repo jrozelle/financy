@@ -755,6 +755,9 @@ async function renderTRI() {
         <span class="tri-val ${cls}">${tri > 0 ? '+' : ''}${tri.toFixed(2)}\u202f%</span>
       </div>`;
     }
+    if (data.excluded_flux) {
+      html += `<div class="text-muted" style="font-size:11px;margin-top:.5rem">⚠ ${data.excluded_flux} flux hors plage ignoré(s) dans le calcul.</div>`;
+    }
     html += '</div>';
     el.innerHTML = html;
   } catch {

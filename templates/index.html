@@ -19,20 +19,20 @@
       <button class="tab-btn" data-tab="entites">Entités</button>
     </div>
     <div class="global-search" id="global-search">
-      <span class="global-search-icon">&#128269;</span>
-      <input type="search" class="global-search-input" id="global-search-input" placeholder="Rechercher…" autocomplete="off">
+      <span class="global-search-icon" aria-hidden="true">&#128269;</span>
+      <input type="search" class="global-search-input" id="global-search-input" placeholder="Rechercher…" autocomplete="off" aria-label="Recherche globale">
       <div class="search-results" id="search-results"></div>
     </div>
     <div class="nav-actions" style="display:flex;gap:.375rem;align-items:center">
       <div class="settings-menu" id="settings-menu">
-        <button class="settings-toggle" id="settings-toggle" title="Paramètres">&#9881;</button>
+        <button class="settings-toggle" id="settings-toggle" title="Paramètres" aria-label="Paramètres">&#9881;</button>
         <div class="settings-dropdown hidden" id="settings-dropdown">
           <button class="settings-item" data-tab="referentiel">&#9881; Référentiel</button>
           <button class="settings-item" data-tab="tools">&#128295; Outils</button>
           <button class="settings-item" data-tab="import">&#8645; Import / Export</button>
         </div>
       </div>
-      <button class="theme-toggle" id="theme-toggle" title="Basculer clair/sombre">&#9790;</button>
+      <button class="theme-toggle" id="theme-toggle" title="Basculer clair/sombre" aria-label="Basculer clair/sombre">&#9790;</button>
       {% if has_auth %}
       <a href="/logout" class="btn btn-secondary btn-sm" style="font-size:12px;padding:.25rem .75rem">Déconnexion</a>
       {% endif %}
@@ -79,7 +79,7 @@
         </div>
       </div>
 
-      <div class="charts-row">
+      <div class="charts-row charts-row-pies">
         <div class="card">
           <h2>Par catégorie</h2>
           <div class="chart-wrap"><canvas id="category-chart"></canvas></div>
@@ -89,7 +89,7 @@
           <div class="chart-wrap"><canvas id="synthese-env-chart"></canvas></div>
         </div>
       </div>
-      <div class="card" style="margin-bottom:1.25rem">
+      <div class="card">
         <h2>Par personne</h2>
         <div id="owners-table"></div>
       </div>
@@ -481,12 +481,12 @@
   </main>
 
   <!-- ── MODAL ALLOCATION CIBLE ──────────────────────────────────────────── -->
-  <div id="targets-modal" class="modal hidden" role="dialog" aria-modal="true">
+  <div id="targets-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="targets-modal-heading">
     <div class="modal-overlay" id="targets-modal-overlay"></div>
     <div class="modal-content">
       <div class="modal-header">
-        <h2>Allocation cible par catégorie</h2>
-        <button class="modal-close" data-close="targets-modal">&#10005;</button>
+        <h2 id="targets-modal-heading">Allocation cible par catégorie</h2>
+        <button class="modal-close" data-close="targets-modal" aria-label="Fermer">&#10005;</button>
       </div>
       <p class="text-muted" style="font-size:13px;margin-bottom:1rem">
         Renseigne un % cible pour chaque catégorie (le total n'a pas besoin de faire 100 %).
@@ -504,25 +504,25 @@
     <div class="drilldown-overlay" id="drilldown-overlay"></div>
     <div class="drilldown-content">
       <div class="drilldown-header">
-        <button class="dd-back hidden" id="dd-back" title="Retour">&#8592;</button>
+        <button class="dd-back hidden" id="dd-back" title="Retour" aria-label="Retour">&#8592;</button>
         <div style="flex:1;min-width:0">
           <div class="drilldown-subtitle" id="dd-subtitle"></div>
           <h2 id="dd-title"></h2>
           <div class="drilldown-amount" id="dd-amount"></div>
         </div>
-        <button class="modal-close" id="dd-close">&#10005;</button>
+        <button class="modal-close" id="dd-close" aria-label="Fermer">&#10005;</button>
       </div>
       <div id="dd-body"></div>
     </div>
   </div>
 
   <!-- ── MODAL POSITION ──────────────────────────────────────────────────── -->
-  <div id="position-modal" class="modal hidden" role="dialog" aria-modal="true">
+  <div id="position-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="position-modal-title">
     <div class="modal-overlay" id="position-modal-overlay"></div>
     <div class="modal-content">
       <div class="modal-header">
         <h2 id="position-modal-title">Ajouter une position</h2>
-        <button class="modal-close" data-close="position-modal">&#10005;</button>
+        <button class="modal-close" data-close="position-modal" aria-label="Fermer">&#10005;</button>
       </div>
       <form id="position-form">
         <div class="form-grid">
@@ -603,12 +603,12 @@
   </div>
 
   <!-- ── MODAL FLUX ───────────────────────────────────────────────────────── -->
-  <div id="flux-modal" class="modal hidden" role="dialog" aria-modal="true">
+  <div id="flux-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="flux-modal-title">
     <div class="modal-overlay" id="flux-modal-overlay"></div>
     <div class="modal-content">
       <div class="modal-header">
         <h2 id="flux-modal-title">Ajouter un flux</h2>
-        <button class="modal-close" data-close="flux-modal">&#10005;</button>
+        <button class="modal-close" data-close="flux-modal" aria-label="Fermer">&#10005;</button>
       </div>
       <form id="flux-form">
         <div class="form-grid">
@@ -650,12 +650,12 @@
   </div>
 
   <!-- ── MODAL ENTITÉ ────────────────────────────────────────────────────── -->
-  <div id="entity-modal" class="modal hidden" role="dialog" aria-modal="true">
+  <div id="entity-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="entity-modal-title">
     <div class="modal-overlay" id="entity-modal-overlay"></div>
     <div class="modal-content">
       <div class="modal-header">
         <h2 id="entity-modal-title">Ajouter une entité</h2>
-        <button class="modal-close" data-close="entity-modal">&#10005;</button>
+        <button class="modal-close" data-close="entity-modal" aria-label="Fermer">&#10005;</button>
       </div>
       <form id="entity-form">
         <div class="form-grid">

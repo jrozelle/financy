@@ -19,16 +19,20 @@ def get_dates():
 @positions_bp.route('/api/positions', methods=['GET'])
 @login_required
 def get_positions():
-    date = request.args.get('date')
+    date   = request.args.get('date')
+    limit  = request.args.get('limit', type=int)
+    offset = request.args.get('offset', 0, type=int)
     with get_db() as conn:
         if date:
-            rows = conn.execute(
-                'SELECT * FROM positions WHERE date=? ORDER BY owner, category', (date,)
-            ).fetchall()
+            query = 'SELECT * FROM positions WHERE date=? ORDER BY owner, category'
+            params = [date]
         else:
-            rows = conn.execute(
-                'SELECT * FROM positions ORDER BY date DESC, owner, category'
-            ).fetchall()
+            query = 'SELECT * FROM positions ORDER BY date DESC, owner, category'
+            params = []
+        if limit is not None:
+            query += ' LIMIT ? OFFSET ?'
+            params += [limit, offset]
+        rows = conn.execute(query, params).fetchall()
         entity_map = get_entity_map(conn, date)
         ref        = load_referential(conn)
     return jsonify([compute_position(dict(r), entity_map, ref) for r in rows])

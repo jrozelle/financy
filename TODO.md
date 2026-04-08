@@ -232,11 +232,11 @@ Moyens :
 
 Backlog :
 - [x] 🟡 SECRET_KEY : warning si longueur < 32 caractères
-- [ ] 🟡 Flux hors plage snapshots inclus dans le TRI — filtrer ou avertir
-- [ ] 🟡 Catch silencieux dans alerts.js et targets.js — logger ou toast
-- [ ] 🟡 Focus trap dans les modales (accessibilité)
-- [ ] 🟡 ARIA labels manquants sur boutons icônes et recherche
-- [ ] 🟡 Cache getComputedStyle() pour les couleurs de graphes
-- [ ] 🟡 @media print : styles d'impression manquants
-- [ ] 🟡 Migration sans rollback si crash midway
-- [ ] 🟡 Pagination GET positions/flux/entities pour gros volumes
+- [x] 🟡 Flux hors plage snapshots inclus dans le TRI — filtrer ou avertir
+- [x] 🟡 Catch silencieux dans alerts.js et targets.js — logger ou toast
+- [x] 🟡 Focus trap dans les modales (accessibilité)
+- [x] 🟡 ARIA labels manquants sur boutons icônes et recherche
+- [x] 🟡 Cache getComputedStyle() pour les couleurs de graphes
+- [x] 🟡 @media print : styles d'impression manquants
+- [x] 🟡 Migration sans rollback si crash midway
+- [x] 🟡 Pagination GET positions/flux/entities pour gros volumes
