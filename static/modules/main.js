@@ -370,31 +370,45 @@ function wireEvents() {
 
 // ─── Dark mode ────────────────────────────────────────────────────────────
 
+function _systemTheme() {
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function _resolveTheme(mode) {
+  return mode === 'auto' ? _systemTheme() : mode;
+}
+
 function initTheme() {
-  const saved = localStorage.getItem('financy_theme');
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const theme = saved || (prefersDark ? 'dark' : 'light');
-  applyTheme(theme);
+  const saved = localStorage.getItem('financy_theme') || 'auto';
+  applyTheme(saved);
+
+  // Follow system changes in auto mode
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if ((localStorage.getItem('financy_theme') || 'auto') === 'auto') {
+      applyTheme('auto');
+    }
+  });
 
   document.getElementById('theme-toggle')?.addEventListener('click', () => {
-    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-    applyTheme(next);
+    const current = localStorage.getItem('financy_theme') || 'auto';
+    const next = current === 'auto' ? 'light' : current === 'light' ? 'dark' : 'auto';
     localStorage.setItem('financy_theme', next);
+    applyTheme(next);
   });
 }
 
-function applyTheme(theme) {
-  document.documentElement.dataset.theme = theme;
+function applyTheme(mode) {
+  document.documentElement.dataset.theme = _resolveTheme(mode);
   const btn = document.getElementById('theme-toggle');
-  if (btn) btn.textContent = theme === 'dark' ? '\u2600' : '\u263E';
+  if (btn) btn.textContent = mode === 'auto' ? '\u25D0' : mode === 'dark' ? '\u2600' : '\u263E';
+  if (btn) btn.title = mode === 'auto' ? 'Thème : auto (système)' : mode === 'dark' ? 'Thème : sombre' : 'Thème : clair';
   if (S.currentTab === 'synthese' && S.synthese) renderSynthese();
 }
 
 // Apply immediately to prevent flash
 (function() {
-  const saved = localStorage.getItem('financy_theme');
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  document.documentElement.dataset.theme = saved || (prefersDark ? 'dark' : 'light');
+  const saved = localStorage.getItem('financy_theme') || 'auto';
+  document.documentElement.dataset.theme = _resolveTheme(saved);
 })();
 
 // ─── Boot ─────────────────────────────────────────────────────────────────
