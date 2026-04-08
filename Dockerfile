@@ -1,13 +1,12 @@
 FROM python:3.12-slim
+
+RUN useradd -r -s /bin/false financy
 WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
-
-RUN useradd -r -s /bin/false financy && \
-    chown -R financy:financy /app
+COPY --chown=financy:financy . .
 USER financy
 
 ENV FLASK_ENV=production
