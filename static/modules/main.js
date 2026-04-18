@@ -17,7 +17,7 @@ import { loadFlux, renderFlux, openFluxModal, saveFlux } from './tabs/flux.js';
 import { loadEntities, renderEntities, openEntityModal, saveEntity, updateEntInfo } from './tabs/entities.js';
 import { importXlsx, importJson, exportJson, resetDb, initDemoToggle, createBackup } from './tabs/import-export.js';
 import { loadReferential, saveReferential, initTemplateSelect } from './tabs/referentiel.js';
-import { loadTimeline, wireSimulation, triggerAutoSnapshot, triggerPricesRefresh } from './tabs/tools.js';
+import { loadTimeline, wireSimulation, triggerAutoSnapshot, triggerPricesRefresh, loadSchedulerStatus } from './tabs/tools.js';
 import { wireGlobalSearch } from './search.js';
 
 // ─── Init ─────────────────────────────────────────────────────────────────
@@ -116,7 +116,7 @@ export async function switchTab(tab) {
     if (tab === 'flux')        await loadFlux();
     if (tab === 'entites')     await loadEntities();
     if (tab === 'referentiel') await loadReferential();
-    if (tab === 'tools')       await loadTimeline();
+    if (tab === 'tools')       { await loadTimeline(); loadSchedulerStatus(); }
   } finally {
     hideLoading(tabId);
   }

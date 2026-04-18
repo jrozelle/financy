@@ -1,10 +1,11 @@
-"""Routes de gestion des cours de marche (phase 2)."""
+"""Routes de gestion des cours de marche (phase 2 + 3)."""
 import logging
 from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, request
 from models import get_db, validate_isin
 from services.prices import (get_provider, refresh_securities, refresh_history,
                              freshness_status)
+from services.scheduler import status as scheduler_status, is_enabled as scheduler_is_enabled
 from auth import login_required, csrf_protect
 
 logger = logging.getLogger('financy')
@@ -144,6 +145,16 @@ def history(isin):
             'pnl':           pnl,
             'pnl_pct':       pnl_pct,
         } if qty else None,
+    })
+
+
+@prices_bp.route('/api/scheduler/status', methods=['GET'])
+@login_required
+def get_scheduler_status():
+    """Expose l'etat du scheduler pour diagnostic cote UI."""
+    return jsonify({
+        'configured': scheduler_is_enabled(),
+        **scheduler_status(),
     })
 
 
