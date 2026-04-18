@@ -1,4 +1,4 @@
-"""Routes du module de conseil patrimonial (phase 6 : profil, objectifs, allocation)."""
+"""Routes du module de conseil patrimonial (phases 6 + 7)."""
 import logging
 from datetime import datetime
 from flask import Blueprint, jsonify, request
@@ -7,6 +7,9 @@ from models import (get_db, compute_position, get_entity_map, get_holdings_map,
                     validate_string, validate_number, validate_pct, validate_date)
 from services.advisor.allocation import (target_allocation, compute_actual_allocation,
                                          compute_gap, load_matrix)
+from services.advisor import macro as macro_svc
+from services.advisor import rebalance as rebalance_svc
+from services.advisor import llm as llm_svc
 from auth import login_required, csrf_protect
 
 logger = logging.getLogger('financy')
@@ -286,4 +289,191 @@ def get_allocation(owner):
         'total_eur':    round(total_eur, 2),
         'gap':          gap,
         'adjustments':  adjustments,
+    })
+
+
+# ─── Macro snapshot (phase 7) ────────────────────────────────────────────────
+
+def _macro_to_json(snapshot):
+    if not snapshot:
+        return None
+    return {
+        'id':             snapshot.get('id'),
+        'date':           snapshot.get('date'),
+        'regime_rates':   snapshot.get('regime_rates'),
+        'inflation_view': snapshot.get('inflation_view'),
+        'equities_bias':  snapshot.get('equities_bias'),
+        'raw_summary':    snapshot.get('raw_summary'),
+        'source':         snapshot.get('source'),
+        'created_at':     snapshot.get('created_at'),
+    }
+
+
+@advisor_bp.route('/api/advisor/macro/latest', methods=['GET'])
+@login_required
+def get_macro_latest():
+    with get_db() as conn:
+        snap = macro_svc.latest_snapshot(conn)
+    return jsonify({
+        'snapshot':      _macro_to_json(snap),
+        'llm_available': llm_svc.is_available(),
+        'llm_mock':      llm_svc.is_mock_mode(),
+    })
+
+
+@advisor_bp.route('/api/advisor/macro/refresh', methods=['POST'])
+@login_required
+@csrf_protect
+def refresh_macro():
+    if not llm_svc.is_available():
+        return jsonify({'error': 'Service LLM indisponible (ANTHROPIC_API_KEY absente).'}), 503
+    with get_db() as conn:
+        try:
+            snap, meta = macro_svc.generate_snapshot(conn)
+        except RuntimeError as e:
+            return jsonify({'error': str(e)}), 503
+        snap_id = macro_svc.save_snapshot(conn, snap)
+        snap = conn.execute(
+            'SELECT * FROM macro_snapshots WHERE id=?', (snap_id,)
+        ).fetchone()
+    return jsonify({
+        'snapshot': _macro_to_json(dict(snap)),
+        'meta':     {'cost_usd': meta['cost_usd'], 'latency_ms': meta['latency_ms'],
+                     'model': meta['model'], 'cached': meta['cached']},
+    }), 201
+
+
+@advisor_bp.route('/api/advisor/macro/<int:snap_id>', methods=['PATCH'])
+@login_required
+@csrf_protect
+def patch_macro(snap_id):
+    d = request.json or {}
+    updates = {}
+    if 'regime_rates' in d:
+        if d['regime_rates'] not in macro_svc.VALID_REGIME_RATES:
+            return jsonify({'error': 'regime_rates invalide'}), 400
+        updates['regime_rates'] = d['regime_rates']
+    if 'inflation_view' in d:
+        if d['inflation_view'] not in macro_svc.VALID_INFLATION:
+            return jsonify({'error': 'inflation_view invalide'}), 400
+        updates['inflation_view'] = d['inflation_view']
+    if 'equities_bias' in d:
+        if d['equities_bias'] not in macro_svc.VALID_EQUITIES_BIAS:
+            return jsonify({'error': 'equities_bias invalide'}), 400
+        updates['equities_bias'] = d['equities_bias']
+    if 'raw_summary' in d:
+        if not validate_string(d['raw_summary'], 4000):
+            return jsonify({'error': 'raw_summary trop long'}), 400
+        updates['raw_summary'] = d['raw_summary']
+    if not updates:
+        return jsonify({'error': 'Aucun champ a mettre a jour'}), 400
+    with get_db() as conn:
+        snap = macro_svc.update_snapshot(conn, snap_id, updates)
+    if not snap:
+        return jsonify({'error': 'Snapshot introuvable'}), 404
+    return jsonify(_macro_to_json(snap))
+
+
+# ─── Propositions de rebalance (phase 7) ─────────────────────────────────────
+
+def _build_positions_for_owner(conn, owner, date):
+    """Recharge les positions enrichies (avec holdings_detail) pour un owner."""
+    if not date:
+        r = conn.execute(
+            'SELECT MAX(date) AS d FROM positions WHERE owner=?', (owner,)
+        ).fetchone()
+        date = r['d']
+    rows = conn.execute(
+        'SELECT * FROM positions WHERE owner=? AND date=?', (owner, date)
+    ).fetchall() if date else []
+    entity_map = get_entity_map(conn, date) if date else {}
+    ref = load_referential(conn)
+    holdings_map = get_holdings_map(conn, [r['id'] for r in rows]) if rows else {}
+    positions = []
+    for r in rows:
+        p = compute_position(dict(r), entity_map, ref, holdings_map)
+        # Injecte les holdings sous une clef explicite pour la couche security
+        p['holdings_detail'] = holdings_map.get(r['id'], [])
+        positions.append(p)
+    return positions, date
+
+
+@advisor_bp.route('/api/advisor/profiles/<owner>/proposals/refresh', methods=['POST'])
+@login_required
+@csrf_protect
+def refresh_proposals(owner):
+    """Regenere les propositions pending pour un owner."""
+    with get_db() as conn:
+        profile = _get_profile_row(conn, owner)
+        if not profile:
+            return jsonify({'error': 'Profil introuvable'}), 404
+        positions, date = _build_positions_for_owner(conn, owner, request.args.get('date'))
+        if not date:
+            return jsonify({'error': 'Aucune position trouvee pour ce proprietaire'}), 400
+        matrix = load_matrix(conn)
+        target, adjustments = target_allocation(_normalize_profile_dict(profile), matrix)
+        actual = compute_actual_allocation(positions)
+        total = sum(max(0, p.get('net_attributed') or 0) for p in positions)
+        gap = compute_gap(target, actual, total)
+        allocation = {'target': target, 'actual': actual, 'gap': gap, 'total_eur': total}
+
+        proposals = rebalance_svc.generate_proposals(
+            _normalize_profile_dict(profile), positions, allocation
+        )
+        rebalance_svc.replace_proposals(conn, owner, date, proposals)
+        listed = rebalance_svc.list_proposals(conn, owner)
+
+    return jsonify({
+        'owner':         owner,
+        'snapshot_date': date,
+        'count':         len(proposals),
+        'proposals':     listed,
+    })
+
+
+@advisor_bp.route('/api/advisor/profiles/<owner>/proposals', methods=['GET'])
+@login_required
+def list_proposals_route(owner):
+    status = request.args.get('status')
+    if status and status not in ('pending', 'applied', 'dismissed'):
+        return jsonify({'error': 'status invalide'}), 400
+    with get_db() as conn:
+        rows = rebalance_svc.list_proposals(conn, owner, status=status)
+    return jsonify(rows)
+
+
+@advisor_bp.route('/api/advisor/proposals/<int:pid>', methods=['PATCH'])
+@login_required
+@csrf_protect
+def patch_proposal(pid):
+    d = request.json or {}
+    status = d.get('status')
+    if not status:
+        return jsonify({'error': 'status requis'}), 400
+    try:
+        with get_db() as conn:
+            ok = rebalance_svc.update_status(conn, pid, status)
+            if not ok:
+                return jsonify({'error': 'Proposition introuvable'}), 404
+            row = conn.execute(
+                'SELECT * FROM rebalance_proposals WHERE id=?', (pid,)
+            ).fetchone()
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    return jsonify(dict(row))
+
+
+# ─── Consommation LLM (phase 7) ──────────────────────────────────────────────
+
+@advisor_bp.route('/api/advisor/usage', methods=['GET'])
+@login_required
+def get_usage():
+    with get_db() as conn:
+        monthly = llm_svc.monthly_cost(conn)
+        rows = llm_svc.usage_summary(conn, days=30)
+    return jsonify({
+        'month_total_usd': round(monthly, 4),
+        'budget_usd':      llm_svc.budget_remaining_usd(),
+        'days':            rows,
+        'mock_mode':       llm_svc.is_mock_mode(),
     })

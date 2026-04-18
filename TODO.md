@@ -316,14 +316,16 @@ Phase 6 — Advisor 1 : profil & objectifs :
 - [x] Tests : 18 nouveaux (moteur + CRUD + allocation end-to-end), 188 au total
 
 Phase 7 — Advisor 2 : macro LLM + arbitrages :
-- [ ] requirements : anthropic
-- [ ] services/advisor/macro.py (Claude API + prompt caching)
-- [ ] Bouton « Actualiser la vue macro »
-- [ ] services/advisor/rebalance.py (bucket + security + fiscal)
-- [ ] Génération narrative LLM par proposition
-- [ ] UI propositions (list, filtres, Appliquer/Écarter)
-- [ ] Logging llm_usage + vue consommation dans Outils
-- [ ] Garde-fou ADVISOR_BUDGET_USD
+- [x] requirements : anthropic
+- [x] services/advisor/llm.py : wrapper Anthropic + cache_control + cost calc + log usage + mock auto
+- [x] services/advisor/macro.py : génération JSON structurée + édition manuelle (source bascule à 'manual')
+- [x] services/advisor/rebalance.py : bucket + fiscal + security (déterministes)
+- [x] Bouton « Actualiser la vue macro » (désactivé sans API key)
+- [x] Garde-fou budget mensuel ADVISOR_BUDGET_USD
+- [x] UI propositions (filtres, Appliquer/Écarter/Remettre en attente)
+- [x] Vue consommation API Claude dans onglet Conseil
+- [x] Mode démo et tests : LLM 100% mocké (aucun appel réseau)
+- [x] Tests : 17 nouveaux tests, 205 au total
 
 Déploiement prod dclab (après validation locale complète) :
 - [ ] Backup DB prod

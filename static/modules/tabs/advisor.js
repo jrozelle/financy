@@ -29,7 +29,12 @@ async function _loadOwnerData() {
   ]);
   _fillProfileForm(profile);
   _renderObjectives(objectives);
-  await _loadAllocation(profile);
+  await Promise.all([
+    _loadAllocation(profile),
+    _loadMacro(),
+    _loadProposals(),
+    _loadUsage(),
+  ]);
 }
 
 async function _loadProfile() {
@@ -235,6 +240,163 @@ function _renderAllocationChart(data) {
   });
 }
 
+// ─── Macro snapshot ─────────────────────────────────────────────────────────
+
+let _currentMacroId = null;
+let _llmAvailable = false;
+let _llmMock = false;
+
+async function _loadMacro() {
+  let data;
+  try {
+    data = await api('GET', '/api/advisor/macro/latest', null, { silent: true });
+  } catch { return; }
+  _llmAvailable = !!data.llm_available;
+  _llmMock = !!data.llm_mock;
+
+  const btn = document.getElementById('btn-macro-refresh');
+  if (btn) {
+    btn.disabled = !_llmAvailable;
+    btn.title = _llmAvailable
+      ? (_llmMock ? 'Mode mock : reponse fictive' : 'Appel Claude API')
+      : 'ANTHROPIC_API_KEY absente';
+  }
+
+  const snap = data.snapshot;
+  const empty = document.getElementById('macro-empty');
+  const content = document.getElementById('macro-content');
+  const meta = document.getElementById('macro-meta');
+  if (!snap) {
+    _currentMacroId = null;
+    empty.style.display = '';
+    content.style.display = 'none';
+    meta.textContent = '';
+    return;
+  }
+  _currentMacroId = snap.id;
+  empty.style.display = 'none';
+  content.style.display = '';
+  document.getElementById('macro-rates').value     = snap.regime_rates || 'neutre';
+  document.getElementById('macro-inflation').value = snap.inflation_view || 'maitrisee';
+  document.getElementById('macro-bias').value      = snap.equities_bias || 'neutre';
+  document.getElementById('macro-summary').value   = snap.raw_summary || '';
+  meta.textContent = `Source : ${snap.source === 'manual' ? 'manuelle' : 'LLM'} · ${snap.date || ''}`;
+}
+
+async function refreshMacro() {
+  const btn = document.getElementById('btn-macro-refresh');
+  btn.disabled = true;
+  try {
+    const r = await api('POST', '/api/advisor/macro/refresh');
+    toast(`Macro actualisée${r.meta?.cached ? ' (cache)' : ''}`, 'success');
+    await _loadMacro();
+  } catch {} finally {
+    btn.disabled = false;
+  }
+}
+
+async function saveMacro() {
+  if (!_currentMacroId) return;
+  try {
+    await api('PATCH', `/api/advisor/macro/${_currentMacroId}`, {
+      regime_rates:   document.getElementById('macro-rates').value,
+      inflation_view: document.getElementById('macro-inflation').value,
+      equities_bias:  document.getElementById('macro-bias').value,
+      raw_summary:    document.getElementById('macro-summary').value,
+    });
+    toast('Snapshot macro enregistré', 'success');
+    await _loadMacro();
+  } catch {}
+}
+
+// ─── Propositions ───────────────────────────────────────────────────────────
+
+async function _loadProposals() {
+  if (!_currentOwner) return;
+  const status = document.getElementById('proposals-filter').value;
+  const url = status
+    ? `/api/advisor/profiles/${encodeURIComponent(_currentOwner)}/proposals?status=${status}`
+    : `/api/advisor/profiles/${encodeURIComponent(_currentOwner)}/proposals`;
+  let list;
+  try {
+    list = await api('GET', url, null, { silent: true });
+  } catch { return; }
+  _renderProposals(list);
+}
+
+function _renderProposals(list) {
+  const wrap = document.getElementById('proposals-list');
+  const empty = document.getElementById('proposals-empty');
+  if (!list.length) {
+    wrap.innerHTML = '';
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+  wrap.innerHTML = list.map(p => {
+    const cls = `proposal-item kind-${p.kind} status-${p.status}`;
+    const amount = p.amount != null ? `<strong>${fmt(p.amount)} €</strong>` : '';
+    return `
+      <div class="${cls}" data-pid="${p.id}">
+        <div class="proposal-head">
+          <div>
+            <span class="proposal-kind">${esc(p.kind)}</span>
+            <strong style="margin-left:.4rem">${esc(p.label)}</strong>
+            ${amount ? '· ' + amount : ''}
+          </div>
+          <div class="proposal-actions">
+            ${p.status === 'pending' ? `
+              <button type="button" class="btn-icon" data-action="apply">Appliquer</button>
+              <button type="button" class="btn-icon" data-action="dismiss">Écarter</button>
+            ` : `
+              <button type="button" class="btn-icon" data-action="reset">Remettre en attente</button>
+            `}
+          </div>
+        </div>
+        ${p.rationale ? `<div class="proposal-rationale">${esc(p.rationale)}</div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+async function refreshProposals() {
+  if (!_currentOwner) return;
+  const btn = document.getElementById('btn-proposals-refresh');
+  btn.disabled = true;
+  try {
+    const r = await api('POST', `/api/advisor/profiles/${encodeURIComponent(_currentOwner)}/proposals/refresh`);
+    toast(`${r.count} proposition(s) générée(s)`, 'success');
+    document.getElementById('proposals-filter').value = 'pending';
+    await _loadProposals();
+  } catch {} finally {
+    btn.disabled = false;
+  }
+}
+
+async function _patchProposal(pid, status) {
+  try {
+    await api('PATCH', `/api/advisor/proposals/${pid}`, { status });
+    await _loadProposals();
+  } catch {}
+}
+
+// ─── Usage ─────────────────────────────────────────────────────────────────
+
+async function _loadUsage() {
+  let data;
+  try {
+    data = await api('GET', '/api/advisor/usage', null, { silent: true });
+  } catch { return; }
+  const el = document.getElementById('advisor-usage-summary');
+  if (!el) return;
+  const callsToday = data.days.length ? data.days[data.days.length - 1].calls : 0;
+  const budget = data.budget_usd != null ? ` / ${data.budget_usd.toFixed(2)} $` : '';
+  const mode = data.mock_mode ? ' <span class="h-badge h-badge-muted">mock</span>' : '';
+  el.innerHTML = `
+    Ce mois : <strong>${data.month_total_usd.toFixed(4)} $</strong>${budget}${mode}
+    · Aujourd'hui : ${callsToday} appel(s)
+  `;
+}
+
 // ─── Wiring ─────────────────────────────────────────────────────────────────
 
 export function wireAdvisorEvents() {
@@ -256,5 +418,22 @@ export function wireAdvisorEvents() {
     if (!tr) return;
     if (btn.dataset.action === 'save-obj') saveObjectiveRow(tr);
     if (btn.dataset.action === 'del-obj')  deleteObjective(tr);
+  });
+
+  // Macro
+  document.getElementById('btn-macro-refresh')?.addEventListener('click', refreshMacro);
+  document.getElementById('btn-macro-save')?.addEventListener('click', saveMacro);
+
+  // Propositions
+  document.getElementById('btn-proposals-refresh')?.addEventListener('click', refreshProposals);
+  document.getElementById('proposals-filter')?.addEventListener('change', _loadProposals);
+  document.getElementById('proposals-list')?.addEventListener('click', e => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const item = btn.closest('.proposal-item');
+    const pid = parseInt(item.dataset.pid);
+    if (btn.dataset.action === 'apply')   _patchProposal(pid, 'applied');
+    if (btn.dataset.action === 'dismiss') _patchProposal(pid, 'dismissed');
+    if (btn.dataset.action === 'reset')   _patchProposal(pid, 'pending');
   });
 }
