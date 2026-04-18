@@ -240,3 +240,73 @@ Backlog :
 - [x] 🟡 @media print : styles d'impression manquants
 - [x] 🟡 Migration sans rollback si crash midway
 - [x] 🟡 Pagination GET positions/flux/entities pour gros volumes
+
+
+--- Actifs & conseil patrimonial ---
+
+Spec détaillée : docs/plan-actifs-conseil.md
+Branche : claude/asset-import-tracking-8psft
+
+Setup :
+- [ ] Dev local : venv + requirements-dev.txt + .env.local + DB isolée financy_dev.db
+- [ ] Script scripts/seed_dev.py (owner, position PEA, 3 ISIN réels, profil advisor test)
+- [ ] README.dev.md avec checklist de tests par phase
+
+Phase 1 — Schéma holdings + CRUD manuel :
+- [ ] Migration _migration_005 (securities, holdings, price_history, holdings_snapshots)
+- [ ] routes/holdings.py — GET/PUT/DELETE (auth + CSRF)
+- [ ] compute_position adapté (holdings + is_priceable → Σ qty×last_price)
+- [ ] static/modules/holdings.js + modale « Gérer les lignes »
+- [ ] Validation ISIN (regex + checksum Luhn)
+- [ ] Snapshots étendus pour holdings_snapshots
+- [ ] Export XLSX onglet Holdings + import
+
+Phase 2 — Provider cours + refresh manuel + popover :
+- [ ] requirements : yfinance
+- [ ] services/prices.py (PriceProvider, YahooProvider, mock démo)
+- [ ] Batching 10 + délai, try/except robuste
+- [ ] POST /api/prices/refresh
+- [ ] Bouton « Rafraîchir les cours » dans Outils
+- [ ] Badge fraîcheur (vert/orange/rouge)
+- [ ] Résolution ISIN→ticker Yahoo, cache securities.ticker
+- [ ] Popover au clic ISIN : graphe 1J/7J/30J + PRU + P&L
+
+Phase 3 — Scheduler :
+- [ ] requirements : APScheduler
+- [ ] Job quotidien refresh_prices() (SCHEDULER_ENABLED=true)
+- [ ] Lock anti-double-exécution + logs
+
+Phase 4 — Import PDF :
+- [ ] requirements : pdfplumber
+- [ ] Upload sécurisé (5 Mo, MIME, purge, CSRF)
+- [ ] POST /api/envelope/<id>/import-pdf (preview + validate)
+- [ ] Détection format (PEA Boursorama, AV Linxea) + parser générique ISIN
+- [ ] Fallback modale manuelle pré-remplie
+
+Phase 5 — Onglet Actifs (optionnel) :
+- [ ] Vue consolidée holdings (tri ISIN/poids/perf/fraîcheur)
+- [ ] Graphes répartition (asset_class, devise)
+
+Phase 6 — Advisor 1 : profil & objectifs :
+- [ ] Migration _migration_006 (owner_profiles, owner_objectives, macro_snapshots, allocation_targets, rebalance_proposals, llm_usage)
+- [ ] routes/advisor.py (CRUD profil + objectifs)
+- [ ] Onglet « Conseil » + static/modules/advisor.js
+- [ ] services/advisor/allocation.py (matrice horizon×risque + ajustements contextuels)
+- [ ] Vue comparative allocation cible vs actuelle
+- [ ] Bannière disclaimer persistante
+
+Phase 7 — Advisor 2 : macro LLM + arbitrages :
+- [ ] requirements : anthropic
+- [ ] services/advisor/macro.py (Claude API + prompt caching)
+- [ ] Bouton « Actualiser la vue macro »
+- [ ] services/advisor/rebalance.py (bucket + security + fiscal)
+- [ ] Génération narrative LLM par proposition
+- [ ] UI propositions (list, filtres, Appliquer/Écarter)
+- [ ] Logging llm_usage + vue consommation dans Outils
+- [ ] Garde-fou ADVISOR_BUDGET_USD
+
+Déploiement prod dclab (après validation locale complète) :
+- [ ] Backup DB prod
+- [ ] Variables d'env (ANTHROPIC_API_KEY, SCHEDULER_ENABLED=true)
+- [ ] Vérif migrations au démarrage
+- [ ] Tests post-déploiement (refresh cours, positions existantes)
