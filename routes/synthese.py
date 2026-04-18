@@ -1,7 +1,8 @@
 import json
 from flask import Blueprint, jsonify, request
 from datetime import datetime
-from models import (get_db, compute_position, get_entity_map, load_referential)
+from models import (get_db, compute_position, get_entity_map, get_holdings_map,
+                    load_referential)
 from auth import login_required, csrf_protect
 
 synthese_bp = Blueprint('synthese', __name__)
@@ -17,10 +18,11 @@ def get_synthese():
             date = row['d']
         if not date:
             return jsonify({'date': None})
-        rows       = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
-        entity_map = get_entity_map(conn, date)
-        ref        = load_referential(conn)
-        linked     = conn.execute(
+        rows         = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
+        entity_map   = get_entity_map(conn, date)
+        ref          = load_referential(conn)
+        holdings_map = get_holdings_map(conn, [r['id'] for r in rows])
+        linked       = conn.execute(
             '''SELECT entity,
                       SUM(ownership_pct) as total_own,
                       SUM(debt_pct)      as total_debt
@@ -28,7 +30,7 @@ def get_synthese():
                GROUP BY entity''', (date,)
         ).fetchall()
 
-    positions = [compute_position(dict(r), entity_map, ref) for r in rows]
+    positions = [compute_position(dict(r), entity_map, ref, holdings_map) for r in rows]
 
     # Derive owners from actual data, preserving ref order for known ones
     ref_owners = ref['owners']
@@ -79,10 +81,11 @@ def get_synthese():
     # ── Helper : calculer les totaux d'un snapshot ──
     def _snapshot_totals(snap_date):
         with get_db() as c:
-            snap_rows      = c.execute('SELECT * FROM positions WHERE date=?', (snap_date,)).fetchall()
-            snap_entity_map = get_entity_map(c, snap_date)
-            snap_ref        = load_referential(c)
-        snap_positions = [compute_position(dict(r), snap_entity_map, snap_ref) for r in snap_rows]
+            snap_rows        = c.execute('SELECT * FROM positions WHERE date=?', (snap_date,)).fetchall()
+            snap_entity_map  = get_entity_map(c, snap_date)
+            snap_ref         = load_referential(c)
+            snap_holdings    = get_holdings_map(c, [r['id'] for r in snap_rows])
+        snap_positions = [compute_position(dict(r), snap_entity_map, snap_ref, snap_holdings) for r in snap_rows]
         return {
             'net':   sum(p['net_attributed'] for p in snap_positions),
             'gross': sum(p['gross_attributed'] for p in snap_positions),
@@ -163,9 +166,10 @@ def get_historique():
         ref = load_referential(conn)
         history = []
         for date in dates:
-            rows       = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
-            entity_map = get_entity_map(conn, date)
-            positions  = [compute_position(dict(r), entity_map, ref) for r in rows]
+            rows         = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
+            entity_map   = get_entity_map(conn, date)
+            holdings_map = get_holdings_map(conn, [r['id'] for r in rows])
+            positions    = [compute_position(dict(r), entity_map, ref, holdings_map) for r in rows]
             if owner:
                 positions = [p for p in positions if p['owner'] == owner]
             snap_owners = sorted(set(p['owner'] for p in positions))
@@ -295,9 +299,10 @@ def get_tri():
         ref = load_referential(conn)
 
         # Valeur initiale par enveloppe (1er snapshot)
-        first_rows = conn.execute('SELECT * FROM positions WHERE date=?', (first_date,)).fetchall()
+        first_rows       = conn.execute('SELECT * FROM positions WHERE date=?', (first_date,)).fetchall()
         first_entity_map = get_entity_map(conn, first_date)
-        first_positions = [compute_position(dict(r), first_entity_map, ref) for r in first_rows]
+        first_holdings   = get_holdings_map(conn, [r['id'] for r in first_rows])
+        first_positions  = [compute_position(dict(r), first_entity_map, ref, first_holdings) for r in first_rows]
         if owner:
             first_positions = [p for p in first_positions if p['owner'] == owner]
 
@@ -309,9 +314,10 @@ def get_tri():
             total_initial += (p['net_attributed'] or 0)
 
         # Valeur finale par enveloppe (dernier snapshot)
-        last_rows = conn.execute('SELECT * FROM positions WHERE date=?', (last_date,)).fetchall()
+        last_rows       = conn.execute('SELECT * FROM positions WHERE date=?', (last_date,)).fetchall()
         last_entity_map = get_entity_map(conn, last_date)
-        last_positions = [compute_position(dict(r), last_entity_map, ref) for r in last_rows]
+        last_holdings   = get_holdings_map(conn, [r['id'] for r in last_rows])
+        last_positions  = [compute_position(dict(r), last_entity_map, ref, last_holdings) for r in last_rows]
         if owner:
             last_positions = [p for p in last_positions if p['owner'] == owner]
 

@@ -11,6 +11,7 @@ import { wireSortableTable } from './utils.js';
 import { loadSynthese, renderSynthese, renderSyntheseHistory, loadHistorique } from './tabs/synthese.js';
 import { loadPositions, renderPositions, clearFilters, openPosModal, duplicateSnapshot,
          onEntitySelectChange, updatePosInfo, savePosition, startInlineEdit, deletePosition } from './tabs/positions.js';
+import { openHoldingsModal, wireHoldingsEvents } from './tabs/holdings.js';
 import { loadFlux, renderFlux, openFluxModal, saveFlux } from './tabs/flux.js';
 import { loadEntities, renderEntities, openEntityModal, saveEntity, updateEntInfo } from './tabs/entities.js';
 import { importXlsx, importJson, exportJson, resetDb, initDemoToggle, createBackup } from './tabs/import-export.js';
@@ -155,6 +156,11 @@ function wireEvents() {
       const id = parseInt(btn.dataset.id);
       if (btn.dataset.action === 'edit-pos') openPosModal(id);
       if (btn.dataset.action === 'del-pos')  deletePosition(id);
+      if (btn.dataset.action === 'manage-holdings') {
+        const p = S.positions.find(x => x.id === id);
+        const label = p ? `${p.envelope || p.category} (${p.owner})` : '';
+        openHoldingsModal(id, label);
+      }
       if (btn.dataset.action === 'add-pos-ctx') {
         openPosModal(null, {
           owner:         btn.dataset.owner         || undefined,
@@ -317,8 +323,11 @@ function wireEvents() {
   document.getElementById('position-modal-overlay').addEventListener('click', () => closeModal('position-modal'));
   document.getElementById('flux-modal-overlay').addEventListener('click', () => closeModal('flux-modal'));
 
+  // Holdings
+  wireHoldingsEvents();
+
   // Focus traps on static modals
-  ['position-modal', 'flux-modal', 'entity-modal', 'targets-modal'].forEach(trapModalFocus);
+  ['position-modal', 'flux-modal', 'entity-modal', 'targets-modal', 'holdings-modal'].forEach(trapModalFocus);
 
   // Keyboard shortcuts
   document.addEventListener('keydown', e => {
@@ -333,7 +342,7 @@ function wireEvents() {
     if (e.key === 'Escape') {
       const confirm = document.querySelector('.confirm-overlay');
       if (confirm) { confirm.querySelector('.confirm-cancel')?.click(); return; }
-      for (const id of ['position-modal', 'flux-modal', 'entity-modal', 'targets-modal']) {
+      for (const id of ['position-modal', 'flux-modal', 'entity-modal', 'targets-modal', 'holdings-modal']) {
         const m = document.getElementById(id);
         if (m && !m.classList.contains('hidden')) { closeModal(id); return; }
       }

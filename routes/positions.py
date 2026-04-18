@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
-from models import (get_db, compute_position, get_entity_map, load_referential,
+from models import (get_db, compute_position, get_entity_map, get_holdings_map,
+                    load_referential, snapshot_holdings_to_date,
                     validate_date, validate_number, validate_string, validate_pct)
 from auth import login_required, csrf_protect
 
@@ -33,9 +34,10 @@ def get_positions():
             query += ' LIMIT ? OFFSET ?'
             params += [limit, offset]
         rows = conn.execute(query, params).fetchall()
-        entity_map = get_entity_map(conn, date)
-        ref        = load_referential(conn)
-    return jsonify([compute_position(dict(r), entity_map, ref) for r in rows])
+        entity_map   = get_entity_map(conn, date)
+        ref          = load_referential(conn)
+        holdings_map = get_holdings_map(conn, [r['id'] for r in rows])
+    return jsonify([compute_position(dict(r), entity_map, ref, holdings_map) for r in rows])
 
 
 @positions_bp.route('/api/positions', methods=['POST'])
@@ -73,10 +75,11 @@ def add_position():
              d.get('notes'), entity,
              d.get('ownership_pct', 1.0), d.get('debt_pct', 1.0), mob_override)
         )
-        row        = conn.execute('SELECT * FROM positions WHERE id=?', (cur.lastrowid,)).fetchone()
-        entity_map = get_entity_map(conn)
-        ref        = load_referential(conn)
-    return jsonify(compute_position(dict(row), entity_map, ref)), 201
+        row          = conn.execute('SELECT * FROM positions WHERE id=?', (cur.lastrowid,)).fetchone()
+        entity_map   = get_entity_map(conn)
+        ref          = load_referential(conn)
+        holdings_map = get_holdings_map(conn, [row['id']])
+    return jsonify(compute_position(dict(row), entity_map, ref, holdings_map)), 201
 
 
 @positions_bp.route('/api/positions/<int:pid>', methods=['PUT'])
@@ -111,10 +114,11 @@ def update_position(pid):
              d.get('notes'), entity,
              d.get('ownership_pct', 1.0), d.get('debt_pct', 1.0), mob_override, pid)
         )
-        row        = conn.execute('SELECT * FROM positions WHERE id=?', (pid,)).fetchone()
-        entity_map = get_entity_map(conn)
-        ref        = load_referential(conn)
-    return jsonify(compute_position(dict(row), entity_map, ref))
+        row          = conn.execute('SELECT * FROM positions WHERE id=?', (pid,)).fetchone()
+        entity_map   = get_entity_map(conn)
+        ref          = load_referential(conn)
+        holdings_map = get_holdings_map(conn, [row['id']])
+    return jsonify(compute_position(dict(row), entity_map, ref, holdings_map))
 
 
 @positions_bp.route('/api/positions/<int:pid>', methods=['DELETE'])
@@ -196,6 +200,9 @@ def snapshot_update(pid):
                      r['ownership_pct'], r['debt_pct'])
                 )
             new_row = conn.execute('SELECT * FROM positions WHERE id=?', (cur.lastrowid,)).fetchone()
-            created.append(compute_position(dict(new_row), entity_map, ref))
+            holdings_map = get_holdings_map(conn, [new_row['id']])
+            created.append(compute_position(dict(new_row), entity_map, ref, holdings_map))
+
+        snapshot_holdings_to_date(conn, target_date)
 
     return jsonify({'target_date': target_date, 'count': len(created)}), 201

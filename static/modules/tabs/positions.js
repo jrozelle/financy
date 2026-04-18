@@ -3,6 +3,7 @@ import { fmt, fmtDate, esc, liqBadge, sortArr, updateSortIndicators, today, wire
 import { api, refreshEntitySelect } from '../api.js';
 import { confirmDialog, promptDialog, toast, closeModal } from '../dialogs.js';
 import { loadSynthese, loadHistorique } from './synthese.js';
+import { openHoldingsModal } from './holdings.js';
 import { refreshDates } from '../main.js';
 
 export async function loadPositions() {
@@ -201,6 +202,7 @@ function renderPositionsTree(allPositions) {
                     ${inlineVal}
                     <span class="tree-actions">
                       <button class="btn-icon" data-action="history-pos" data-id="${p.id}" title="Évolution dans le temps">📈</button>
+                      <button class="btn-icon" data-action="manage-holdings" data-id="${p.id}" title="Gérer les lignes">Lignes</button>
                       <button class="btn-icon edit" data-id="${p.id}" data-action="edit-pos">Éditer</button>
                       <button class="btn-icon del"  data-id="${p.id}" data-action="del-pos">Suppr.</button>
                     </span>
@@ -308,9 +310,12 @@ export function renderPositions() {
       ? `<div style="font-size:11px;color:var(--text-muted);margin-top:1px">↳ ${esc(p.entity)}</div>` : '';
     const notesMark = p.notes
       ? `<span title="${esc(p.notes)}" style="color:var(--text-muted);font-size:11px;margin-left:4px;cursor:default">📋</span>` : '';
+    const holdingsBadge = p.holdings_count
+      ? `<span class="badge badge-j27" style="margin-left:4px;font-size:10px;vertical-align:middle" title="${p.holdings_count} ligne(s)">${p.holdings_count}L</span>`
+      : '';
     return `<tr>
       <td><strong>${esc(p.owner)}</strong></td>
-      <td>${esc(p.category)}${notesMark}</td>
+      <td>${esc(p.category)}${notesMark}${holdingsBadge}</td>
       <td>${esc(p.envelope || '—')}</td>
       <td>${esc(p.establishment || '—')}${entitySub}</td>
       <td class="num">${fmt(p.gross_attributed)}${pctBadge}</td>
@@ -319,6 +324,7 @@ export function renderPositions() {
       <td>${liqBadge(p.liquidity)}</td>
       <td class="num">${fmt(p.mobilizable_value)}${p.mobilizable_pct_override != null ? ` <span title="Mobilisabilité surchargée : ${Math.round(p.mobilizable_pct_override*100)} %" style="color:var(--warning);font-size:11px">⚠</span>` : ''}</td>
       <td style="white-space:nowrap">
+        <button class="btn-icon" data-id="${p.id}" data-action="manage-holdings" title="Gérer les lignes">Lignes</button>
         <button class="btn-icon edit" data-id="${p.id}" data-action="edit-pos">Éditer</button>
         <button class="btn-icon del"  data-id="${p.id}" data-action="del-pos">Suppr.</button>
       </td>
@@ -347,9 +353,16 @@ function onPosTableClick(e) {
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
   const id = parseInt(btn.dataset.id);
-  if (btn.dataset.action === 'edit-pos') openPosModal(id);
-  if (btn.dataset.action === 'del-pos')  deletePosition(id);
+  if (btn.dataset.action === 'edit-pos')         openPosModal(id);
+  if (btn.dataset.action === 'del-pos')          deletePosition(id);
+  if (btn.dataset.action === 'manage-holdings')  _openHoldingsForPosition(id);
   document.getElementById('positions-tbody').addEventListener('click', onPosTableClick, { once: true });
+}
+
+function _openHoldingsForPosition(id) {
+  const p = S.positions.find(x => x.id === id);
+  const label = p ? `${p.envelope || p.category} (${p.owner})` : '';
+  openHoldingsModal(id, label);
 }
 
 export async function duplicateSnapshot() {
@@ -368,9 +381,13 @@ export async function duplicateSnapshot() {
   const src = await api('GET', `/api/positions?date=${S.positionsDate}`);
   await Promise.all(src.map(p => {
     const { id, created_at, net_value, gross_attributed, debt_attributed,
-            net_attributed, liquidity, friction, mobilizable_pct, mobilizable_value, ...rest } = p;
+            net_attributed, liquidity, friction, mobilizable_pct, mobilizable_value,
+            has_holdings, holdings_count, ...rest } = p;
     return api('POST', '/api/positions', { ...rest, date: newDate });
   }));
+  // Fige l'etat des holdings a la nouvelle date
+  try { await api('POST', '/api/holdings/snapshot', { date: newDate }, { silent: true }); }
+  catch {}
   S.positionsDate = newDate;
   await refreshDates();
   await loadPositions();
