@@ -466,6 +466,66 @@
           </div>
         </div>
       </div>
+
+      <div class="card">
+        <h2>Vue macroéconomique</h2>
+        <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
+          Synthèse générée par Claude (sans web search) ou éditée à la main.
+          Utilisée comme contexte pour les propositions d'arbitrage.
+        </p>
+        <div id="macro-empty" class="text-muted" style="font-size:13px;margin-bottom:.875rem;display:none">
+          Aucun snapshot pour le moment.
+        </div>
+        <div id="macro-content" class="form-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:.875rem;display:none">
+          <div class="form-group">
+            <label>Régime de taux</label>
+            <select id="macro-rates"><option value="bas">Bas</option><option value="neutre">Neutre</option><option value="haut">Haut</option></select>
+          </div>
+          <div class="form-group">
+            <label>Inflation</label>
+            <select id="macro-inflation"><option value="maitrisee">Maîtrisée</option><option value="persistante">Persistante</option></select>
+          </div>
+          <div class="form-group">
+            <label>Biais actions</label>
+            <select id="macro-bias"><option value="defensif">Défensif</option><option value="neutre">Neutre</option><option value="offensif">Offensif</option></select>
+          </div>
+          <div class="form-group full-span" style="grid-column:span 3">
+            <label>Synthèse</label>
+            <textarea id="macro-summary" rows="4" maxlength="4000" style="border:1px solid var(--border);border-radius:6px;padding:.5rem .75rem;font-size:13px;background:var(--card);color:var(--text);font-family:inherit;resize:vertical"></textarea>
+          </div>
+        </div>
+        <div id="macro-meta" class="text-muted" style="font-size:11.5px;margin-bottom:.5rem"></div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button type="button" class="btn btn-primary" id="btn-macro-refresh">Actualiser via Claude</button>
+          <button type="button" class="btn btn-secondary" id="btn-macro-save">Enregistrer ma version</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Propositions d'arbitrage</h2>
+        <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
+          Allègements par poche, optimisations fiscales et lignes nominatives,
+          générés à partir du profil et des écarts d'allocation.
+        </p>
+        <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.875rem;flex-wrap:wrap">
+          <button type="button" class="btn btn-primary" id="btn-proposals-refresh">Générer les propositions</button>
+          <select id="proposals-filter" style="margin-left:auto">
+            <option value="">Tous</option>
+            <option value="pending" selected>En attente</option>
+            <option value="applied">Appliquées</option>
+            <option value="dismissed">Écartées</option>
+          </select>
+        </div>
+        <div id="proposals-empty" class="text-muted" style="font-size:13px;font-style:italic;display:none">
+          Aucune proposition. Cliquez « Générer » pour les calculer.
+        </div>
+        <div id="proposals-list" class="proposals-list"></div>
+      </div>
+
+      <div class="card">
+        <h2>Consommation API Claude</h2>
+        <div id="advisor-usage-summary" class="text-muted" style="font-size:13px"></div>
+      </div>
     </div>
 
     <!-- ── OUTILS ──────────────────────────────────────────────────────── -->
