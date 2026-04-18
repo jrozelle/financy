@@ -283,12 +283,87 @@ async function onIsinInput(e) {
 
 // ─── Event wiring ────────────────────────────────────────────────────────────
 
+// ─── Import PDF (phase 4) ────────────────────────────────────────────────────
+
+async function openPdfPicker() {
+  const input = document.getElementById('holdings-pdf-input');
+  if (!input) return;
+  input.value = '';
+  input.click();
+}
+
+async function onPdfSelected(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  if (!state.positionId) {
+    toast('Ouvrez d\'abord la modale d\'une position', 'error');
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    toast('Fichier trop volumineux (>5 Mo)', 'error');
+    return;
+  }
+  const status = document.getElementById('holdings-import-status');
+  if (status) status.innerHTML = '<span class="text-muted">Analyse du PDF…</span>';
+
+  const fd = new FormData();
+  fd.append('file', file);
+  const meta = document.querySelector('meta[name="csrf-token"]');
+
+  let data;
+  try {
+    const res = await fetch(
+      `/api/envelope/${state.positionId}/import-pdf?step=preview`,
+      {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': meta ? meta.content : '' },
+        body: fd,
+      }
+    );
+    data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Echec du parsing');
+  } catch (err) {
+    toast(err.message || 'Erreur lors de l\'analyse du PDF', 'error');
+    if (status) status.innerHTML = '';
+    return;
+  }
+
+  // Remplit le draft avec les lignes detectees
+  state.rows = (data.lines || []).map(l => makeRow({
+    isin:         l.isin,
+    name:         l.name,
+    quantity:     l.quantity,
+    cost_basis:   l.cost_basis,
+    market_value: l.market_value,
+  }));
+  renderHoldingsTable();
+
+  // Statut : format detecte + warnings + action a faire
+  const lines = data.lines || [];
+  const lowConf = lines.filter(l => (l.confidence || 0) < 0.5).length;
+  const parts = [
+    `<strong>${esc(data.source_label || 'Format inconnu')}</strong>`,
+    `${lines.length} ligne(s) détectée(s)`,
+  ];
+  if (lowConf) parts.push(`<span style="color:var(--warning)">${lowConf} à faible confiance</span>`);
+  if (data.warnings && data.warnings.length) {
+    parts.push(`<span style="color:var(--warning)">${esc(data.warnings[0])}</span>`);
+  }
+  if (status) {
+    status.innerHTML = parts.join(' · ') +
+      ' — vérifiez le tableau puis cliquez Enregistrer pour <strong>remplacer</strong> les lignes existantes.';
+  }
+  toast(`${lines.length} ligne(s) détectée(s) depuis le PDF`, 'success');
+}
+
 export function wireHoldingsEvents() {
   const modal = document.getElementById('holdings-modal');
   if (!modal) return;
 
   document.getElementById('holdings-add-line')?.addEventListener('click', addLine);
   document.getElementById('holdings-save')?.addEventListener('click', saveAll);
+  document.getElementById('holdings-import-pdf')?.addEventListener('click', openPdfPicker);
+  document.getElementById('holdings-pdf-input')?.addEventListener('change', onPdfSelected);
 
   document.getElementById('holdings-tbody').addEventListener('click', e => {
     const remove = e.target.closest('[data-action="remove-line"]');

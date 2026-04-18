@@ -683,13 +683,18 @@
           </table>
         </div>
         <datalist id="holdings-isin-list"></datalist>
-        <div class="modal-actions" style="justify-content:space-between">
-          <button type="button" class="btn btn-secondary" id="holdings-add-line">+ Ajouter une ligne</button>
-          <div>
+        <div class="modal-actions" style="justify-content:space-between;gap:.5rem;flex-wrap:wrap">
+          <div style="display:flex;gap:.4rem">
+            <button type="button" class="btn btn-secondary" id="holdings-add-line">+ Ajouter une ligne</button>
+            <button type="button" class="btn btn-secondary" id="holdings-import-pdf">Importer PDF…</button>
+            <input type="file" id="holdings-pdf-input" accept="application/pdf,.pdf" style="display:none">
+          </div>
+          <div style="display:flex;gap:.4rem">
             <button type="button" class="btn btn-secondary" data-close="holdings-modal">Annuler</button>
             <button type="button" class="btn btn-primary" id="holdings-save">Enregistrer</button>
           </div>
         </div>
+        <div id="holdings-import-status" style="margin-top:.5rem;font-size:12.5px"></div>
       </div>
     </div>
   </div>

@@ -7,6 +7,7 @@ from .referential import referential_bp
 from .tools import tools_bp
 from .holdings import holdings_bp
 from .prices import prices_bp
+from .pdf_import import pdf_import_bp
 
 all_blueprints = [
     positions_bp,
@@ -18,4 +19,5 @@ all_blueprints = [
     tools_bp,
     holdings_bp,
     prices_bp,
+    pdf_import_bp,
 ]
