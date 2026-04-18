@@ -1,7 +1,8 @@
 import logging
 from flask import Blueprint, jsonify, request
 from datetime import datetime
-from models import get_db, compute_position, get_entity_map, load_referential
+from models import (get_db, compute_position, get_entity_map, get_holdings_map,
+                    load_referential, snapshot_holdings_to_date)
 from auth import login_required, csrf_protect
 
 logger = logging.getLogger('financy')
@@ -27,9 +28,10 @@ def get_timeline():
         ).fetchall()
         for row in dates:
             d = row['date']
-            pos_rows = conn.execute('SELECT * FROM positions WHERE date=?', (d,)).fetchall()
-            entity_map = get_entity_map(conn, d)
-            positions = [compute_position(dict(r), entity_map, ref) for r in pos_rows]
+            pos_rows     = conn.execute('SELECT * FROM positions WHERE date=?', (d,)).fetchall()
+            entity_map   = get_entity_map(conn, d)
+            holdings_map = get_holdings_map(conn, [r['id'] for r in pos_rows])
+            positions    = [compute_position(dict(r), entity_map, ref, holdings_map) for r in pos_rows]
             net = sum(p['net_attributed'] for p in positions)
             events.append({
                 'date': d,
@@ -88,9 +90,10 @@ def get_position_history():
         history = []
 
         for date in dates:
-            rows = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
-            entity_map = get_entity_map(conn, date)
-            positions = [compute_position(dict(r), entity_map, ref) for r in rows]
+            rows         = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
+            entity_map   = get_entity_map(conn, date)
+            holdings_map = get_holdings_map(conn, [r['id'] for r in rows])
+            positions    = [compute_position(dict(r), entity_map, ref, holdings_map) for r in rows]
 
             if pos_id:
                 # Recherche par correspondance : même owner/category/envelope/establishment/entity
@@ -226,19 +229,30 @@ def auto_snapshot():
         if existing['cnt'] > 0:
             return jsonify({'error': 'Un snapshot existe déjà à cette date', 'skipped': True}), 200
 
-        # Copier toutes les positions
-        rows = conn.execute('SELECT * FROM positions WHERE date=?', (last_date,)).fetchall()
+        # Copier toutes les positions — pour chaque source on recalcule la valeur
+        # effective (incluant les holdings) pour la figer au moment du snapshot.
+        source_rows  = conn.execute('SELECT * FROM positions WHERE date=?', (last_date,)).fetchall()
+        holdings_map = get_holdings_map(conn, [r['id'] for r in source_rows])
+        ref          = load_referential(conn)
+        entity_map   = get_entity_map(conn, last_date)
         count = 0
-        for r in rows:
+        for r in source_rows:
+            p = compute_position(dict(r), entity_map, ref, holdings_map)
+            # Si la position a des holdings et pas d'entité, on fige la valeur calculée
+            frozen_value = p['value'] if p.get('has_holdings') and not p.get('entity') else r['value']
             conn.execute(
                 '''INSERT INTO positions (date, owner, category, envelope, establishment,
                    value, debt, notes, entity, ownership_pct, debt_pct, mobilizable_pct_override)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)''',
                 (target_date, r['owner'], r['category'], r['envelope'], r['establishment'],
-                 r['value'], r['debt'], r['notes'], r['entity'],
+                 frozen_value, r['debt'], r['notes'], r['entity'],
                  r['ownership_pct'], r['debt_pct'], r['mobilizable_pct_override'])
             )
             count += 1
 
-    logger.info('Auto-snapshot: %d positions copied from %s to %s', count, last_date, target_date)
-    return jsonify({'ok': True, 'copied': count, 'from_date': last_date, 'to_date': target_date})
+        snap_count = snapshot_holdings_to_date(conn, target_date)
+
+    logger.info('Auto-snapshot: %d positions + %d holdings copied from %s to %s',
+                count, snap_count, last_date, target_date)
+    return jsonify({'ok': True, 'copied': count, 'holdings_snapshots': snap_count,
+                    'from_date': last_date, 'to_date': target_date})

@@ -5,6 +5,7 @@ from .entities import entities_bp
 from .import_export import import_export_bp
 from .referential import referential_bp
 from .tools import tools_bp
+from .holdings import holdings_bp
 
 all_blueprints = [
     positions_bp,
@@ -14,4 +15,5 @@ all_blueprints = [
     import_export_bp,
     referential_bp,
     tools_bp,
+    holdings_bp,
 ]

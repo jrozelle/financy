@@ -602,6 +602,49 @@
     </div>
   </div>
 
+  <!-- ── MODAL HOLDINGS (lignes d'actifs) ───────────────────────────────── -->
+  <div id="holdings-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="holdings-modal-title">
+    <div class="modal-overlay" id="holdings-modal-overlay"></div>
+    <div class="modal-content modal-wide">
+      <div class="modal-header">
+        <h2 id="holdings-modal-title">Gérer les lignes</h2>
+        <button class="modal-close" data-close="holdings-modal" aria-label="Fermer">&#10005;</button>
+      </div>
+      <div class="modal-body">
+        <div class="holdings-hint">
+          Saisissez les lignes détenues dans cette enveloppe. ISIN standard (12 caractères)
+          ou pseudo-ISIN commençant par <code>FONDS_EUROS_</code> / <code>CUSTOM_</code>
+          pour un actif non coté.
+        </div>
+        <div class="holdings-table-wrap">
+          <table class="holdings-table">
+            <thead>
+              <tr>
+                <th>ISIN</th>
+                <th>Nom</th>
+                <th class="num">Quantité</th>
+                <th class="num">Prix de revient</th>
+                <th class="num">Valorisation</th>
+                <th class="num">+/-</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="holdings-tbody"></tbody>
+            <tfoot id="holdings-tfoot"></tfoot>
+          </table>
+        </div>
+        <datalist id="holdings-isin-list"></datalist>
+        <div class="modal-actions" style="justify-content:space-between">
+          <button type="button" class="btn btn-secondary" id="holdings-add-line">+ Ajouter une ligne</button>
+          <div>
+            <button type="button" class="btn btn-secondary" data-close="holdings-modal">Annuler</button>
+            <button type="button" class="btn btn-primary" id="holdings-save">Enregistrer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ── MODAL FLUX ───────────────────────────────────────────────────────── -->
   <div id="flux-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="flux-modal-title">
     <div class="modal-overlay" id="flux-modal-overlay"></div>

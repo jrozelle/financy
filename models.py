@@ -74,6 +74,54 @@ def validate_pct(v):
     except (ValueError, TypeError):
         return False
 
+
+# Pseudo-ISIN pour les fonds euros et actifs non cotés :
+# format 'FONDS_EUROS_<slug>' ou 'CUSTOM_<slug>', longueur libre, bypass du checksum.
+_PSEUDO_ISIN_PREFIXES = ('FONDS_EUROS_', 'CUSTOM_')
+_ISIN_RE = re.compile(r'^[A-Z]{2}[A-Z0-9]{9}[0-9]$')
+
+
+def _isin_checksum_valid(isin):
+    """Algorithme Luhn modifié pour ISIN (ISO 6166).
+
+    Remplace les lettres par leur valeur (A=10..Z=35) puis applique Luhn sur la
+    chaîne numérique résultante. La somme totale doit être divisible par 10.
+    """
+    expanded = ''.join(
+        str(ord(c) - ord('A') + 10) if c.isalpha() else c
+        for c in isin
+    )
+    total = 0
+    # De droite à gauche : les positions paires (0, 2, 4...) sont prises telles
+    # quelles, les positions impaires sont doublées puis les chiffres additionnés.
+    for i, digit in enumerate(reversed(expanded)):
+        n = int(digit)
+        if i % 2 == 1:
+            n *= 2
+            if n > 9:
+                n -= 9
+        total += n
+    return total % 10 == 0
+
+
+def validate_isin(isin):
+    """Vérifie qu'une chaîne est un ISIN valide ou un pseudo-ISIN autorisé.
+
+    - ISIN standard : 12 caractères, 2 lettres pays + 9 alphanum + 1 chiffre check.
+    - Pseudo-ISIN : préfixé 'FONDS_EUROS_' ou 'CUSTOM_' (fonds euros, actifs custom).
+    """
+    if not isin or not isinstance(isin, str):
+        return False
+    isin = isin.strip().upper()
+    if any(isin.startswith(p) for p in _PSEUDO_ISIN_PREFIXES):
+        return len(isin) <= 64 and all(
+            c.isalnum() or c == '_' for c in isin
+        )
+    if not _ISIN_RE.match(isin):
+        return False
+    return _isin_checksum_valid(isin)
+
+
 # ─── Référentiels — constantes structurelles ─────────────────────────────────
 
 LIQUIDITY_ORDER = ['J0–J1', 'J2–J7', 'J8–J30', '30J+', 'Bloqué']
@@ -309,12 +357,67 @@ def _migration_004(conn):
         conn.execute(stmt)
 
 
+def _migration_005(conn):
+    """Feature actifs : tables securities, holdings, price_history, holdings_snapshots.
+
+    Les positions existantes restent intactes. Tant qu'une position n'a pas de
+    holdings, son comportement (value/debt manuels) est identique à avant.
+    """
+    conn.executescript('''
+        CREATE TABLE IF NOT EXISTS securities (
+            isin             TEXT PRIMARY KEY,
+            name             TEXT,
+            ticker           TEXT,
+            currency         TEXT DEFAULT 'EUR',
+            asset_class      TEXT,
+            is_priceable     INTEGER DEFAULT 1,
+            last_price       REAL,
+            last_price_date  TEXT,
+            data_source      TEXT,
+            created_at       TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at       TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS holdings (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            position_id  INTEGER NOT NULL REFERENCES positions(id) ON DELETE CASCADE,
+            isin         TEXT NOT NULL REFERENCES securities(isin),
+            quantity     REAL NOT NULL,
+            cost_basis   REAL,
+            market_value REAL,
+            as_of_date   TEXT,
+            created_at   TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_holdings_position ON holdings(position_id);
+        CREATE INDEX IF NOT EXISTS idx_holdings_isin     ON holdings(isin);
+        CREATE TABLE IF NOT EXISTS price_history (
+            isin  TEXT NOT NULL,
+            date  TEXT NOT NULL,
+            price REAL NOT NULL,
+            PRIMARY KEY (isin, date)
+        );
+        CREATE TABLE IF NOT EXISTS holdings_snapshots (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            snapshot_date  TEXT NOT NULL,
+            position_id    INTEGER NOT NULL,
+            isin           TEXT NOT NULL,
+            quantity       REAL,
+            cost_basis     REAL,
+            price          REAL,
+            market_value   REAL,
+            created_at     TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_holdings_snap_date ON holdings_snapshots(snapshot_date);
+        CREATE INDEX IF NOT EXISTS idx_holdings_snap_pos  ON holdings_snapshots(position_id);
+    ''')
+
+
 # Registre des migrations — ajouter les futures migrations ici
 MIGRATIONS = [
     (1, _migration_001),
     (2, _migration_002),
     (3, _migration_003),
     (4, _migration_004),
+    (5, _migration_005),
 ]
 
 
@@ -348,7 +451,28 @@ def init_db():
 
 # ─── Calculs ─────────────────────────────────────────────────────────────────
 
-def compute_position(pos, entity_map=None, ref=None):
+def _holding_effective_value(h):
+    """Valorisation effective d'une ligne : qty*last_price si is_priceable et
+    last_price connu, sinon market_value saisi. Pour les fonds euros
+    (is_priceable=false) on utilise toujours market_value."""
+    is_priceable = h.get('is_priceable')
+    if is_priceable is None:
+        is_priceable = True
+    last_price = h.get('last_price')
+    quantity   = h.get('quantity') or 0
+    if is_priceable and last_price is not None:
+        return quantity * last_price
+    return h.get('market_value') or 0
+
+
+def compute_position(pos, entity_map=None, ref=None, holdings_map=None):
+    """Calcule les agrégats d'une position.
+
+    Priorité de la valorisation :
+    1. Entité liée → valeur de l'entité (inchangé).
+    2. Holdings présents (pas d'entité) → somme des valorisations effectives.
+    3. Sinon → champ `value` stocké (comportement historique).
+    """
     if ref is None:
         ref = DEFAULT_REFERENTIAL
     ownership_pct = pos.get('ownership_pct') if pos.get('ownership_pct') is not None else 1.0
@@ -357,9 +481,16 @@ def compute_position(pos, entity_map=None, ref=None):
     envelope      = pos.get('envelope', '') or ''
     entity        = pos.get('entity')
 
+    holdings = None
+    if holdings_map is not None and pos.get('id') is not None:
+        holdings = holdings_map.get(pos['id'])
+
     if entity and entity_map and entity in entity_map:
         value = entity_map[entity]['gross_assets'] or 0
         debt  = entity_map[entity]['debt'] or 0
+    elif holdings:
+        value = sum(_holding_effective_value(h) for h in holdings)
+        debt  = pos.get('debt') or 0
     else:
         value = pos.get('value') or 0
         debt  = pos.get('debt') or 0
@@ -375,8 +506,9 @@ def compute_position(pos, entity_map=None, ref=None):
     mobilizable_pct  = override if override is not None else cat_mob.get(category, 0.8)
     mobilizable_val  = net_attributed * mobilizable_pct if net_attributed > 0 else 0
 
-    return {
+    result = {
         **pos,
+        'value':             value,
         'net_value':         value - debt,
         'gross_attributed':  gross_attributed,
         'debt_attributed':   debt_attributed,
@@ -386,6 +518,78 @@ def compute_position(pos, entity_map=None, ref=None):
         'mobilizable_pct':   mobilizable_pct,
         'mobilizable_value': mobilizable_val,
     }
+    if holdings is not None:
+        result['has_holdings']    = True
+        result['holdings_count']  = len(holdings)
+    return result
+
+
+def snapshot_holdings_to_date(conn, snapshot_date):
+    """Capture l'état courant des holdings dans holdings_snapshots.
+
+    Inséré lors d'un événement de snapshot (auto_snapshot, snapshot_update,
+    duplicateSnapshot côté front). Idempotent pour une date donnée : on supprime
+    d'abord les lignes existantes à cette date pour éviter les doublons en cas
+    de re-snapshot.
+    """
+    try:
+        conn.execute('DELETE FROM holdings_snapshots WHERE snapshot_date=?', (snapshot_date,))
+        rows = conn.execute('''
+            SELECT h.position_id, h.isin, h.quantity, h.cost_basis, h.market_value,
+                   s.is_priceable, s.last_price
+            FROM holdings h
+            LEFT JOIN securities s ON s.isin = h.isin
+        ''').fetchall()
+        for r in rows:
+            is_priceable = r['is_priceable'] if r['is_priceable'] is not None else 1
+            price = r['last_price'] if is_priceable else None
+            conn.execute(
+                '''INSERT INTO holdings_snapshots
+                   (snapshot_date, position_id, isin, quantity, cost_basis, price, market_value)
+                   VALUES (?,?,?,?,?,?,?)''',
+                (snapshot_date, r['position_id'], r['isin'],
+                 r['quantity'], r['cost_basis'], price, r['market_value'])
+            )
+        return len(rows)
+    except sqlite3.OperationalError:
+        # Tables non encore migrées
+        return 0
+
+
+def get_holdings_map(conn, position_ids=None):
+    """Retourne un dict {position_id: [holdings]} joint avec securities.
+
+    Si position_ids est fourni, limite la requête à ces positions (plus rapide
+    pour les grosses bases). Sinon retourne toutes les holdings.
+    """
+    try:
+        base_query = '''
+            SELECT h.id, h.position_id, h.isin, h.quantity, h.cost_basis,
+                   h.market_value, h.as_of_date,
+                   s.name, s.ticker, s.currency, s.asset_class,
+                   s.is_priceable, s.last_price, s.last_price_date
+            FROM holdings h
+            LEFT JOIN securities s ON s.isin = h.isin
+        '''
+        if position_ids:
+            placeholders = ','.join('?' * len(position_ids))
+            rows = conn.execute(
+                base_query + f' WHERE h.position_id IN ({placeholders})',
+                list(position_ids)
+            ).fetchall()
+        else:
+            rows = conn.execute(base_query).fetchall()
+    except sqlite3.OperationalError:
+        # Table holdings absente (migration 005 pas appliquée)
+        return {}
+
+    result = {}
+    for r in rows:
+        d = dict(r)
+        if d.get('is_priceable') is not None:
+            d['is_priceable'] = bool(d['is_priceable'])
+        result.setdefault(d['position_id'], []).append(d)
+    return result
 
 
 def get_entity_map(conn, date=None):

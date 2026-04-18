@@ -248,18 +248,20 @@ Spec détaillée : docs/plan-actifs-conseil.md
 Branche : claude/asset-import-tracking-8psft
 
 Setup :
-- [ ] Dev local : venv + requirements-dev.txt + .env.local + DB isolée financy_dev.db
-- [ ] Script scripts/seed_dev.py (owner, position PEA, 3 ISIN réels, profil advisor test)
-- [ ] README.dev.md avec checklist de tests par phase
+- [x] Dev local : venv + .env.example + DB isolée financy_dev.db
+- [x] Script scripts/seed_dev.py (owner, position PEA, 3 ISIN réels)
+- [x] README.dev.md avec checklist de tests par phase
 
 Phase 1 — Schéma holdings + CRUD manuel :
-- [ ] Migration _migration_005 (securities, holdings, price_history, holdings_snapshots)
-- [ ] routes/holdings.py — GET/PUT/DELETE (auth + CSRF)
-- [ ] compute_position adapté (holdings + is_priceable → Σ qty×last_price)
-- [ ] static/modules/holdings.js + modale « Gérer les lignes »
-- [ ] Validation ISIN (regex + checksum Luhn)
-- [ ] Snapshots étendus pour holdings_snapshots
-- [ ] Export XLSX onglet Holdings + import
+- [x] Migration _migration_005 (securities, holdings, price_history, holdings_snapshots)
+- [x] routes/holdings.py — GET/PUT/POST/PATCH/DELETE (auth + CSRF)
+- [x] compute_position adapté (holdings + is_priceable → Σ qty×last_price)
+- [x] static/modules/holdings.js + modale « Gérer les lignes »
+- [x] Validation ISIN (regex + checksum Luhn) + pseudo-ISIN fonds euros
+- [x] Snapshots étendus pour holdings_snapshots (auto-snapshot, snapshot_update, endpoint manuel)
+- [x] Import/export JSON round-trip securities + holdings + holdings_snapshots
+- [x] Import XLSX onglets Securities + Holdings
+- [x] Tests d'intégration (22 tests holdings, 132 au total)
 
 Phase 2 — Provider cours + refresh manuel + popover :
 - [ ] requirements : yfinance

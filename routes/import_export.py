@@ -2,7 +2,8 @@ import logging
 from flask import Blueprint, jsonify, request
 from datetime import datetime
 from io import BytesIO
-from models import get_db, validate_date, validate_number, validate_pct, validate_string
+from models import (get_db, validate_date, validate_number, validate_pct,
+                    validate_string, validate_isin)
 from auth import login_required, csrf_protect
 
 MAX_IMPORT_ROWS = 10000
@@ -178,8 +179,108 @@ def import_xlsx():
                     )
                     entities_imported += 1
 
-        logger.info('Import XLSX: %d positions, %d entités, %d skipped', imported, entities_imported, skipped)
-        return jsonify({'imported': imported, 'entities': entities_imported, 'skipped': skipped})
+            # Securities (optionnel, avant Holdings pour que les FK existent)
+            securities_imported = 0
+            if 'Securities' in wb.sheetnames:
+                ws_sec = wb['Securities']
+                for i, row in enumerate(ws_sec.iter_rows(min_row=2, values_only=True)):
+                    if i >= MAX_IMPORT_ROWS:
+                        break
+                    if not row or not row[0]:
+                        continue
+                    raw_isin = str(row[0]).strip().upper()
+                    if not validate_isin(raw_isin):
+                        continue
+                    name         = _safe_str(row[1] if len(row) > 1 else None, 200)
+                    ticker       = _safe_str(row[2] if len(row) > 2 else None, 50)
+                    currency     = _safe_str(row[3] if len(row) > 3 else 'EUR', 10) or 'EUR'
+                    asset_class  = _safe_str(row[4] if len(row) > 4 else None, 50)
+                    is_priceable = row[5] if len(row) > 5 else 1
+                    is_priceable = 0 if str(is_priceable).lower() in ('0', 'false', 'non', 'no', '') else 1
+                    if raw_isin.startswith(('FONDS_EUROS_', 'CUSTOM_')):
+                        is_priceable = 0
+                    existing = conn.execute(
+                        'SELECT isin FROM securities WHERE isin=?', (raw_isin,)
+                    ).fetchone()
+                    if existing:
+                        conn.execute(
+                            '''UPDATE securities SET name=?, ticker=?, currency=?,
+                               asset_class=?, is_priceable=?, updated_at=CURRENT_TIMESTAMP
+                               WHERE isin=?''',
+                            (name, ticker, currency, asset_class, is_priceable, raw_isin)
+                        )
+                    else:
+                        conn.execute(
+                            '''INSERT INTO securities
+                               (isin, name, ticker, currency, asset_class, is_priceable, data_source)
+                               VALUES (?,?,?,?,?,?,'xlsx')''',
+                            (raw_isin, name, ticker, currency, asset_class, is_priceable)
+                        )
+                    securities_imported += 1
+
+            # Holdings : rattachement par clef (date, owner, category, envelope, entity)
+            holdings_imported = 0
+            if 'Holdings' in wb.sheetnames:
+                ws_h = wb['Holdings']
+                for i, row in enumerate(ws_h.iter_rows(min_row=2, values_only=True)):
+                    if i >= MAX_IMPORT_ROWS:
+                        break
+                    if not row or len(row) < 7:
+                        continue
+                    pos_date = _parse_date(row[0])
+                    pos_owner = _safe_str(row[1], 100)
+                    pos_category = _safe_str(row[2], 100) or ''
+                    pos_envelope = _safe_str(row[3], 100) or ''
+                    pos_entity = _safe_str(row[4], 200) or ''
+                    raw_isin = str(row[5]).strip().upper() if row[5] else ''
+                    quantity = _safe_float(row[6], 0)
+                    cost_basis = _safe_float(row[7], 0) if len(row) > 7 and row[7] is not None else None
+                    market_value = _safe_float(row[8], 0) if len(row) > 8 and row[8] is not None else None
+                    as_of_date = _parse_date(row[9]) if len(row) > 9 else None
+
+                    if not pos_date or not pos_owner or not raw_isin or quantity <= 0:
+                        continue
+                    if not validate_isin(raw_isin):
+                        continue
+
+                    pos = conn.execute(
+                        '''SELECT id FROM positions
+                           WHERE date=? AND owner=? AND category=?
+                             AND COALESCE(envelope,'')=? AND COALESCE(entity,'')=?''',
+                        (pos_date, pos_owner, pos_category, pos_envelope, pos_entity)
+                    ).fetchone()
+                    if not pos:
+                        continue  # Position parente introuvable → skip
+
+                    # Upsert auto de la security si absente
+                    existing = conn.execute(
+                        'SELECT isin FROM securities WHERE isin=?', (raw_isin,)
+                    ).fetchone()
+                    if not existing:
+                        is_priceable = 0 if raw_isin.startswith(('FONDS_EUROS_', 'CUSTOM_')) else 1
+                        conn.execute(
+                            '''INSERT INTO securities
+                               (isin, currency, is_priceable, data_source)
+                               VALUES (?,'EUR',?,'xlsx-auto')''',
+                            (raw_isin, is_priceable)
+                        )
+                    conn.execute(
+                        '''INSERT INTO holdings
+                           (position_id, isin, quantity, cost_basis, market_value, as_of_date)
+                           VALUES (?,?,?,?,?,?)''',
+                        (pos['id'], raw_isin, quantity, cost_basis, market_value, as_of_date)
+                    )
+                    holdings_imported += 1
+
+        logger.info('Import XLSX: %d positions, %d entités, %d securities, %d holdings, %d skipped',
+                    imported, entities_imported, securities_imported, holdings_imported, skipped)
+        return jsonify({
+            'imported': imported,
+            'entities': entities_imported,
+            'securities': securities_imported,
+            'holdings': holdings_imported,
+            'skipped': skipped,
+        })
 
     except Exception as e:
         logger.error('Import XLSX failed: %s', e, exc_info=True)
@@ -196,7 +297,8 @@ def import_json():
     if not isinstance(data, dict):
         return jsonify({'error': 'Objet JSON attendu'}), 400
 
-    imported = {'positions': 0, 'flux': 0, 'entities': 0, 'entity_snapshots': 0, 'skipped': 0}
+    imported = {'positions': 0, 'flux': 0, 'entities': 0, 'entity_snapshots': 0,
+                'securities': 0, 'holdings': 0, 'holdings_snapshots': 0, 'skipped': 0}
 
     def _clamp_pct(v, default=1.0):
         try:
@@ -295,6 +397,112 @@ def import_json():
                     (date, str(notes)[:MAX_NOTE_LENGTH])
                 )
 
+        # Securities (obligatoire avant holdings)
+        for sec in data.get('securities', [])[:MAX_IMPORT_ROWS]:
+            isin = str(sec.get('isin') or '').strip().upper()
+            if not validate_isin(isin):
+                imported['skipped'] += 1
+                continue
+            is_priceable = sec.get('is_priceable')
+            if is_priceable is None:
+                is_priceable = 0 if isin.startswith(('FONDS_EUROS_', 'CUSTOM_')) else 1
+            else:
+                is_priceable = 0 if not is_priceable else 1
+            existing = conn.execute('SELECT isin FROM securities WHERE isin=?', (isin,)).fetchone()
+            if existing:
+                conn.execute(
+                    '''UPDATE securities SET name=?, ticker=?, currency=?, asset_class=?,
+                       is_priceable=?, last_price=?, last_price_date=?, updated_at=CURRENT_TIMESTAMP
+                       WHERE isin=?''',
+                    (_trunc(sec.get('name'), 200), _trunc(sec.get('ticker'), 50),
+                     _trunc(sec.get('currency'), 10) or 'EUR',
+                     _trunc(sec.get('asset_class'), 50), is_priceable,
+                     _safe_num(sec.get('last_price')) if sec.get('last_price') is not None else None,
+                     sec.get('last_price_date') if validate_date(sec.get('last_price_date')) else None,
+                     isin)
+                )
+            else:
+                conn.execute(
+                    '''INSERT INTO securities
+                       (isin, name, ticker, currency, asset_class, is_priceable,
+                        last_price, last_price_date, data_source)
+                       VALUES (?,?,?,?,?,?,?,?,?)''',
+                    (isin, _trunc(sec.get('name'), 200), _trunc(sec.get('ticker'), 50),
+                     _trunc(sec.get('currency'), 10) or 'EUR',
+                     _trunc(sec.get('asset_class'), 50), is_priceable,
+                     _safe_num(sec.get('last_price')) if sec.get('last_price') is not None else None,
+                     sec.get('last_price_date') if validate_date(sec.get('last_price_date')) else None,
+                     _trunc(sec.get('data_source'), 50) or 'json')
+                )
+            imported['securities'] += 1
+
+        # Holdings : matchés sur la clef métier de position
+        for h in data.get('holdings', [])[:MAX_IMPORT_ROWS]:
+            isin = str(h.get('isin') or '').strip().upper()
+            if not validate_isin(isin):
+                imported['skipped'] += 1
+                continue
+            pos_date = h.get('pos_date') or h.get('date')
+            if not validate_date(pos_date):
+                imported['skipped'] += 1
+                continue
+            try:
+                qty = float(h.get('quantity') or 0)
+            except (ValueError, TypeError):
+                imported['skipped'] += 1
+                continue
+            if qty <= 0:
+                imported['skipped'] += 1
+                continue
+            row = conn.execute(
+                '''SELECT id FROM positions WHERE date=? AND owner=? AND category=?
+                   AND COALESCE(envelope,'')=? AND COALESCE(entity,'')=?''',
+                (pos_date, _trunc(h.get('pos_owner'), 100),
+                 _trunc(h.get('pos_category'), 100) or '',
+                 _trunc(h.get('pos_envelope'), 100) or '',
+                 _trunc(h.get('pos_entity'), 200) or '')
+            ).fetchone()
+            if not row:
+                imported['skipped'] += 1
+                continue
+            # Auto-upsert security si inconnue
+            if not conn.execute('SELECT 1 FROM securities WHERE isin=?', (isin,)).fetchone():
+                is_priceable = 0 if isin.startswith(('FONDS_EUROS_', 'CUSTOM_')) else 1
+                conn.execute(
+                    '''INSERT INTO securities (isin, currency, is_priceable, data_source)
+                       VALUES (?,'EUR',?, 'json-auto')''',
+                    (isin, is_priceable)
+                )
+            conn.execute(
+                '''INSERT INTO holdings
+                   (position_id, isin, quantity, cost_basis, market_value, as_of_date)
+                   VALUES (?,?,?,?,?,?)''',
+                (row['id'], isin, qty,
+                 _safe_num(h.get('cost_basis')) if h.get('cost_basis') is not None else None,
+                 _safe_num(h.get('market_value')) if h.get('market_value') is not None else None,
+                 h.get('as_of_date') if validate_date(h.get('as_of_date')) else None)
+            )
+            imported['holdings'] += 1
+
+        # Holdings snapshots (reconstruction de l'historique détaillé)
+        for s in data.get('holdings_snapshots', [])[:MAX_IMPORT_ROWS]:
+            snap_date = s.get('snapshot_date')
+            isin = str(s.get('isin') or '').strip().upper()
+            if not validate_date(snap_date) or not validate_isin(isin):
+                imported['skipped'] += 1
+                continue
+            conn.execute(
+                '''INSERT INTO holdings_snapshots
+                   (snapshot_date, position_id, isin, quantity, cost_basis, price, market_value)
+                   VALUES (?,?,?,?,?,?,?)''',
+                (snap_date, s.get('position_id'), isin,
+                 _safe_num(s.get('quantity')),
+                 _safe_num(s.get('cost_basis')) if s.get('cost_basis') is not None else None,
+                 _safe_num(s.get('price')) if s.get('price') is not None else None,
+                 _safe_num(s.get('market_value')) if s.get('market_value') is not None else None)
+            )
+            imported['holdings_snapshots'] += 1
+
     logger.info('Import JSON: %s', imported)
     return jsonify(imported)
 
@@ -318,12 +526,38 @@ def export_data():
         snapshot_notes = {r['date']: r['notes'] for r in conn.execute(
             'SELECT date, notes FROM snapshot_notes ORDER BY date'
         ).fetchall()}
+
+        securities, holdings, holdings_snapshots = [], [], []
+        try:
+            securities = [dict(r) for r in conn.execute(
+                'SELECT * FROM securities ORDER BY isin'
+            ).fetchall()]
+            # Pour les holdings, on exporte la clef métier de la position plutôt
+            # que l'id (qui ne survit pas un reset/reimport).
+            holdings = [dict(r) for r in conn.execute(
+                '''SELECT h.isin, h.quantity, h.cost_basis, h.market_value, h.as_of_date,
+                          p.date AS pos_date, p.owner AS pos_owner, p.category AS pos_category,
+                          COALESCE(p.envelope,'')  AS pos_envelope,
+                          COALESCE(p.entity,'')    AS pos_entity
+                   FROM holdings h
+                   JOIN positions p ON p.id = h.position_id
+                   ORDER BY p.date, p.owner, h.id'''
+            ).fetchall()]
+            holdings_snapshots = [dict(r) for r in conn.execute(
+                'SELECT * FROM holdings_snapshots ORDER BY snapshot_date, id'
+            ).fetchall()]
+        except Exception:
+            pass  # tables holdings non migrées
+
     return jsonify({
         'positions': positions,
         'flux': flux,
         'entities': entities,
         'entity_snapshots': entity_snapshots,
         'snapshot_notes': snapshot_notes,
+        'securities': securities,
+        'holdings': holdings,
+        'holdings_snapshots': holdings_snapshots,
     })
 
 
@@ -332,10 +566,14 @@ def export_data():
 @csrf_protect
 def reset_db():
     with get_db() as conn:
-        conn.executescript(
-            'DELETE FROM positions; DELETE FROM flux; '
-            'DELETE FROM entities; DELETE FROM entity_snapshots; '
-            'DELETE FROM snapshot_notes;'
-        )
+        tables = [
+            'positions', 'flux', 'entities', 'entity_snapshots', 'snapshot_notes',
+            'holdings', 'holdings_snapshots', 'price_history', 'securities',
+        ]
+        for t in tables:
+            try:
+                conn.execute(f'DELETE FROM {t}')
+            except Exception:
+                pass  # Table peut ne pas exister si migration non appliquée
     logger.warning('Database reset — all data deleted')
     return jsonify({'ok': True})
