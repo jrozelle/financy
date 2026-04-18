@@ -301,9 +301,14 @@ Phase 4 — Import PDF :
 - [x] Full replace avec confirmation implicite (l'Enregistrer remplace tout)
 - [x] Tests : 19 nouveaux tests (helpers + parser + route), 170 au total
 
-Phase 5 — Onglet Actifs (optionnel) :
-- [ ] Vue consolidée holdings (tri ISIN/poids/perf/fraîcheur)
-- [ ] Graphes répartition (asset_class, devise)
+Phase 5 — Onglet Actifs :
+- [x] GET /api/holdings/consolidated (agrégation cross-positions par ISIN)
+- [x] KPIs : valorisation totale, prix de revient, P&L latent (€/%), nombre de lignes
+- [x] Doughnut charts Chart.js : par asset_class, par enveloppe
+- [x] Tableau triable (ISIN/nom/classe/enveloppes/qté/PRU/cours/valo/P&L/poids/fraîcheur)
+- [x] Filtre par personne
+- [x] Clic ISIN ouvre le popover graphe 1J/7J/30J
+- [x] Tests : 8 nouveaux tests (agrégation, totals, filtres, breakdowns), 213 au total
 
 Phase 6 — Advisor 1 : profil & objectifs :
 - [x] Migration _migration_006 (owner_profiles, owner_objectives, macro_snapshots, allocation_targets, rebalance_proposals, llm_usage)

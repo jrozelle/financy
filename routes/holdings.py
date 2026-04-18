@@ -291,6 +291,160 @@ def holdings_snapshot():
     return jsonify({'ok': True, 'snapshot_date': snap_date, 'count': n})
 
 
+@holdings_bp.route('/api/holdings/consolidated', methods=['GET'])
+@login_required
+def get_consolidated():
+    """Agregation cross-positions par ISIN.
+
+    Retourne les lignes d'actifs cumulees sur l'ensemble des positions
+    (optionnellement filtre par owner ou date), avec totaux valorisation,
+    cout de revient, P&L, poids, et breakdowns par asset_class / devise /
+    enveloppe.
+    """
+    owner = request.args.get('owner')
+    date  = request.args.get('date')  # optionnel : date specifique du snapshot
+
+    with get_db() as conn:
+        # Si pas de date, on prend les positions de la derniere date disponible
+        # (cross-owner ou filtre par owner)
+        if not date:
+            if owner:
+                r = conn.execute(
+                    'SELECT MAX(date) AS d FROM positions WHERE owner=?', (owner,)
+                ).fetchone()
+            else:
+                r = conn.execute('SELECT MAX(date) AS d FROM positions').fetchone()
+            date = r['d'] if r else None
+
+        if not date:
+            return jsonify({
+                'snapshot_date': None, 'owner': owner, 'lines': [], 'totals': {},
+                'breakdowns': {'asset_class': [], 'currency': [], 'envelope': []},
+            })
+
+        params = [date]
+        where  = 'WHERE p.date=?'
+        if owner:
+            where += ' AND p.owner=?'
+            params.append(owner)
+
+        rows = conn.execute(
+            f'''SELECT h.isin, h.quantity, h.cost_basis, h.market_value,
+                       p.owner    AS pos_owner,
+                       p.envelope AS pos_envelope,
+                       p.category AS pos_category,
+                       s.name, s.ticker, s.currency, s.asset_class, s.is_priceable,
+                       s.last_price, s.last_price_date
+                FROM holdings h
+                JOIN positions p ON p.id = h.position_id
+                LEFT JOIN securities s ON s.isin = h.isin
+                {where}
+                ORDER BY h.isin''',
+            params
+        ).fetchall()
+
+    # Agregation par ISIN
+    by_isin = {}
+    for r in rows:
+        isin = r['isin']
+        q  = r['quantity'] or 0
+        mv = r['market_value'] if r['market_value'] is not None else None
+        # Valorisation effective : qty * last_price si is_priceable + last_price dispo,
+        # sinon market_value saisi
+        is_priceable = r['is_priceable']
+        if is_priceable is None:
+            is_priceable = 1
+        if is_priceable and r['last_price'] is not None:
+            effective_mv = q * r['last_price']
+        else:
+            effective_mv = mv or 0
+
+        rec = by_isin.setdefault(isin, {
+            'isin':            isin,
+            'name':            r['name'],
+            'ticker':          r['ticker'],
+            'currency':        r['currency'] or 'EUR',
+            'asset_class':     r['asset_class'] or 'autre',
+            'is_priceable':    bool(is_priceable),
+            'last_price':      r['last_price'],
+            'last_price_date': r['last_price_date'],
+            'quantity':        0,
+            'cost_basis':      0,
+            'market_value':    0,
+            'positions_count': 0,
+            'owners':          set(),
+            'envelopes':       set(),
+        })
+        rec['quantity']         += q
+        rec['cost_basis']       += r['cost_basis'] or 0
+        rec['market_value']     += effective_mv
+        rec['positions_count']  += 1
+        if r['pos_owner']:    rec['owners'].add(r['pos_owner'])
+        if r['pos_envelope']: rec['envelopes'].add(r['pos_envelope'])
+
+    total_mv   = sum(v['market_value'] for v in by_isin.values())
+    total_cost = sum(v['cost_basis']   for v in by_isin.values())
+
+    lines = []
+    for v in by_isin.values():
+        pnl = (v['market_value'] - v['cost_basis']) if v['cost_basis'] else None
+        pnl_pct = (pnl / v['cost_basis'] * 100) if (pnl is not None and v['cost_basis']) else None
+        weight = (v['market_value'] / total_mv * 100) if total_mv > 0 else 0
+        avg_cost = (v['cost_basis'] / v['quantity']) if v['quantity'] else None
+        lines.append({
+            **v,
+            'owners':          sorted(v['owners']),
+            'envelopes':       sorted(v['envelopes']),
+            'avg_cost':        round(avg_cost, 4) if avg_cost is not None else None,
+            'pnl':             round(pnl, 2) if pnl is not None else None,
+            'pnl_pct':         round(pnl_pct, 2) if pnl_pct is not None else None,
+            'weight_pct':      round(weight, 2),
+            'market_value':    round(v['market_value'], 2),
+            'cost_basis':      round(v['cost_basis'], 2),
+        })
+    lines.sort(key=lambda l: -l['market_value'])
+
+    # Breakdowns
+    def _group(attr):
+        agg = {}
+        for l in lines:
+            k = l.get(attr) or 'autre'
+            agg[k] = agg.get(k, 0) + l['market_value']
+        return [{'label': k, 'market_value': round(v, 2),
+                 'weight_pct': round(v / total_mv * 100, 2) if total_mv else 0}
+                for k, v in sorted(agg.items(), key=lambda x: -x[1])]
+
+    by_envelope_agg = {}
+    for l in lines:
+        for env in (l['envelopes'] or ['autre']):
+            # Pour une ligne presente sur N enveloppes, on divise equitablement (approximation)
+            share = l['market_value'] / max(1, len(l['envelopes'] or ['autre']))
+            by_envelope_agg[env] = by_envelope_agg.get(env, 0) + share
+    envelope_breakdown = [
+        {'label': k, 'market_value': round(v, 2),
+         'weight_pct': round(v / total_mv * 100, 2) if total_mv else 0}
+        for k, v in sorted(by_envelope_agg.items(), key=lambda x: -x[1])
+    ]
+
+    return jsonify({
+        'snapshot_date': date,
+        'owner':         owner,
+        'lines':         lines,
+        'totals': {
+            'market_value': round(total_mv, 2),
+            'cost_basis':   round(total_cost, 2),
+            'pnl':          round(total_mv - total_cost, 2) if total_cost else None,
+            'pnl_pct':      round((total_mv - total_cost) / total_cost * 100, 2) if total_cost else None,
+            'lines_count':  len(lines),
+        },
+        'breakdowns': {
+            'asset_class': _group('asset_class'),
+            'currency':    _group('currency'),
+            'envelope':    envelope_breakdown,
+        },
+    })
+
+
 # ─── Routes securities ───────────────────────────────────────────────────────
 
 @holdings_bp.route('/api/securities', methods=['GET'])

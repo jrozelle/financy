@@ -14,6 +14,7 @@ import { loadPositions, renderPositions, clearFilters, openPosModal, duplicateSn
 import { openHoldingsModal, wireHoldingsEvents } from './tabs/holdings.js';
 import { wireIsinPopoverEvents } from './isin-popover.js';
 import { loadAdvisor, wireAdvisorEvents } from './tabs/advisor.js';
+import { loadActifs, wireActifsEvents } from './tabs/actifs.js';
 import { loadFlux, renderFlux, openFluxModal, saveFlux } from './tabs/flux.js';
 import { loadEntities, renderEntities, openEntityModal, saveEntity, updateEntInfo } from './tabs/entities.js';
 import { importXlsx, importJson, exportJson, resetDb, initDemoToggle, createBackup } from './tabs/import-export.js';
@@ -117,6 +118,7 @@ export async function switchTab(tab) {
     if (tab === 'flux')        await loadFlux();
     if (tab === 'entites')     await loadEntities();
     if (tab === 'referentiel') await loadReferential();
+    if (tab === 'actifs')      await loadActifs();
     if (tab === 'conseil')     await loadAdvisor();
     if (tab === 'tools')       { await loadTimeline(); loadSchedulerStatus(); }
   } finally {
@@ -328,10 +330,11 @@ function wireEvents() {
   document.getElementById('position-modal-overlay').addEventListener('click', () => closeModal('position-modal'));
   document.getElementById('flux-modal-overlay').addEventListener('click', () => closeModal('flux-modal'));
 
-  // Holdings + popover ISIN + advisor
+  // Holdings + popover ISIN + advisor + actifs
   wireHoldingsEvents();
   wireIsinPopoverEvents();
   wireAdvisorEvents();
+  wireActifsEvents();
 
   // Focus traps on static modals
   ['position-modal', 'flux-modal', 'entity-modal', 'targets-modal', 'holdings-modal'].forEach(trapModalFocus);
