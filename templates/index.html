@@ -399,6 +399,18 @@
         </p>
         <button class="btn btn-secondary" id="btn-auto-snapshot">Créer un snapshot aujourd'hui</button>
       </div>
+
+      <div class="card">
+        <h2>Cours de marché</h2>
+        <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
+          Rafraîchit automatiquement les derniers cours des ISIN cotés (actions, ETF, OPCVM). Les fonds euros et actifs non cotés sont ignorés.
+        </p>
+        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-primary" id="btn-refresh-prices">Rafraîchir les cours</button>
+          <button class="btn btn-secondary" id="btn-refresh-prices-stale">Rafraîchir uniquement les périmés (&gt;20h)</button>
+        </div>
+        <div id="prices-refresh-result" style="margin-top:1rem;font-size:12.5px"></div>
+      </div>
     </div>
 
     <!-- ── IMPORT / EXPORT ──────────────────────────────────────────────── -->
@@ -599,6 +611,42 @@
           <button type="submit" class="btn btn-primary">Enregistrer</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ── PANNEAU ISIN (cours, graphe, P&L) ──────────────────────────────── -->
+  <div id="isin-popover" class="isin-popover hidden" role="dialog" aria-modal="true" aria-labelledby="isin-popover-title">
+    <div class="isin-popover-overlay" id="isin-popover-overlay"></div>
+    <div class="isin-popover-content">
+      <div class="isin-popover-header">
+        <div>
+          <h3 id="isin-popover-title">ISIN</h3>
+          <div id="isin-popover-subtitle" class="text-muted" style="font-size:12px"></div>
+        </div>
+        <button class="modal-close" id="isin-popover-close" aria-label="Fermer">&#10005;</button>
+      </div>
+      <div class="isin-popover-body">
+        <div id="isin-popover-summary"></div>
+        <div class="isin-period-tabs" id="isin-period-tabs">
+          <button data-period="7d" class="isin-period-btn active">7J</button>
+          <button data-period="30d" class="isin-period-btn">30J</button>
+          <button data-period="90d" class="isin-period-btn">90J</button>
+          <button data-period="1y" class="isin-period-btn">1A</button>
+        </div>
+        <div class="isin-chart-wrap">
+          <canvas id="isin-chart"></canvas>
+          <div id="isin-chart-empty" class="isin-chart-empty hidden">Pas de données de cours.</div>
+        </div>
+        <div id="isin-popover-holding"></div>
+        <div class="isin-popover-actions">
+          <button type="button" class="btn btn-secondary btn-sm" id="isin-refresh-btn">Actualiser</button>
+          <div class="isin-ticker-row">
+            <label>Ticker</label>
+            <input type="text" id="isin-ticker-input" placeholder="(auto-résolu)">
+            <button type="button" class="btn-icon" id="isin-ticker-save">Enregistrer</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 

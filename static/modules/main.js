@@ -12,11 +12,12 @@ import { loadSynthese, renderSynthese, renderSyntheseHistory, loadHistorique } f
 import { loadPositions, renderPositions, clearFilters, openPosModal, duplicateSnapshot,
          onEntitySelectChange, updatePosInfo, savePosition, startInlineEdit, deletePosition } from './tabs/positions.js';
 import { openHoldingsModal, wireHoldingsEvents } from './tabs/holdings.js';
+import { wireIsinPopoverEvents } from './isin-popover.js';
 import { loadFlux, renderFlux, openFluxModal, saveFlux } from './tabs/flux.js';
 import { loadEntities, renderEntities, openEntityModal, saveEntity, updateEntInfo } from './tabs/entities.js';
 import { importXlsx, importJson, exportJson, resetDb, initDemoToggle, createBackup } from './tabs/import-export.js';
 import { loadReferential, saveReferential, initTemplateSelect } from './tabs/referentiel.js';
-import { loadTimeline, wireSimulation, triggerAutoSnapshot } from './tabs/tools.js';
+import { loadTimeline, wireSimulation, triggerAutoSnapshot, triggerPricesRefresh } from './tabs/tools.js';
 import { wireGlobalSearch } from './search.js';
 
 // ─── Init ─────────────────────────────────────────────────────────────────
@@ -298,6 +299,8 @@ function wireEvents() {
   // Tools
   wireSimulation();
   document.getElementById('btn-auto-snapshot')?.addEventListener('click', triggerAutoSnapshot);
+  document.getElementById('btn-refresh-prices')?.addEventListener('click', () => triggerPricesRefresh(false));
+  document.getElementById('btn-refresh-prices-stale')?.addEventListener('click', () => triggerPricesRefresh(true));
 
   // Position form
   document.getElementById('position-form').addEventListener('submit', savePosition);
@@ -323,8 +326,9 @@ function wireEvents() {
   document.getElementById('position-modal-overlay').addEventListener('click', () => closeModal('position-modal'));
   document.getElementById('flux-modal-overlay').addEventListener('click', () => closeModal('flux-modal'));
 
-  // Holdings
+  // Holdings + popover ISIN
   wireHoldingsEvents();
+  wireIsinPopoverEvents();
 
   // Focus traps on static modals
   ['position-modal', 'flux-modal', 'entity-modal', 'targets-modal', 'holdings-modal'].forEach(trapModalFocus);
@@ -342,6 +346,10 @@ function wireEvents() {
     if (e.key === 'Escape') {
       const confirm = document.querySelector('.confirm-overlay');
       if (confirm) { confirm.querySelector('.confirm-cancel')?.click(); return; }
+      const popover = document.getElementById('isin-popover');
+      if (popover && !popover.classList.contains('hidden')) {
+        popover.classList.add('hidden'); return;
+      }
       for (const id of ['position-modal', 'flux-modal', 'entity-modal', 'targets-modal', 'holdings-modal']) {
         const m = document.getElementById(id);
         if (m && !m.classList.contains('hidden')) { closeModal(id); return; }

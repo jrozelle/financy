@@ -264,14 +264,17 @@ Phase 1 — Schéma holdings + CRUD manuel :
 - [x] Tests d'intégration (22 tests holdings, 132 au total)
 
 Phase 2 — Provider cours + refresh manuel + popover :
-- [ ] requirements : yfinance
-- [ ] services/prices.py (PriceProvider, YahooProvider, mock démo)
-- [ ] Batching 10 + délai, try/except robuste
-- [ ] POST /api/prices/refresh
-- [ ] Bouton « Rafraîchir les cours » dans Outils
-- [ ] Badge fraîcheur (vert/orange/rouge)
-- [ ] Résolution ISIN→ticker Yahoo, cache securities.ticker
-- [ ] Popover au clic ISIN : graphe 1J/7J/30J + PRU + P&L
+- [x] requirements : yfinance + requests
+- [x] services/prices.py (PriceProvider abstrait, YahooProvider, MockProvider)
+- [x] Batching 10 + délai, try/except robuste, jamais de crash global
+- [x] POST /api/prices/refresh (+ flag only_stale)
+- [x] GET /api/prices/history/<isin>?period= avec backfill heuristique
+- [x] POST /api/securities/<isin>/resolve-ticker
+- [x] Bouton « Rafraîchir les cours » dans Outils (+ variante only_stale)
+- [x] Badge fraîcheur dans la modale holdings (vert <1j, orange <7j, rouge sinon)
+- [x] Résolution ISIN→ticker Yahoo lazy, cache dans securities.ticker, editable
+- [x] Popover au clic ISIN : graphe 7J/30J/90J/1A + PRU + P&L + édition ticker
+- [x] Tests : 14 nouveaux tests prices (mock provider), 146 au total
 
 Phase 3 — Scheduler :
 - [ ] requirements : APScheduler
