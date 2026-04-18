@@ -2,6 +2,7 @@ import { api } from '../api.js';
 import { esc, fmt } from '../utils.js';
 import { closeModal, confirmDialog, toast } from '../dialogs.js';
 import { loadPositions } from './positions.js';
+import { openIsinPopover } from '../isin-popover.js';
 
 // Etat interne de la modale : position courante + liste de lignes (draft).
 // Chaque ligne a un `draftId` local (index) et optionnellement un `id` DB.
@@ -22,17 +23,28 @@ function isPseudoIsin(isin) {
 
 function makeRow(h = {}) {
   return {
-    draftId:      state.nextDraftId++,
-    id:           h.id ?? null,
-    isin:         h.isin ?? '',
-    name:         h.name ?? '',
-    ticker:       h.ticker ?? '',
-    quantity:     h.quantity ?? '',
-    cost_basis:   h.cost_basis ?? '',
-    market_value: h.market_value ?? '',
-    is_priceable: h.is_priceable ?? null,
-    last_price:   h.last_price ?? null,
+    draftId:         state.nextDraftId++,
+    id:              h.id ?? null,
+    isin:            h.isin ?? '',
+    name:            h.name ?? '',
+    ticker:          h.ticker ?? '',
+    quantity:        h.quantity ?? '',
+    cost_basis:      h.cost_basis ?? '',
+    market_value:    h.market_value ?? '',
+    is_priceable:    h.is_priceable ?? null,
+    last_price:      h.last_price ?? null,
+    last_price_date: h.last_price_date ?? null,
   };
+}
+
+function _freshnessFromDate(lastPriceDate) {
+  if (!lastPriceDate) return 'unknown';
+  const last = new Date(lastPriceDate);
+  if (isNaN(last)) return 'unknown';
+  const ageDays = (Date.now() - last.getTime()) / (1000 * 60 * 60 * 24);
+  if (ageDays < 1) return 'fresh';
+  if (ageDays < 7) return 'stale';
+  return 'expired';
 }
 
 export async function openHoldingsModal(positionId, positionLabel = '') {
@@ -81,7 +93,10 @@ function renderHoldingsTable() {
 
 function rowHtml(r) {
   const pseudo = isPseudoIsin(r.isin);
-  const freshness = _freshnessBadge(r.last_price, r.is_priceable);
+  const freshness = _freshnessBadge(r);
+  const openBtn = (r.id && r.isin)
+    ? `<button type="button" class="h-isin-btn" data-action="open-popover" data-isin="${esc(r.isin)}" title="Voir le cours et l'historique">${esc(r.isin)}</button>`
+    : '';
   return `
     <tr data-draft="${r.draftId}">
       <td>
@@ -90,6 +105,7 @@ function rowHtml(r) {
                placeholder="FR0000000000 ou FONDS_EUROS_..."
                autocomplete="off" spellcheck="false"
                style="text-transform:uppercase;min-width:140px">
+        ${openBtn ? `<div style="margin-top:2px">${openBtn}</div>` : ''}
         ${freshness}
       </td>
       <td>
@@ -115,12 +131,20 @@ function rowHtml(r) {
     </tr>`;
 }
 
-function _freshnessBadge(lastPrice, isPriceable) {
-  if (isPriceable === false) {
+function _freshnessBadge(r) {
+  if (r.is_priceable === false) {
     return '<span class="h-badge h-badge-muted" title="Non coté (fonds euros, actif custom)">non coté</span>';
   }
-  if (lastPrice == null) return '';
-  return '<span class="h-badge h-badge-ok" title="Cours connu">coté</span>';
+  if (r.last_price == null) return '';
+  const f = _freshnessFromDate(r.last_price_date);
+  const cls = f === 'fresh' ? 'h-badge-fresh'
+            : f === 'stale' ? 'h-badge-stale'
+            : f === 'expired' ? 'h-badge-expired' : 'h-badge-muted';
+  const label = f === 'fresh' ? 'à jour'
+              : f === 'stale' ? 'vieillissant'
+              : f === 'expired' ? 'périmé' : 'coté';
+  const title = r.last_price_date ? `Dernier cours : ${r.last_price} le ${r.last_price_date}` : 'Cours connu';
+  return `<span class="h-badge ${cls}" title="${esc(title)}">${label}</span>`;
 }
 
 function _pnlCell(r) {
@@ -267,9 +291,14 @@ export function wireHoldingsEvents() {
   document.getElementById('holdings-save')?.addEventListener('click', saveAll);
 
   document.getElementById('holdings-tbody').addEventListener('click', e => {
-    const btn = e.target.closest('[data-action="remove-line"]');
-    if (btn) {
-      removeLine(parseInt(btn.dataset.draft));
+    const remove = e.target.closest('[data-action="remove-line"]');
+    if (remove) {
+      removeLine(parseInt(remove.dataset.draft));
+      return;
+    }
+    const popover = e.target.closest('[data-action="open-popover"]');
+    if (popover) {
+      openIsinPopover(popover.dataset.isin);
     }
   });
 

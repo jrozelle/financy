@@ -6,6 +6,7 @@ from .import_export import import_export_bp
 from .referential import referential_bp
 from .tools import tools_bp
 from .holdings import holdings_bp
+from .prices import prices_bp
 
 all_blueprints = [
     positions_bp,
@@ -16,4 +17,5 @@ all_blueprints = [
     referential_bp,
     tools_bp,
     holdings_bp,
+    prices_bp,
 ]

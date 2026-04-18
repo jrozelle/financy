@@ -220,3 +220,34 @@ export async function triggerAutoSnapshot() {
     }
   } catch (err) { toast('Erreur snapshot : ' + err.message, 'error'); }
 }
+
+// ─── Refresh des cours de marche ────────────────────────────────────────────
+
+export async function triggerPricesRefresh(onlyStale = false) {
+  const btnAll   = document.getElementById('btn-refresh-prices');
+  const btnStale = document.getElementById('btn-refresh-prices-stale');
+  const resultEl = document.getElementById('prices-refresh-result');
+  if (btnAll)   btnAll.disabled = true;
+  if (btnStale) btnStale.disabled = true;
+  if (resultEl) resultEl.innerHTML = '<span class="text-muted">Rafraichissement en cours…</span>';
+
+  try {
+    const url = onlyStale ? '/api/prices/refresh?only_stale=1' : '/api/prices/refresh';
+    const stats = await api('POST', url);
+    const parts = [
+      `${stats.refreshed} cours mis a jour`,
+      stats.resolved_tickers ? `${stats.resolved_tickers} tickers résolus` : null,
+      stats.errors ? `<span style="color:var(--danger)">${stats.errors} erreur(s)</span>` : null,
+      stats.skipped ? `${stats.skipped} ignoré(s)` : null,
+    ].filter(Boolean);
+    if (resultEl) {
+      resultEl.innerHTML = `Provider <strong>${esc(stats.provider)}</strong> — ${parts.join(' · ')}`;
+    }
+    toast('Cours rafraichis', 'success');
+  } catch (err) {
+    if (resultEl) resultEl.innerHTML = `<span style="color:var(--danger)">Erreur : ${esc(err.message)}</span>`;
+  } finally {
+    if (btnAll)   btnAll.disabled = false;
+    if (btnStale) btnStale.disabled = false;
+  }
+}
