@@ -288,11 +288,18 @@ Phase 3 — Scheduler :
 - [x] Tests : 5 nouveaux tests (job en isolation, status, init idempotent), 151 au total
 
 Phase 4 — Import PDF :
-- [ ] requirements : pdfplumber
-- [ ] Upload sécurisé (5 Mo, MIME, purge, CSRF)
-- [ ] POST /api/envelope/<id>/import-pdf (preview + validate)
-- [ ] Détection format (PEA Boursorama, AV Linxea) + parser générique ISIN
-- [ ] Fallback modale manuelle pré-remplie
+- [x] requirements : pdfplumber
+- [x] services/pdf_parser.py : extraction 2 couches (tableaux + lignes texte)
+- [x] Heuristique auto : ISIN regex + Luhn + mapping qty/prix/valo par coherence
+- [x] Fingerprint 15+ formats (Boursorama PEA/CTO, Fortuneo, Linxea, Spirica,
+      Suravenir, Generali, Yomoni, Nalo, SwissLife, CA, BNP, SG, Bourse Direct...)
+- [x] Score de confiance par ligne (0-1)
+- [x] Upload securise (5 Mo, MIME, CSRF)
+- [x] POST /api/envelope/<id>/import-pdf (step=preview + step=commit)
+- [x] Frontend : bouton « Importer PDF… » dans la modale holdings,
+      preview editable, statut format detecte + warnings
+- [x] Full replace avec confirmation implicite (l'Enregistrer remplace tout)
+- [x] Tests : 19 nouveaux tests (helpers + parser + route), 170 au total
 
 Phase 5 — Onglet Actifs (optionnel) :
 - [ ] Vue consolidée holdings (tri ISIN/poids/perf/fraîcheur)
