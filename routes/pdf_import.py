@@ -11,7 +11,8 @@ Flux en 2 temps :
 import logging
 from flask import Blueprint, jsonify, request
 from models import get_db, validate_isin, validate_number, validate_date
-from services.pdf_parser import parse_pdf
+from services.pdf_parser import parse_pdf, PdfEncryptedError, PdfImageScanError
+from services.securities import upsert_security
 from auth import login_required, csrf_protect
 
 logger = logging.getLogger('financy')
@@ -60,9 +61,13 @@ def _preview(position_id):
 
     try:
         result = parse_pdf(data)
+    except PdfEncryptedError as e:
+        return jsonify({'error': str(e)}), 400
+    except PdfImageScanError as e:
+        return jsonify({'error': str(e)}), 422
     except Exception as e:
         logger.warning('parse_pdf failed: %s', e, exc_info=True)
-        return jsonify({'error': "Echec du parsing — le PDF est peut-etre un scan image ou un format inattendu."}), 400
+        return jsonify({'error': "Echec du parsing — format inattendu. Saisie manuelle possible."}), 400
 
     return jsonify({
         'position_id': position_id,
@@ -115,27 +120,12 @@ def _commit(position_id):
         conn.execute('DELETE FROM holdings WHERE position_id=?', (position_id,))
         for item in validated:
             isin = item['isin']
-            existing = conn.execute('SELECT isin FROM securities WHERE isin=?', (isin,)).fetchone()
-            is_pseudo = isin.startswith(('FONDS_EUROS_', 'CUSTOM_'))
-            is_priceable = item['is_priceable']
-            if is_priceable is None:
-                is_priceable = 0 if is_pseudo else 1
-            else:
-                is_priceable = 0 if not is_priceable else 1
-            if not existing:
-                conn.execute(
-                    '''INSERT INTO securities
-                       (isin, name, currency, is_priceable, data_source)
-                       VALUES (?,?,'EUR',?,'pdf-import')''',
-                    (isin, item['name'], is_priceable)
-                )
-            elif item['name']:
-                # Renseigne le nom si on l'a extrait du PDF et qu'il etait vide
-                conn.execute(
-                    '''UPDATE securities SET name=COALESCE(NULLIF(name,''), ?),
-                       updated_at=CURRENT_TIMESTAMP WHERE isin=?''',
-                    (item['name'], isin)
-                )
+            upsert_security(
+                conn, isin,
+                name=item.get('name') or None,
+                is_priceable=item.get('is_priceable'),
+                data_source='pdf-import',
+            )
             conn.execute(
                 '''INSERT INTO holdings
                    (position_id, isin, quantity, cost_basis, market_value, as_of_date)

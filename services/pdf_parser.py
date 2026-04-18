@@ -344,16 +344,41 @@ def _deduplicate(lines: List[DetectedLine]) -> List[DetectedLine]:
 
 # ─── API publique ────────────────────────────────────────────────────────────
 
+class PdfEncryptedError(RuntimeError):
+    """PDF protege par mot de passe."""
+    pass
+
+
+class PdfImageScanError(RuntimeError):
+    """PDF qui semble etre un scan image sans couche texte."""
+    pass
+
+
 def parse_pdf(file_bytes: bytes) -> ParseResult:
-    """Point d'entree : renvoie un ParseResult pret a afficher en preview."""
+    """Point d'entree : renvoie un ParseResult pret a afficher en preview.
+
+    Leve :
+    - PdfEncryptedError     : PDF chiffre (mot de passe requis)
+    - PdfImageScanError     : PDF scan sans couche texte exploitable
+    - RuntimeError          : tout autre probleme de parsing
+    """
     try:
         import pdfplumber
+        from pdfminer.pdfdocument import PDFPasswordIncorrect
     except ImportError:
         raise RuntimeError('pdfplumber non installé')
 
     result = ParseResult(format='generic', source_label='Format inconnu')
 
-    with pdfplumber.open(BytesIO(file_bytes)) as pdf:
+    try:
+        pdf_ctx = pdfplumber.open(BytesIO(file_bytes))
+    except Exception as e:
+        msg = str(e).lower()
+        if 'password' in msg or 'encrypt' in msg:
+            raise PdfEncryptedError('Le PDF est chiffré (mot de passe requis).')
+        raise RuntimeError(f'Impossible d\'ouvrir le PDF : {e}')
+
+    with pdf_ctx as pdf:
         # Extraction texte global pour fingerprint
         global_text = ''
         for page in pdf.pages[:3]:  # les 3 premieres pages suffisent pour fingerprinting
@@ -377,6 +402,15 @@ def parse_pdf(file_bytes: bytes) -> ParseResult:
 
     result.lines = merged
     result.total_market_value = sum(l.market_value or 0 for l in merged)
+
+    # Heuristique scan image : aucune ligne detectee ET texte global quasi vide
+    # (typique des PDF issus d'un scan non-OCRise). On tolere jusqu'a 10 car. de
+    # texte (entetes de page minimalistes).
+    if not merged and len(global_text.strip()) < 10:
+        raise PdfImageScanError(
+            "Le PDF ne contient pas de couche texte (scan image ?). "
+            "Utilisez la saisie manuelle ou un OCR externe."
+        )
 
     if not merged:
         result.warnings.append('Aucune ligne détectée. Vérifiez que le PDF n\'est pas un scan image, ou saisissez manuellement.')

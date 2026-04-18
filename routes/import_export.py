@@ -491,11 +491,20 @@ def import_json():
             if not validate_date(snap_date) or not validate_isin(isin):
                 imported['skipped'] += 1
                 continue
+            position_id = s.get('position_id')
+            # Skip si la position cible n'existe plus (import cross-DB cassé)
+            if position_id is not None:
+                exists = conn.execute(
+                    'SELECT 1 FROM positions WHERE id=?', (position_id,)
+                ).fetchone()
+                if not exists:
+                    imported['skipped'] += 1
+                    continue
             conn.execute(
                 '''INSERT INTO holdings_snapshots
                    (snapshot_date, position_id, isin, quantity, cost_basis, price, market_value)
                    VALUES (?,?,?,?,?,?,?)''',
-                (snap_date, s.get('position_id'), isin,
+                (snap_date, position_id, isin,
                  _safe_num(s.get('quantity')),
                  _safe_num(s.get('cost_basis')) if s.get('cost_basis') is not None else None,
                  _safe_num(s.get('price')) if s.get('price') is not None else None,

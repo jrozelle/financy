@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from models import (get_db, validate_isin, validate_number, validate_string,
                     validate_date, snapshot_holdings_to_date)
+from services.securities import upsert_security as _upsert_security
 from auth import login_required, csrf_protect
 
 holdings_bp = Blueprint('holdings', __name__)
@@ -14,40 +15,6 @@ def _normalize_isin(raw):
         return None
     isin = raw.strip().upper()
     return isin if validate_isin(isin) else None
-
-
-def _upsert_security(conn, isin, name=None, ticker=None, currency='EUR',
-                     asset_class=None, is_priceable=None):
-    """Cree la security si elle n'existe pas, met a jour les champs fournis."""
-    row = conn.execute('SELECT * FROM securities WHERE isin=?', (isin,)).fetchone()
-    is_pseudo = isin.startswith(('FONDS_EUROS_', 'CUSTOM_'))
-    if row is None:
-        conn.execute(
-            '''INSERT INTO securities
-               (isin, name, ticker, currency, asset_class, is_priceable, data_source)
-               VALUES (?,?,?,?,?,?,?)''',
-            (isin, name, ticker, currency or 'EUR',
-             asset_class or ('fonds_euros' if isin.startswith('FONDS_EUROS_') else 'autre'),
-             0 if is_pseudo else (1 if is_priceable is None else int(bool(is_priceable))),
-             'manual')
-        )
-        return
-    # Update partiel des champs fournis
-    updates, params = [], []
-    for col, val in [('name', name), ('ticker', ticker), ('currency', currency),
-                     ('asset_class', asset_class)]:
-        if val is not None:
-            updates.append(f'{col}=?')
-            params.append(val)
-    if is_priceable is not None:
-        updates.append('is_priceable=?')
-        params.append(int(bool(is_priceable)))
-    if updates:
-        updates.append("updated_at=CURRENT_TIMESTAMP")
-        params.append(isin)
-        conn.execute(
-            f'UPDATE securities SET {", ".join(updates)} WHERE isin=?', params
-        )
 
 
 def _validate_holding_payload(d):

@@ -1,5 +1,6 @@
 """Routes de gestion des cours de marche (phase 2 + 3)."""
 import logging
+import threading
 from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, request
 from models import get_db, validate_isin
@@ -13,6 +14,10 @@ prices_bp = Blueprint('prices', __name__)
 
 PERIOD_DAYS = {'1d': 2, '7d': 8, '30d': 32, '90d': 92, '1y': 370, '5y': 1830}
 
+# Lock applicatif : empeche deux refresh globaux concurrents (spam bouton UI).
+# Non-bloquant — le second appel recoit 409.
+_refresh_lock = threading.Lock()
+
 
 @prices_bp.route('/api/prices/refresh', methods=['POST'])
 @login_required
@@ -23,13 +28,20 @@ def refresh():
     Query params :
     - only_stale=1 : ne traite que les cours > 20h.
     """
-    only_stale = request.args.get('only_stale') in ('1', 'true', 'yes')
-    provider = get_provider()
-    with get_db() as conn:
-        stats = refresh_securities(conn, provider=provider, only_stale=only_stale)
-    stats['provider'] = provider.name
-    logger.info('Prices refresh: %s', stats)
-    return jsonify(stats)
+    if not _refresh_lock.acquire(blocking=False):
+        return jsonify({
+            'error': 'Un refresh est deja en cours. Reessayez dans quelques secondes.'
+        }), 409
+    try:
+        only_stale = request.args.get('only_stale') in ('1', 'true', 'yes')
+        provider = get_provider()
+        with get_db() as conn:
+            stats = refresh_securities(conn, provider=provider, only_stale=only_stale)
+        stats['provider'] = provider.name
+        logger.info('Prices refresh: %s', stats)
+        return jsonify(stats)
+    finally:
+        _refresh_lock.release()
 
 
 @prices_bp.route('/api/prices/history/<isin>', methods=['GET'])
