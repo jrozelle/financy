@@ -10,6 +10,8 @@ const DEFAULT_PERIOD = '30d';
 export async function openIsinPopover(isin) {
   if (!isin) return;
   isin = isin.toUpperCase();
+  // Detruit tout chart residuel (reouverture rapide sur un autre ISIN)
+  _chart = destroyChart(_chart);
   _current = { isin, period: DEFAULT_PERIOD };
   const popover = document.getElementById('isin-popover');
   popover.classList.remove('hidden');

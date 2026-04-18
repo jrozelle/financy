@@ -109,13 +109,15 @@ def validate_isin(isin):
 
     - ISIN standard : 12 caractères, 2 lettres pays + 9 alphanum + 1 chiffre check.
     - Pseudo-ISIN : préfixé 'FONDS_EUROS_' ou 'CUSTOM_' (fonds euros, actifs custom).
+
+    Restreint a ASCII (les `é`, `中`, emoji sont rejetes — `isalnum()` seul les accepterait).
     """
     if not isin or not isinstance(isin, str):
         return False
     isin = isin.strip().upper()
     if any(isin.startswith(p) for p in _PSEUDO_ISIN_PREFIXES):
         return len(isin) <= 64 and all(
-            c.isalnum() or c == '_' for c in isin
+            c.isascii() and (c.isalnum() or c == '_') for c in isin
         )
     if not _ISIN_RE.match(isin):
         return False
@@ -326,14 +328,18 @@ def _migration_001(conn):
 
 def _migration_002(conn):
     """Ajout colonnes mobilizable_pct_override (positions) et category (flux)."""
+    import logging
+    _m002_logger = logging.getLogger(__name__)
     for col, definition, table in [
         ('mobilizable_pct_override', 'REAL DEFAULT NULL', 'positions'),
         ('category', 'TEXT', 'flux'),
     ]:
         try:
             conn.execute(f'ALTER TABLE {table} ADD COLUMN {col} {definition}')
-        except Exception:
-            pass  # colonne déjà existante
+        except Exception as e:
+            # Colonne deja existante (re-run idempotent) : OK, mais on trace
+            # en debug pour distinguer d'une vraie erreur SQL.
+            _m002_logger.debug('migration_002: %s.%s already exists (%s)', table, col, e)
 
 
 def _migration_003(conn):
@@ -615,8 +621,16 @@ def snapshot_holdings_to_date(conn, snapshot_date):
     duplicateSnapshot côté front). Idempotent pour une date donnée : on supprime
     d'abord les lignes existantes à cette date pour éviter les doublons en cas
     de re-snapshot.
+
+    Lock : `BEGIN IMMEDIATE` evite que deux snapshots concurrents creent des
+    doublons (delete + insert pas atomiques sinon).
     """
     try:
+        # Si une transaction est deja ouverte par l'appelant (ex: snapshot_update),
+        # on ne re-ouvre pas — SQLite ne supporte pas les transactions imbriquees.
+        in_txn = conn.in_transaction
+        if not in_txn:
+            conn.execute('BEGIN IMMEDIATE')
         conn.execute('DELETE FROM holdings_snapshots WHERE snapshot_date=?', (snapshot_date,))
         rows = conn.execute('''
             SELECT h.position_id, h.isin, h.quantity, h.cost_basis, h.market_value,

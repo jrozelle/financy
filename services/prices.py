@@ -22,6 +22,8 @@ logger = logging.getLogger('financy.prices')
 BATCH_SIZE = 10
 BATCH_DELAY = 1.0  # secondes entre batches
 HTTP_TIMEOUT = 5.0
+YF_TIMEOUT = 10.0        # timeout par appel yfinance
+REFRESH_MAX_SECONDS = 90  # duree max totale d'un refresh global
 
 
 # ─── Interface ───────────────────────────────────────────────────────────────
@@ -90,7 +92,7 @@ class YahooProvider(PriceProvider):
         try:
             import yfinance as yf
             t = yf.Ticker(ticker)
-            hist = t.history(period='5d', auto_adjust=False)
+            hist = t.history(period='5d', auto_adjust=False, timeout=YF_TIMEOUT)
             if hist.empty:
                 return None
             last = hist.iloc[-1]
@@ -109,7 +111,7 @@ class YahooProvider(PriceProvider):
         try:
             import yfinance as yf
             t = yf.Ticker(ticker)
-            hist = t.history(period=yf_period, auto_adjust=False)
+            hist = t.history(period=yf_period, auto_adjust=False, timeout=YF_TIMEOUT)
             if hist.empty:
                 return []
             return [
@@ -210,7 +212,15 @@ def refresh_securities(conn, provider=None, only_stale=False, stale_hours=20):
         ]
 
     today = datetime.now().strftime('%Y-%m-%d')
+    start = time.monotonic()
     for idx, row in enumerate(rows):
+        # Cap dur sur la duree totale pour ne pas bloquer le request handler
+        if time.monotonic() - start > REFRESH_MAX_SECONDS:
+            stats['skipped'] += len(rows) - idx
+            logger.warning('refresh_securities : cap %ss atteint, %d ISIN non traites',
+                           REFRESH_MAX_SECONDS, len(rows) - idx)
+            stats['timeout'] = True
+            break
         isin = row['isin']
         ticker = row['ticker']
 
