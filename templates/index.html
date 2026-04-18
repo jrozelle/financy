@@ -15,6 +15,7 @@
     <div class="nav-tabs">
       <button class="tab-btn active" data-tab="synthese">Synthèse</button>
       <button class="tab-btn" data-tab="positions">Positions</button>
+      <button class="tab-btn" data-tab="actifs">Actifs</button>
       <button class="tab-btn" data-tab="flux">Flux</button>
       <button class="tab-btn" data-tab="entites">Entités</button>
       <button class="tab-btn" data-tab="conseil">Conseil</button>
@@ -348,6 +349,61 @@
             </tr></thead>
             <tbody id="ref-envelopes-body"></tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ACTIFS (vue consolidée holdings) ───────────────────────────── -->
+    <div id="tab-actifs" class="tab-content hidden">
+      <div class="page-header">
+        <h1>Actifs</h1>
+        <div class="page-filters" style="display:flex;gap:.5rem;align-items:center">
+          <label style="font-size:12px;color:var(--text-muted);font-weight:600">Personne</label>
+          <select id="actifs-owner-filter">
+            <option value="">Toutes</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:1rem">
+        <div class="kpi-card"><div class="kpi-label">Valorisation totale</div><div class="kpi-value" id="actifs-kpi-value">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">Prix de revient</div><div class="kpi-value" id="actifs-kpi-cost">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">+/- latent</div><div class="kpi-value" id="actifs-kpi-pnl">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">Lignes</div><div class="kpi-value" id="actifs-kpi-count">—</div></div>
+      </div>
+
+      <div class="charts-row" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+        <div class="card">
+          <h2>Par classe d'actif</h2>
+          <div style="position:relative;height:240px"><canvas id="actifs-chart-class"></canvas></div>
+        </div>
+        <div class="card">
+          <h2>Par enveloppe</h2>
+          <div style="position:relative;height:240px"><canvas id="actifs-chart-envelope"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card card-table">
+        <table class="data-table">
+          <thead id="actifs-thead">
+            <tr>
+              <th data-sort="isin">ISIN</th>
+              <th data-sort="name">Nom</th>
+              <th data-sort="asset_class">Classe</th>
+              <th data-sort="envelopes">Enveloppes</th>
+              <th class="num" data-sort="quantity">Quantité</th>
+              <th class="num" data-sort="avg_cost">PRU</th>
+              <th class="num" data-sort="last_price">Cours</th>
+              <th class="num" data-sort="market_value">Valo</th>
+              <th class="num" data-sort="pnl">+/-</th>
+              <th class="num" data-sort="weight_pct">Poids</th>
+              <th>Fraîcheur</th>
+            </tr>
+          </thead>
+          <tbody id="actifs-tbody"></tbody>
+        </table>
+        <div id="actifs-empty" class="text-muted" style="font-style:italic;padding:1rem;text-align:center;display:none">
+          Aucune ligne détenue. Renseignez des holdings via l'onglet Positions.
         </div>
       </div>
     </div>
