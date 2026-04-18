@@ -17,6 +17,7 @@
       <button class="tab-btn" data-tab="positions">Positions</button>
       <button class="tab-btn" data-tab="flux">Flux</button>
       <button class="tab-btn" data-tab="entites">Entités</button>
+      <button class="tab-btn" data-tab="conseil">Conseil</button>
     </div>
     <div class="global-search" id="global-search">
       <span class="global-search-icon" aria-hidden="true">&#128269;</span>
@@ -347,6 +348,122 @@
             </tr></thead>
             <tbody id="ref-envelopes-body"></tbody>
           </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CONSEIL PATRIMONIAL ─────────────────────────────────────────── -->
+    <div id="tab-conseil" class="tab-content hidden">
+      <div class="page-header"><h1>Conseil patrimonial</h1></div>
+      <div class="advisor-disclaimer">
+        <strong>Outil personnel à vocation pédagogique.</strong>
+        Ne constitue pas un conseil en investissement réglementé.
+        Les propositions sont générées par des règles automatiques, à croiser avec votre propre jugement ou celui d'un conseiller CIF.
+      </div>
+
+      <div class="card">
+        <h2>Profil de la personne</h2>
+        <div style="margin-bottom:.75rem">
+          <label style="font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Personne</label>
+          <select id="advisor-owner-select" style="margin-left:.5rem"></select>
+        </div>
+        <form id="advisor-profile-form">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Horizon (années)</label>
+              <input type="number" id="adv-horizon" min="0" max="100" step="1">
+            </div>
+            <div class="form-group">
+              <label>Tolérance au risque</label>
+              <select id="adv-risk">
+                <option value="1">1 — Prudent</option>
+                <option value="2">2 — Modéré bas</option>
+                <option value="3" selected>3 — Équilibré</option>
+                <option value="4">4 — Dynamique</option>
+                <option value="5">5 — Offensif</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Statut professionnel</label>
+              <select id="adv-employment">
+                <option value="">—</option>
+                <option value="salarie">Salarié</option>
+                <option value="TNS">TNS / Dirigeant</option>
+                <option value="fonction_publique">Fonction publique</option>
+                <option value="retraite">Retraité</option>
+                <option value="autre">Autre</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Âge de départ souhaité</label>
+              <input type="number" id="adv-pension-age" min="18" max="120" step="1" placeholder="ex: 65">
+            </div>
+            <div class="form-group">
+              <label>Enfants à charge</label>
+              <input type="number" id="adv-children" min="0" max="20" step="1" value="0">
+            </div>
+            <div class="form-group" style="align-self:end">
+              <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer">
+                <input type="checkbox" id="adv-main-residence"> Résidence principale détenue
+              </label>
+              <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer">
+                <input type="checkbox" id="adv-lbo"> Patrimoine pro (LBO, actions de société)
+              </label>
+            </div>
+            <div class="form-group full-span">
+              <label>Notes / contexte</label>
+              <input type="text" id="adv-notes" maxlength="2000" placeholder="Ex: objectif transmission, concentration immobilière, etc.">
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button type="submit" class="btn btn-primary">Enregistrer le profil</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Objectifs</h2>
+        <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
+          Projets patrimoniaux multi-horizons. Pris en compte pour affiner l'allocation cible en phase ultérieure.
+        </p>
+        <div class="advisor-objectives-wrap">
+          <table class="data-table" id="advisor-objectives-table">
+            <thead>
+              <tr>
+                <th>Libellé</th>
+                <th class="num">Montant cible (€)</th>
+                <th class="num">Horizon (ans)</th>
+                <th>Priorité</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="advisor-objectives-tbody"></tbody>
+          </table>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-add-objective" style="margin-top:.75rem">+ Ajouter un objectif</button>
+      </div>
+
+      <div class="card">
+        <h2>Allocation cible vs actuelle</h2>
+        <div id="advisor-adjustments" class="advisor-adjustments"></div>
+        <div id="advisor-allocation-wrap">
+          <div style="position:relative;height:280px;margin-bottom:1rem">
+            <canvas id="advisor-allocation-chart"></canvas>
+          </div>
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Classe d'actif</th>
+                  <th class="num">Cible</th>
+                  <th class="num">Actuelle</th>
+                  <th class="num">Écart %</th>
+                  <th class="num">Écart €</th>
+                </tr>
+              </thead>
+              <tbody id="advisor-gap-tbody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

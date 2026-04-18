@@ -411,6 +411,89 @@ def _migration_005(conn):
     ''')
 
 
+def _migration_006(conn):
+    """Feature conseil patrimonial : profil, objectifs, allocation cible, macro, propositions.
+
+    Toutes les tables utilisees par l'advisor (phases 6 et 7). La phase 6
+    exploite owner_profiles + owner_objectives + allocation_targets ; la phase 7
+    ajoute macro_snapshots + rebalance_proposals + llm_usage.
+    """
+    conn.executescript('''
+        CREATE TABLE IF NOT EXISTS owner_profiles (
+            owner                TEXT PRIMARY KEY,
+            horizon_years        INTEGER,
+            risk_tolerance       INTEGER,          -- 1 (prudent) a 5 (dynamique)
+            employment_type      TEXT,             -- salarie | TNS | fonction_publique | retraite | autre
+            has_lbo              INTEGER DEFAULT 0,
+            children_count       INTEGER DEFAULT 0,
+            main_residence_owned INTEGER DEFAULT 0,
+            pension_age          INTEGER,
+            notes                TEXT,
+            updated_at           TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS owner_objectives (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner          TEXT NOT NULL,
+            label          TEXT NOT NULL,
+            target_amount  REAL,
+            horizon_years  INTEGER,
+            priority       INTEGER DEFAULT 3,      -- 1 (faible) a 5 (critique)
+            created_at     TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_objectives_owner ON owner_objectives(owner);
+
+        CREATE TABLE IF NOT EXISTS macro_snapshots (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            date           TEXT NOT NULL,
+            regime_rates   TEXT,                   -- bas | neutre | haut
+            inflation_view TEXT,                   -- maitrisee | persistante
+            equities_bias  TEXT,                   -- defensif | neutre | offensif
+            raw_summary    TEXT,
+            source         TEXT,                   -- llm | manual
+            created_at     TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS allocation_targets (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner          TEXT NOT NULL,
+            snapshot_date  TEXT NOT NULL,
+            bucket_type    TEXT NOT NULL,          -- liquidity | category
+            bucket_name    TEXT NOT NULL,
+            target_pct     REAL NOT NULL,
+            UNIQUE (owner, snapshot_date, bucket_type, bucket_name)
+        );
+
+        CREATE TABLE IF NOT EXISTS rebalance_proposals (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner          TEXT NOT NULL,
+            snapshot_date  TEXT NOT NULL,
+            kind           TEXT NOT NULL,          -- bucket | security | fiscal
+            label          TEXT NOT NULL,
+            from_ref       TEXT,                   -- ex: 'Actions' ou 'FR0010315770'
+            to_ref         TEXT,
+            amount         REAL,
+            rationale      TEXT,
+            status         TEXT DEFAULT 'pending', -- pending | applied | dismissed
+            created_at     TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_proposals_owner_status ON rebalance_proposals(owner, status);
+
+        CREATE TABLE IF NOT EXISTS llm_usage (
+            id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+            date                 TEXT NOT NULL,
+            endpoint             TEXT,
+            model                TEXT,
+            input_tokens         INTEGER DEFAULT 0,
+            cached_input_tokens  INTEGER DEFAULT 0,
+            output_tokens        INTEGER DEFAULT 0,
+            cost_usd             REAL DEFAULT 0,
+            latency_ms           INTEGER DEFAULT 0,
+            created_at           TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_llm_usage_date ON llm_usage(date);
+    ''')
+
+
 # Registre des migrations — ajouter les futures migrations ici
 MIGRATIONS = [
     (1, _migration_001),
@@ -418,6 +501,7 @@ MIGRATIONS = [
     (3, _migration_003),
     (4, _migration_004),
     (5, _migration_005),
+    (6, _migration_006),
 ]
 
 
