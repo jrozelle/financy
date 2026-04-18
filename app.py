@@ -230,6 +230,11 @@ def security_headers(response):
 
 init_db()
 
+# ─── Scheduler APScheduler (optionnel, opt-in via SCHEDULER_ENABLED=true) ────
+
+from services.scheduler import init_scheduler
+init_scheduler(app)
+
 # ─── Démarrage (dev uniquement, Gunicorn utilise app:app directement) ────────
 
 if __name__ == '__main__':

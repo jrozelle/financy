@@ -277,9 +277,15 @@ Phase 2 — Provider cours + refresh manuel + popover :
 - [x] Tests : 14 nouveaux tests prices (mock provider), 146 au total
 
 Phase 3 — Scheduler :
-- [ ] requirements : APScheduler
-- [ ] Job quotidien refresh_prices() (SCHEDULER_ENABLED=true)
-- [ ] Lock anti-double-exécution + logs
+- [x] requirements : apscheduler
+- [x] services/scheduler.py : BackgroundScheduler + cron trigger quotidien
+- [x] Initialisation conditionnelle dans app.py (SCHEDULER_ENABLED=true)
+- [x] max_instances=1 (anti-double-exécution) + coalesce + misfire grace
+- [x] Shutdown propre via atexit
+- [x] GET /api/scheduler/status pour diagnostic UI
+- [x] Indicateur dans l'onglet Outils (état + prochain passage)
+- [x] Configuration via env : SCHEDULER_HOUR / SCHEDULER_MINUTE / SCHEDULER_TZ
+- [x] Tests : 5 nouveaux tests (job en isolation, status, init idempotent), 151 au total
 
 Phase 4 — Import PDF :
 - [ ] requirements : pdfplumber

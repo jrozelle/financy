@@ -223,6 +223,26 @@ export async function triggerAutoSnapshot() {
 
 // ─── Refresh des cours de marche ────────────────────────────────────────────
 
+export async function loadSchedulerStatus() {
+  const el = document.getElementById('scheduler-status');
+  if (!el) return;
+  try {
+    const s = await api('GET', '/api/scheduler/status', null, { silent: true });
+    if (!s.configured) {
+      el.innerHTML = 'Refresh automatique <strong>désactivé</strong> (SCHEDULER_ENABLED=false).';
+      return;
+    }
+    if (!s.running) {
+      el.innerHTML = 'Scheduler configuré mais non démarré — vérifier les logs.';
+      return;
+    }
+    const next = s.next_run ? new Date(s.next_run).toLocaleString('fr-FR') : '—';
+    el.innerHTML = `Refresh automatique <strong>actif</strong> — prochain passage : ${esc(next)} (${esc(s.timezone || '')})`;
+  } catch {
+    el.innerHTML = '';
+  }
+}
+
 export async function triggerPricesRefresh(onlyStale = false) {
   const btnAll   = document.getElementById('btn-refresh-prices');
   const btnStale = document.getElementById('btn-refresh-prices-stale');
