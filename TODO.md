@@ -306,12 +306,14 @@ Phase 5 — Onglet Actifs (optionnel) :
 - [ ] Graphes répartition (asset_class, devise)
 
 Phase 6 — Advisor 1 : profil & objectifs :
-- [ ] Migration _migration_006 (owner_profiles, owner_objectives, macro_snapshots, allocation_targets, rebalance_proposals, llm_usage)
-- [ ] routes/advisor.py (CRUD profil + objectifs)
-- [ ] Onglet « Conseil » + static/modules/advisor.js
-- [ ] services/advisor/allocation.py (matrice horizon×risque + ajustements contextuels)
-- [ ] Vue comparative allocation cible vs actuelle
-- [ ] Bannière disclaimer persistante
+- [x] Migration _migration_006 (owner_profiles, owner_objectives, macro_snapshots, allocation_targets, rebalance_proposals, llm_usage)
+- [x] services/advisor/allocation.py : matrice 5 horizons × 5 niveaux de risque
+- [x] Ajustements contextuels (LBO, TNS, horizon court, RP)
+- [x] routes/advisor.py : CRUD profil + objectifs + GET allocation
+- [x] Onglet « Conseil » dans index.html + static/modules/tabs/advisor.js
+- [x] Vue comparative cible vs actuelle (graphe barres Chart.js + tableau écarts €/%)
+- [x] Bannière disclaimer persistante en haut de l'onglet
+- [x] Tests : 18 nouveaux (moteur + CRUD + allocation end-to-end), 188 au total
 
 Phase 7 — Advisor 2 : macro LLM + arbitrages :
 - [ ] requirements : anthropic

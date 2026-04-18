@@ -8,6 +8,7 @@ from .tools import tools_bp
 from .holdings import holdings_bp
 from .prices import prices_bp
 from .pdf_import import pdf_import_bp
+from .advisor import advisor_bp
 
 all_blueprints = [
     positions_bp,
@@ -20,4 +21,5 @@ all_blueprints = [
     holdings_bp,
     prices_bp,
     pdf_import_bp,
+    advisor_bp,
 ]
