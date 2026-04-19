@@ -236,25 +236,38 @@ def auto_snapshot():
         ref          = load_referential(conn)
         entity_map   = get_entity_map(conn, last_date)
         count = 0
+        old_to_new = {}
         for r in source_rows:
             p = compute_position(dict(r), entity_map, ref, holdings_map)
-            # Si la position a des holdings et pas d'entité, on fige la valeur calculée
             frozen_value = p['value'] if p.get('has_holdings') and not p.get('entity') else r['value']
-            conn.execute(
+            cur = conn.execute(
                 '''INSERT INTO positions (date, owner, category, envelope, establishment,
-                   value, debt, notes, entity, ownership_pct, debt_pct,
+                   value, debt, label, notes, entity, ownership_pct, debt_pct,
                    mobilizable_pct_override, liquidity_override)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
                 (target_date, r['owner'], r['category'], r['envelope'], r['establishment'],
-                 frozen_value, r['debt'], r['notes'], r['entity'],
+                 frozen_value, r['debt'],
+                 r['label'] if 'label' in r.keys() else None,
+                 r['notes'], r['entity'],
                  r['ownership_pct'], r['debt_pct'], r['mobilizable_pct_override'],
                  r['liquidity_override'] if 'liquidity_override' in r.keys() else None)
             )
+            old_to_new[r['id']] = cur.lastrowid
             count += 1
+
+        # Copier les holdings vers les nouvelles positions
+        h_count = 0
+        for old_id, new_id in old_to_new.items():
+            for h in conn.execute('SELECT * FROM holdings WHERE position_id=?', (old_id,)).fetchall():
+                conn.execute(
+                    '''INSERT INTO holdings (position_id, isin, quantity, cost_basis, market_value, as_of_date)
+                       VALUES (?,?,?,?,?,?)''',
+                    (new_id, h['isin'], h['quantity'], h['cost_basis'], h['market_value'], h['as_of_date']))
+                h_count += 1
 
         snap_count = snapshot_holdings_to_date(conn, target_date)
 
     logger.info('Auto-snapshot: %d positions + %d holdings copied from %s to %s',
-                count, snap_count, last_date, target_date)
-    return jsonify({'ok': True, 'copied': count, 'holdings_snapshots': snap_count,
+                count, h_count, last_date, target_date)
+    return jsonify({'ok': True, 'copied': count, 'holdings_copied': h_count,
                     'from_date': last_date, 'to_date': target_date})
