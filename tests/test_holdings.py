@@ -199,7 +199,7 @@ class TestHoldingsSnapshot:
         r = client.post('/api/auto-snapshot', json={'date': '2024-07-01'},
                         headers=CSRF_HEADERS)
         data = r.get_json()
-        assert data['copied'] == 1
+        assert data['positions_copied'] == 1
         assert data['holdings_copied'] == 2
         # La nouvelle position a bien la valeur figee (Σ market_value)
         r = client.get('/api/positions?date=2024-07-01')

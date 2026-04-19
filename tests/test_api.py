@@ -714,7 +714,7 @@ class TestTools:
         assert resp.status_code == 200
         data = resp.get_json()
         assert data['ok'] is True
-        assert data['copied'] == 2
+        assert data['positions_copied'] == 2
         assert data['from_date'] == '2024-01-01'
         assert data['to_date'] == '2024-06-01'
         # Verify new positions exist

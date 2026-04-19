@@ -139,47 +139,7 @@ def _preview(position_id):
     })
 
 
-# Mapping asset_class → categorie position pour l'auto-split
-_ASSET_CLASS_TO_CATEGORY = {
-    'etf':         'Actions',
-    'action':      'Actions',
-    'opcvm':       'Actions',
-    'obligation':  'Obligations',
-    'fonds_euros': 'Fond Euro',
-    'scpi':        'Immobilier',
-    'sci':         'Immobilier',
-    'cash':        'Cash & dépôts',
-}
-
-
-def _infer_category(isin, name):
-    """Infere la categorie position depuis l'ISIN/nom du holding."""
-    from services.securities import _infer_asset_class
-    ac = _infer_asset_class(name)
-    return _ASSET_CLASS_TO_CATEGORY.get(ac, 'Actions')
-
-
-def _find_or_create_position(conn, base_pos, category):
-    """Trouve une position compagnon (meme date/owner/envelope/etablissement)
-    avec la bonne categorie, ou en cree une."""
-    row = conn.execute(
-        '''SELECT id FROM positions
-           WHERE date=? AND owner=? AND envelope=? AND category=?
-                 AND COALESCE(establishment,'')=?''',
-        (base_pos['date'], base_pos['owner'], base_pos['envelope'],
-         category, base_pos['establishment'] or '')
-    ).fetchone()
-    if row:
-        return row['id']
-    cur = conn.execute(
-        '''INSERT INTO positions (date, owner, category, envelope, establishment, value, debt)
-           VALUES (?,?,?,?,?,0,0)''',
-        (base_pos['date'], base_pos['owner'], category,
-         base_pos['envelope'], base_pos['establishment'])
-    )
-    logger.info('Auto-split: created position %s/%s/%s (id=%d)',
-                base_pos['owner'], base_pos['envelope'], category, cur.lastrowid)
-    return cur.lastrowid
+from services.holdings_split import infer_category, find_or_create_position
 
 
 def _commit(position_id):
@@ -247,7 +207,7 @@ def _commit(position_id):
         # Grouper les holdings par categorie inferee
         by_category = {}
         for item in validated:
-            cat = _infer_category(item['isin'], item['name'])
+            cat = infer_category(item['name'])
             by_category.setdefault(cat, []).append(item)
 
         categories = list(by_category.keys())
@@ -271,7 +231,7 @@ def _commit(position_id):
                 if cat == base_pos['category']:
                     pid = position_id
                 else:
-                    pid = _find_or_create_position(conn, base_pos, cat)
+                    pid = find_or_create_position(conn, base_pos, cat)
                 conn.execute('DELETE FROM holdings WHERE position_id=?', (pid,))
                 for item in cat_items:
                     conn.execute(
