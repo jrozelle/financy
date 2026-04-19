@@ -10,7 +10,13 @@ export async function loadFlux() {
   const globalOwner = S.syntheseOwner;
   if (globalOwner && globalOwner !== 'Famille') {
     const sel = document.getElementById('flux-filter-owner');
-    if (sel) sel.value = globalOwner;
+    if (sel) {
+      // Ajouter l'option si elle n'existe pas (personne sans flux)
+      if (![...sel.options].some(o => o.value === globalOwner)) {
+        sel.add(new Option(globalOwner, globalOwner));
+      }
+      sel.value = globalOwner;
+    }
   }
   renderFlux();
 }
