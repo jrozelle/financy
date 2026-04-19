@@ -11,14 +11,9 @@ let _sortCol = 'market_value';
 let _sortDesc = true;
 
 export async function loadActifs() {
-  // Remplir le filtre personne
-  const owners = (S.config && S.config.owners) || [];
-  const sel = document.getElementById('actifs-owner-filter');
-  if (sel && sel.options.length <= 1) {
-    sel.innerHTML = '<option value="">Toutes</option>' +
-      owners.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
-  }
-  const owner = sel ? sel.value : '';
+  // Utiliser le filtre global owner
+  const globalOwner = S.syntheseOwner;
+  const owner = (globalOwner && globalOwner !== 'Famille') ? globalOwner : '';
   const url = owner ? `/api/holdings/consolidated?owner=${encodeURIComponent(owner)}` : '/api/holdings/consolidated';
   try {
     _data = await api('GET', url, null, { silent: true });

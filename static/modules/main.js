@@ -28,6 +28,7 @@ import { wireSettingsEvents } from './settings.js';
 async function init() {
   S.config = await api('GET', '/api/config');
   buildSelects();
+  _buildGlobalOwnerFilter();
   wireEvents();
   wireDrilldownEvents();
   wireGlobalSearch(switchTab);
@@ -100,6 +101,33 @@ function hideLoading(tabId) {
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────
 
+// ─── Global owner filter ──────────────────────────────────────────────────
+
+function _buildGlobalOwnerFilter() {
+  const sel = document.getElementById('global-owner-filter');
+  if (!sel) return;
+  const owners = S.config?.owners || [];
+  sel.innerHTML = '<option value="Famille">Famille</option>' +
+    owners.map(o => `<option value="${o}">${o}</option>`).join('');
+  sel.value = S.syntheseOwner || 'Famille';
+}
+
+function _onGlobalOwnerChange(e) {
+  S.syntheseOwner = e.target.value;
+  // Sync person tabs in synthese
+  const container = document.getElementById('synthese-person-tabs');
+  if (container) {
+    container.querySelectorAll('.person-tab-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.owner === S.syntheseOwner);
+    });
+  }
+  // Sync actifs filter
+  const actifsSel = document.getElementById('actifs-owner-filter');
+  if (actifsSel) actifsSel.value = S.syntheseOwner === 'Famille' ? '' : S.syntheseOwner;
+  // Reload current tab
+  switchTab(S.currentTab, { pushHistory: false });
+}
+
 const VALID_TABS = new Set([
   'synthese', 'positions', 'actifs', 'flux', 'entites', 'conseil',
   'referentiel', 'tools', 'import',
@@ -148,6 +176,9 @@ function wireEvents() {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
+
+  // Global owner filter
+  document.getElementById('global-owner-filter')?.addEventListener('change', _onGlobalOwnerChange);
 
   // Browser back/forward
   window.addEventListener('popstate', e => {

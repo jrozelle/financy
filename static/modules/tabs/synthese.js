@@ -44,6 +44,9 @@ export function renderSynthesePersonTabs() {
   container.querySelectorAll('.person-tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       S.syntheseOwner = btn.dataset.owner;
+      // Sync global filter
+      const globalSel = document.getElementById('global-owner-filter');
+      if (globalSel) globalSel.value = S.syntheseOwner;
       renderSynthesePersonTabs();
       renderSynthese();
     });

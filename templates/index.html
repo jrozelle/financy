@@ -20,6 +20,11 @@
       <button class="tab-btn" data-tab="entites">Entités</button>
       <button class="tab-btn" data-tab="conseil">Conseil</button>
     </div>
+    <div class="nav-owner-filter" style="display:flex;align-items:center;gap:.25rem;margin-left:.5rem">
+      <select id="global-owner-filter" style="font-size:12px;padding:.2rem .5rem;border-radius:4px;border:1px solid var(--border);background:var(--card);color:var(--text)">
+        <option value="Famille">Famille</option>
+      </select>
+    </div>
     <div class="global-search" id="global-search">
       <span class="global-search-icon" aria-hidden="true">&#128269;</span>
       <input type="search" class="global-search-input" id="global-search-input" placeholder="Rechercher…" autocomplete="off" aria-label="Recherche globale">
@@ -359,10 +364,6 @@
       <div class="page-header">
         <h1>Actifs</h1>
         <div class="page-filters" style="display:flex;gap:.5rem;align-items:center">
-          <label style="font-size:12px;color:var(--text-muted);font-weight:600">Personne</label>
-          <select id="actifs-owner-filter">
-            <option value="">Toutes</option>
-          </select>
           <button class="btn btn-secondary btn-sm" id="actifs-refresh-prices" title="Rafraichir tous les cours">Rafraichir cours</button>
         </div>
       </div>
