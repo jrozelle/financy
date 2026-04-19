@@ -205,7 +205,7 @@ function renderPositionsTree(allPositions) {
                   return `
                     <div class="tree-row tree-pos-leaf" data-pos-id="${p.id}">
                       <span class="tree-dot"></span>
-                      <span class="tree-label">${p.notes ? esc(p.notes.substring(0, 50)) : esc(p.category)}${pctBadge}${mobMark}</span>
+                      <span class="tree-label">${esc(p.label || p.category)}${pctBadge}${mobMark}</span>
                       <span class="tree-badges">${liqBadge(p.liquidity)}</span>
                       ${inlineVal}
                       <span class="tree-actions">
@@ -236,7 +236,7 @@ function renderPositionsTree(allPositions) {
                 return `
                   <div class="tree-row tree-pos-leaf" data-pos-id="${p.id}">
                     <span class="tree-dot"></span>
-                    <span class="tree-label">${p.notes ? esc(p.notes.substring(0, 50)) : esc(p.category)}${pctBadge}${mobMark}</span>
+                    <span class="tree-label">${esc(p.label || p.category)}${pctBadge}${mobMark}</span>
                     <span class="tree-badges">${liqBadge(p.liquidity)}</span>
                     ${inlineVal}
                     <span class="tree-actions">
@@ -451,6 +451,7 @@ export function openPosModal(id = null, prefill = {}) {
     document.getElementById('pos-ownership').value     = Math.round((p.ownership_pct ?? 1) * 100);
     document.getElementById('pos-debt-pct').value      = Math.round((p.debt_pct ?? 1) * 100);
     document.getElementById('pos-entity-select').value = p.entity || '';
+    document.getElementById('pos-label').value         = p.label || '';
     document.getElementById('pos-notes').value         = p.notes || '';
     const hasOverride = p.mobilizable_pct_override != null || p.liquidity_override;
     document.getElementById('pos-mob-override-check').checked = hasOverride;
@@ -475,6 +476,7 @@ export function openPosModal(id = null, prefill = {}) {
     document.getElementById('pos-debt').value         = 0;
     document.getElementById('pos-ownership').value    = 100;
     document.getElementById('pos-debt-pct').value     = 100;
+    document.getElementById('pos-label').value          = '';
     document.getElementById('pos-notes').value          = '';
     document.getElementById('pos-mob-override-check').checked = false;
     document.getElementById('pos-mob-override-field').style.display = 'none';
@@ -585,6 +587,7 @@ export async function savePosition(e) {
     ownership_pct: (parseFloat(document.getElementById('pos-ownership').value) || 100) / 100,
     debt_pct:      (parseFloat(document.getElementById('pos-debt-pct').value) || 100) / 100,
     entity:        document.getElementById('pos-entity-select').value || null,
+    label:         document.getElementById('pos-label').value || null,
     notes:         document.getElementById('pos-notes').value || null,
     mobilizable_pct_override: document.getElementById('pos-mob-override-check').checked
       ? (parseFloat(document.getElementById('pos-mob-override-pct').value) || 0) / 100

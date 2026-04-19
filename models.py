@@ -503,11 +503,15 @@ def _migration_006(conn):
 
 # Registre des migrations — ajouter les futures migrations ici
 def _migration_007(conn):
-    """Ajout colonne liquidity_override sur positions."""
-    try:
-        conn.execute('ALTER TABLE positions ADD COLUMN liquidity_override TEXT DEFAULT NULL')
-    except Exception:
-        pass  # Colonne deja existante
+    """Ajout colonnes liquidity_override et label sur positions."""
+    for col, defn in [
+        ('liquidity_override', 'TEXT DEFAULT NULL'),
+        ('label', 'TEXT DEFAULT NULL'),
+    ]:
+        try:
+            conn.execute(f'ALTER TABLE positions ADD COLUMN {col} {defn}')
+        except Exception:
+            pass
 
 
 MIGRATIONS = [
