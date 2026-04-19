@@ -37,14 +37,34 @@ def _proposal(kind, label, from_ref=None, to_ref=None, amount=None, rationale=''
     }
 
 
+# Categories non-arbitrables : on ne peut pas "vendre" de l'immobilier
+# ou des objets de valeur pour acheter des ETF.
+NON_ARBITRABLE = {'Immobilier', 'Objets de valeur', 'Société', 'SCPI'}
+
+
 # ─── Bucket level ────────────────────────────────────────────────────────────
 
 def _bucket_proposals(gap, threshold_eur=2000):
     """A partir du gap (cf. allocation.compute_gap), genere des allegements
-    par couple (categorie surponderee → categorie sous-ponderee)."""
-    over  = sorted([g for g in gap if g['delta_eur'] < -threshold_eur],
-                   key=lambda g: g['delta_eur'])  # plus negatif d'abord
-    under = sorted([g for g in gap if g['delta_eur'] >  threshold_eur],
+    par couple (categorie surponderee → categorie sous-ponderee).
+
+    Exclut les categories non-arbitrables (immobilier, objets de valeur, etc.).
+    """
+    arbitrable = [g for g in gap if g['category'] not in NON_ARBITRABLE]
+
+    # Fusionner Cash & Fond Euro en une seule poche "Cash/Fond Euro"
+    # (le fonds euro est du quasi-cash securise, meme profil de risque)
+    merged = {}
+    for g in arbitrable:
+        key = 'Cash / Fond Euro' if g['category'] in ('Cash & dépôts', 'Fond Euro', 'Monétaire') else g['category']
+        if key not in merged:
+            merged[key] = {'category': key, 'delta_eur': 0}
+        merged[key]['delta_eur'] += g['delta_eur']
+    arbitrable = list(merged.values())
+
+    over  = sorted([g for g in arbitrable if g['delta_eur'] < -threshold_eur],
+                   key=lambda g: g['delta_eur'])
+    under = sorted([g for g in arbitrable if g['delta_eur'] >  threshold_eur],
                    key=lambda g: -g['delta_eur'])
 
     out = []
