@@ -514,6 +514,14 @@ def _migration_007(conn):
             pass
 
 
+def _migration_008(conn):
+    """Ajout colonne label sur positions (si absente)."""
+    try:
+        conn.execute('ALTER TABLE positions ADD COLUMN label TEXT DEFAULT NULL')
+    except Exception:
+        pass
+
+
 MIGRATIONS = [
     (1, _migration_001),
     (2, _migration_002),
@@ -522,6 +530,7 @@ MIGRATIONS = [
     (5, _migration_005),
     (6, _migration_006),
     (7, _migration_007),
+    (8, _migration_008),
 ]
 
 
