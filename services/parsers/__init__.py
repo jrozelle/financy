@@ -16,6 +16,7 @@ from .pdf_generic import parse_tables, parse_text_lines
 from .pdf_attestation import parse_attestation
 from .pdf_predica import parse_predica_detail
 from .csv_generic import parse_csv  # noqa: F401 — re-export
+from .text_paste import parse_pasted_text  # noqa: F401 — re-export
 
 logger = logging.getLogger('financy.parsers')
 

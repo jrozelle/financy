@@ -111,11 +111,21 @@ def history(isin):
                 logger.warning('refresh_history failed for %s: %s', isin, e)
 
         # Recupere les eventuels holdings pour calculer P&L contextuel
-        # (on agrege toutes les positions portant cet ISIN)
         hs = conn.execute(
             '''SELECT SUM(quantity) as qty, SUM(cost_basis) as cost, SUM(market_value) as mv
                FROM holdings WHERE isin=?''', (isin,)
         ).fetchone()
+
+        # Detail par position (etablissement, enveloppe, owner)
+        positions_detail = conn.execute(
+            '''SELECT h.quantity, h.cost_basis, h.market_value,
+                      p.owner, p.envelope, p.establishment, p.category
+               FROM holdings h
+               JOIN positions p ON p.id = h.position_id
+               WHERE h.isin=?
+               ORDER BY h.market_value DESC''',
+            (isin,)
+        ).fetchall()
 
     points = [{'date': r['date'], 'price': r['price']} for r in rows]
     last_price = points[-1]['price'] if points else sec['last_price']
@@ -156,6 +166,14 @@ def history(isin):
             'current_value': current_value,
             'pnl':           pnl,
             'pnl_pct':       pnl_pct,
+            'positions': [{
+                'owner':         r['owner'],
+                'envelope':      r['envelope'],
+                'establishment': r['establishment'],
+                'category':      r['category'],
+                'quantity':      r['quantity'],
+                'market_value':  r['market_value'],
+            } for r in positions_detail],
         } if qty else None,
     })
 

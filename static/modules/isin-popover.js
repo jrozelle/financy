@@ -115,13 +115,42 @@ function _holdingHtml(h) {
   const pnl = h.pnl;
   const pnlPct = h.pnl_pct;
   const pnlCls = pnl == null ? '' : pnl >= 0 ? 'pos' : 'neg';
+
+  let posHtml = '';
+  if (h.positions && h.positions.length) {
+    const rows = h.positions.map(p => {
+      const label = [p.establishment, p.envelope, p.category].filter(Boolean).join(' / ');
+      const pct = h.current_value ? ((p.market_value || 0) / h.current_value * 100).toFixed(1) : '—';
+      return `<tr>
+        <td style="font-size:12px">${esc(label)}</td>
+        <td class="num" style="font-size:12px">${new Intl.NumberFormat('fr-FR', {maximumFractionDigits:2}).format(p.quantity || 0)}</td>
+        <td class="num" style="font-size:12px">${fmt(p.market_value || 0)}</td>
+        <td class="num" style="font-size:12px;color:var(--text-muted)">${pct}%</td>
+      </tr>`;
+    }).join('');
+    posHtml = `
+      <div style="margin-top:.75rem">
+        <div style="font-size:12px;font-weight:600;margin-bottom:.25rem">Detention par enveloppe</div>
+        <table style="width:100%;font-size:12px">
+          <thead><tr>
+            <th style="text-align:left;font-weight:600">Enveloppe</th>
+            <th style="text-align:right;font-weight:600">Qty</th>
+            <th style="text-align:right;font-weight:600">Valo</th>
+            <th style="text-align:right;font-weight:600">Part</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
   return `
     <div class="isin-holding-card">
-      <div class="isin-holding-row"><span>Quantité cumulée</span><strong>${fmt(h.quantity)}</strong></div>
-      ${h.cost_basis != null ? `<div class="isin-holding-row"><span>Coût total</span><strong>${fmt(h.cost_basis)} €</strong></div>` : ''}
-      ${pru != null ? `<div class="isin-holding-row"><span>PRU</span><strong>${fmt(pru)} €</strong></div>` : ''}
-      ${h.current_value != null ? `<div class="isin-holding-row"><span>Valorisation</span><strong>${fmt(h.current_value)} €</strong></div>` : ''}
-      ${pnl != null ? `<div class="isin-holding-row"><span>P&amp;L latent</span><strong class="${pnlCls}">${fmt(pnl)} €${pnlPct != null ? ` (${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%)` : ''}</strong></div>` : ''}
+      <div class="isin-holding-row"><span>Quantite cumulee</span><strong>${new Intl.NumberFormat('fr-FR', {maximumFractionDigits:4}).format(h.quantity)}</strong></div>
+      ${h.cost_basis != null && h.cost_basis > 0 ? `<div class="isin-holding-row"><span>Cout total</span><strong>${fmt(h.cost_basis)}</strong></div>` : ''}
+      ${pru != null ? `<div class="isin-holding-row"><span>PRU</span><strong>${fmt(pru, 2)}</strong></div>` : ''}
+      ${h.current_value != null ? `<div class="isin-holding-row"><span>Valorisation</span><strong>${fmt(h.current_value)}</strong></div>` : ''}
+      ${pnl != null ? `<div class="isin-holding-row"><span>P&amp;L latent</span><strong class="${pnlCls}">${fmt(pnl)}${pnlPct != null ? ` (${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(2)}%)` : ''}</strong></div>` : ''}
+      ${posHtml}
     </div>`;
 }
 
@@ -221,7 +250,33 @@ export function wireIsinPopoverEvents() {
     const ticker = document.getElementById('isin-ticker-input').value.trim();
     try {
       await api('PATCH', `/api/securities/${encodeURIComponent(_current.isin)}`, { ticker });
-      toast('Ticker enregistré', 'success');
+      toast('Ticker enregistre', 'success');
+      await _loadAndRender();
+    } catch {}
+  });
+
+  document.getElementById('isin-reset-btn').addEventListener('click', async () => {
+    if (!_current.isin) return;
+    try {
+      await api('PATCH', `/api/securities/${encodeURIComponent(_current.isin)}`, {
+        ticker: null, last_price: null, last_price_date: null,
+      });
+      toast('Ticker et cours reinitialises', 'success');
+      await _loadAndRender();
+    } catch {}
+  });
+
+  document.getElementById('isin-price-save').addEventListener('click', async () => {
+    if (!_current.isin) return;
+    const priceStr = document.getElementById('isin-price-input').value.trim();
+    if (!priceStr) return;
+    const price = parseFloat(priceStr);
+    if (isNaN(price) || price <= 0) { toast('Prix invalide', 'error'); return; }
+    try {
+      await api('PATCH', `/api/securities/${encodeURIComponent(_current.isin)}`, {
+        last_price: price,
+      });
+      toast('Prix mis a jour', 'success');
       await _loadAndRender();
     } catch {}
   });

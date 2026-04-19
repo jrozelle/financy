@@ -212,6 +212,8 @@ function removeLine(draftId) {
 
 async function saveAll() {
   collectFromInputs();
+  // Auto-snapshot si besoin
+  try { await api('POST', '/api/auto-snapshot', {}, { silent: true }); } catch {}
 
   // Validation client basique avant envoi
   for (let i = 0; i < state.rows.length; i++) {
@@ -283,6 +285,48 @@ async function onIsinInput(e) {
 }
 
 // ─── Event wiring ────────────────────────────────────────────────────────────
+
+// ─── Import par copier-coller ────────────────────────────────────────────────
+
+async function openPasteDialog() {
+  if (!state.positionId) {
+    toast('Ouvrez d\'abord la modale d\'une position', 'error');
+    return;
+  }
+  const { promptDialog } = await import('../dialogs.js');
+  const text = await promptDialog('Coller le texte depuis le navigateur', {
+    placeholder: 'Selectionnez les lignes sur le site de votre courtier, copiez (Ctrl+C) et collez ici (Ctrl+V)',
+    inputType: 'textarea',
+    confirmText: 'Analyser',
+  });
+  if (!text) return;
+
+  const status = document.getElementById('holdings-import-status');
+  if (status) status.innerHTML = '<span class="text-muted">Analyse du texte…</span>';
+
+  try {
+    const data = await api('POST',
+      `/api/envelope/${state.positionId}/import-paste`,
+      { text });
+    if (!data.lines || !data.lines.length) {
+      toast('Aucune ligne detectee dans le texte', 'error');
+      if (status) status.innerHTML = '';
+      return;
+    }
+    state.rows = (data.lines || []).map(l => makeRow({
+      isin: l.isin, name: l.name, quantity: l.quantity,
+      cost_basis: l.cost_basis, market_value: l.market_value,
+    }));
+    renderHoldingsTable();
+    if (status) {
+      status.innerHTML = `<strong>${data.source_label}</strong> · ${data.lines.length} ligne(s) — verifiez puis Enregistrer.`;
+    }
+    toast(`${data.lines.length} ligne(s) detectee(s)`, 'success');
+  } catch (err) {
+    toast(err.message || 'Erreur', 'error');
+    if (status) status.innerHTML = '';
+  }
+}
 
 // ─── Import PDF / CSV ───────────────────────────────────────────────────────
 
@@ -366,6 +410,7 @@ export function wireHoldingsEvents() {
 document.getElementById('holdings-save')?.addEventListener('click', saveAll);
   document.getElementById('holdings-import-pdf')?.addEventListener('click', openPdfPicker);
   document.getElementById('holdings-pdf-input')?.addEventListener('change', onPdfSelected);
+  document.getElementById('holdings-paste-btn')?.addEventListener('click', openPasteDialog);
 
   document.getElementById('holdings-tbody').addEventListener('click', e => {
     const remove = e.target.closest('[data-action="remove-line"]');

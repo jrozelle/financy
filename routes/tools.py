@@ -242,11 +242,13 @@ def auto_snapshot():
             frozen_value = p['value'] if p.get('has_holdings') and not p.get('entity') else r['value']
             conn.execute(
                 '''INSERT INTO positions (date, owner, category, envelope, establishment,
-                   value, debt, notes, entity, ownership_pct, debt_pct, mobilizable_pct_override)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?)''',
+                   value, debt, notes, entity, ownership_pct, debt_pct,
+                   mobilizable_pct_override, liquidity_override)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)''',
                 (target_date, r['owner'], r['category'], r['envelope'], r['establishment'],
                  frozen_value, r['debt'], r['notes'], r['entity'],
-                 r['ownership_pct'], r['debt_pct'], r['mobilizable_pct_override'])
+                 r['ownership_pct'], r['debt_pct'], r['mobilizable_pct_override'],
+                 r['liquidity_override'] if 'liquidity_override' in r.keys() else None)
             )
             count += 1
 

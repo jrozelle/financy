@@ -23,17 +23,21 @@ logger = logging.getLogger('financy.parsers.csv_generic')
 # ISIN strict (pas de word boundary — on matche une cellule entiere)
 ISIN_RE = re.compile(r'^[A-Z]{2}[A-Z0-9]{9}[0-9]$')
 
+# Pattern fonds euros dans les noms
+_FONDS_EURO_RE = re.compile(r'fonds?\s*(en\s*)?euros?', re.IGNORECASE)
+
 # Mapping semantique : chaque role -> liste de patterns (lowercase)
 _COL_PATTERNS: Dict[str, List[str]] = {
     'isin':         ['isin', 'code isin', 'code_isin'],
     'name':         ['name', 'nom', 'libelle', 'libellé', 'support', 'titre',
-                     'designation', 'désignation', 'intitule', 'intitulé'],
+                     'designation', 'désignation', 'intitule', 'intitulé', 'valeur'],
     'quantity':     ['quantity', 'quantite', 'quantité', 'qty', 'nb', 'parts',
                      'nombre', 'nbre', 'nb de parts', 'nombre de parts'],
     'cost_price':   ['buyingprice', 'buying_price', 'pru', 'prix achat',
-                     'prix_achat', 'cout', 'cost', 'cost_price', 'prix moyen',
+                     'prix_achat', 'prix revient', 'prix de revient',
+                     'cout', 'cost', 'cost_price', 'prix moyen',
                      'prix d\'achat', 'prix d\'achat moyen'],
-    'last_price':   ['lastprice', 'last_price', 'cours', 'prix', 'vl',
+    'last_price':   ['lastprice', 'last_price', 'cours', 'vl',
                      'valeur liquidative', 'valeur_liquidative', 'dernier cours',
                      'price', 'valeur de part'],
     'market_value': ['amount', 'montant', 'valorisation', 'valeur', 'market_value',
@@ -56,6 +60,8 @@ def _detect_separator(first_lines: str) -> str:
 
 def _match_column(header: str) -> Optional[str]:
     h = _normalize_header(header)
+    if h.startswith('date'):
+        return None
     for role, patterns in _COL_PATTERNS.items():
         for pat in patterns:
             if pat == h or pat in h:
@@ -86,6 +92,15 @@ def _parse_csv_number(s: str) -> Optional[float]:
         return None
     cleaned = cleaned.replace('€', '').replace('$', '').replace('%', '').strip()
     return parse_number(cleaned)
+
+
+def _name_to_pseudo_isin(name: str) -> str:
+    """Genere un pseudo-ISIN depuis un nom de fonds."""
+    if _FONDS_EURO_RE.search(name):
+        suffix = re.sub(r'[^A-Z0-9]', '_', name.upper())[:30]
+        return f'FONDS_EUROS_{suffix}'
+    suffix = re.sub(r'[^A-Z0-9]', '_', name.upper())[:30]
+    return f'CUSTOM_{suffix}'
 
 
 def _detect_source(headers: List[str]) -> str:
@@ -127,22 +142,33 @@ def parse_csv(file_bytes: bytes) -> ParseResult:
             if 'isin' in col_map:
                 break
 
-    if 'isin' not in col_map:
-        raise ValueError('Aucune colonne ISIN detectee dans le CSV.')
+    # Mode sans ISIN : utiliser la colonne nom pour generer des pseudo-ISINs
+    no_isin_mode = 'isin' not in col_map
+    if no_isin_mode and 'name' not in col_map:
+        raise ValueError('Aucune colonne ISIN ou nom detectee dans le CSV.')
 
     source = _detect_source(headers)
     result = ParseResult(format='csv', source_label=f'Import CSV — {source}')
+    if no_isin_mode:
+        result.warnings.append('Pas de colonne ISIN — pseudo-ISINs generes depuis les noms.')
 
     for row in rows[1:]:
-        if len(row) <= col_map['isin']:
-            continue
-        raw_isin = row[col_map['isin']].strip().strip('"').upper()
-        if not ISIN_RE.match(raw_isin):
-            continue
-
-        name = None
-        if 'name' in col_map and col_map['name'] < len(row):
+        if no_isin_mode:
+            if len(row) <= col_map['name']:
+                continue
             name = row[col_map['name']].strip().strip('"')[:120] or None
+            if not name:
+                continue
+            raw_isin = _name_to_pseudo_isin(name)
+        else:
+            if len(row) <= col_map['isin']:
+                continue
+            raw_isin = row[col_map['isin']].strip().strip('"').upper()
+            if not ISIN_RE.match(raw_isin):
+                continue
+            name = None
+            if 'name' in col_map and col_map['name'] < len(row):
+                name = row[col_map['name']].strip().strip('"')[:120] or None
 
         qty = _parse_csv_number(row[col_map['quantity']]) if 'quantity' in col_map and col_map['quantity'] < len(row) else None
         cost_price = _parse_csv_number(row[col_map['cost_price']]) if 'cost_price' in col_map and col_map['cost_price'] < len(row) else None

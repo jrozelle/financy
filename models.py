@@ -150,13 +150,14 @@ _ENVELOPES_FULL = {
 _CATEGORIES_FULL = [
     'Cash & dépôts', 'Monétaire', 'Obligations', 'Actions',
     'Immobilier', 'SCPI', 'Fond Euro', 'Produits Structurés',
-    'Crypto', 'Objets de valeur', 'Autre'
+    'Crypto', 'Objets de valeur', 'Société', 'Autre'
 ]
 
 _MOBILIZABLE_FULL = {
     'Cash & dépôts': 1.0, 'Monétaire': 0.95, 'Obligations': 0.95,
     'Actions': 0.9, 'Immobilier': 0.0, 'SCPI': 0.0, 'Fond Euro': 0.95,
-    'Produits Structurés': 0.0, 'Crypto': 0.9, 'Objets de valeur': 0.0, 'Autre': 0.8,
+    'Produits Structurés': 0.0, 'Crypto': 0.9, 'Objets de valeur': 0.0,
+    'Société': 0.0, 'Autre': 0.8,
 }
 
 _FLUX_TYPES = ['Versement', 'Retrait', 'Dividende/Intérêt', 'Frais', 'Autre']
@@ -501,6 +502,14 @@ def _migration_006(conn):
 
 
 # Registre des migrations — ajouter les futures migrations ici
+def _migration_007(conn):
+    """Ajout colonne liquidity_override sur positions."""
+    try:
+        conn.execute('ALTER TABLE positions ADD COLUMN liquidity_override TEXT DEFAULT NULL')
+    except Exception:
+        pass  # Colonne deja existante
+
+
 MIGRATIONS = [
     (1, _migration_001),
     (2, _migration_002),
@@ -508,6 +517,7 @@ MIGRATIONS = [
     (4, _migration_004),
     (5, _migration_005),
     (6, _migration_006),
+    (7, _migration_007),
 ]
 
 
@@ -603,7 +613,7 @@ def compute_position(pos, entity_map=None, ref=None, holdings_map=None):
         'gross_attributed':  gross_attributed,
         'debt_attributed':   debt_attributed,
         'net_attributed':    net_attributed,
-        'liquidity':         env['liquidity'],
+        'liquidity':         pos.get('liquidity_override') or env['liquidity'],
         'friction':          env['friction'],
         'mobilizable_pct':   mobilizable_pct,
         'mobilizable_value': mobilizable_val,

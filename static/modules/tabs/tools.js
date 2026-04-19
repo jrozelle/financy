@@ -260,10 +260,17 @@ export async function triggerPricesRefresh(onlyStale = false) {
       stats.errors ? `<span style="color:var(--danger)">${stats.errors} erreur(s)</span>` : null,
       stats.skipped ? `${stats.skipped} ignoré(s)` : null,
     ].filter(Boolean);
-    if (resultEl) {
-      resultEl.innerHTML = `Provider <strong>${esc(stats.provider)}</strong> — ${parts.join(' · ')}`;
+    let divergentHtml = '';
+    if (stats.divergent && stats.divergent.length) {
+      const items = stats.divergent.map(d =>
+        `<li>${esc(d.isin)} (${esc(d.ticker)}) : ${d.old_price.toFixed(2)} → ${d.new_price.toFixed(2)} — <strong>ignore, verifiez le ticker</strong></li>`
+      ).join('');
+      divergentHtml = `<div style="color:var(--warning);margin-top:.5rem;font-size:12px">Cours divergents (>50%) ignores :<ul style="margin:.25rem 0">${items}</ul></div>`;
     }
-    toast('Cours rafraichis', 'success');
+    if (resultEl) {
+      resultEl.innerHTML = `Provider <strong>${esc(stats.provider)}</strong> — ${parts.join(' · ')}${divergentHtml}`;
+    }
+    toast(stats.divergent?.length ? 'Cours rafraichis (divergences detectees)' : 'Cours rafraichis', stats.divergent?.length ? 'warning' : 'success');
   } catch (err) {
     if (resultEl) resultEl.innerHTML = `<span style="color:var(--danger)">Erreur : ${esc(err.message)}</span>`;
   } finally {
