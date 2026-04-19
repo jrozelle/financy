@@ -67,13 +67,13 @@ function _renderTable(lines) {
       <td><button type="button" class="h-isin-btn" data-action="open-popover" data-isin="${esc(l.isin)}">${esc(l.isin)}</button></td>
       <td>${esc(l.name || '—')}</td>
       <td>${esc(l.asset_class || '—')}</td>
-      <td>${esc((l.envelopes || []).join(', ') || '—')}</td>
       <td class="num">${new Intl.NumberFormat('fr-FR').format(l.quantity)}</td>
       <td class="num">${l.avg_cost != null ? fmt(l.avg_cost) : '—'}</td>
       <td class="num">${l.last_price != null ? fmt(l.last_price) : '—'}</td>
       <td class="num">${fmt(l.market_value)}</td>
       <td class="num ${pnlCls}">${pnlStr}</td>
       <td class="num">${l.weight_pct.toFixed(1)}%</td>
+      <td>${esc((l.envelopes || []).join(', ') || '—')}</td>
       <td>${fresh}</td>
     </tr>`;
   }).join('');

@@ -974,6 +974,9 @@ input[type="file"] {
   .global-search-input { width: 100%; }
   .global-search-input:focus { width: 100%; }
   .search-results { min-width: 0; width: 100%; }
+  .drilldown-content { width: 95vw; min-width: 0; }
+  .isin-popover-content { width: 95vw; min-width: 0; }
+  .confirm-dialog { max-width: 95vw; }
 }
 
 /* ── Timeline ─────────────────────────────────────────────────────────── */
