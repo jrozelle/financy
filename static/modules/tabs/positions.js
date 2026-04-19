@@ -330,7 +330,7 @@ export function renderPositions() {
   renderPosViewToggle();
 
   if (isTree) {
-    renderPositionsTree(S.positions);
+    renderPositionsTree(filteredPositions());
     return;
   }
 
