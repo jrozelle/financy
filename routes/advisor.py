@@ -330,7 +330,7 @@ def refresh_macro():
     with get_db() as conn:
         try:
             snap, meta = macro_svc.generate_snapshot(conn)
-        except RuntimeError as e:
+        except Exception as e:
             return jsonify({'error': str(e)}), 503
         snap_id = macro_svc.save_snapshot(conn, snap)
         snap = conn.execute(

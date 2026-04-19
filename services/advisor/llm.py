@@ -239,8 +239,8 @@ def _live_call(conn, endpoint, system_blocks, user_message,
         'system':     sys_blocks,
         'messages':   messages,
     }
-    if json_response:
-        kwargs['output_config'] = {'format': {'type': 'json_object'}}
+    # JSON mode : pas d'output_config, on ajoute l'instruction dans le prompt
+    # et on parse la reponse. L'API Anthropic ne supporte pas json_object nativement.
 
     start = time.monotonic()
     try:
