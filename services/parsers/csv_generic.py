@@ -152,6 +152,7 @@ def parse_csv(file_bytes: bytes) -> ParseResult:
     if no_isin_mode:
         result.warnings.append('Pas de colonne ISIN — pseudo-ISINs generes depuis les noms.')
 
+    seen_isins = set()
     for row in rows[1:]:
         if no_isin_mode:
             if len(row) <= col_map['name']:
@@ -169,6 +170,10 @@ def parse_csv(file_bytes: bytes) -> ParseResult:
             name = None
             if 'name' in col_map and col_map['name'] < len(row):
                 name = row[col_map['name']].strip().strip('"')[:120] or None
+
+        if raw_isin in seen_isins:
+            result.warnings.append(f'ISIN en doublon : {raw_isin} (derniere occurrence utilisee)')
+        seen_isins.add(raw_isin)
 
         qty = _parse_csv_number(row[col_map['quantity']]) if 'quantity' in col_map and col_map['quantity'] < len(row) else None
         cost_price = _parse_csv_number(row[col_map['cost_price']]) if 'cost_price' in col_map and col_map['cost_price'] < len(row) else None
