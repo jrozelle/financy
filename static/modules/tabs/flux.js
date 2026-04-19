@@ -6,6 +6,12 @@ import { confirmDialog, toast, closeModal } from '../dialogs.js';
 export async function loadFlux() {
   S.flux = await api('GET', '/api/flux');
   populateFluxFilters();
+  // Sync filtre local avec le selecteur global
+  const globalOwner = S.syntheseOwner;
+  if (globalOwner && globalOwner !== 'Famille') {
+    const sel = document.getElementById('flux-filter-owner');
+    if (sel) sel.value = globalOwner;
+  }
   renderFlux();
 }
 

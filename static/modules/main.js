@@ -322,7 +322,15 @@ function wireEvents() {
   document.getElementById('btn-add-flux').addEventListener('click', () => openFluxModal());
   ['flux-filter-owner','flux-filter-type','flux-filter-category','flux-filter-year'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.addEventListener('change', renderFlux);
+    if (el) el.addEventListener('change', () => {
+      if (id === 'flux-filter-owner') {
+        const val = el.value;
+        S.syntheseOwner = val || 'Famille';
+        const globalSel = document.getElementById('global-owner-filter');
+        if (globalSel) globalSel.value = S.syntheseOwner;
+      }
+      renderFlux();
+    });
   });
   const btnClearFlux = document.getElementById('btn-clear-flux-filters');
   if (btnClearFlux) btnClearFlux.addEventListener('click', () => {
