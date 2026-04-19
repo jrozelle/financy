@@ -157,7 +157,12 @@ def add_holding(position_id):
 @login_required
 @csrf_protect
 def replace_holdings(position_id):
-    """Remplace integralement les holdings d'une position (usage : import PDF, modale)."""
+    """Remplace integralement les holdings d'une position (usage : import PDF/CSV, modale).
+
+    Auto-split : si les holdings ont des asset_classes mixtes, les lignes sont
+    reparties dans des positions compagnons par categorie.
+    """
+    from services.holdings_split import split_holdings_by_category
     d = request.json or {}
     items = d.get('holdings')
     if not isinstance(items, list):
@@ -176,7 +181,8 @@ def replace_holdings(position_id):
         if not _position_exists(conn, position_id):
             return jsonify({'error': 'Position introuvable'}), 404
         conn.execute('BEGIN IMMEDIATE')
-        conn.execute('DELETE FROM holdings WHERE position_id=?', (position_id,))
+
+        # Upsert securities
         for isin, item in validated:
             _upsert_security(
                 conn, isin,
@@ -185,18 +191,24 @@ def replace_holdings(position_id):
                 asset_class=item.get('asset_class'),
                 is_priceable=item.get('is_priceable'),
             )
-            conn.execute(
-                '''INSERT INTO holdings
-                   (position_id, isin, quantity, cost_basis, market_value, as_of_date)
-                   VALUES (?,?,?,?,?,?)''',
-                (position_id, isin,
-                 float(item['quantity']),
-                 float(item['cost_basis']) if item.get('cost_basis') is not None else None,
-                 float(item['market_value']) if item.get('market_value') is not None else None,
-                 item.get('as_of_date'))
-            )
+
+        # Auto-split par categorie
+        split_items = [{
+            'isin': isin,
+            'name': item.get('name'),
+            'quantity': float(item['quantity']),
+            'cost_basis': float(item['cost_basis']) if item.get('cost_basis') is not None else None,
+            'market_value': float(item['market_value']) if item.get('market_value') is not None else None,
+            'as_of_date': item.get('as_of_date'),
+        } for isin, item in validated]
+
+        touched, split_cats = split_holdings_by_category(conn, position_id, split_items)
         holdings = _fetch_holdings(conn, position_id)
-    return jsonify({'position_id': position_id, 'holdings': holdings})
+
+    result = {'position_id': position_id, 'holdings': holdings}
+    if split_cats:
+        result['split_categories'] = split_cats
+    return jsonify(result)
 
 
 @holdings_bp.route('/api/holdings/<int:holding_id>', methods=['PATCH'])
@@ -363,11 +375,15 @@ def get_consolidated():
         if r['pos_envelope']: rec['envelopes'].add(r['pos_envelope'])
 
     total_mv   = sum(v['market_value'] for v in by_isin.values())
-    total_cost = sum(v['cost_basis']   for v in by_isin.values())
+    # P&L : ne compter que les lignes avec un vrai cost_basis
+    has_cost_lines = [v for v in by_isin.values() if v['cost_basis']]
+    total_cost = sum(v['cost_basis'] for v in has_cost_lines)
+    total_mv_with_cost = sum(v['market_value'] for v in has_cost_lines)
 
     lines = []
     for v in by_isin.values():
-        pnl = (v['market_value'] - v['cost_basis']) if v['cost_basis'] else None
+        has_cost = v['cost_basis'] is not None and v['cost_basis'] > 0
+        pnl = (v['market_value'] - v['cost_basis']) if has_cost else None
         pnl_pct = (pnl / v['cost_basis'] * 100) if (pnl is not None and v['cost_basis']) else None
         weight = (v['market_value'] / total_mv * 100) if total_mv > 0 else 0
         avg_cost = (v['cost_basis'] / v['quantity']) if v['quantity'] else None
@@ -412,9 +428,9 @@ def get_consolidated():
         'lines':         lines,
         'totals': {
             'market_value': round(total_mv, 2),
-            'cost_basis':   round(total_cost, 2),
-            'pnl':          round(total_mv - total_cost, 2) if total_cost else None,
-            'pnl_pct':      round((total_mv - total_cost) / total_cost * 100, 2) if total_cost else None,
+            'cost_basis':   round(total_cost, 2) if total_cost else None,
+            'pnl':          round(total_mv_with_cost - total_cost, 2) if total_cost else None,
+            'pnl_pct':      round((total_mv_with_cost - total_cost) / total_cost * 100, 2) if total_cost else None,
             'lines_count':  len(lines),
         },
         'breakdowns': {
@@ -471,12 +487,19 @@ def update_security(isin):
             ('asset_class', lambda v: validate_string(v, 50)),
         ]:
             if field in d:
-                if not validator(d[field]):
+                val = d[field]
+                if val is not None and not validator(val):
                     return jsonify({'error': f'{field} invalide'}), 400
-                updates.append(f'{field}=?'); params.append(d[field])
+                updates.append(f'{field}=?'); params.append(val)
         if 'is_priceable' in d:
             updates.append('is_priceable=?')
             params.append(int(bool(d['is_priceable'])))
+        if 'last_price' in d:
+            updates.append('last_price=?')
+            params.append(float(d['last_price']) if d['last_price'] is not None else None)
+        if 'last_price_date' in d:
+            updates.append('last_price_date=?')
+            params.append(d['last_price_date'])
 
         if not updates:
             return jsonify({'error': 'Aucun champ a mettre a jour'}), 400

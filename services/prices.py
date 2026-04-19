@@ -70,18 +70,33 @@ class YahooProvider(PriceProvider):
             cls._session = s
         return cls._session
 
+    # Preference de marche : Paris > Europe > reste du monde
+    _EXCHANGE_PRIORITY = {'.PA': 0, '.BR': 1, '.AS': 2, '.DE': 3, '.L': 4, '.MI': 5}
+
     def _yahoo_search(self, query):
-        """Recherche Yahoo Finance, retourne (ticker, quoteType) ou (None, None)."""
+        """Recherche Yahoo Finance, retourne (ticker, quoteType) ou (None, None).
+
+        Privilegie les cotations Paris (.PA) quand plusieurs resultats existent.
+        """
         try:
             s = self._get_session()
-            url = f'https://query1.finance.yahoo.com/v1/finance/search?q={query}&quotesCount=5&newsCount=0'
+            url = f'https://query1.finance.yahoo.com/v1/finance/search?q={query}&quotesCount=10&newsCount=0'
             resp = s.get(url, timeout=HTTP_TIMEOUT)
             resp.raise_for_status()
             data = resp.json()
-            for q in data.get('quotes', []):
-                sym = q.get('symbol')
-                if sym:
-                    return sym, q.get('quoteType')
+            quotes = data.get('quotes', [])
+            if not quotes:
+                return None, None
+            # Trier par preference de marche
+            def _rank(q):
+                sym = q.get('symbol', '')
+                for suffix, prio in self._EXCHANGE_PRIORITY.items():
+                    if sym.endswith(suffix):
+                        return prio
+                return 99
+            quotes.sort(key=_rank)
+            sym = quotes[0].get('symbol')
+            return (sym, quotes[0].get('quoteType')) if sym else (None, None)
         except Exception as e:
             logger.debug('yahoo_search(%s) failed: %s', query, e)
         return None, None
@@ -277,6 +292,23 @@ def refresh_securities(conn, provider=None, only_stale=False, stale_hours=20):
             stats['errors'] += 1
             continue
         price, price_date = result
+
+        # Garde-fou : si le prix diverge trop du market_value existant, ne pas ecrire
+        existing_price = conn.execute(
+            'SELECT last_price FROM securities WHERE isin=?', (isin,)
+        ).fetchone()
+        old_price = existing_price['last_price'] if existing_price else None
+        if old_price and old_price > 0:
+            divergence = abs(price - old_price) / old_price
+            if divergence > 0.5:
+                logger.warning('refresh: %s prix divergent (%.2f → %.2f, %.0f%%) — IGNORE',
+                               isin, old_price, price, divergence * 100)
+                stats.setdefault('divergent', []).append({
+                    'isin': isin, 'ticker': ticker,
+                    'old_price': old_price, 'new_price': price,
+                })
+                stats['skipped'] += 1
+                continue
 
         try:
             conn.execute(

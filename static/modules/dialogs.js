@@ -54,14 +54,17 @@ export function promptDialog(title, { defaultValue = '', placeholder = '', input
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-label', title);
+    const isTextarea = inputType === 'textarea';
+    const inputHtml = isTextarea
+      ? `<textarea class="prompt-input" placeholder="${esc(placeholder)}" aria-label="${esc(title)}"
+                   style="width:100%;min-height:180px;padding:.5rem .75rem;border:1px solid var(--border);border-radius:6px;font-size:13px;margin-top:.5rem;resize:vertical;font-family:monospace">${esc(defaultValue)}</textarea>`
+      : `<input type="${esc(inputType)}" class="prompt-input" value="${esc(defaultValue)}"
+               placeholder="${esc(placeholder)}" aria-label="${esc(title)}"
+               style="width:100%;padding:.5rem .75rem;border:1px solid var(--border);border-radius:6px;font-size:14px;margin-top:.5rem">`;
     overlay.innerHTML = `
-      <div class="confirm-dialog">
+      <div class="confirm-dialog" ${isTextarea ? 'style="max-width:600px"' : ''}>
         <div class="confirm-title">${esc(title)}</div>
-        <div class="confirm-message">
-          <input type="${esc(inputType)}" class="prompt-input" value="${esc(defaultValue)}"
-                 placeholder="${esc(placeholder)}" aria-label="${esc(title)}"
-                 style="width:100%;padding:.5rem .75rem;border:1px solid var(--border);border-radius:6px;font-size:14px;margin-top:.5rem">
-        </div>
+        <div class="confirm-message">${inputHtml}</div>
         <div class="confirm-actions">
           <button class="btn btn-secondary confirm-cancel">Annuler</button>
           <button class="btn btn-primary confirm-ok">${esc(confirmText)}</button>
@@ -75,11 +78,10 @@ export function promptDialog(title, { defaultValue = '', placeholder = '', input
     overlay.querySelector('.confirm-ok').addEventListener('click', () => cleanup(input.value));
     overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(null); });
     input.addEventListener('keydown', e => {
-      if (e.key === 'Enter') cleanup(input.value);
+      if (!isTextarea && e.key === 'Enter') cleanup(input.value);
       if (e.key === 'Escape') cleanup(null);
     });
     input.focus();
-    input.select();
   });
 }
 

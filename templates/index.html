@@ -852,11 +852,23 @@
           <div class="form-group full-span" id="pos-mob-override-row">
             <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
               <input type="checkbox" id="pos-mob-override-check">
-              Surcharger la mobilisabilité pour cette ligne
+              Surcharger la mobilisabilite pour cette ligne
             </label>
-            <div id="pos-mob-override-field" style="display:none;margin-top:.4rem">
-              <input type="number" id="pos-mob-override-pct" step="1" min="0" max="100" value="100" style="width:90px">
-              <span style="font-size:13px;color:var(--text-muted);margin-left:.4rem">% mobilisable (remplace le défaut de la catégorie)</span>
+            <div id="pos-mob-override-field" style="display:none;margin-top:.4rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap">
+              <div>
+                <input type="number" id="pos-mob-override-pct" step="1" min="0" max="100" value="100" style="width:90px">
+                <span style="font-size:13px;color:var(--text-muted);margin-left:.25rem">% mobilisable</span>
+              </div>
+              <div>
+                <select id="pos-liquidity-override" style="font-size:13px">
+                  <option value="">Liquidite par defaut</option>
+                  <option value="J0–J1">J0-J1</option>
+                  <option value="J2–J7">J2-J7</option>
+                  <option value="J8–J30">J8-J30</option>
+                  <option value="30J+">30J+</option>
+                  <option value="Bloqué">Bloque</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -902,12 +914,20 @@
           <div id="isin-chart-empty" class="isin-chart-empty hidden">Pas de données de cours.</div>
         </div>
         <div id="isin-popover-holding"></div>
-        <div class="isin-popover-actions">
-          <button type="button" class="btn btn-secondary btn-sm" id="isin-refresh-btn">Actualiser</button>
+        <div class="isin-popover-actions" style="display:flex;flex-direction:column;gap:.5rem">
+          <div style="display:flex;gap:.4rem;align-items:center">
+            <button type="button" class="btn btn-secondary btn-sm" id="isin-refresh-btn">Actualiser</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="isin-reset-btn" title="Effacer ticker + cours (force re-resolution)">Reset</button>
+          </div>
           <div class="isin-ticker-row">
             <label>Ticker</label>
-            <input type="text" id="isin-ticker-input" placeholder="(auto-résolu)">
-            <button type="button" class="btn-icon" id="isin-ticker-save">Enregistrer</button>
+            <input type="text" id="isin-ticker-input" placeholder="(auto-resolu)" style="width:100px">
+            <button type="button" class="btn-icon" id="isin-ticker-save">OK</button>
+          </div>
+          <div class="isin-ticker-row">
+            <label>Prix manuel</label>
+            <input type="number" id="isin-price-input" placeholder="ex: 144.71" step="0.01" style="width:100px">
+            <button type="button" class="btn-icon" id="isin-price-save">OK</button>
           </div>
         </div>
       </div>
@@ -948,8 +968,9 @@
         <datalist id="holdings-isin-list"></datalist>
         <div class="modal-actions" style="justify-content:space-between;gap:.5rem;flex-wrap:wrap">
           <div style="display:flex;gap:.4rem">
-            <button type="button" class="btn btn-secondary" id="holdings-add-line">+ Ajouter une ligne</button>
-            <button type="button" class="btn btn-secondary" id="holdings-import-pdf">Importer PDF / CSV…</button>
+            <button type="button" class="btn btn-secondary" id="holdings-add-line">+ Ligne</button>
+            <button type="button" class="btn btn-secondary" id="holdings-import-pdf">Importer fichier…</button>
+            <button type="button" class="btn btn-secondary" id="holdings-paste-btn">Coller</button>
             <input type="file" id="holdings-pdf-input" accept="application/pdf,.pdf,.csv,text/csv" style="display:none">
           </div>
           <div style="display:flex;gap:.4rem">

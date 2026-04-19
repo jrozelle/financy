@@ -11,7 +11,7 @@ Flux en 2 temps :
 import logging
 from flask import Blueprint, jsonify, request
 from models import get_db, validate_isin, validate_number, validate_date
-from services.parsers import parse_pdf, parse_csv
+from services.parsers import parse_pdf, parse_csv, parse_pasted_text
 from services.parsers.common import PdfEncryptedError, PdfImageScanError
 from services.securities import upsert_security
 from auth import login_required, csrf_protect
@@ -55,6 +55,26 @@ def _enrich_with_prices(result):
     result.total_market_value = sum(l.market_value or 0 for l in result.lines)
     if enriched:
         logger.info('Price lookup: enriched %d/%d lines', enriched, len(result.lines))
+
+
+@pdf_import_bp.route('/api/envelope/<int:position_id>/import-paste', methods=['POST'])
+@login_required
+@csrf_protect
+def import_paste(position_id):
+    """Parse du texte colle depuis le navigateur."""
+    with get_db() as conn:
+        pos = conn.execute('SELECT id FROM positions WHERE id=?', (position_id,)).fetchone()
+    if not pos:
+        return jsonify({'error': 'Position introuvable'}), 404
+    d = request.json or {}
+    text = d.get('text', '')
+    if not text or len(text) < 20:
+        return jsonify({'error': 'Texte trop court ou vide.'}), 400
+    try:
+        result = parse_pasted_text(text)
+    except Exception as e:
+        return jsonify({'error': f'Echec du parsing : {e}'}), 400
+    return jsonify({'position_id': position_id, **result.to_dict()})
 
 
 @pdf_import_bp.route('/api/envelope/<int:position_id>/import-pdf', methods=['POST'])

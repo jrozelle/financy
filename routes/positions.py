@@ -64,16 +64,17 @@ def add_position():
         mob_override = d.get('mobilizable_pct_override')
         if mob_override is not None:
             mob_override = float(mob_override)
+        liq_override = d.get('liquidity_override') or None
         cur = conn.execute(
             '''INSERT INTO positions
                (date, owner, category, envelope, establishment, value, debt,
-                notes, entity, ownership_pct, debt_pct, mobilizable_pct_override)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)''',
+                notes, entity, ownership_pct, debt_pct, mobilizable_pct_override, liquidity_override)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)''',
             (d['date'], d['owner'], d['category'],
              d.get('envelope'), d.get('establishment'),
              stored_value, stored_debt,
              d.get('notes'), entity,
-             d.get('ownership_pct', 1.0), d.get('debt_pct', 1.0), mob_override)
+             d.get('ownership_pct', 1.0), d.get('debt_pct', 1.0), mob_override, liq_override)
         )
         row          = conn.execute('SELECT * FROM positions WHERE id=?', (cur.lastrowid,)).fetchone()
         entity_map   = get_entity_map(conn)
@@ -102,17 +103,18 @@ def update_position(pid):
         mob_override = d.get('mobilizable_pct_override')
         if mob_override is not None:
             mob_override = float(mob_override)
+        liq_override = d.get('liquidity_override') or None
         conn.execute(
             '''UPDATE positions SET
                date=?, owner=?, category=?, envelope=?, establishment=?,
                value=?, debt=?, notes=?, entity=?, ownership_pct=?, debt_pct=?,
-               mobilizable_pct_override=?
+               mobilizable_pct_override=?, liquidity_override=?
                WHERE id=?''',
             (d['date'], d['owner'], d['category'],
              d.get('envelope'), d.get('establishment'),
              stored_value, stored_debt,
              d.get('notes'), entity,
-             d.get('ownership_pct', 1.0), d.get('debt_pct', 1.0), mob_override, pid)
+             d.get('ownership_pct', 1.0), d.get('debt_pct', 1.0), mob_override, liq_override, pid)
         )
         row          = conn.execute('SELECT * FROM positions WHERE id=?', (pid,)).fetchone()
         entity_map   = get_entity_map(conn)

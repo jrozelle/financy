@@ -6,6 +6,16 @@ import { loadSynthese, loadHistorique } from './synthese.js';
 import { openHoldingsModal } from './holdings.js';
 import { refreshDates } from '../main.js';
 
+let _snapshotEnsured = false;
+async function ensureTodaySnapshot() {
+  if (_snapshotEnsured) return;
+  try {
+    await api('POST', '/api/auto-snapshot', {}, { silent: true });
+    await refreshDates();
+    _snapshotEnsured = true;
+  } catch {}
+}
+
 export async function loadPositions() {
   if (!S.positionsDate && S.dates.length) S.positionsDate = S.dates[0];
   if (!S.positionsDate) {
@@ -143,7 +153,7 @@ function renderPositionsTree(allPositions) {
     return;
   }
 
-  const etablKey = p => p.entity ? `Entité : ${p.entity}` : (p.establishment || '(Sans établissement)');
+  const etablKey = p => p.entity ? `Entité : ${p.entity}` : (p.establishment || 'Biens personnels');
 
   let html = '';
   for (const owner of S.config.owners) {
@@ -163,7 +173,8 @@ function renderPositionsTree(allPositions) {
       .map(([etabl, ePoses]) => {
         const etablNet   = ePoses.reduce((s, p) => s + (p.net_attributed || 0), 0);
         const isEntity   = etabl.startsWith('Entité : ');
-        const etablIcon  = isEntity ? '🏢' : '🏦';
+        const isPersonal = etabl === 'Biens personnels';
+        const etablIcon  = isEntity ? '🏢' : isPersonal ? '' : '🏦';
         const etablEntityName = isEntity ? etabl.replace(/^Entité : /, '') : '';
         const etablRealName   = isEntity ? '' : etabl;
 
@@ -177,6 +188,34 @@ function renderPositionsTree(allPositions) {
         const envHtml = Object.entries(byEnv)
           .sort((a, b) => b[1].reduce((s, p) => s + (p.net_attributed||0), 0) - a[1].reduce((s, p) => s + (p.net_attributed||0), 0))
           .map(([env, envPoses]) => {
+            // Pas d'enveloppe (biens personnels) : afficher les positions directement
+            if (env === '(Sans enveloppe)') {
+              const catHtml = [...envPoses]
+                .sort((a, b) => (b.net_attributed||0) - (a.net_attributed||0))
+                .map(p => {
+                  const ownPct = p.ownership_pct ?? 1;
+                  const pctBadge = ownPct < 0.999
+                    ? `<span class="badge badge-j27" style="font-size:10px">${Math.round(ownPct*100)}%</span>` : '';
+                  const mobMark = p.mobilizable_pct_override != null
+                    ? `<span title="Mobilisabilité surchargée : ${Math.round(p.mobilizable_pct_override*100)} %" style="font-size:11px;cursor:default;margin-left:3px;color:var(--warning)">⚠</span>` : '';
+                  const hasEntity = !!p.entity;
+                  const inlineVal = hasEntity
+                    ? `<span class="tree-amount ${p.net_attributed < 0 ? 'neg' : ''}">${fmt(p.net_attributed)}</span>`
+                    : `<span class="tree-inline-amount ${p.net_attributed < 0 ? 'neg' : ''}" title="Cliquer pour éditer la valeur" data-id="${p.id}" data-field="value" data-val="${p.value || 0}">${fmt(p.net_attributed)}</span>`;
+                  return `
+                    <div class="tree-row tree-pos-leaf" data-pos-id="${p.id}">
+                      <span class="tree-dot"></span>
+                      <span class="tree-label">${esc(p.category)}${p.notes ? ` <span style="font-weight:400;color:var(--text-muted);font-size:12px">— ${esc(p.notes.substring(0, 40))}</span>` : ''}${pctBadge}${mobMark}</span>
+                      <span class="tree-badges">${liqBadge(p.liquidity)}</span>
+                      ${inlineVal}
+                      <span class="tree-actions">
+                        <button class="btn-icon" data-action="edit-pos" data-id="${p.id}">Éditer</button>
+                        <button class="btn-icon del" data-action="del-pos" data-id="${p.id}">Suppr.</button>
+                      </span>
+                    </div>`;
+                }).join('');
+              return catHtml;
+            }
             const envNet   = envPoses.reduce((s, p) => s + (p.net_attributed || 0), 0);
             const envDebt  = envPoses.reduce((s, p) => s + (p.debt_attributed || 0), 0);
 
@@ -197,7 +236,7 @@ function renderPositionsTree(allPositions) {
                 return `
                   <div class="tree-row tree-pos-leaf" data-pos-id="${p.id}">
                     <span class="tree-dot"></span>
-                    <span class="tree-label">${esc(p.category)}${pctBadge}${notesMark}${mobMark}</span>
+                    <span class="tree-label">${!p.establishment && p.notes ? esc(p.notes.substring(0, 50)) : esc(p.category)}${pctBadge}${mobMark}</span>
                     <span class="tree-badges">${liqBadge(p.liquidity)}</span>
                     ${inlineVal}
                     <span class="tree-actions">
@@ -413,10 +452,11 @@ export function openPosModal(id = null, prefill = {}) {
     document.getElementById('pos-debt-pct').value      = Math.round((p.debt_pct ?? 1) * 100);
     document.getElementById('pos-entity-select').value = p.entity || '';
     document.getElementById('pos-notes').value         = p.notes || '';
-    const hasOverride = p.mobilizable_pct_override != null;
+    const hasOverride = p.mobilizable_pct_override != null || p.liquidity_override;
     document.getElementById('pos-mob-override-check').checked = hasOverride;
-    document.getElementById('pos-mob-override-field').style.display = hasOverride ? '' : 'none';
-    document.getElementById('pos-mob-override-pct').value = hasOverride ? Math.round(p.mobilizable_pct_override * 100) : 100;
+    document.getElementById('pos-mob-override-field').style.display = hasOverride ? 'flex' : 'none';
+    document.getElementById('pos-mob-override-pct').value = p.mobilizable_pct_override != null ? Math.round(p.mobilizable_pct_override * 100) : 100;
+    document.getElementById('pos-liquidity-override').value = p.liquidity_override || '';
     const hasPctFields = document.getElementById('pos-pct-fields');
     if (hasPctFields) hasPctFields.style.display = p.entity ? 'contents' : 'none';
     document.getElementById('pos-value').disabled = !!p.entity;
@@ -439,6 +479,7 @@ export function openPosModal(id = null, prefill = {}) {
     document.getElementById('pos-mob-override-check').checked = false;
     document.getElementById('pos-mob-override-field').style.display = 'none';
     document.getElementById('pos-mob-override-pct').value = 100;
+    document.getElementById('pos-liquidity-override').value = '';
     if (prefill.owner)         document.getElementById('pos-owner').value         = prefill.owner;
     if (prefill.establishment) document.getElementById('pos-establishment').value  = prefill.establishment;
     if (prefill.envelope)      document.getElementById('pos-envelope').value       = prefill.envelope;
@@ -532,6 +573,7 @@ export function updatePosInfo() {
 
 export async function savePosition(e) {
   e.preventDefault();
+  await ensureTodaySnapshot();
   const data = {
     date:          document.getElementById('pos-date').value,
     owner:         document.getElementById('pos-owner').value,
@@ -546,6 +588,9 @@ export async function savePosition(e) {
     notes:         document.getElementById('pos-notes').value || null,
     mobilizable_pct_override: document.getElementById('pos-mob-override-check').checked
       ? (parseFloat(document.getElementById('pos-mob-override-pct').value) || 0) / 100
+      : null,
+    liquidity_override: document.getElementById('pos-mob-override-check').checked
+      ? (document.getElementById('pos-liquidity-override').value || null)
       : null,
   };
 
