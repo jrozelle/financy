@@ -24,6 +24,11 @@ export async function loadPositions() {
   }
   S.positions = await api('GET', `/api/positions?date=${S.positionsDate}`);
   populateFilters();
+  // Sync filtre local avec le selecteur global
+  const globalOwner = S.syntheseOwner;
+  if (globalOwner && globalOwner !== 'Famille') {
+    document.getElementById('filter-owner').value = globalOwner;
+  }
   renderPositions();
 }
 

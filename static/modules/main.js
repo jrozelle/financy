@@ -201,7 +201,13 @@ function wireEvents() {
   // Positions buttons
   document.getElementById('btn-add-position').addEventListener('click', () => openPosModal());
   document.getElementById('btn-duplicate').addEventListener('click', duplicateSnapshot);
-  document.getElementById('filter-owner').addEventListener('change', renderPositions);
+  document.getElementById('filter-owner').addEventListener('change', () => {
+    const val = document.getElementById('filter-owner').value;
+    S.syntheseOwner = val || 'Famille';
+    const globalSel = document.getElementById('global-owner-filter');
+    if (globalSel) globalSel.value = S.syntheseOwner;
+    renderPositions();
+  });
   document.getElementById('filter-envelope').addEventListener('change', renderPositions);
   document.getElementById('filter-establishment').addEventListener('change', renderPositions);
   document.getElementById('btn-clear-filters').addEventListener('click', clearFilters);

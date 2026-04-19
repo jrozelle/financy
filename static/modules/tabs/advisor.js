@@ -14,7 +14,11 @@ export async function loadAdvisor() {
   if (sel.options.length !== owners.length) {
     sel.innerHTML = owners.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
   }
-  if (!_currentOwner || !owners.includes(_currentOwner)) {
+  // Sync avec le selecteur global
+  const globalOwner = S.syntheseOwner;
+  if (globalOwner && globalOwner !== 'Famille' && owners.includes(globalOwner)) {
+    _currentOwner = globalOwner;
+  } else if (!_currentOwner || !owners.includes(_currentOwner)) {
     _currentOwner = owners[0] || null;
   }
   sel.value = _currentOwner;
