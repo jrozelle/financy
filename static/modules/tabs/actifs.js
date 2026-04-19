@@ -1,7 +1,8 @@
 import { S } from '../state.js';
 import { api } from '../api.js';
-import { esc, fmt, fmtDate, destroyChart, getColors, chartBorderColor, sortArr, updateSortIndicators } from '../utils.js';
+import { esc, fmt, fmtDate, destroyChart, getColors, chartBorderColor, sortArr } from '../utils.js';
 import { openIsinPopover } from '../isin-popover.js';
+import { triggerPricesRefresh } from './tools.js';
 
 let _classChart = null;
 let _envelopeChart = null;
@@ -30,11 +31,11 @@ function _render() {
   const t = _data.totals;
   const lines = _data.lines || [];
 
-  document.getElementById('actifs-kpi-value').textContent = fmt(t.market_value || 0) + ' €';
-  document.getElementById('actifs-kpi-cost').textContent  = t.cost_basis ? fmt(t.cost_basis) + ' €' : '—';
+  document.getElementById('actifs-kpi-value').textContent = fmt(t.market_value || 0);
+  document.getElementById('actifs-kpi-cost').textContent  = t.cost_basis ? fmt(t.cost_basis) : '—';
   const pnlEl = document.getElementById('actifs-kpi-pnl');
   if (t.pnl != null) {
-    pnlEl.textContent = (t.pnl >= 0 ? '+' : '') + fmt(t.pnl) + ' €' + (t.pnl_pct != null ? ` (${t.pnl_pct.toFixed(2)}%)` : '');
+    pnlEl.textContent = (t.pnl >= 0 ? '+' : '') + fmt(t.pnl) + (t.pnl_pct != null ? ` (${t.pnl_pct.toFixed(2)}%)` : '');
     pnlEl.style.color = t.pnl >= 0 ? 'var(--success)' : 'var(--danger)';
   } else {
     pnlEl.textContent = '—'; pnlEl.style.color = '';
@@ -55,7 +56,7 @@ function _renderTable(lines) {
     return;
   }
   empty.style.display = 'none';
-  const sorted = sortArr([...lines], _sortCol, _sortDesc);
+  const sorted = sortArr([...lines], _sortCol, _sortDesc ? -1 : 1);
   tbody.innerHTML = sorted.map(l => {
     const pnl = l.pnl;
     const pnlCls = pnl == null ? '' : pnl >= 0 ? 'pos' : 'neg';
@@ -67,7 +68,7 @@ function _renderTable(lines) {
       <td>${esc(l.name || '—')}</td>
       <td>${esc(l.asset_class || '—')}</td>
       <td>${esc((l.envelopes || []).join(', ') || '—')}</td>
-      <td class="num">${fmt(l.quantity)}</td>
+      <td class="num">${new Intl.NumberFormat('fr-FR').format(l.quantity)}</td>
       <td class="num">${l.avg_cost != null ? fmt(l.avg_cost) : '—'}</td>
       <td class="num">${l.last_price != null ? fmt(l.last_price) : '—'}</td>
       <td class="num">${fmt(l.market_value)}</td>
@@ -76,18 +77,30 @@ function _renderTable(lines) {
       <td>${fresh}</td>
     </tr>`;
   }).join('');
-  updateSortIndicators('actifs-thead', _sortCol, _sortDesc);
+  const thead = document.getElementById('actifs-thead');
+  if (thead) {
+    thead.querySelectorAll('th[data-sort]').forEach(th => {
+      th.classList.remove('sort-asc', 'sort-desc');
+      if (th.dataset.sort === _sortCol) th.classList.add(_sortDesc ? 'sort-desc' : 'sort-asc');
+    });
+  }
 }
 
 function _freshnessBadge(l) {
   if (!l.is_priceable) {
     return '<span class="h-badge h-badge-muted" title="Non coté">non coté</span>';
   }
-  if (!l.last_price_date) return '';
-  const ageDays = (Date.now() - new Date(l.last_price_date).getTime()) / (1000 * 3600 * 24);
-  if (isNaN(ageDays)) return '';
-  const cls = ageDays < 1 ? 'h-badge-fresh' : ageDays < 7 ? 'h-badge-stale' : 'h-badge-expired';
-  const lbl = ageDays < 1 ? 'à jour' : ageDays < 7 ? 'vieillissant' : 'périmé';
+  if (!l.last_price_date) return '<span class="h-badge h-badge-expired" title="Jamais rafraichi">inconnu</span>';
+  const ageMs = Date.now() - new Date(l.last_price_date + 'T23:59:59').getTime();
+  if (isNaN(ageMs)) return '<span class="h-badge h-badge-expired">inconnu</span>';
+  const ageHours = ageMs / (1000 * 3600);
+  let cls, lbl;
+  if (ageHours < 1)       { cls = 'h-badge-fresh'; lbl = '<1h'; }
+  else if (ageHours < 12) { cls = 'h-badge-fresh'; lbl = `${Math.floor(ageHours)}h`; }
+  else if (ageHours < 24) { cls = 'h-badge-fresh'; lbl = '<1j'; }
+  else if (ageHours < 48) { cls = 'h-badge-stale'; lbl = '1j'; }
+  else if (ageHours < 168){ cls = 'h-badge-stale'; lbl = `${Math.floor(ageHours / 24)}j`; }
+  else                    { cls = 'h-badge-expired'; lbl = `${Math.floor(ageHours / 24)}j`; }
   return `<span class="h-badge ${cls}" title="${esc(l.last_price_date)}">${lbl}</span>`;
 }
 
@@ -99,7 +112,7 @@ function _pieDataset(breakdown, colors) {
     datasets: [{
       data: breakdown.map(b => b.market_value),
       backgroundColor: breakdown.map((_, i) => colors[i % colors.length] + 'cc'),
-      borderColor: 'var(--card)',
+      borderColor: chartBorderColor(),
       borderWidth: 1.5,
     }],
   };
@@ -117,7 +130,7 @@ function _pieOptions() {
             const b = _data?.breakdowns?.asset_class?.[ctx.dataIndex]
                    || _data?.breakdowns?.envelope?.[ctx.dataIndex]
                    || {};
-            return ` ${ctx.label} : ${fmt(ctx.parsed)} € (${b.weight_pct ?? '—'}%)`;
+            return ` ${ctx.label} : ${fmt(ctx.parsed)} (${b.weight_pct ?? '—'}%)`;
           },
         },
       },
@@ -154,6 +167,11 @@ function _renderEnvelopeChart(breakdown) {
 export function wireActifsEvents() {
   const sel = document.getElementById('actifs-owner-filter');
   sel?.addEventListener('change', loadActifs);
+
+  document.getElementById('actifs-refresh-prices')?.addEventListener('click', async () => {
+    await triggerPricesRefresh(false);
+    loadActifs();
+  });
 
   document.getElementById('actifs-tbody')?.addEventListener('click', e => {
     const btn = e.target.closest('[data-action="open-popover"]');

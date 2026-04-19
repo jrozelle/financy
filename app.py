@@ -58,7 +58,7 @@ def _env_int(key, default, min_val=1, max_val=None):
         logger.warning('%s invalide — valeur par défaut %s', key, default)
         return default
 
-_session_minutes = _env_int('SESSION_TIMEOUT_MINUTES', 60, min_val=5, max_val=1440)
+_session_minutes = _env_int('SESSION_TIMEOUT_MINUTES', 21600, min_val=5, max_val=21600)
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=_session_minutes)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
@@ -137,9 +137,14 @@ def ensure_csrf_token():
 
 # ─── Index ────────────────────────────────────────────────────────────────────
 
+TAB_ROUTES = ['synthese', 'positions', 'actifs', 'flux', 'entites', 'conseil',
+              'referentiel', 'tools', 'import']
+
+
 @app.route('/')
+@app.route('/<tab>')
 @login_required
-def index():
+def index(tab=None):
     return render_template('index.html', has_auth=bool(AUTH_PASSWORD), csrf_token=session.get('csrf_token', ''))
 
 

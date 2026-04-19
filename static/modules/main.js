@@ -21,6 +21,7 @@ import { importXlsx, importJson, exportJson, resetDb, initDemoToggle, createBack
 import { loadReferential, saveReferential, initTemplateSelect } from './tabs/referentiel.js';
 import { loadTimeline, wireSimulation, triggerAutoSnapshot, triggerPricesRefresh, loadSchedulerStatus } from './tabs/tools.js';
 import { wireGlobalSearch } from './search.js';
+import { wireSettingsEvents } from './settings.js';
 
 // ─── Init ─────────────────────────────────────────────────────────────────
 
@@ -32,7 +33,7 @@ async function init() {
   wireGlobalSearch(switchTab);
   await Promise.all([refreshDates(), loadEntities(), loadHistorique(), loadTargets(), loadUserAlertsAsync()]);
   await migrateLocalStorageToDB();
-  await switchTab('synthese');
+  await switchTab(_tabFromUrl() || 'synthese', { pushHistory: false });
   initDemoToggle();
 }
 
@@ -99,13 +100,27 @@ function hideLoading(tabId) {
 
 // ─── Tabs ─────────────────────────────────────────────────────────────────
 
-export async function switchTab(tab) {
+const VALID_TABS = new Set([
+  'synthese', 'positions', 'actifs', 'flux', 'entites', 'conseil',
+  'referentiel', 'tools', 'import',
+]);
+
+function _tabFromUrl() {
+  const path = location.pathname.replace(/^\//, '');
+  return VALID_TABS.has(path) ? path : null;
+}
+
+export async function switchTab(tab, { pushHistory = true } = {}) {
   S.currentTab = tab;
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
   document.getElementById(`tab-${tab}`).classList.remove('hidden');
   const mainBtn = document.querySelector(`.nav-tabs .tab-btn[data-tab="${tab}"]`);
   if (mainBtn) mainBtn.classList.add('active');
+
+  if (pushHistory && location.pathname !== `/${tab}`) {
+    history.pushState({ tab }, '', `/${tab}`);
+  }
 
   const dd = document.getElementById('settings-dropdown');
   if (dd) dd.classList.add('hidden');
@@ -132,6 +147,12 @@ function wireEvents() {
   // Tabs
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
+
+  // Browser back/forward
+  window.addEventListener('popstate', e => {
+    const tab = e.state?.tab || _tabFromUrl() || 'synthese';
+    switchTab(tab, { pushHistory: false });
   });
 
   // Date selects (with spinner)
@@ -247,7 +268,8 @@ function wireEvents() {
     settingsDropdown.addEventListener('click', e => {
       const item = e.target.closest('.settings-item');
       if (!item) return;
-      switchTab(item.dataset.tab);
+      settingsDropdown.classList.add('hidden');
+      if (item.dataset.tab) switchTab(item.dataset.tab);
     });
     document.addEventListener('click', e => {
       if (!e.target.closest('#settings-menu')) {
@@ -335,9 +357,10 @@ function wireEvents() {
   wireIsinPopoverEvents();
   wireAdvisorEvents();
   wireActifsEvents();
+  wireSettingsEvents();
 
   // Focus traps on static modals
-  ['position-modal', 'flux-modal', 'entity-modal', 'targets-modal', 'holdings-modal'].forEach(trapModalFocus);
+  ['position-modal', 'flux-modal', 'entity-modal', 'targets-modal', 'holdings-modal', 'settings-modal'].forEach(trapModalFocus);
 
   // Keyboard shortcuts
   document.addEventListener('keydown', e => {

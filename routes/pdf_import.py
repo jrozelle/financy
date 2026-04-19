@@ -1,8 +1,8 @@
-"""Route d'import de holdings via PDF (phase 4).
+"""Route d'import de holdings via PDF ou CSV (phase 4).
 
 Flux en 2 temps :
 1. POST /api/envelope/<position_id>/import-pdf?step=preview
-   - Upload du PDF, parsing, renvoie les lignes detectees + warnings.
+   - Upload du PDF ou CSV, parsing, renvoie les lignes detectees + warnings.
    - Ne modifie rien en base. L'utilisateur corrige dans la modale UI.
 2. POST /api/envelope/<position_id>/import-pdf?step=commit
    - Recoit la liste des lignes validees/corrigees (JSON),
@@ -11,7 +11,8 @@ Flux en 2 temps :
 import logging
 from flask import Blueprint, jsonify, request
 from models import get_db, validate_isin, validate_number, validate_date
-from services.pdf_parser import parse_pdf, PdfEncryptedError, PdfImageScanError
+from services.parsers import parse_pdf, parse_csv
+from services.parsers.common import PdfEncryptedError, PdfImageScanError
 from services.securities import upsert_security
 from auth import login_required, csrf_protect
 
@@ -19,6 +20,41 @@ logger = logging.getLogger('financy')
 pdf_import_bp = Blueprint('pdf_import', __name__)
 
 MAX_PDF_SIZE = 5 * 1024 * 1024  # 5 MB
+
+
+def _enrich_with_prices(result):
+    """Lookup live prices for lines missing market_value."""
+    try:
+        from services.prices import get_provider
+        provider = get_provider()
+    except Exception:
+        result.warnings.append('Impossible de charger le provider de cours.')
+        return
+
+    enriched = 0
+    for line in result.lines:
+        if line.market_value is not None or not line.quantity:
+            continue
+        try:
+            ticker, _ = provider.resolve_ticker(line.isin, name=line.name)
+            if not ticker:
+                result.warnings.append(f'{line.isin} : ticker non trouve.')
+                continue
+            price_data = provider.fetch_last_price(ticker)
+            if not price_data:
+                result.warnings.append(f'{line.isin} : cours indisponible.')
+                continue
+            price, price_date = price_data
+            line.unit_price = round(price, 4)
+            line.market_value = round(line.quantity * price, 2)
+            line.confidence = min(line.confidence + 0.1, 1.0)
+            enriched += 1
+        except Exception as e:
+            logger.debug('Price lookup failed for %s: %s', line.isin, e)
+
+    result.total_market_value = sum(l.market_value or 0 for l in result.lines)
+    if enriched:
+        logger.info('Price lookup: enriched %d/%d lines', enriched, len(result.lines))
 
 
 @pdf_import_bp.route('/api/envelope/<int:position_id>/import-pdf', methods=['POST'])
@@ -40,18 +76,18 @@ def import_pdf(position_id):
 
 
 def _preview(position_id):
-    """Upload du PDF + parsing, renvoie lignes detectees."""
+    """Upload du PDF ou CSV + parsing, renvoie lignes detectees."""
     if 'file' not in request.files:
         return jsonify({'error': 'Aucun fichier recu'}), 400
     file = request.files['file']
     if not file.filename:
         return jsonify({'error': 'Nom de fichier vide'}), 400
-    if not file.filename.lower().endswith('.pdf'):
-        return jsonify({'error': 'Seuls les fichiers .pdf sont acceptes'}), 400
-    # MIME check (best effort : les navigateurs mentent parfois)
-    mime = (file.mimetype or '').lower()
-    if mime and mime != 'application/pdf':
-        return jsonify({'error': f'Type MIME invalide : {mime}'}), 400
+
+    filename_lower = file.filename.lower()
+    is_csv = filename_lower.endswith('.csv')
+    is_pdf = filename_lower.endswith('.pdf')
+    if not is_csv and not is_pdf:
+        return jsonify({'error': 'Formats acceptes : .pdf ou .csv'}), 400
 
     data = file.read(MAX_PDF_SIZE + 1)
     if len(data) > MAX_PDF_SIZE:
@@ -60,14 +96,22 @@ def _preview(position_id):
         return jsonify({'error': 'Fichier vide'}), 400
 
     try:
-        result = parse_pdf(data)
+        if is_csv:
+            result = parse_csv(data)
+        else:
+            result = parse_pdf(data)
     except PdfEncryptedError as e:
         return jsonify({'error': str(e)}), 400
     except PdfImageScanError as e:
         return jsonify({'error': str(e)}), 422
     except Exception as e:
-        logger.warning('parse_pdf failed: %s', e, exc_info=True)
-        return jsonify({'error': "Echec du parsing — format inattendu. Saisie manuelle possible."}), 400
+        logger.warning('parse failed: %s', e, exc_info=True)
+        kind = 'CSV' if is_csv else 'PDF'
+        return jsonify({'error': f"Echec du parsing {kind} — verifiez le format du fichier."}), 400
+
+    # Price lookup for formats without prices (e.g. attestation de detention)
+    if result.needs_price_lookup:
+        _enrich_with_prices(result)
 
     return jsonify({
         'position_id': position_id,
@@ -75,8 +119,55 @@ def _preview(position_id):
     })
 
 
+# Mapping asset_class → categorie position pour l'auto-split
+_ASSET_CLASS_TO_CATEGORY = {
+    'etf':         'Actions',
+    'action':      'Actions',
+    'opcvm':       'Actions',
+    'obligation':  'Obligations',
+    'fonds_euros': 'Fond Euro',
+    'scpi':        'Immobilier',
+    'sci':         'Immobilier',
+    'cash':        'Cash & dépôts',
+}
+
+
+def _infer_category(isin, name):
+    """Infere la categorie position depuis l'ISIN/nom du holding."""
+    from services.securities import _infer_asset_class
+    ac = _infer_asset_class(name)
+    return _ASSET_CLASS_TO_CATEGORY.get(ac, 'Actions')
+
+
+def _find_or_create_position(conn, base_pos, category):
+    """Trouve une position compagnon (meme date/owner/envelope/etablissement)
+    avec la bonne categorie, ou en cree une."""
+    row = conn.execute(
+        '''SELECT id FROM positions
+           WHERE date=? AND owner=? AND envelope=? AND category=?
+                 AND COALESCE(establishment,'')=?''',
+        (base_pos['date'], base_pos['owner'], base_pos['envelope'],
+         category, base_pos['establishment'] or '')
+    ).fetchone()
+    if row:
+        return row['id']
+    cur = conn.execute(
+        '''INSERT INTO positions (date, owner, category, envelope, establishment, value, debt)
+           VALUES (?,?,?,?,?,0,0)''',
+        (base_pos['date'], base_pos['owner'], category,
+         base_pos['envelope'], base_pos['establishment'])
+    )
+    logger.info('Auto-split: created position %s/%s/%s (id=%d)',
+                base_pos['owner'], base_pos['envelope'], category, cur.lastrowid)
+    return cur.lastrowid
+
+
 def _commit(position_id):
-    """Valide et insere (full replace) les holdings corriges."""
+    """Valide et insere (full replace) les holdings corriges.
+
+    Auto-split : si les holdings ont des asset_classes mixtes (ex: ETF + fonds euro),
+    les lignes sont reparties dans des positions compagnons par categorie.
+    """
     d = request.json or {}
     items = d.get('holdings')
     if not isinstance(items, list):
@@ -117,23 +208,62 @@ def _commit(position_id):
 
     with get_db() as conn:
         conn.execute('BEGIN IMMEDIATE')
-        conn.execute('DELETE FROM holdings WHERE position_id=?', (position_id,))
+
+        # Upsert toutes les securities
         for item in validated:
-            isin = item['isin']
             upsert_security(
-                conn, isin,
+                conn, item['isin'],
                 name=item.get('name') or None,
                 is_priceable=item.get('is_priceable'),
                 data_source='pdf-import',
             )
-            conn.execute(
-                '''INSERT INTO holdings
-                   (position_id, isin, quantity, cost_basis, market_value, as_of_date)
-                   VALUES (?,?,?,?,?,?)''',
-                (position_id, isin, item['quantity'],
-                 item['cost_basis'], item['market_value'], item['as_of_date'])
-            )
 
+        # Lire la position de base
+        base_pos = conn.execute(
+            'SELECT * FROM positions WHERE id=?', (position_id,)
+        ).fetchone()
+        base_pos = dict(base_pos)
+
+        # Grouper les holdings par categorie inferee
+        by_category = {}
+        for item in validated:
+            cat = _infer_category(item['isin'], item['name'])
+            by_category.setdefault(cat, []).append(item)
+
+        categories = list(by_category.keys())
+        touched_positions = []
+
+        if len(categories) == 1:
+            # Pas de split — import simple dans la position d'origine
+            conn.execute('DELETE FROM holdings WHERE position_id=?', (position_id,))
+            for item in validated:
+                conn.execute(
+                    '''INSERT INTO holdings
+                       (position_id, isin, quantity, cost_basis, market_value, as_of_date)
+                       VALUES (?,?,?,?,?,?)''',
+                    (position_id, item['isin'], item['quantity'],
+                     item['cost_basis'], item['market_value'], item['as_of_date'])
+                )
+            touched_positions.append(position_id)
+        else:
+            # Auto-split : repartir dans des positions par categorie
+            for cat, cat_items in by_category.items():
+                if cat == base_pos['category']:
+                    pid = position_id
+                else:
+                    pid = _find_or_create_position(conn, base_pos, cat)
+                conn.execute('DELETE FROM holdings WHERE position_id=?', (pid,))
+                for item in cat_items:
+                    conn.execute(
+                        '''INSERT INTO holdings
+                           (position_id, isin, quantity, cost_basis, market_value, as_of_date)
+                           VALUES (?,?,?,?,?,?)''',
+                        (pid, item['isin'], item['quantity'],
+                         item['cost_basis'], item['market_value'], item['as_of_date'])
+                    )
+                touched_positions.append(pid)
+
+        # Retourner les holdings de la position principale
         holdings = conn.execute(
             '''SELECT h.*, s.name AS sec_name, s.ticker AS sec_ticker,
                       s.currency AS sec_currency, s.is_priceable AS sec_is_priceable
@@ -142,10 +272,14 @@ def _commit(position_id):
             (position_id,)
         ).fetchall()
 
-    logger.info('PDF import commit: position_id=%d, %d holdings',
-                position_id, len(validated))
+    split_msg = ''
+    if len(categories) > 1:
+        split_msg = f' (auto-split en {len(categories)} categories : {", ".join(categories)})'
+    logger.info('Import commit: position_id=%d, %d holdings%s',
+                position_id, len(validated), split_msg)
     return jsonify({
         'position_id': position_id,
         'count': len(validated),
         'holdings': [dict(r) for r in holdings],
+        'split_categories': categories if len(categories) > 1 else None,
     })

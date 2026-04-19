@@ -7,6 +7,10 @@ import { loadUserAlerts } from '../alerts.js';
 import { renderAllocationTargets } from '../targets.js';
 import { toast, promptDialog } from '../dialogs.js';
 
+function _owners() {
+  return S.synthese?._owners || S.config.owners;
+}
+
 export async function loadSynthese() {
   if (!S.syntheseDate && S.dates.length) S.syntheseDate = S.dates[0];
   if (!S.syntheseDate) return;
@@ -15,8 +19,15 @@ export async function loadSynthese() {
     api('GET', `/api/positions?date=${S.syntheseDate}`),
     loadWealthTarget(),
   ]);
+  // Build owner list: union of config owners + actual data owners
+  const dataOwners = [...new Set(positions.map(p => p.owner))];
+  const allOwners = [...S.config.owners];
+  for (const o of dataOwners) {
+    if (!allOwners.includes(o)) allOwners.push(o);
+  }
+  syn._owners = allOwners;
   syn._positions_cache = {};
-  for (const o of S.config.owners) {
+  for (const o of allOwners) {
     syn._positions_cache[o] = positions.filter(p => p.owner === o);
   }
   S.synthese = syn;
@@ -26,7 +37,7 @@ export async function loadSynthese() {
 
 export function renderSynthesePersonTabs() {
   const container = document.getElementById('synthese-person-tabs');
-  container.innerHTML = ['Famille', ...S.config.owners].map(o => `
+  container.innerHTML = ['Famille', ..._owners()].map(o => `
     <button class="person-tab-btn ${S.syntheseOwner === o ? 'active' : ''}"
             data-owner="${esc(o)}">${esc(o)}</button>
   `).join('');
@@ -114,7 +125,7 @@ export function renderSynthese() {
 function renderOwnersTable(byOwner, family, totalMob) {
   const activeOwner = S.syntheseOwner;
   const familyNet = family.net || 0;
-  const rows = S.config.owners.map(o => {
+  const rows = _owners().map(o => {
     const t = byOwner[o] || { gross: 0, debt: 0, net: 0, mobilizable: 0 };
     const pct = familyNet !== 0 ? ((t.net / familyNet) * 100).toFixed(1) : '—';
     const highlight = (activeOwner !== 'Famille' && activeOwner === o)
@@ -353,7 +364,7 @@ function renderHistChart(filterOwner = 'Famille') {
   let datasets;
   if (filterOwner === 'Famille') {
     const famData = S.historique.map(h => h.family_net);
-    const ownerSets = S.config.owners.map((o, i) => ({
+    const ownerSets = _owners().map((o, i) => ({
       label: o,
       data: S.historique.map(h => h.by_owner[o] || 0),
       borderColor: colors[i],
@@ -367,7 +378,7 @@ function renderHistChart(filterOwner = 'Famille') {
       ...ownerSets,
     ];
   } else {
-    const i = S.config.owners.indexOf(filterOwner);
+    const i = _owners().indexOf(filterOwner);
     datasets = [{
       label: filterOwner,
       data: S.historique.map(h => h.by_owner[filterOwner] || 0),
@@ -394,7 +405,7 @@ function renderHistChart(filterOwner = 'Famille') {
         // If clicked on an owner line, drill down that owner; otherwise show all
         const dsIdx = elements[0].datasetIndex;
         const clickedLabel = datasets[dsIdx]?.label;
-        const isOwnerLine = clickedLabel && clickedLabel !== 'Famille' && S.config.owners.includes(clickedLabel);
+        const isOwnerLine = clickedLabel && clickedLabel !== 'Famille' && _owners().includes(clickedLabel);
         api('GET', `/api/positions?date=${h.date}`).then(positions => {
           const filtered = isOwnerLine ? positions.filter(p => p.owner === clickedLabel) : positions;
           const title = isOwnerLine ? clickedLabel : 'Famille';

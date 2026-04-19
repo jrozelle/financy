@@ -29,8 +29,8 @@ class TestMockProvider:
     def test_deterministic_ticker_and_price(self):
         from services.prices import MockProvider
         p = MockProvider()
-        t1 = p.resolve_ticker('FR0010315770')
-        t2 = p.resolve_ticker('FR0010315770')
+        t1, qt1 = p.resolve_ticker('FR0010315770')
+        t2, qt2 = p.resolve_ticker('FR0010315770')
         assert t1 == t2  # deterministe
         price1 = p.fetch_last_price(t1)
         price2 = p.fetch_last_price(t1)

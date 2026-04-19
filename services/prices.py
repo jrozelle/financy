@@ -34,8 +34,8 @@ class PriceProvider(ABC):
     name = 'abstract'
 
     @abstractmethod
-    def resolve_ticker(self, isin):
-        """Retourne le ticker correspondant a l'ISIN, ou None si introuvable."""
+    def resolve_ticker(self, isin, name=None):
+        """Retourne (ticker, quote_type) ou (None, None)."""
         ...
 
     @abstractmethod
@@ -70,23 +70,38 @@ class YahooProvider(PriceProvider):
             cls._session = s
         return cls._session
 
-    def resolve_ticker(self, isin):
-        """Interroge l'endpoint Yahoo search pour trouver le ticker."""
+    def _yahoo_search(self, query):
+        """Recherche Yahoo Finance, retourne (ticker, quoteType) ou (None, None)."""
         try:
             s = self._get_session()
-            url = f'https://query1.finance.yahoo.com/v1/finance/search?q={isin}&quotesCount=5&newsCount=0'
+            url = f'https://query1.finance.yahoo.com/v1/finance/search?q={query}&quotesCount=5&newsCount=0'
             resp = s.get(url, timeout=HTTP_TIMEOUT)
             resp.raise_for_status()
             data = resp.json()
-            quotes = data.get('quotes', [])
-            # Priorite : match exact ISIN, puis premier resultat coherent
-            for q in quotes:
+            for q in data.get('quotes', []):
                 sym = q.get('symbol')
                 if sym:
-                    return sym
+                    return sym, q.get('quoteType')
         except Exception as e:
-            logger.warning('resolve_ticker(%s) failed: %s', isin, e)
-        return None
+            logger.debug('yahoo_search(%s) failed: %s', query, e)
+        return None, None
+
+    def resolve_ticker(self, isin, name=None):
+        """Recherche par ISIN, puis fallback par nom si echec.
+
+        Retourne (ticker, quote_type) ou (None, None).
+        """
+        ticker, qt = self._yahoo_search(isin)
+        if ticker:
+            return ticker, qt
+        # Fallback : recherche par nom du titre
+        if name:
+            logger.info('resolve_ticker(%s): ISIN not found, trying name "%s"', isin, name)
+            ticker, qt = self._yahoo_search(name)
+            if ticker:
+                return ticker, qt
+        logger.warning('resolve_ticker(%s): not found (ISIN + name)', isin)
+        return None, None
 
     def fetch_last_price(self, ticker):
         try:
@@ -129,8 +144,8 @@ class MockProvider(PriceProvider):
     """Cours deterministes derives de l'ISIN. Aucun appel reseau."""
     name = 'mock'
 
-    def resolve_ticker(self, isin):
-        return f'MOCK_{isin[:6].replace("_", "")}' if isin else None
+    def resolve_ticker(self, isin, name=None):
+        return (f'MOCK_{isin[:6].replace("_", "")}', 'EQUITY') if isin else (None, None)
 
     def _seed_price(self, ticker):
         base = sum(ord(c) for c in (ticker or 'X'))
@@ -151,6 +166,21 @@ class MockProvider(PriceProvider):
             variation = math.sin(i / 7) * 0.05 * base  # +-5%
             out.append((d.strftime('%Y-%m-%d'), round(base + variation, 2)))
         return out
+
+
+_QUOTE_TYPE_MAP = {
+    'ETF': 'etf',
+    'EQUITY': 'action',
+    'MUTUALFUND': 'opcvm',
+    'INDEX': 'autre',
+}
+
+
+def _quote_type_to_asset_class(quote_type):
+    """Convertit un Yahoo quoteType en asset_class interne, ou None."""
+    if not quote_type:
+        return None
+    return _QUOTE_TYPE_MAP.get(quote_type.upper())
 
 
 # ─── Selection automatique ───────────────────────────────────────────────────
@@ -200,7 +230,7 @@ def refresh_securities(conn, provider=None, only_stale=False, stale_hours=20):
 
     stats = {'refreshed': 0, 'skipped': 0, 'errors': 0, 'resolved_tickers': 0}
     rows = conn.execute(
-        'SELECT isin, ticker, last_price_date FROM securities WHERE is_priceable=1'
+        'SELECT isin, name, ticker, last_price_date FROM securities WHERE is_priceable=1'
     ).fetchall()
 
     if only_stale:
@@ -226,12 +256,17 @@ def refresh_securities(conn, provider=None, only_stale=False, stale_hours=20):
 
         # Resolution lazy du ticker si absent
         if not ticker:
-            ticker = provider.resolve_ticker(isin)
+            ticker, quote_type = provider.resolve_ticker(isin, name=row['name'])
             if ticker:
-                conn.execute(
-                    'UPDATE securities SET ticker=?, updated_at=CURRENT_TIMESTAMP WHERE isin=?',
-                    (ticker, isin)
-                )
+                updates = ['ticker=?', 'updated_at=CURRENT_TIMESTAMP']
+                params = [ticker]
+                # Enrichir asset_class depuis Yahoo quoteType
+                ac = _quote_type_to_asset_class(quote_type)
+                if ac:
+                    updates.insert(1, 'asset_class=CASE WHEN asset_class IN (?, ?) THEN ? ELSE asset_class END')
+                    params.extend(['autre', '', ac])
+                params.append(isin)
+                conn.execute(f'UPDATE securities SET {", ".join(updates)} WHERE isin=?', params)
                 stats['resolved_tickers'] += 1
             else:
                 stats['skipped'] += 1
@@ -276,13 +311,14 @@ def refresh_history(conn, isin, period='30d', provider=None):
         provider = get_provider()
 
     row = conn.execute(
-        'SELECT isin, ticker, is_priceable FROM securities WHERE isin=?', (isin,)
+        'SELECT isin, name, ticker, is_priceable FROM securities WHERE isin=?', (isin,)
     ).fetchone()
     if not row or not row['is_priceable']:
         return []
     ticker = row['ticker']
     if not ticker:
-        ticker = provider.resolve_ticker(isin)
+        sec_name = row['name'] if row else None
+        ticker, _ = provider.resolve_ticker(isin, name=sec_name)
         if ticker:
             conn.execute(
                 'UPDATE securities SET ticker=?, updated_at=CURRENT_TIMESTAMP WHERE isin=?',

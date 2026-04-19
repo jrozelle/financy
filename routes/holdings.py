@@ -9,6 +9,19 @@ holdings_bp = Blueprint('holdings', __name__)
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
+_ASSET_CLASS_LABELS = {
+    'etf': 'ETF', 'opcvm': 'OPCVM', 'scpi': 'SCPI', 'sci': 'SCI',
+    'action': 'Action', 'fonds_euros': 'Fonds euros', 'cash': 'Cash',
+    'obligation': 'Obligation', 'autre': 'Autre',
+}
+
+
+def _asset_class_label(raw):
+    if not raw:
+        return 'Autre'
+    return _ASSET_CLASS_LABELS.get(raw.lower(), raw.capitalize())
+
+
 def _normalize_isin(raw):
     """Normalise un ISIN (trim + upper). Retourne None si invalide."""
     if not raw or not isinstance(raw, str):
@@ -55,7 +68,7 @@ def _holding_row_to_dict(row):
         'name':            row['sec_name'],
         'ticker':          row['sec_ticker'],
         'currency':        row['sec_currency'],
-        'asset_class':     row['sec_asset_class'],
+        'asset_class':     _asset_class_label(row['sec_asset_class']),
         'is_priceable':    bool(row['sec_is_priceable']) if row['sec_is_priceable'] is not None else True,
         'last_price':      row['sec_last_price'],
         'last_price_date': row['sec_last_price_date'],
@@ -331,7 +344,7 @@ def get_consolidated():
             'name':            r['name'],
             'ticker':          r['ticker'],
             'currency':        r['currency'] or 'EUR',
-            'asset_class':     r['asset_class'] or 'autre',
+            'asset_class':     _asset_class_label(r['asset_class']),
             'is_priceable':    bool(is_priceable),
             'last_price':      r['last_price'],
             'last_price_date': r['last_price_date'],
@@ -375,7 +388,7 @@ def get_consolidated():
     def _group(attr):
         agg = {}
         for l in lines:
-            k = l.get(attr) or 'autre'
+            k = l.get(attr) or 'Autre'
             agg[k] = agg.get(k, 0) + l['market_value']
         return [{'label': k, 'market_value': round(v, 2),
                  'weight_pct': round(v / total_mv * 100, 2) if total_mv else 0}
@@ -383,9 +396,9 @@ def get_consolidated():
 
     by_envelope_agg = {}
     for l in lines:
-        for env in (l['envelopes'] or ['autre']):
+        for env in (l['envelopes'] or ['Autre']):
             # Pour une ligne presente sur N enveloppes, on divise equitablement (approximation)
-            share = l['market_value'] / max(1, len(l['envelopes'] or ['autre']))
+            share = l['market_value'] / max(1, len(l['envelopes'] or ['Autre']))
             by_envelope_agg[env] = by_envelope_agg.get(env, 0) + share
     envelope_breakdown = [
         {'label': k, 'market_value': round(v, 2),

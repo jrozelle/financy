@@ -179,16 +179,26 @@ def resolve_ticker(isin):
     if not validate_isin(isin):
         return jsonify({'error': 'ISIN invalide'}), 400
     provider = get_provider()
-    ticker = provider.resolve_ticker(isin)
+    with get_db() as conn:
+        row = conn.execute('SELECT isin, name FROM securities WHERE isin=?', (isin,)).fetchone()
+        if not row:
+            return jsonify({'error': 'Security introuvable'}), 404
+    ticker, quote_type = provider.resolve_ticker(isin, name=row['name'])
     if not ticker:
         return jsonify({'error': 'Ticker introuvable sur le provider',
                         'provider': provider.name}), 404
+    from services.prices import _quote_type_to_asset_class
     with get_db() as conn:
-        row = conn.execute('SELECT isin FROM securities WHERE isin=?', (isin,)).fetchone()
-        if not row:
-            return jsonify({'error': 'Security introuvable'}), 404
-        conn.execute(
-            'UPDATE securities SET ticker=?, updated_at=CURRENT_TIMESTAMP WHERE isin=?',
-            (ticker, isin)
-        )
-    return jsonify({'isin': isin, 'ticker': ticker, 'provider': provider.name})
+        ac = _quote_type_to_asset_class(quote_type)
+        if ac:
+            conn.execute(
+                '''UPDATE securities SET ticker=?, asset_class=CASE WHEN asset_class IN ('autre','') THEN ? ELSE asset_class END,
+                   updated_at=CURRENT_TIMESTAMP WHERE isin=?''',
+                (ticker, ac, isin)
+            )
+        else:
+            conn.execute(
+                'UPDATE securities SET ticker=?, updated_at=CURRENT_TIMESTAMP WHERE isin=?',
+                (ticker, isin)
+            )
+    return jsonify({'isin': isin, 'ticker': ticker, 'quote_type': quote_type, 'provider': provider.name})
