@@ -9,8 +9,10 @@ let _envelopeChart = null;
 let _data = null;
 let _sortCol = 'market_value';
 let _sortDesc = true;
+let _filter = { type: null, value: null }; // {type: 'asset_class'|'envelope', value: 'ETF'}
 
 export async function loadActifs() {
+  _filter = { type: null, value: null };
   // Utiliser le filtre global owner
   const globalOwner = S.syntheseOwner;
   const owner = (globalOwner && globalOwner !== 'Famille') ? globalOwner : '';
@@ -51,7 +53,16 @@ function _renderTable(lines) {
     return;
   }
   empty.style.display = 'none';
-  const sorted = sortArr([...lines], _sortCol, _sortDesc ? -1 : 1);
+  // Appliquer le filtre graphe si actif
+  let filtered = lines;
+  if (_filter.type && _filter.value) {
+    if (_filter.type === 'asset_class') {
+      filtered = lines.filter(l => l.asset_class === _filter.value);
+    } else if (_filter.type === 'envelope') {
+      filtered = lines.filter(l => (l.envelopes || []).includes(_filter.value));
+    }
+  }
+  const sorted = sortArr([...filtered], _sortCol, _sortDesc ? -1 : 1);
   tbody.innerHTML = sorted.map(l => {
     const pnl = l.pnl;
     const pnlCls = pnl == null ? '' : pnl >= 0 ? 'pos' : 'neg';
@@ -113,12 +124,39 @@ function _pieDataset(breakdown, colors) {
   };
 }
 
-function _pieOptions() {
+function _pieOptions(filterType, labels) {
   return {
     responsive: true,
     maintainAspectRatio: false,
+    onClick: (_, elements) => {
+      if (!elements.length) {
+        // Clic hors slice → reset filtre
+        _filter = { type: null, value: null };
+      } else {
+        const label = labels[elements[0].index];
+        // Toggle : re-clic sur le meme → reset
+        if (_filter.type === filterType && _filter.value === label) {
+          _filter = { type: null, value: null };
+        } else {
+          _filter = { type: filterType, value: label };
+        }
+      }
+      if (_data) _renderTable(_data.lines);
+    },
     plugins: {
-      legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } },
+      legend: {
+        position: 'right',
+        labels: { boxWidth: 12, font: { size: 11 } },
+        onClick: (e, item, legend) => {
+          const label = labels[item.index];
+          if (_filter.type === filterType && _filter.value === label) {
+            _filter = { type: null, value: null };
+          } else {
+            _filter = { type: filterType, value: label };
+          }
+          if (_data) _renderTable(_data.lines);
+        },
+      },
       tooltip: {
         callbacks: {
           label: ctx => {
@@ -138,10 +176,11 @@ function _renderClassChart(breakdown) {
   if (!canvas) return;
   _classChart = destroyChart(_classChart);
   if (!breakdown.length) return;
+  const labels = breakdown.map(b => b.label);
   _classChart = new Chart(canvas, {
     type: 'doughnut',
     data: _pieDataset(breakdown, getColors()),
-    options: _pieOptions(),
+    options: _pieOptions('asset_class', labels),
   });
 }
 
@@ -150,10 +189,11 @@ function _renderEnvelopeChart(breakdown) {
   if (!canvas) return;
   _envelopeChart = destroyChart(_envelopeChart);
   if (!breakdown.length) return;
+  const labels = breakdown.map(b => b.label);
   _envelopeChart = new Chart(canvas, {
     type: 'doughnut',
     data: _pieDataset(breakdown, getColors().slice().reverse()),
-    options: _pieOptions(),
+    options: _pieOptions('envelope', labels),
   });
 }
 
