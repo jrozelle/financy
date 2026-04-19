@@ -109,16 +109,8 @@ def _replace_holdings(conn, position_id, items):
     for item in items:
         cost = item.get('cost_basis')
         if not cost:
-            # Reutiliser le cost_basis precedent si disponible
+            # Reutiliser le cost_basis de cette meme position (import precedent)
             cost = existing.get(item['isin'])
-        if not cost:
-            # Chercher dans d'autres positions (meme ISIN)
-            row = conn.execute(
-                'SELECT cost_basis FROM holdings WHERE isin=? AND cost_basis > 0 LIMIT 1',
-                (item['isin'],)
-            ).fetchone()
-            if row:
-                cost = row['cost_basis']
         if not cost and item.get('market_value'):
             # Derniere resort : premiere observation = cout d'entree
             cost = item['market_value']

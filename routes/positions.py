@@ -154,11 +154,12 @@ def snapshot_update(pid):
     if not validate_string(new_values.get('notes'), 2000):
         return jsonify({'error': 'Notes trop longues'}), 400
 
+    from services.snapshot import duplicate_position
+
     with get_db() as conn:
         entity_map = get_entity_map(conn, target_date)
         ref        = load_referential(conn)
 
-        # Acquire write lock immediately to prevent race conditions
         conn.execute('BEGIN IMMEDIATE')
 
         source_rows = conn.execute(
@@ -172,37 +173,28 @@ def snapshot_update(pid):
 
         created = []
         for row in source_rows:
-            r = dict(row)
-            if r['id'] == pid:
+            if row['id'] == pid:
                 entity = new_values.get('entity')
-                stored_value = 0 if entity else new_values.get('value', 0)
-                stored_debt  = 0 if entity else new_values.get('debt', 0)
-                cur = conn.execute(
-                    '''INSERT INTO positions
-                       (date, owner, category, envelope, establishment,
-                        value, debt, notes, entity, ownership_pct, debt_pct)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
-                    (target_date,
-                     new_values['owner'], new_values['category'],
-                     new_values.get('envelope'), new_values.get('establishment'),
-                     stored_value, stored_debt,
-                     new_values.get('notes'), entity,
-                     new_values.get('ownership_pct', 1.0),
-                     new_values.get('debt_pct', 1.0))
-                )
+                override = {
+                    'owner': new_values['owner'],
+                    'category': new_values['category'],
+                    'envelope': new_values.get('envelope'),
+                    'establishment': new_values.get('establishment'),
+                    'value': 0 if entity else new_values.get('value', 0),
+                    'debt': 0 if entity else new_values.get('debt', 0),
+                    'label': new_values.get('label'),
+                    'notes': new_values.get('notes'),
+                    'entity': entity,
+                    'ownership_pct': new_values.get('ownership_pct', 1.0),
+                    'debt_pct': new_values.get('debt_pct', 1.0),
+                    'mobilizable_pct_override': new_values.get('mobilizable_pct_override'),
+                    'liquidity_override': new_values.get('liquidity_override'),
+                }
+                new_id = duplicate_position(conn, row, target_date, value_override=override)
             else:
-                cur = conn.execute(
-                    '''INSERT INTO positions
-                       (date, owner, category, envelope, establishment,
-                        value, debt, notes, entity, ownership_pct, debt_pct)
-                       VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
-                    (target_date,
-                     r['owner'], r['category'], r['envelope'], r['establishment'],
-                     r['value'], r['debt'], r['notes'], r['entity'],
-                     r['ownership_pct'], r['debt_pct'])
-                )
-            new_row = conn.execute('SELECT * FROM positions WHERE id=?', (cur.lastrowid,)).fetchone()
-            holdings_map = get_holdings_map(conn, [new_row['id']])
+                new_id = duplicate_position(conn, row, target_date)
+            new_row = conn.execute('SELECT * FROM positions WHERE id=?', (new_id,)).fetchone()
+            holdings_map = get_holdings_map(conn, [new_id])
             created.append(compute_position(dict(new_row), entity_map, ref, holdings_map))
 
         snapshot_holdings_to_date(conn, target_date)
