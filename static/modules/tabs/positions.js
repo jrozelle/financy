@@ -236,7 +236,7 @@ function renderPositionsTree(allPositions) {
                 return `
                   <div class="tree-row tree-pos-leaf" data-pos-id="${p.id}">
                     <span class="tree-dot"></span>
-                    <span class="tree-label">${!p.establishment && p.notes ? esc(p.notes.substring(0, 50)) : esc(p.category)}${pctBadge}${mobMark}</span>
+                    <span class="tree-label">${p.notes ? esc(p.notes.substring(0, 50)) : esc(p.category)}${pctBadge}${mobMark}</span>
                     <span class="tree-badges">${liqBadge(p.liquidity)}</span>
                     ${inlineVal}
                     <span class="tree-actions">
