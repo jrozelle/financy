@@ -29,7 +29,8 @@
       <div class="settings-menu" id="settings-menu">
         <button class="settings-toggle" id="settings-toggle" title="Paramètres" aria-label="Paramètres">&#9881;</button>
         <div class="settings-dropdown hidden" id="settings-dropdown">
-          <button class="settings-item" data-tab="referentiel">&#9881; Référentiel</button>
+          <button class="settings-item" id="btn-open-settings">&#128273; Cles API</button>
+          <button class="settings-item" data-tab="referentiel">&#9881; Referentiel</button>
           <button class="settings-item" data-tab="tools">&#128295; Outils</button>
           <button class="settings-item" data-tab="import">&#8645; Import / Export</button>
         </div>
@@ -362,6 +363,7 @@
           <select id="actifs-owner-filter">
             <option value="">Toutes</option>
           </select>
+          <button class="btn btn-secondary btn-sm" id="actifs-refresh-prices" title="Rafraichir tous les cours">Rafraichir cours</button>
         </div>
       </div>
 
@@ -727,6 +729,34 @@
   </main>
 
   <!-- ── MODAL ALLOCATION CIBLE ──────────────────────────────────────────── -->
+  <!-- ── MODAL PARAMETRES (Cles API) ───────────────────────────────────── -->
+  <div id="settings-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settings-modal-heading">
+    <div class="modal-overlay" id="settings-modal-overlay"></div>
+    <div class="modal-content" style="max-width:520px">
+      <div class="modal-header">
+        <h2 id="settings-modal-heading">Parametres</h2>
+        <button class="modal-close" data-close="settings-modal" aria-label="Fermer">&#10005;</button>
+      </div>
+      <div style="margin-bottom:1.25rem">
+        <label for="settings-api-key" style="display:block;font-size:13px;font-weight:600;margin-bottom:.375rem">Cle API Anthropic</label>
+        <p class="text-muted" style="font-size:12px;margin-bottom:.5rem">
+          Necessaire pour l'onglet Conseil (analyse LLM). La cle est stockee localement dans la base SQLite.
+        </p>
+        <div style="display:flex;gap:.5rem;align-items:center">
+          <input type="password" id="settings-api-key" class="form-control"
+                 placeholder="sk-ant-api03-..." autocomplete="off"
+                 style="flex:1;font-family:monospace;font-size:13px">
+          <button type="button" class="btn btn-secondary btn-sm" id="settings-toggle-key-visibility" title="Afficher/masquer">&#128065;</button>
+        </div>
+        <div id="settings-api-status" class="text-muted" style="font-size:12px;margin-top:.375rem"></div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" data-close="settings-modal">Annuler</button>
+        <button type="button" class="btn btn-primary" id="btn-save-settings">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
   <div id="targets-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="targets-modal-heading">
     <div class="modal-overlay" id="targets-modal-overlay"></div>
     <div class="modal-content">
@@ -919,8 +949,8 @@
         <div class="modal-actions" style="justify-content:space-between;gap:.5rem;flex-wrap:wrap">
           <div style="display:flex;gap:.4rem">
             <button type="button" class="btn btn-secondary" id="holdings-add-line">+ Ajouter une ligne</button>
-            <button type="button" class="btn btn-secondary" id="holdings-import-pdf">Importer PDF…</button>
-            <input type="file" id="holdings-pdf-input" accept="application/pdf,.pdf" style="display:none">
+            <button type="button" class="btn btn-secondary" id="holdings-import-pdf">Importer PDF / CSV…</button>
+            <input type="file" id="holdings-pdf-input" accept="application/pdf,.pdf,.csv,text/csv" style="display:none">
           </div>
           <div style="display:flex;gap:.4rem">
             <button type="button" class="btn btn-secondary" data-close="holdings-modal">Annuler</button>

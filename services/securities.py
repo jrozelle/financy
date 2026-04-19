@@ -1,5 +1,25 @@
 """Helpers partages sur la table securities (dedupliques entre routes)."""
+import re
 from models import validate_isin
+
+
+def _infer_asset_class(name):
+    """Infere la classe d'actif depuis le nom du titre."""
+    if not name:
+        return 'autre'
+    upper = name.upper()
+    if re.search(r'\bETF\b|\bUCITS\b|\bTRACKER\b', upper):
+        return 'etf'
+    if re.search(r'\bOPCVM\b|\bSICAV\b|\bFCP\b', upper):
+        return 'opcvm'
+    if re.search(r'\bSCPI\b', upper):
+        return 'scpi'
+    if re.search(r'\bSCI\b', upper):
+        return 'sci'
+    if re.search(r'\bFONDS?\s*(EURO|EUR\b|EN\s*EURO)', upper):
+        return 'fonds_euros'
+    # Actions individuelles : pas de keyword ETF/OPCVM, ISIN FR/US/DE + nom court
+    return 'action'
 
 
 def upsert_security(conn, isin, name=None, ticker=None, currency=None,
@@ -38,11 +58,19 @@ def upsert_security(conn, isin, name=None, ticker=None, currency=None,
              name,
              ticker,
              currency or 'EUR',
-             asset_class or ('fonds_euros' if isin.startswith('FONDS_EUROS_') else 'autre'),
+             asset_class or ('fonds_euros' if isin.startswith('FONDS_EUROS_') else _infer_asset_class(name)),
              1 if effective_priceable is None else effective_priceable,
              data_source)
         )
         return
+
+    # Si asset_class est 'autre' en base et qu'on a un nom, tenter d'inferer mieux
+    if asset_class is None and name:
+        existing = conn.execute('SELECT asset_class FROM securities WHERE isin=?', (isin,)).fetchone()
+        if existing and (existing['asset_class'] or 'autre') == 'autre':
+            inferred = _infer_asset_class(name)
+            if inferred != 'action':  # ne pas ecraser 'autre' par 'action' (trop generique)
+                asset_class = inferred
 
     updates, params = [], []
     for col, val in [('name', name), ('ticker', ticker), ('currency', currency),

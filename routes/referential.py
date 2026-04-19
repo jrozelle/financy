@@ -1,4 +1,5 @@
 import json
+import os
 from flask import Blueprint, jsonify, request
 from models import get_db, load_referential, REFERENTIAL_TEMPLATES
 from auth import login_required, csrf_protect
@@ -158,3 +159,46 @@ def check_orphans():
                     orphans.setdefault('envelopes', {})[env] = {'positions': pos_cnt, 'flux': flux_cnt}
 
     return jsonify(orphans)
+
+
+# — Parametres applicatifs (cles API, etc.) —
+
+from services.settings import load_settings as _load_settings, save_settings as _save_settings
+
+
+@referential_bp.route('/api/settings', methods=['GET'])
+@login_required
+def get_settings():
+    s = _load_settings()
+    api_key = s.get('anthropic_api_key', '')
+    env_key = os.environ.get('ANTHROPIC_API_KEY', '')
+    effective = api_key or env_key
+    result = {
+        'anthropic_api_key_set': bool(api_key),
+        'anthropic_api_key_masked': (api_key[:10] + '...' + api_key[-4:]) if len(api_key) > 14 else '',
+        'anthropic_api_key_env': bool(env_key),
+        'effective_source': 'db' if api_key else ('env' if env_key else 'none'),
+        'llm_available': bool(effective),
+    }
+    return jsonify(result)
+
+
+@referential_bp.route('/api/settings', methods=['PUT'])
+@login_required
+@csrf_protect
+def update_settings():
+    d = request.json
+    if not d:
+        return jsonify({'error': 'Corps requis'}), 400
+    with get_db() as conn:
+        s = _load_settings()
+        if 'anthropic_api_key' in d:
+            key = (d['anthropic_api_key'] or '').strip()
+            if key:
+                if not key.startswith('sk-ant-'):
+                    return jsonify({'error': 'Format de cle invalide (attendu : sk-ant-...)'}), 400
+                s['anthropic_api_key'] = key
+            else:
+                s.pop('anthropic_api_key', None)
+        _save_settings(conn, s)
+    return jsonify({'ok': True})

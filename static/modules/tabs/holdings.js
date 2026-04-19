@@ -203,6 +203,7 @@ function addLine() {
   lastIsin?.focus();
 }
 
+
 function removeLine(draftId) {
   collectFromInputs();
   state.rows = state.rows.filter(r => r.draftId !== draftId);
@@ -283,7 +284,7 @@ async function onIsinInput(e) {
 
 // ─── Event wiring ────────────────────────────────────────────────────────────
 
-// ─── Import PDF (phase 4) ────────────────────────────────────────────────────
+// ─── Import PDF / CSV ───────────────────────────────────────────────────────
 
 async function openPdfPicker() {
   const input = document.getElementById('holdings-pdf-input');
@@ -304,7 +305,8 @@ async function onPdfSelected(e) {
     return;
   }
   const status = document.getElementById('holdings-import-status');
-  if (status) status.innerHTML = '<span class="text-muted">Analyse du PDF…</span>';
+  const isCsv = file.name.toLowerCase().endsWith('.csv');
+  if (status) status.innerHTML = `<span class="text-muted">Analyse du ${isCsv ? 'CSV' : 'PDF'}…</span>`;
 
   const fd = new FormData();
   fd.append('file', file);
@@ -323,7 +325,7 @@ async function onPdfSelected(e) {
     data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Echec du parsing');
   } catch (err) {
-    toast(err.message || 'Erreur lors de l\'analyse du PDF', 'error');
+    toast(err.message || 'Erreur lors de l\'analyse du fichier', 'error');
     if (status) status.innerHTML = '';
     return;
   }
@@ -353,7 +355,7 @@ async function onPdfSelected(e) {
     status.innerHTML = parts.join(' · ') +
       ' — vérifiez le tableau puis cliquez Enregistrer pour <strong>remplacer</strong> les lignes existantes.';
   }
-  toast(`${lines.length} ligne(s) détectée(s) depuis le PDF`, 'success');
+  toast(`${lines.length} ligne(s) detectee(s)`, 'success');
 }
 
 export function wireHoldingsEvents() {
@@ -361,7 +363,7 @@ export function wireHoldingsEvents() {
   if (!modal) return;
 
   document.getElementById('holdings-add-line')?.addEventListener('click', addLine);
-  document.getElementById('holdings-save')?.addEventListener('click', saveAll);
+document.getElementById('holdings-save')?.addEventListener('click', saveAll);
   document.getElementById('holdings-import-pdf')?.addEventListener('click', openPdfPicker);
   document.getElementById('holdings-pdf-input')?.addEventListener('change', onPdfSelected);
 

@@ -47,11 +47,17 @@ def get_model():
     return os.environ.get('ADVISOR_MODEL', DEFAULT_MODEL)
 
 
+def _get_api_key():
+    """Cle API Anthropic : DB settings d'abord, puis env var."""
+    from services.settings import get_api_key
+    return get_api_key()
+
+
 def is_mock_mode():
     """Mock LLM en mode demo, sans cle API, ou si ADVISOR_LLM_PROVIDER=mock."""
     if os.environ.get('ADVISOR_LLM_PROVIDER', '').lower() == 'mock':
         return True
-    if not os.environ.get('ANTHROPIC_API_KEY'):
+    if not _get_api_key():
         return True
     try:
         from models import is_demo_mode
@@ -64,7 +70,7 @@ def is_mock_mode():
 
 def is_available():
     """L'advisor LLM est disponible si on a une cle API ou en mode mock (tests)."""
-    return bool(os.environ.get('ANTHROPIC_API_KEY')) or is_mock_mode()
+    return bool(_get_api_key()) or is_mock_mode()
 
 
 # ─── Calcul de cout ──────────────────────────────────────────────────────────
@@ -211,7 +217,7 @@ def _live_call(conn, endpoint, system_blocks, user_message,
     except ImportError:
         raise RuntimeError('SDK anthropic non installe (pip install anthropic).')
 
-    client = anthropic.Anthropic()
+    client = anthropic.Anthropic(api_key=_get_api_key())
 
     # Place le cache_control sur le dernier bloc systeme pour caching.
     sys_blocks = [dict(b) for b in system_blocks]  # deep copy minimal
