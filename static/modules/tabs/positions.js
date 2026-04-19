@@ -354,7 +354,7 @@ export function renderPositions() {
       : '';
     return `<tr>
       <td><strong>${esc(p.owner)}</strong></td>
-      <td>${esc(p.category)}${notesMark}${holdingsBadge}</td>
+      <td>${esc(p.label || p.category)}${notesMark}${holdingsBadge}</td>
       <td>${esc(p.envelope || '—')}</td>
       <td>${esc(p.establishment || '—')}${entitySub}</td>
       <td class="num">${fmt(p.gross_attributed)}${pctBadge}</td>

@@ -80,29 +80,55 @@ def get_synthese():
 
     # ── Helper : calculer les totaux d'un snapshot ──
     def _snapshot_totals(snap_date):
+        """Retourne les totaux famille + par owner pour un snapshot donne."""
         with get_db() as c:
             snap_rows        = c.execute('SELECT * FROM positions WHERE date=?', (snap_date,)).fetchall()
             snap_entity_map  = get_entity_map(c, snap_date)
             snap_ref         = load_referential(c)
             snap_holdings    = get_holdings_map(c, [r['id'] for r in snap_rows])
         snap_positions = [compute_position(dict(r), snap_entity_map, snap_ref, snap_holdings) for r in snap_rows]
-        return {
+        fam = {
             'net':   sum(p['net_attributed'] for p in snap_positions),
             'gross': sum(p['gross_attributed'] for p in snap_positions),
             'debt':  sum(p['debt_attributed'] for p in snap_positions),
             'mob':   sum(p['mobilizable_value'] for p in snap_positions),
         }
+        by_owner = {}
+        for o in set(p['owner'] for p in snap_positions):
+            ops = [p for p in snap_positions if p['owner'] == o]
+            by_owner[o] = {
+                'net':   sum(p['net_attributed'] for p in ops),
+                'gross': sum(p['gross_attributed'] for p in ops),
+                'debt':  sum(p['debt_attributed'] for p in ops),
+                'mob':   sum(p['mobilizable_value'] for p in ops),
+            }
+        return fam, by_owner
 
-    def _build_variation(totals, prev_date_str):
-        cur_mob = sum(t['mobilizable'] for t in totals_by_owner.values())
+    def _calc_delta(cur, prev):
+        if not cur or not prev:
+            return None
         return {
-            'prev_date':   prev_date_str,
-            'net_delta':   family['net'] - totals['net'],
-            'net_pct':     ((family['net'] - totals['net']) / abs(totals['net']) * 100) if totals['net'] != 0 else None,
-            'gross_delta': family['gross'] - totals['gross'],
-            'debt_delta':  family['debt'] - totals['debt'],
-            'mob_delta':   cur_mob - totals['mob'],
+            'net_delta':   cur['net'] - prev['net'],
+            'net_pct':     ((cur['net'] - prev['net']) / abs(prev['net']) * 100) if prev['net'] != 0 else None,
+            'gross_delta': cur['gross'] - prev['gross'],
+            'debt_delta':  cur['debt'] - prev['debt'],
+            'mob_delta':   cur['mob'] - prev['mob'],
         }
+
+    def _build_variation(prev_date_str):
+        prev_fam, prev_by_owner = _snapshot_totals(prev_date_str)
+        cur_mob = sum(t['mobilizable'] for t in totals_by_owner.values())
+        cur_fam = {**family, 'mob': cur_mob}
+        result = _calc_delta(cur_fam, prev_fam)
+        if result:
+            result['prev_date'] = prev_date_str
+            result['by_owner'] = {}
+            for o in owners:
+                cur_o = totals_by_owner.get(o, {'net': 0, 'gross': 0, 'debt': 0, 'mobilizable': 0})
+                cur_o_norm = {'net': cur_o['net'], 'gross': cur_o['gross'], 'debt': cur_o['debt'], 'mob': cur_o['mobilizable']}
+                prev_o = prev_by_owner.get(o, {'net': 0, 'gross': 0, 'debt': 0, 'mob': 0})
+                result['by_owner'][o] = _calc_delta(cur_o_norm, prev_o)
+        return result
 
     # ── Variation vs snapshot précédent ──
     variation = None
@@ -112,7 +138,7 @@ def get_synthese():
             (date,)
         ).fetchone()
     if prev_row:
-        variation = _build_variation(_snapshot_totals(prev_row['date']), prev_row['date'])
+        variation = _build_variation(prev_row['date'])
 
     # ── Variation N / N-1 (Year-over-Year) ──
     yoy_variation = None
@@ -130,7 +156,7 @@ def get_synthese():
                 (year_ago,)
             ).fetchone()
         if yoy_row and yoy_row['date'] != date:
-            yoy_variation = _build_variation(_snapshot_totals(yoy_row['date']), yoy_row['date'])
+            yoy_variation = _build_variation(yoy_row['date'])
     except Exception:
         pass
 

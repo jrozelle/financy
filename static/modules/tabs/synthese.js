@@ -71,11 +71,13 @@ export function renderSynthese() {
         net:   totals_by_owner[owner]?.net        || 0,
         mob:   totals_by_owner[owner]?.mobilizable|| 0 };
 
-  // Variation vs précédent + YoY
+  // Variation vs precedent + YoY (par owner si pas famille)
+  const variation = isFamily ? syn.variation : syn.variation?.by_owner?.[owner];
+  const yoyVariation = isFamily ? syn.yoy_variation : syn.yoy_variation?.by_owner?.[owner];
   const varHtml = (field, pctField, opts) => {
-    let html = kpiDelta(syn.variation, field, pctField, opts);
-    if (syn.yoy_variation) {
-      html += kpiDelta(syn.yoy_variation, field, pctField, { ...opts, label: 'N-1' });
+    let html = kpiDelta(variation, field, pctField, opts);
+    if (yoyVariation) {
+      html += kpiDelta(yoyVariation, field, pctField, { ...opts, label: 'N-1' });
     }
     return html;
   };
