@@ -205,7 +205,7 @@ function renderPositionsTree(allPositions) {
                   return `
                     <div class="tree-row tree-pos-leaf" data-pos-id="${p.id}">
                       <span class="tree-dot"></span>
-                      <span class="tree-label">${esc(p.category)}${p.notes ? ` <span style="font-weight:400;color:var(--text-muted);font-size:12px">— ${esc(p.notes.substring(0, 40))}</span>` : ''}${pctBadge}${mobMark}</span>
+                      <span class="tree-label">${p.notes ? esc(p.notes.substring(0, 50)) : esc(p.category)}${pctBadge}${mobMark}</span>
                       <span class="tree-badges">${liqBadge(p.liquidity)}</span>
                       ${inlineVal}
                       <span class="tree-actions">
