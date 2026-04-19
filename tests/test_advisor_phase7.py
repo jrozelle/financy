@@ -92,20 +92,37 @@ class TestRebalanceEngine:
         profile = {'horizon_years': 20, 'risk_tolerance': 5}
         positions = [
             {'category': 'Actions', 'envelope': 'PEA', 'net_attributed': 30000, 'value': 30000},
-            {'category': 'Immobilier', 'envelope': 'Immobilier', 'net_attributed': 60000, 'value': 60000},
+            {'category': 'Cash & dépôts', 'envelope': '', 'net_attributed': 60000, 'value': 60000},
         ]
-        # Forcer un gap : Actions tres sous-ponderee, Immobilier tres surponderee
+        # Forcer un gap : Actions sous-ponderee, Cash surponderee (arbitrable)
         allocation = {
             'gap': [
-                {'category': 'Actions',    'delta_eur':  20000, 'delta_pct': 0.2, 'target_pct': 0.7, 'actual_pct': 0.5},
-                {'category': 'Immobilier', 'delta_eur': -20000, 'delta_pct': -0.2, 'target_pct': 0.2, 'actual_pct': 0.4},
+                {'category': 'Actions',        'delta_eur':  20000, 'delta_pct': 0.2, 'target_pct': 0.7, 'actual_pct': 0.5},
+                {'category': 'Cash & dépôts',  'delta_eur': -20000, 'delta_pct': -0.2, 'target_pct': 0.2, 'actual_pct': 0.4},
             ],
             'target': {}, 'actual': {}, 'total_eur': 100000,
         }
         props = generate_proposals(profile, positions, allocation)
         bucket = [p for p in props if p['kind'] == 'bucket']
-        assert any('Immobilier' in p['from_ref'] for p in bucket)
+        assert any('Cash' in p['from_ref'] for p in bucket)
         assert any('Actions' in p['to_ref'] for p in bucket)
+
+    def test_non_arbitrable_excluded(self):
+        """Immobilier, Objets de valeur, etc. ne genere pas de bucket proposals."""
+        from services.advisor.rebalance import generate_proposals
+        profile = {'horizon_years': 20, 'risk_tolerance': 5}
+        positions = []
+        allocation = {
+            'gap': [
+                {'category': 'Immobilier',        'delta_eur': -50000},
+                {'category': 'Objets de valeur',  'delta_eur': -30000},
+                {'category': 'Actions',            'delta_eur':  80000},
+            ],
+            'target': {}, 'actual': {}, 'total_eur': 200000,
+        }
+        props = generate_proposals(profile, positions, allocation)
+        bucket = [p for p in props if p['kind'] == 'bucket']
+        assert not bucket  # rien a arbitrer (pas de source arbitrable)
 
     def test_fiscal_pea_room(self):
         from services.advisor.rebalance import generate_proposals

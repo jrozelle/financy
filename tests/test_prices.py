@@ -156,3 +156,53 @@ class TestResolveTicker:
         r = client.post('/api/securities/FR0010315770/resolve-ticker',
                         headers=CSRF_HEADERS)
         assert r.status_code == 404
+
+
+# ─── Divergence guard ───────────────────────────────────────────────────────
+
+class TestDivergenceGuard:
+    def test_divergent_price_is_rejected(self, client):
+        """Un prix qui diverge de >50% du precedent est ignore."""
+        _seed_pea_with_holdings(client)
+        # Premier refresh — ecrit les prix initiaux
+        r1 = client.post('/api/prices/refresh', headers=CSRF_HEADERS)
+        assert r1.status_code == 200
+
+        # Modifier last_price en base pour simuler un prix connu
+        from models import get_db
+        with get_db() as conn:
+            conn.execute(
+                'UPDATE securities SET last_price=100.0, last_price_date="2026-04-01" WHERE isin=?',
+                ('FR0010315770',))
+
+        # Le mock va retourner un prix deterministe (~170-250 selon le hash)
+        # qui diverge de 100.0 de plus de 50%
+        from services.prices import MockProvider
+        p = MockProvider()
+        ticker, _ = p.resolve_ticker('FR0010315770')
+        mock_price = p.fetch_last_price(ticker)[0]
+
+        if abs(mock_price - 100.0) / 100.0 > 0.5:
+            # Le mock diverge → le refresh devrait l'ignorer
+            r2 = client.post('/api/prices/refresh', headers=CSRF_HEADERS)
+            data = r2.get_json()
+            divergent = data.get('divergent', [])
+            assert any(d['isin'] == 'FR0010315770' for d in divergent)
+
+            # Verifier que le prix en base n'a PAS change
+            with get_db() as conn:
+                row = conn.execute('SELECT last_price FROM securities WHERE isin=?',
+                                   ('FR0010315770',)).fetchone()
+                assert row['last_price'] == 100.0  # inchange
+
+    def test_first_fetch_no_guard(self, client):
+        """Le premier fetch (pas de prix precedent) passe toujours."""
+        _seed_pea_with_holdings(client)
+        from models import get_db
+        with get_db() as conn:
+            conn.execute('UPDATE securities SET last_price=NULL WHERE isin=?',
+                         ('FR0010315770',))
+        r = client.post('/api/prices/refresh', headers=CSRF_HEADERS)
+        data = r.get_json()
+        assert data['refreshed'] >= 1
+        assert not data.get('divergent')
