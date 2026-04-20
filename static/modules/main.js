@@ -1,7 +1,7 @@
 import { S } from './state.js';
 import { fmtDate, treeFilter, treeExpandCollapse, treeToggleRow } from './utils.js';
 import { api, buildSelects } from './api.js';
-import { closeModal, trapModalFocus } from './dialogs.js';
+import { closeModal, trapModalFocus, installModalScrollLock } from './dialogs.js';
 import { wireDrilldownEvents, drilldownHistory } from './drilldown.js';
 import { wireTargetsEvents } from './targets.js';
 import { loadUserAlertsAsync, saveUserAlerts } from './alerts.js';
@@ -10,12 +10,13 @@ import { wireSortableTable } from './utils.js';
 
 import { loadSynthese, renderSynthese, renderSyntheseHistory, loadHistorique } from './tabs/synthese.js';
 import { loadPositions, renderPositions, clearFilters, openPosModal, duplicateSnapshot,
-         onEntitySelectChange, updatePosInfo, savePosition, startInlineEdit, deletePosition } from './tabs/positions.js';
-import { openHoldingsModal, wireHoldingsEvents } from './tabs/holdings.js';
+         onEntitySelectChange, updatePosInfo, savePosition, startInlineEdit, deletePosition,
+         persistPositionFilters, persistPositionsTreeState } from './tabs/positions.js';
+import { openHoldingsModal, wireHoldingsEvents, confirmCloseHoldings } from './tabs/holdings.js';
 import { wireIsinPopoverEvents } from './isin-popover.js';
 import { loadAdvisor, wireAdvisorEvents } from './tabs/advisor.js';
 import { loadActifs, wireActifsEvents } from './tabs/actifs.js';
-import { loadFlux, renderFlux, openFluxModal, saveFlux } from './tabs/flux.js';
+import { loadFlux, renderFlux, openFluxModal, saveFlux, persistFluxFilters, clearFluxFilters } from './tabs/flux.js';
 import { loadEntities, renderEntities, openEntityModal, saveEntity, updateEntInfo } from './tabs/entities.js';
 import { importXlsx, importJson, exportJson, resetDb, initDemoToggle, createBackup } from './tabs/import-export.js';
 import { loadReferential, saveReferential, initTemplateSelect } from './tabs/referentiel.js';
@@ -204,12 +205,19 @@ function wireEvents() {
   document.getElementById('filter-owner').addEventListener('change', () => {
     const val = document.getElementById('filter-owner').value;
     S.syntheseOwner = val || 'Famille';
+    persistPositionFilters();
     const globalSel = document.getElementById('global-owner-filter');
     if (globalSel) globalSel.value = S.syntheseOwner;
     renderPositions();
   });
-  document.getElementById('filter-envelope').addEventListener('change', renderPositions);
-  document.getElementById('filter-establishment').addEventListener('change', renderPositions);
+  document.getElementById('filter-envelope').addEventListener('change', () => {
+    persistPositionFilters();
+    renderPositions();
+  });
+  document.getElementById('filter-establishment').addEventListener('change', () => {
+    persistPositionFilters();
+    renderPositions();
+  });
   document.getElementById('btn-clear-filters').addEventListener('click', clearFilters);
 
   // Tree delegation
@@ -292,6 +300,7 @@ function wireEvents() {
     if (depthIndex >= levels.length) {
       treeExpandCollapse(cid, true);
     }
+    persistPositionsTreeState();
   });
 
   // Settings gear menu
@@ -329,14 +338,13 @@ function wireEvents() {
         const globalSel = document.getElementById('global-owner-filter');
         if (globalSel) globalSel.value = S.syntheseOwner;
       }
+      persistFluxFilters();
       renderFlux();
     });
   });
   const btnClearFlux = document.getElementById('btn-clear-flux-filters');
   if (btnClearFlux) btnClearFlux.addEventListener('click', () => {
-    ['flux-filter-owner','flux-filter-type','flux-filter-category','flux-filter-year'].forEach(id => {
-      document.getElementById(id).value = '';
-    });
+    clearFluxFilters();
     renderFlux();
   });
 
@@ -407,6 +415,9 @@ function wireEvents() {
   // Focus traps on static modals
   ['position-modal', 'flux-modal', 'entity-modal', 'targets-modal', 'holdings-modal', 'settings-modal'].forEach(trapModalFocus);
 
+  // Body scroll-lock : observe toutes les modales statiques + popover ISIN
+  installModalScrollLock();
+
   // Keyboard shortcuts
   document.addEventListener('keydown', e => {
     // Ignore shortcuts when typing in an input/textarea/select
@@ -424,7 +435,13 @@ function wireEvents() {
       if (popover && !popover.classList.contains('hidden')) {
         popover.classList.add('hidden'); return;
       }
-      for (const id of ['position-modal', 'flux-modal', 'entity-modal', 'targets-modal', 'holdings-modal']) {
+      // Holdings : warning si brouillon dirty (intercepte Escape)
+      const holdingsModal = document.getElementById('holdings-modal');
+      if (holdingsModal && !holdingsModal.classList.contains('hidden')) {
+        confirmCloseHoldings();
+        return;
+      }
+      for (const id of ['position-modal', 'flux-modal', 'entity-modal', 'targets-modal']) {
         const m = document.getElementById(id);
         if (m && !m.classList.contains('hidden')) { closeModal(id); return; }
       }

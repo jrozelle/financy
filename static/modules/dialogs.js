@@ -1,5 +1,58 @@
 import { esc } from './utils.js';
 
+// ─── Body scroll-lock ──────────────────────────────────────────────────────
+// Empeche le background de scroller quand une modale est ouverte. Compte les
+// modales visibles pour ne deverrouiller qu'a la fermeture de la derniere.
+
+let _scrollLockCount = 0;
+let _savedOverflow = '';
+
+export function lockBodyScroll() {
+  if (_scrollLockCount === 0) {
+    _savedOverflow = document.body.style.overflow || '';
+    document.body.style.overflow = 'hidden';
+  }
+  _scrollLockCount++;
+}
+
+export function unlockBodyScroll() {
+  _scrollLockCount = Math.max(0, _scrollLockCount - 1);
+  if (_scrollLockCount === 0) {
+    document.body.style.overflow = _savedOverflow;
+  }
+}
+
+/**
+ * Installe un MutationObserver qui detecte l'ajout/retrait de la classe `hidden`
+ * sur les modales statiques et verrouille/deverrouille le body en consequence.
+ * A appeler une fois au boot.
+ */
+export function installModalScrollLock(selectors = [
+  '.modal', '.isin-popover',
+]) {
+  const modals = [];
+  selectors.forEach(sel => {
+    document.querySelectorAll(sel).forEach(el => modals.push(el));
+  });
+  const states = new WeakMap();
+  modals.forEach(el => {
+    states.set(el, el.classList.contains('hidden'));
+  });
+  const observer = new MutationObserver(mutations => {
+    for (const m of mutations) {
+      if (m.type !== 'attributes' || m.attributeName !== 'class') continue;
+      const el = m.target;
+      const wasHidden = states.get(el);
+      const isHidden = el.classList.contains('hidden');
+      if (wasHidden === isHidden) continue;
+      states.set(el, isHidden);
+      if (isHidden) unlockBodyScroll();
+      else lockBodyScroll();
+    }
+  });
+  modals.forEach(el => observer.observe(el, { attributes: true, attributeFilter: ['class'] }));
+}
+
 // ─── Focus trap ────────────────────────────────────────────────────────────
 const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
@@ -37,8 +90,9 @@ export function confirmDialog(title, message, { confirmText = 'Supprimer', dange
         </div>
       </div>`;
     document.body.appendChild(overlay);
+    lockBodyScroll();
     _trapFocus(overlay);
-    const cleanup = (val) => { overlay.remove(); resolve(val); };
+    const cleanup = (val) => { overlay.remove(); unlockBodyScroll(); resolve(val); };
     overlay.querySelector('.confirm-cancel').addEventListener('click', () => cleanup(false));
     overlay.querySelector('.confirm-ok').addEventListener('click', () => cleanup(true));
     overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(false); });
@@ -71,9 +125,10 @@ export function promptDialog(title, { defaultValue = '', placeholder = '', input
         </div>
       </div>`;
     document.body.appendChild(overlay);
+    lockBodyScroll();
     _trapFocus(overlay);
     const input = overlay.querySelector('.prompt-input');
-    const cleanup = (val) => { overlay.remove(); resolve(val); };
+    const cleanup = (val) => { overlay.remove(); unlockBodyScroll(); resolve(val); };
     overlay.querySelector('.confirm-cancel').addEventListener('click', () => cleanup(null));
     overlay.querySelector('.confirm-ok').addEventListener('click', () => cleanup(input.value));
     overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(null); });

@@ -13,6 +13,36 @@ let state = {
   nextDraftId: 0,
 };
 
+// Indique que l'utilisateur a modifie le brouillon depuis la derniere ouverture
+// ou le dernier save. Utilise par confirmCloseHoldings() pour eviter de perdre
+// les edits par erreur (overlay/Escape/X/Annuler).
+let _dirty = false;
+
+function _markDirty() { _dirty = true; }
+function _markClean() { _dirty = false; }
+
+export function isHoldingsDirty() { return _dirty; }
+
+/**
+ * Tente de fermer la modale holdings. Si le brouillon est dirty, demande
+ * confirmation. Retourne true si la modale a été fermée, false sinon.
+ */
+export async function confirmCloseHoldings() {
+  const modal = document.getElementById('holdings-modal');
+  if (!modal || modal.classList.contains('hidden')) return true;
+  if (_dirty) {
+    const ok = await confirmDialog(
+      'Brouillon non enregistré',
+      'Vos modifications n\'ont pas été sauvegardées. <strong>Fermer quand même ?</strong>',
+      { confirmText: 'Fermer sans sauvegarder', danger: true }
+    );
+    if (!ok) return false;
+  }
+  closeModal('holdings-modal');
+  _markClean();
+  return true;
+}
+
 const PSEUDO_ISIN_PREFIXES = ['FONDS_EUROS_', 'CUSTOM_'];
 
 function isPseudoIsin(isin) {
@@ -71,6 +101,7 @@ export async function openHoldingsModal(positionId, positionLabel = '') {
     return;
   }
 
+  _markClean();  // fraichement ouverte = propre
   renderHoldingsTable();
   modal.classList.remove('hidden');
   const firstInput = modal.querySelector('input, button');
@@ -197,6 +228,7 @@ function collectFromInputs() {
 function addLine() {
   collectFromInputs();
   state.rows.push(makeRow());
+  _markDirty();
   renderHoldingsTable();
   const tbody = document.getElementById('holdings-tbody');
   const lastIsin = tbody.querySelector('tr:last-child .h-isin');
@@ -207,6 +239,7 @@ function addLine() {
 function removeLine(draftId) {
   collectFromInputs();
   state.rows = state.rows.filter(r => r.draftId !== draftId);
+  _markDirty();
   renderHoldingsTable();
 }
 
@@ -247,6 +280,7 @@ async function saveAll() {
   try {
     await api('PUT', `/api/positions/${state.positionId}/holdings`, payload);
     toast('Lignes enregistrées', 'success');
+    _markClean();
     closeModal('holdings-modal');
     await loadPositions();
   } catch {
@@ -382,6 +416,7 @@ async function onPdfSelected(e) {
     cost_basis:   l.cost_basis,
     market_value: l.market_value,
   }));
+  _markDirty();  // l'import replace le contenu, l'utilisateur doit enregistrer
   renderHoldingsTable();
 
   // Statut : format detecte + warnings + action a faire
@@ -425,6 +460,10 @@ document.getElementById('holdings-save')?.addEventListener('click', saveAll);
   });
 
   document.getElementById('holdings-tbody').addEventListener('input', e => {
+    // Toute saisie dans une ligne => brouillon dirty
+    if (e.target.matches('.h-isin, .h-name, .h-qty, .h-cost, .h-mv')) {
+      _markDirty();
+    }
     if (e.target.matches('.h-isin')) onIsinInput(e);
     if (e.target.matches('.h-qty, .h-cost, .h-mv')) {
       // Recalcul P&L ligne et totaux en live — on collecte puis re-render la ligne courante
@@ -443,5 +482,13 @@ document.getElementById('holdings-save')?.addEventListener('click', saveAll);
     }
   });
 
-  document.getElementById('holdings-modal-overlay')?.addEventListener('click', () => closeModal('holdings-modal'));
+  // Intercepte les 3 points de fermeture pour proposer sauvegarde si dirty
+  document.getElementById('holdings-modal-overlay')?.addEventListener('click', confirmCloseHoldings);
+  modal.querySelectorAll('[data-close="holdings-modal"]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      confirmCloseHoldings();
+    }, { capture: true });
+  });
 }
