@@ -23,6 +23,7 @@ import { loadReferential, saveReferential, initTemplateSelect } from './tabs/ref
 import { loadTimeline, wireSimulation, triggerAutoSnapshot, triggerPricesRefresh, loadSchedulerStatus } from './tabs/tools.js';
 import { wireGlobalSearch } from './search.js';
 import { wireSettingsEvents } from './settings.js';
+import { initColumnPicker, reapplyColumns } from './column-picker.js';
 
 // ─── Init ─────────────────────────────────────────────────────────────────
 
@@ -480,6 +481,19 @@ function wireEvents() {
   wireAdvisorEvents();
   wireActifsEvents();
   wireSettingsEvents();
+
+  // Column pickers
+  initColumnPicker('positions', 'positions-col-picker', 'positions-thead', {
+    owner: 'Proprietaire', category: 'Categorie', envelope: 'Enveloppe',
+    establishment: 'Etablissement', gross_attributed: 'Actif attribue',
+    debt_attributed: 'Dette', net_attributed: 'Net attribue',
+    liquidity: 'Liquidite', mobilizable_value: 'Mobilisable',
+  });
+  initColumnPicker('actifs', 'actifs-col-picker', 'actifs-thead', {
+    isin: 'ISIN', name: 'Nom', asset_class: 'Classe', quantity: 'Qty',
+    avg_cost: 'PRU', last_price: 'Cours', market_value: 'Valo',
+    pnl: '+/-', weight_pct: 'Poids', envelopes: 'Enveloppes',
+  });
 
   // Focus traps on static modals
   ['position-modal', 'flux-modal', 'entity-modal', 'targets-modal', 'holdings-modal', 'settings-modal'].forEach(trapModalFocus);
