@@ -125,7 +125,8 @@ function _onGlobalOwnerChange(e) {
   // Sync actifs filter
   const actifsSel = document.getElementById('actifs-owner-filter');
   if (actifsSel) actifsSel.value = S.syntheseOwner === 'Famille' ? '' : S.syntheseOwner;
-  // Reload current tab
+  // Force reload current tab
+  _lastLoadedTab = null;
   switchTab(S.currentTab, { pushHistory: false });
 }
 
@@ -154,12 +155,8 @@ function _installTableOverflowHints() {
   };
   update();
   window.addEventListener('resize', update);
-  // Mutation observer : re-check quand une table est rerender
-  const obs = new MutationObserver(() => {
-    requestAnimationFrame(update);
-  });
+  // Re-check overflow apres chaque resize (pas de MutationObserver — risque de boucle)
   document.querySelectorAll('.card-table').forEach(el => {
-    obs.observe(el, { childList: true, subtree: true });
     el.addEventListener('scroll', () => {
       const scrolledRight = el.scrollLeft + el.clientWidth >= el.scrollWidth - 2;
       el.classList.toggle('has-overflow', !scrolledRight && el.scrollWidth > el.clientWidth + 2);
@@ -171,6 +168,8 @@ function _tabFromUrl() {
   const path = location.pathname.replace(/^\//, '');
   return VALID_TABS.has(path) ? path : null;
 }
+
+let _lastLoadedTab = null;
 
 export async function switchTab(tab, { pushHistory = true } = {}) {
   S.currentTab = tab;
@@ -188,6 +187,11 @@ export async function switchTab(tab, { pushHistory = true } = {}) {
   if (dd) dd.classList.add('hidden');
 
   const tabId = `tab-${tab}`;
+  // Eviter de recharger l'onglet si on y est deja et qu'on ne force pas
+  if (tab === _lastLoadedTab && pushHistory) {
+    return;
+  }
+  _lastLoadedTab = tab;
   showLoading(tabId);
   try {
     if (tab === 'synthese')    await loadSynthese();
