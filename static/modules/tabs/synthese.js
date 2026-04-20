@@ -230,7 +230,9 @@ function renderCatChart(byCat) {
         if (!elements.length) return;
         const cat = cats[elements[0].index];
         api('GET', `/api/positions?date=${S.syntheseDate}`).then(positions => {
-          drilldownPositions(positions.filter(p => p.category === cat), cat, 'Catégorie', { showOwner: true });
+          const _o = S.syntheseOwner;
+          const filtered = positions.filter(p => p.category === cat && (_o === 'Famille' || p.owner === _o));
+          drilldownPositions(filtered, cat, 'Catégorie', { showOwner: _o === 'Famille' });
         });
       },
       plugins: {
@@ -240,7 +242,9 @@ function renderCatChart(byCat) {
           onClick: (e, item, legend) => {
             const cat = cats[item.index];
             api('GET', `/api/positions?date=${S.syntheseDate}`).then(positions => {
-              drilldownPositions(positions.filter(p => p.category === cat), cat, 'Catégorie', { showOwner: true });
+              const _o = S.syntheseOwner;
+              const filtered = positions.filter(p => p.category === cat && (_o === 'Famille' || p.owner === _o));
+              drilldownPositions(filtered, cat, 'Catégorie', { showOwner: _o === 'Famille' });
             });
           },
         },
