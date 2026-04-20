@@ -13,7 +13,11 @@ function _owners() {
 
 export async function loadSynthese() {
   if (!S.syntheseDate && S.dates.length) S.syntheseDate = S.dates[0];
-  if (!S.syntheseDate) return;
+  if (!S.syntheseDate) {
+    _renderSyntheseEmpty();
+    return;
+  }
+  _clearSyntheseEmpty();
   const [syn, positions] = await Promise.all([
     api('GET', `/api/synthese?date=${S.syntheseDate}`),
     api('GET', `/api/positions?date=${S.syntheseDate}`),
@@ -33,6 +37,36 @@ export async function loadSynthese() {
   S.synthese = syn;
   renderSynthesePersonTabs();
   renderSynthese();
+}
+
+function _renderSyntheseEmpty() {
+  const host = document.getElementById('tab-synthese');
+  if (!host || host.querySelector('.empty-state-synthese')) return;
+  // Masquer le contenu existant pendant l'etat vide
+  host.querySelectorAll('.kpi-grid, .charts-row, .card').forEach(el => el.classList.add('hidden'));
+  const card = document.createElement('div');
+  card.className = 'card empty-state empty-state-synthese';
+  card.innerHTML = `
+    <div style="text-align:center;padding:1.5rem .5rem">
+      <div style="font-size:32px;margin-bottom:.5rem;opacity:.5">&#128202;</div>
+      <h2 style="margin-bottom:.5rem">Aucun snapshot pour le moment</h2>
+      <p class="text-muted" style="font-size:13.5px;margin-bottom:1.25rem;line-height:1.6">
+        Commence par ajouter une position ou importer un fichier existant
+        pour que ton patrimoine s'affiche ici.
+      </p>
+      <div style="display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-primary" data-tab-switch="positions">+ Ajouter une position</button>
+        <button class="btn btn-secondary" data-tab-switch="import">&#8645; Importer des données</button>
+      </div>
+    </div>`;
+  host.querySelector('.page-header')?.after(card);
+  // Delegue au listener global (main.js) qui appelle switchTab
+}
+
+function _clearSyntheseEmpty() {
+  const host = document.getElementById('tab-synthese');
+  host?.querySelector('.empty-state-synthese')?.remove();
+  host?.querySelectorAll('.kpi-grid, .charts-row, .card').forEach(el => el.classList.remove('hidden'));
 }
 
 export function renderSynthesePersonTabs() {

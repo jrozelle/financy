@@ -11,6 +11,22 @@ import { renderSynthese } from './synthese.js';
 
 // ─── Demo mode ───────────────────────────────────────────────────────────────
 
+export function updateDemoBadge({ demo, llmMock } = {}) {
+  const badge = document.getElementById('demo-badge');
+  if (!badge) return;
+  let label = '';
+  if (demo) label = 'Mode démo';
+  else if (llmMock) label = 'LLM mocké';
+  if (label) {
+    badge.textContent = label;
+    badge.classList.remove('hidden');
+    badge.setAttribute('aria-hidden', 'false');
+  } else {
+    badge.classList.add('hidden');
+    badge.setAttribute('aria-hidden', 'true');
+  }
+}
+
 export async function initDemoToggle() {
   const toggle = document.getElementById('demo-toggle');
   const status = document.getElementById('demo-status');
@@ -21,10 +37,12 @@ export async function initDemoToggle() {
     const res = await api('GET', '/api/demo-mode');
     if (!res.available) {
       card.style.display = 'none';
+      updateDemoBadge({ demo: res.demo });
       return;
     }
     toggle.checked = res.demo;
     status.textContent = res.demo ? 'Mode démo actif' : 'Données réelles';
+    updateDemoBadge({ demo: res.demo });
   } catch {
     card.style.display = 'none';
     return;
@@ -35,6 +53,7 @@ export async function initDemoToggle() {
     try {
       await api('PUT', '/api/demo-mode', { demo });
       status.textContent = demo ? 'Mode démo actif' : 'Données réelles';
+      updateDemoBadge({ demo });
       toast(demo ? 'Mode démo activé' : 'Retour aux données réelles');
       await reloadAll();
     } catch (err) {
