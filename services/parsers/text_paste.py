@@ -19,6 +19,32 @@ from typing import List
 
 from .common import DetectedLine, ParseResult, parse_number, isin_luhn_ok, ISIN_RE
 
+# Mapping Classification AMF → asset_class interne
+_AMF_TO_ASSET_CLASS = {
+    'actions internationales': 'opcvm',
+    'actions de pays de la zone euros': 'opcvm',
+    'actions de pays de la zone euro': 'opcvm',
+    'actions françaises': 'opcvm',
+    'diversifié': 'opcvm',
+    'diversifie': 'opcvm',
+    'fps': 'opcvm',
+    'obligations et/ou titres de créances libellés en euros': 'obligation',
+    'obligations et/ou titres de créances internationaux': 'obligation',
+    'obligations et/ou titres de creances libelles en euros': 'obligation',
+    'obligations et/ou titres de creances internationaux': 'obligation',
+    'monétaire': 'opcvm',
+    'monetaire': 'opcvm',
+}
+
+
+def _classify_amf(lines):
+    """Extrait la Classification AMF et la mappe vers asset_class."""
+    for i, line in enumerate(lines):
+        if line.lower().startswith('classification amf') and i + 1 < len(lines):
+            raw = lines[i + 1].strip().lower()
+            return _AMF_TO_ASSET_CLASS.get(raw)
+    return None
+
 
 def parse_pasted_text(text: str) -> ParseResult:
     """Parse un texte colle depuis le navigateur."""
@@ -57,10 +83,14 @@ def parse_pasted_text(text: str) -> ParseResult:
         cost_price = _extract_field(lines, 'Prix de revient') or _extract_field(lines, "Prix d'Achat")
         cost_basis = round(cost_price * qty, 2) if cost_price and qty else None
 
+        # Classification AMF → asset_class
+        asset_class = _classify_amf(lines)
+
         result.lines.append(DetectedLine(
             isin=isin, name=name, quantity=qty, unit_price=vl,
             market_value=mv, cost_basis=cost_basis,
             confidence=0.9, source='paste',
+            asset_class=asset_class,
         ))
 
     result.total_market_value = sum(l.market_value or 0 for l in result.lines)

@@ -64,7 +64,8 @@ function makeRow(h = {}) {
     is_priceable:    h.is_priceable ?? null,
     last_price:      h.last_price ?? null,
     last_price_date: h.last_price_date ?? null,
-    confidence:      h.confidence ?? null,  // 0-1, seul pose apres import PDF/CSV
+    confidence:      h.confidence ?? null,
+    asset_class:     h.asset_class ?? null,
   };
 }
 
@@ -282,6 +283,7 @@ async function saveAll() {
       if (r.cost_basis !== '' && r.cost_basis != null) h.cost_basis = parseFloat(r.cost_basis);
       if (r.market_value !== '' && r.market_value != null) h.market_value = parseFloat(r.market_value);
       if (isPseudoIsin(isin)) h.is_priceable = false;
+      if (r.asset_class) h.asset_class = r.asset_class;
       return h;
     }),
   };
@@ -359,6 +361,7 @@ async function openPasteDialog() {
     state.rows = (data.lines || []).map(l => makeRow({
       isin: l.isin, name: l.name, quantity: l.quantity,
       cost_basis: l.cost_basis, market_value: l.market_value,
+      asset_class: l.asset_class,
     }));
     renderHoldingsTable();
     if (status) {
@@ -425,8 +428,9 @@ async function onPdfSelected(e) {
     cost_basis:   l.cost_basis,
     market_value: l.market_value,
     confidence:   l.confidence,
+    asset_class:  l.asset_class,
   }));
-  _markDirty();  // l'import replace le contenu, l'utilisateur doit enregistrer
+  _markDirty();
   renderHoldingsTable();
 
   // Statut : format detecte + warnings + action a faire

@@ -110,21 +110,30 @@ def history(isin):
             except Exception as e:
                 logger.warning('refresh_history failed for %s: %s', isin, e)
 
-        # Recupere les eventuels holdings pour calculer P&L contextuel
+        # Dernier snapshot pour filtrer les holdings
+        latest = conn.execute(
+            'SELECT MAX(date) as d FROM positions'
+        ).fetchone()
+        latest_date = latest['d'] if latest else None
+
+        # Holdings du dernier snapshot uniquement (pas les anciens)
+        date_filter = 'AND p.date=?' if latest_date else ''
+        date_params = [isin, latest_date] if latest_date else [isin]
+
         hs = conn.execute(
-            '''SELECT SUM(quantity) as qty, SUM(cost_basis) as cost, SUM(market_value) as mv
-               FROM holdings WHERE isin=?''', (isin,)
+            f'''SELECT SUM(h.quantity) as qty, SUM(h.cost_basis) as cost, SUM(h.market_value) as mv
+               FROM holdings h JOIN positions p ON p.id = h.position_id
+               WHERE h.isin=? {date_filter}''', date_params
         ).fetchone()
 
-        # Detail par position (etablissement, enveloppe, owner)
         positions_detail = conn.execute(
-            '''SELECT h.quantity, h.cost_basis, h.market_value,
+            f'''SELECT h.quantity, h.cost_basis, h.market_value,
                       p.owner, p.envelope, p.establishment, p.category
                FROM holdings h
                JOIN positions p ON p.id = h.position_id
-               WHERE h.isin=?
+               WHERE h.isin=? {date_filter}
                ORDER BY h.market_value DESC''',
-            (isin,)
+            date_params
         ).fetchall()
 
     points = [{'date': r['date'], 'price': r['price']} for r in rows]

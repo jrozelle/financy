@@ -88,6 +88,7 @@ class DetectedLine:
     raw: str = ''
     confidence: float = 0.0
     source: str = ''
+    asset_class: Optional[str] = None
 
     def to_dict(self):
         return asdict(self)
