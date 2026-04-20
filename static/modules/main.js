@@ -214,6 +214,14 @@ function wireEvents() {
     });
   });
 
+  // Delegation globale : tout bouton avec data-tab-switch (CTA des empty states)
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-tab-switch]');
+    if (!btn) return;
+    e.preventDefault();
+    switchTab(btn.dataset.tabSwitch);
+  });
+
   // Navbar hamburger mobile
   const navToggle = document.getElementById('navbar-toggle');
   const navTabs = document.getElementById('nav-tabs');

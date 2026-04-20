@@ -64,6 +64,7 @@ function makeRow(h = {}) {
     is_priceable:    h.is_priceable ?? null,
     last_price:      h.last_price ?? null,
     last_price_date: h.last_price_date ?? null,
+    confidence:      h.confidence ?? null,  // 0-1, seul pose apres import PDF/CSV
   };
 }
 
@@ -128,8 +129,16 @@ function rowHtml(r) {
   const openBtn = (r.id && r.isin)
     ? `<button type="button" class="h-isin-btn" data-action="open-popover" data-isin="${esc(r.isin)}" title="Voir le cours et l'historique">${esc(r.isin)}</button>`
     : '';
+  // Lignes issues d'un import PDF/CSV : highlight selon confiance
+  let confClass = '';
+  let confBadge = '';
+  if (r.confidence != null) {
+    if (r.confidence < 0.5)      { confClass = 'row-low-conf';  confBadge = `<span class="h-badge h-badge-expired" title="Confiance ${(r.confidence * 100).toFixed(0)} % — verifier les valeurs">à vérifier</span>`; }
+    else if (r.confidence < 0.8) { confClass = 'row-mid-conf';  confBadge = `<span class="h-badge h-badge-stale"   title="Confiance ${(r.confidence * 100).toFixed(0)} %">moyen</span>`; }
+    else                         { confClass = 'row-high-conf'; }
+  }
   return `
-    <tr data-draft="${r.draftId}">
+    <tr data-draft="${r.draftId}" class="${confClass}">
       <td>
         <input type="text" class="h-input h-isin" value="${esc(r.isin)}"
                list="holdings-isin-list"
@@ -137,7 +146,7 @@ function rowHtml(r) {
                autocomplete="off" spellcheck="false"
                style="text-transform:uppercase;min-width:140px">
         ${openBtn ? `<div style="margin-top:2px">${openBtn}</div>` : ''}
-        ${freshness}
+        ${freshness} ${confBadge}
       </td>
       <td>
         <input type="text" class="h-input h-name" value="${esc(r.name || '')}"
@@ -415,6 +424,7 @@ async function onPdfSelected(e) {
     quantity:     l.quantity,
     cost_basis:   l.cost_basis,
     market_value: l.market_value,
+    confidence:   l.confidence,
   }));
   _markDirty();  // l'import replace le contenu, l'utilisateur doit enregistrer
   renderHoldingsTable();

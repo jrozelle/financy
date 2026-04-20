@@ -1310,6 +1310,18 @@ input[type="file"] {
 .holdings-table .pos { color: var(--success); }
 .holdings-table .neg { color: var(--danger); }
 
+/* Lignes apres import PDF/CSV : highlight selon confiance */
+.holdings-table tr.row-low-conf {
+  background: rgba(239, 68, 68, .06);
+  box-shadow: inset 3px 0 0 var(--danger);
+}
+.holdings-table tr.row-mid-conf {
+  background: rgba(234, 179, 8, .06);
+  box-shadow: inset 3px 0 0 var(--warning);
+}
+[data-theme="dark"] .holdings-table tr.row-low-conf { background: rgba(239, 68, 68, .12); }
+[data-theme="dark"] .holdings-table tr.row-mid-conf { background: rgba(234, 179, 8, .12); }
+
 .h-isin-btn {
   background: none;
   border: none;
@@ -1784,6 +1796,27 @@ textarea:focus-visible {
     border-left-color: transparent;
     border-bottom-color: var(--primary);
   }
+}
+
+/* ── C2. Badge mode démo / LLM mock dans la navbar ────────────────────── */
+.demo-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 .6rem;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  background: rgba(234, 179, 8, .18);
+  color: #a16207;
+  border: 1px solid rgba(234, 179, 8, .38);
+  border-radius: 999px;
+}
+[data-theme="dark"] .demo-badge {
+  color: #fbbf24;
+  background: rgba(234, 179, 8, .14);
+  border-color: rgba(234, 179, 8, .32);
 }
 
 /* ── B7. Spinner inline sur bouton ─────────────────────────────────────── */

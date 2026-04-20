@@ -2,6 +2,7 @@ import { S } from '../state.js';
 import { api } from '../api.js';
 import { esc, fmt, destroyChart, getColors, chartBorderColor } from '../utils.js';
 import { confirmDialog, toast } from '../dialogs.js';
+import { updateDemoBadge } from './import-export.js';
 
 // ─── Sidebar scroll-spy ─────────────────────────────────────────────────────
 let _scrollSpyObserver = null;
@@ -204,7 +205,16 @@ async function _loadAllocation(profile) {
   const wrap = document.getElementById('advisor-allocation-wrap');
   const adjEl = document.getElementById('advisor-adjustments');
   if (!profile) {
-    adjEl.innerHTML = '<div class="text-muted" style="font-size:12.5px">Enregistrez un profil pour calculer l\'allocation cible.</div>';
+    adjEl.innerHTML = `
+      <div class="empty-state" style="padding:1rem 0">
+        <p class="text-muted" style="font-size:12.5px;margin-bottom:.75rem">
+          Enregistre un profil (horizon + tolérance au risque) pour calculer
+          l'allocation cible et générer des propositions d'arbitrage.
+        </p>
+        <a href="#adv-profile" class="btn btn-secondary btn-sm advisor-sidebar-link" data-anchor="adv-profile">
+          Remplir le profil &uarr;
+        </a>
+      </div>`;
     document.getElementById('advisor-gap-tbody').innerHTML = '';
     _allocChart = destroyChart(_allocChart);
     return;
@@ -295,6 +305,8 @@ async function _loadMacro() {
   } catch { return; }
   _llmAvailable = !!data.llm_available;
   _llmMock = !!data.llm_mock;
+  // Sync global demo badge : LLM mock => badge navbar (sauf si deja en mode demo)
+  updateDemoBadge({ llmMock: _llmMock });
 
   const btn = document.getElementById('btn-macro-refresh');
   if (btn) {
@@ -446,11 +458,44 @@ async function _loadUsage() {
   const el = document.getElementById('advisor-usage-summary');
   if (!el) return;
   const callsToday = data.days.length ? data.days[data.days.length - 1].calls : 0;
-  const budget = data.budget_usd != null ? ` / ${data.budget_usd.toFixed(2)} $` : '';
+  const spent  = data.month_total_usd || 0;
+  const budget = data.budget_usd;
+  const pct    = (budget && budget > 0) ? Math.min(100, spent / budget * 100) : null;
+
+  let bar = '';
+  let warning = '';
+  if (budget != null && budget > 0) {
+    const barColor = pct >= 100 ? 'var(--danger)'
+                   : pct >= 80  ? 'var(--warning)'
+                   : 'var(--primary)';
+    bar = `
+      <div style="margin-top:.5rem">
+        <div style="height:6px;background:var(--bg);border-radius:3px;overflow:hidden;border:1px solid var(--border)">
+          <div style="height:100%;width:${pct}%;background:${barColor};transition:width .25s"></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:.25rem">
+          ${spent.toFixed(4)} $ / ${budget.toFixed(2)} $ (${pct.toFixed(0)} %)
+        </div>
+      </div>`;
+    if (pct >= 80 && pct < 100) {
+      warning = `<div class="advisor-budget-warning" style="margin-top:.5rem;padding:.4rem .6rem;border-left:3px solid var(--warning);background:rgba(234,179,8,.1);font-size:12px;border-radius:4px">
+        Budget mensuel consommé à ${pct.toFixed(0)} %. Les prochains appels Claude
+        passeront toujours, mais envisage d'augmenter <code>ADVISOR_BUDGET_USD</code>.
+      </div>`;
+    } else if (pct >= 100) {
+      warning = `<div class="advisor-budget-warning" style="margin-top:.5rem;padding:.4rem .6rem;border-left:3px solid var(--danger);background:rgba(239,68,68,.1);font-size:12px;border-radius:4px">
+        <strong>Budget mensuel dépassé.</strong> Les prochains appels Claude seront bloqués
+        jusqu'à augmentation de <code>ADVISOR_BUDGET_USD</code> ou mois suivant.
+      </div>`;
+    }
+  }
+
   const mode = data.mock_mode ? ' <span class="h-badge h-badge-muted">mock</span>' : '';
   el.innerHTML = `
-    Ce mois : <strong>${data.month_total_usd.toFixed(4)} $</strong>${budget}${mode}
+    Ce mois : <strong>${spent.toFixed(4)} $</strong>${mode}
     · Aujourd'hui : ${callsToday} appel(s)
+    ${bar}
+    ${warning}
   `;
 }
 
