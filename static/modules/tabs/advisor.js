@@ -3,10 +3,48 @@ import { api } from '../api.js';
 import { esc, fmt, destroyChart, getColors, chartBorderColor } from '../utils.js';
 import { confirmDialog, toast } from '../dialogs.js';
 
+// ─── Sidebar scroll-spy ─────────────────────────────────────────────────────
+let _scrollSpyObserver = null;
+function _installSidebarScrollSpy() {
+  if (_scrollSpyObserver) return;
+  const links = document.querySelectorAll('.advisor-sidebar-link');
+  if (!links.length) return;
+  const sections = [...links]
+    .map(a => document.getElementById(a.dataset.anchor))
+    .filter(Boolean);
+  if (!sections.length) return;
+
+  _scrollSpyObserver = new IntersectionObserver(entries => {
+    // Prend la section dont le rect est la plus haute dans le viewport
+    const visible = entries
+      .filter(e => e.isIntersecting)
+      .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+    if (!visible.length) return;
+    const activeId = visible[0].target.id;
+    links.forEach(a => a.classList.toggle('is-active', a.dataset.anchor === activeId));
+  }, { rootMargin: '-40% 0px -55% 0px', threshold: [0, 0.3, 0.6, 1] });
+
+  sections.forEach(s => _scrollSpyObserver.observe(s));
+
+  // Clic : smooth scroll (complement au href="#id" natif)
+  links.forEach(a => {
+    a.addEventListener('click', e => {
+      const id = a.dataset.anchor;
+      const target = document.getElementById(id);
+      if (!target) return;
+      e.preventDefault();
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // Active immediate tant que l'observer n'a pas reagit
+      links.forEach(x => x.classList.toggle('is-active', x === a));
+    });
+  });
+}
+
 let _allocChart = null;
 let _currentOwner = null;
 
 export async function loadAdvisor() {
+  _installSidebarScrollSpy();
   // Remplir le selecteur de proprietaire a partir du referentiel
   const owners = (S.config && S.config.owners) || [];
   const sel = document.getElementById('advisor-owner-select');
@@ -289,13 +327,23 @@ async function _loadMacro() {
 
 async function refreshMacro() {
   const btn = document.getElementById('btn-macro-refresh');
+  const originalLabel = btn.textContent;
   btn.disabled = true;
+  btn.classList.add('is-loading');
+  btn.textContent = 'Appel Claude…';
   try {
     const r = await api('POST', '/api/advisor/macro/refresh');
-    toast(`Macro actualisée${r.meta?.cached ? ' (cache)' : ''}`, 'success');
+    const cost = r.meta?.cost_usd;
+    const dur = r.meta?.latency_ms;
+    const parts = ['Macro actualisée'];
+    if (r.meta?.cached) parts.push('(cache)');
+    else if (cost || dur) parts.push(`(${cost ? cost.toFixed(4) + ' $' : ''}${cost && dur ? ', ' : ''}${dur ? (dur / 1000).toFixed(1) + ' s' : ''})`);
+    toast(parts.join(' '), 'success');
     await _loadMacro();
   } catch {} finally {
     btn.disabled = false;
+    btn.classList.remove('is-loading');
+    btn.textContent = originalLabel;
   }
 }
 
@@ -365,7 +413,10 @@ function _renderProposals(list) {
 async function refreshProposals() {
   if (!_currentOwner) return;
   const btn = document.getElementById('btn-proposals-refresh');
+  const originalLabel = btn.textContent;
   btn.disabled = true;
+  btn.classList.add('is-loading');
+  btn.textContent = 'Calcul…';
   try {
     const r = await api('POST', `/api/advisor/profiles/${encodeURIComponent(_currentOwner)}/proposals/refresh`);
     toast(`${r.count} proposition(s) générée(s)`, 'success');
@@ -373,6 +424,8 @@ async function refreshProposals() {
     await _loadProposals();
   } catch {} finally {
     btn.disabled = false;
+    btn.classList.remove('is-loading');
+    btn.textContent = originalLabel;
   }
 }
 
