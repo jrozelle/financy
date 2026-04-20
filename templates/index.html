@@ -42,6 +42,7 @@
         </div>
       </div>
       <span id="demo-badge" class="demo-badge hidden" title="Mode demo / LLM mocke" aria-hidden="true"></span>
+      <button class="btn-icon" id="btn-keyboard-help" title="Raccourcis clavier (Shift+?)" aria-label="Raccourcis clavier">?</button>
       <button class="theme-toggle" id="theme-toggle" title="Basculer clair/sombre" aria-label="Basculer clair/sombre">&#9790;</button>
       {% if has_auth %}
       <a href="/logout" class="btn btn-secondary btn-sm" style="font-size:12px;padding:.25rem .75rem">Déconnexion</a>
@@ -815,6 +816,34 @@
     </div>
   </div>
 
+  <!-- ── MODAL AIDE RACCOURCIS CLAVIER ─────────────────────────────────── -->
+  <div id="keyboard-help-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="keyboard-help-title">
+    <div class="modal-overlay" data-close="keyboard-help-modal"></div>
+    <div class="modal-content" style="max-width:520px">
+      <div class="modal-header">
+        <h2 id="keyboard-help-title">Raccourcis clavier</h2>
+        <button class="modal-close" data-close="keyboard-help-modal" aria-label="Fermer">&#10005;</button>
+      </div>
+      <div class="modal-body" style="padding:0 1.25rem 1.25rem">
+        <table class="kbd-help-table" style="width:100%;font-size:13.5px">
+          <tbody>
+            <tr><td><kbd>Ctrl</kbd>+<kbd>N</kbd> <span class="text-muted">/</span> <kbd>&#8984;</kbd>+<kbd>N</kbd></td><td>Nouvelle position</td></tr>
+            <tr><td><kbd>/</kbd></td><td>Focus recherche globale</td></tr>
+            <tr><td><kbd>&larr;</kbd> <span class="text-muted">/</span> <kbd>&rarr;</kbd></td><td>Naviguer entre snapshots</td></tr>
+            <tr><td><kbd>&uarr;</kbd> <span class="text-muted">/</span> <kbd>&darr;</kbd></td><td>Naviguer resultats recherche (quand focus dans la search)</td></tr>
+            <tr><td><kbd>Enter</kbd></td><td>Ouvrir le resultat selectionne</td></tr>
+            <tr><td><kbd>Esc</kbd></td><td>Fermer modale / popover / dropdown</td></tr>
+            <tr><td><kbd>Shift</kbd>+<kbd>?</kbd></td><td>Afficher cette aide</td></tr>
+            <tr><td><kbd>Tab</kbd></td><td>Navigation clavier (outline bleu visible)</td></tr>
+          </tbody>
+        </table>
+        <p class="text-muted" style="font-size:12px;margin-top:1rem">
+          Les raccourcis ne s'activent pas quand tu tapes dans un champ (sauf <kbd>Esc</kbd>).
+        </p>
+      </div>
+    </div>
+  </div>
+
   <!-- ── MODAL POSITION ──────────────────────────────────────────────────── -->
   <div id="position-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="position-modal-title">
     <div class="modal-overlay" id="position-modal-overlay"></div>
@@ -974,6 +1003,10 @@
           Saisissez les lignes détenues dans cette enveloppe. ISIN standard (12 caractères)
           ou pseudo-ISIN commençant par <code>FONDS_EUROS_</code> / <code>CUSTOM_</code>
           pour un actif non coté.
+          <div style="margin-top:.4rem;font-size:11.5px">
+            Import CSV : <a href="/api/import/csv-template" download style="color:var(--primary);text-decoration:underline">télécharger le template</a>
+            (colonnes : ISIN, Libellé, Quantité, PRU, Cours, Valorisation — séparateur <code>;</code>).
+          </div>
         </div>
         <div class="holdings-table-wrap">
           <table class="holdings-table">

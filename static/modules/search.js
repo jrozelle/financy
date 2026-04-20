@@ -14,12 +14,31 @@ export function wireGlobalSearch(switchTabFn) {
   });
 
   input.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { input.value = ''; panel.innerHTML = ''; input.blur(); }
+    if (e.key === 'Escape') { input.value = ''; panel.innerHTML = ''; input.blur(); return; }
+    const items = [...panel.querySelectorAll('.search-item')];
+    if (!items.length) return;
+    const active = panel.querySelector('.search-item.is-active');
+    const idx = Math.max(0, items.indexOf(active));
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      _setActive(items, (idx + 1) % items.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      _setActive(items, (idx - 1 + items.length) % items.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      (active || items[0])?.click();
+    }
   });
 
   document.addEventListener('click', e => {
     if (!e.target.closest('#global-search')) panel.innerHTML = '';
   });
+}
+
+function _setActive(items, newIdx) {
+  items.forEach((it, i) => it.classList.toggle('is-active', i === newIdx));
+  items[newIdx]?.scrollIntoView({ block: 'nearest' });
 }
 
 function matchScore(text, query) {
@@ -147,12 +166,20 @@ function renderResults(query, panel, switchTabFn) {
 
   panel.innerHTML = html;
 
-  panel.querySelectorAll('.search-item').forEach(item => {
+  // Auto-select du premier resultat pour que Enter fonctionne tout de suite
+  const items = panel.querySelectorAll('.search-item');
+  items[0]?.classList.add('is-active');
+
+  items.forEach(item => {
     item.addEventListener('click', () => {
       const tab = item.dataset.tab;
       switchTabFn(tab);
       panel.innerHTML = '';
       document.getElementById('global-search-input').value = '';
+    });
+    item.addEventListener('mouseenter', () => {
+      items.forEach(it => it.classList.remove('is-active'));
+      item.classList.add('is-active');
     });
   });
 }

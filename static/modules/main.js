@@ -222,6 +222,11 @@ function wireEvents() {
     switchTab(btn.dataset.tabSwitch);
   });
 
+  // Bouton d'aide raccourcis clavier
+  document.getElementById('btn-keyboard-help')?.addEventListener('click', () => {
+    document.getElementById('keyboard-help-modal')?.classList.remove('hidden');
+  });
+
   // Navbar hamburger mobile
   const navToggle = document.getElementById('navbar-toggle');
   const navTabs = document.getElementById('nav-tabs');
@@ -515,7 +520,7 @@ function wireEvents() {
         confirmCloseHoldings();
         return;
       }
-      for (const id of ['position-modal', 'flux-modal', 'entity-modal', 'targets-modal']) {
+      for (const id of ['keyboard-help-modal', 'position-modal', 'flux-modal', 'entity-modal', 'targets-modal']) {
         const m = document.getElementById(id);
         if (m && !m.classList.contains('hidden')) { closeModal(id); return; }
       }
@@ -526,6 +531,13 @@ function wireEvents() {
       e.preventDefault();
       if (S.currentTab !== 'positions') switchTab('positions');
       openPosModal();
+    }
+
+    // Shift+? — affiche la modale d'aide raccourcis
+    if (e.key === '?') {
+      e.preventDefault();
+      document.getElementById('keyboard-help-modal')?.classList.remove('hidden');
+      return;
     }
 
     // / — focus global search

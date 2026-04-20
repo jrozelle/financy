@@ -135,13 +135,28 @@ function showJsonImportResult(msg, ok) {
     `<div class="alert alert-${ok ? 'success' : 'error'}">${esc(msg)}</div>`;
 }
 
+const _TABLE_LABELS = {
+  positions:          'positions',
+  flux:               'flux',
+  entities:           'entités',
+  entity_snapshots:   'snapshots entités',
+  snapshot_notes:     'notes de snapshot',
+  holdings:           'lignes holdings',
+  holdings_snapshots: 'snapshots holdings',
+  price_history:      'cours historiques',
+  securities:         'securities',
+};
+
 export async function resetDb() {
   if (!await confirmDialog(
     'Vider TOUTE la base ?',
     'Positions, flux et entités seront supprimés <strong>définitivement</strong>.<br>Faites un export JSON avant si vous souhaitez conserver vos données.',
     { confirmText: 'Tout supprimer', danger: true }
   )) return;
-  await api('POST', '/api/reset');
+  let result;
+  try {
+    result = await api('POST', '/api/reset');
+  } catch { return; }
   S.dates = []; S.syntheseDate = null; S.positionsDate = null;
   S.positions = []; S.flux = []; S.entities = []; S.historique = [];
   await refreshDates();
@@ -149,9 +164,18 @@ export async function resetDb() {
   renderEntities();
   renderFlux();
   renderSynthese();
-  document.getElementById('reset-result').innerHTML =
-    '<div class="alert alert-success">Base vidée. Vous pouvez réimporter.</div>';
-  setTimeout(() => { document.getElementById('reset-result').innerHTML = ''; }, 4000);
+  // Recap detaille des lignes supprimees
+  const lines = Object.entries(result?.deleted || {})
+    .filter(([, n]) => n > 0)
+    .map(([t, n]) => `<li>${n.toLocaleString('fr-FR')} ${esc(_TABLE_LABELS[t] || t)}</li>`)
+    .join('');
+  const total = result?.total || 0;
+  document.getElementById('reset-result').innerHTML = `
+    <div class="alert alert-success">
+      Base vidée — <strong>${total.toLocaleString('fr-FR')}</strong> ligne(s) supprimée(s).
+      ${lines ? `<ul style="margin:.4rem 0 0 1.1rem;font-size:12.5px">${lines}</ul>` : ''}
+    </div>`;
+  setTimeout(() => { document.getElementById('reset-result').innerHTML = ''; }, 8000);
 }
 
 export async function createBackup() {

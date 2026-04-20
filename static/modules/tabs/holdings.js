@@ -166,7 +166,7 @@ function rowHtml(r) {
       </td>
       <td class="num">${_pnlCell(r)}</td>
       <td>
-        <button type="button" class="btn-icon del" data-action="remove-line" data-draft="${r.draftId}">Suppr.</button>
+        <button type="button" class="btn-icon del" data-action="remove-line" data-draft="${r.draftId}">Supprimer</button>
       </td>
     </tr>`;
 }
