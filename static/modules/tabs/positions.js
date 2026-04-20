@@ -219,7 +219,7 @@ export function startInlineEdit(span) {
   });
 }
 
-function _posLeafHtml(p, { showHoldings = true } = {}) {
+function _posLeafHtml(p, { showHoldings = true, mergedLabel = null } = {}) {
   const pctBadge = (p.ownership_pct ?? 1) < 0.999
     ? `<span class="tree-badge-pct badge badge-j27">${Math.round((p.ownership_pct ?? 1) * 100)}%</span>` : '';
   const mobMark = p.mobilizable_pct_override != null
@@ -233,7 +233,7 @@ function _posLeafHtml(p, { showHoldings = true } = {}) {
   return `
     <div class="tree-row tree-pos-leaf" data-pos-id="${p.id}">
       <span class="tree-dot"></span>
-      <span class="tree-label" title="${esc(p.label || p.category)}">${esc(p.label || p.category)}${pctBadge}${notesMark}${mobMark}</span>
+      <span class="tree-label" title="${esc(mergedLabel || p.label || p.category)}">${esc(mergedLabel || p.label || p.category)}${pctBadge}${notesMark}${mobMark}</span>
       <span class="tree-badges">${liqBadge(p.liquidity)}</span>
       ${inlineVal}
       <span class="tree-actions">
@@ -295,13 +295,21 @@ function renderPositionsTree(allPositions) {
             }
             const envNet   = envPoses.reduce((s, p) => s + (p.net_attributed || 0), 0);
             const envDebt  = envPoses.reduce((s, p) => s + (p.debt_attributed || 0), 0);
+            const envDebtStr = envDebt > 0 ? `<span class="tree-debt-label">dette ${fmt(envDebt)}</span>` : '';
+
+            // Fusion : si une seule position sous l'enveloppe, on merge la ligne
+            if (envPoses.length === 1) {
+              const p = envPoses[0];
+              const label = (p.label || p.category) !== env
+                ? `${env} — ${p.label || p.category}` : env;
+              return _posLeafHtml({...p, _mergedLabel: label}, { showHoldings: true, mergedLabel: label });
+            }
 
             const catHtml = [...envPoses]
               .sort((a, b) => (b.net_attributed||0) - (a.net_attributed||0))
               .map(p => _posLeafHtml(p))
               .join('');
 
-            const envDebtStr = envDebt > 0 ? `<span class="tree-debt-label">dette ${fmt(envDebt)}</span>` : '';
             const envEntity  = isEntity ? etabl.replace(/^Entité : /, '') : '';
             const envEtabl   = isEntity ? '' : etabl;
             return `
@@ -313,13 +321,13 @@ function renderPositionsTree(allPositions) {
                   <button class="btn-icon" data-action="history-env"
                     data-owner="${esc(owner)}" data-envelope="${esc(env)}"
                     ${isEntity ? `data-entity="${esc(etablEntityName)}"` : `data-establishment="${esc(etablRealName)}"`}
-                    title="Évolution dans le temps">📈</button>
+                    title="Évolution dans le temps">&#128200;</button>
                   <button class="btn-icon add" data-action="add-pos-ctx"
                     data-owner="${esc(owner)}"
                     data-establishment="${esc(envEtabl)}"
                     data-envelope="${esc(env)}"
                     data-entity="${esc(envEntity)}"
-                    title="Ajouter une position dans cette enveloppe">+</button>
+                    title="Ajouter une position">+</button>
                 </span>
               </div>
               <div class="tree-children">${catHtml}</div>`;
