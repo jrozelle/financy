@@ -11,8 +11,9 @@
 <body>
 
   <nav class="navbar">
+    <button class="navbar-toggle" id="navbar-toggle" aria-label="Menu" aria-expanded="false" aria-controls="nav-tabs">&#9776;</button>
     <div class="nav-brand">&#9670; Financy</div>
-    <div class="nav-tabs">
+    <div class="nav-tabs" id="nav-tabs">
       <button class="tab-btn active" data-tab="synthese">Synthèse</button>
       <button class="tab-btn" data-tab="positions">Positions</button>
       <button class="tab-btn" data-tab="actifs">Actifs</button>
@@ -420,7 +421,18 @@
         Les propositions sont générées par des règles automatiques, à croiser avec votre propre jugement ou celui d'un conseiller CIF.
       </div>
 
-      <div class="card">
+      <div class="advisor-layout">
+        <aside class="advisor-sidebar" aria-label="Sections du conseil">
+          <a href="#adv-profile"     class="advisor-sidebar-link" data-anchor="adv-profile">Profil</a>
+          <a href="#adv-objectives"  class="advisor-sidebar-link" data-anchor="adv-objectives">Objectifs</a>
+          <a href="#adv-allocation"  class="advisor-sidebar-link" data-anchor="adv-allocation">Allocation</a>
+          <a href="#adv-macro"       class="advisor-sidebar-link" data-anchor="adv-macro">Macro</a>
+          <a href="#adv-proposals"   class="advisor-sidebar-link" data-anchor="adv-proposals">Propositions</a>
+          <a href="#adv-usage"       class="advisor-sidebar-link" data-anchor="adv-usage">Consommation API</a>
+        </aside>
+        <div class="advisor-content">
+
+      <div class="card" id="adv-profile">
         <h2>Profil de la personne</h2>
         <div style="margin-bottom:.75rem">
           <label style="font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Personne</label>
@@ -480,7 +492,7 @@
         </form>
       </div>
 
-      <div class="card">
+      <div class="card" id="adv-objectives">
         <h2>Objectifs</h2>
         <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
           Projets patrimoniaux multi-horizons. Pris en compte pour affiner l'allocation cible en phase ultérieure.
@@ -502,7 +514,7 @@
         <button type="button" class="btn btn-secondary btn-sm" id="btn-add-objective" style="margin-top:.75rem">+ Ajouter un objectif</button>
       </div>
 
-      <div class="card">
+      <div class="card" id="adv-allocation">
         <h2>Allocation cible vs actuelle</h2>
         <div id="advisor-adjustments" class="advisor-adjustments"></div>
         <div id="advisor-allocation-wrap">
@@ -526,7 +538,7 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="adv-macro">
         <h2>Vue macroéconomique</h2>
         <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
           Synthèse générée par Claude (sans web search) ou éditée à la main.
@@ -560,7 +572,7 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="adv-proposals">
         <h2>Propositions d'arbitrage</h2>
         <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
           Allègements par poche, optimisations fiscales et lignes nominatives,
@@ -581,10 +593,13 @@
         <div id="proposals-list" class="proposals-list"></div>
       </div>
 
-      <div class="card">
+      <div class="card" id="adv-usage">
         <h2>Consommation API Claude</h2>
         <div id="advisor-usage-summary" class="text-muted" style="font-size:13px"></div>
       </div>
+
+        </div><!-- /.advisor-content -->
+      </div><!-- /.advisor-layout -->
     </div>
 
     <!-- ── OUTILS ──────────────────────────────────────────────────────── -->

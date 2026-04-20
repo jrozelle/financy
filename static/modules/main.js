@@ -134,6 +134,39 @@ const VALID_TABS = new Set([
   'referentiel', 'tools', 'import',
 ]);
 
+function _closeNavDrawer() {
+  const navTabs = document.getElementById('nav-tabs');
+  const navToggle = document.getElementById('navbar-toggle');
+  if (navTabs?.classList.contains('is-open')) {
+    navTabs.classList.remove('is-open');
+    navToggle?.setAttribute('aria-expanded', 'false');
+  }
+}
+
+// Ajoute/retire .has-overflow sur les .card-table selon leur scroll horizontal.
+// Appele une fois au boot + a chaque resize + a chaque changement d'onglet.
+function _installTableOverflowHints() {
+  const update = () => {
+    document.querySelectorAll('.card-table').forEach(el => {
+      const overflows = el.scrollWidth > el.clientWidth + 2;
+      el.classList.toggle('has-overflow', overflows);
+    });
+  };
+  update();
+  window.addEventListener('resize', update);
+  // Mutation observer : re-check quand une table est rerender
+  const obs = new MutationObserver(() => {
+    requestAnimationFrame(update);
+  });
+  document.querySelectorAll('.card-table').forEach(el => {
+    obs.observe(el, { childList: true, subtree: true });
+    el.addEventListener('scroll', () => {
+      const scrolledRight = el.scrollLeft + el.clientWidth >= el.scrollWidth - 2;
+      el.classList.toggle('has-overflow', !scrolledRight && el.scrollWidth > el.clientWidth + 2);
+    });
+  });
+}
+
 function _tabFromUrl() {
   const path = location.pathname.replace(/^\//, '');
   return VALID_TABS.has(path) ? path : null;
@@ -173,10 +206,29 @@ export async function switchTab(tab, { pushHistory = true } = {}) {
 // ─── Events ───────────────────────────────────────────────────────────────
 
 function wireEvents() {
-  // Tabs
+  // Tabs (ferment aussi le drawer mobile s'il est ouvert)
   document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+    btn.addEventListener('click', () => {
+      _closeNavDrawer();
+      switchTab(btn.dataset.tab);
+    });
   });
+
+  // Navbar hamburger mobile
+  const navToggle = document.getElementById('navbar-toggle');
+  const navTabs = document.getElementById('nav-tabs');
+  if (navToggle && navTabs) {
+    navToggle.addEventListener('click', e => {
+      e.stopPropagation();
+      const open = navTabs.classList.toggle('is-open');
+      navToggle.setAttribute('aria-expanded', String(open));
+    });
+    document.addEventListener('click', e => {
+      if (!navTabs.classList.contains('is-open')) return;
+      if (e.target.closest('#nav-tabs') || e.target.closest('#navbar-toggle')) return;
+      _closeNavDrawer();
+    });
+  }
 
   // Global owner filter
   document.getElementById('global-owner-filter')?.addEventListener('change', _onGlobalOwnerChange);
@@ -418,6 +470,9 @@ function wireEvents() {
   // Body scroll-lock : observe toutes les modales statiques + popover ISIN
   installModalScrollLock();
 
+  // Indicateur visuel de scroll horizontal sur les tables
+  _installTableOverflowHints();
+
   // Keyboard shortcuts
   document.addEventListener('keydown', e => {
     // Ignore shortcuts when typing in an input/textarea/select
@@ -434,6 +489,17 @@ function wireEvents() {
       const popover = document.getElementById('isin-popover');
       if (popover && !popover.classList.contains('hidden')) {
         popover.classList.add('hidden'); return;
+      }
+      // Settings dropdown + eventuel drawer navbar mobile
+      const settingsDd = document.getElementById('settings-dropdown');
+      if (settingsDd && !settingsDd.classList.contains('hidden')) {
+        settingsDd.classList.add('hidden'); return;
+      }
+      const navTabs = document.querySelector('.nav-tabs.is-open');
+      if (navTabs) {
+        navTabs.classList.remove('is-open');
+        document.getElementById('navbar-toggle')?.setAttribute('aria-expanded', 'false');
+        return;
       }
       // Holdings : warning si brouillon dirty (intercepte Escape)
       const holdingsModal = document.getElementById('holdings-modal');
