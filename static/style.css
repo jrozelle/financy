@@ -673,9 +673,10 @@ input[type="file"] {
 }
 .tree-owner  { font-weight: 700; font-size: 15px; padding: .6rem .5rem; border-bottom: 1px solid var(--border); margin-bottom: .25rem; }
 .tree-etabl  { font-weight: 600; font-size: 13.5px; cursor: pointer; padding-left: .75rem; }
-.tree-env    { font-size: 13px; cursor: pointer; padding-left: 2rem; color: var(--text-muted); }
-.tree-cat    { font-size: 12.5px; padding-left: 3.25rem; }
-.tree-pos    { font-size: 12px; padding-left: 4.25rem; }
+.tree-env    { font-size: 13px; cursor: pointer; padding-left: 1.5rem; color: var(--text); opacity: .75; }
+.tree-env:hover { opacity: 1; }
+.tree-cat    { font-size: 12.5px; padding-left: 2.5rem; }
+.tree-pos    { font-size: 12px; padding-left: 3.5rem; }
 
 .tree-row:hover { background: var(--bg); }
 .tree-owner:hover, .tree-etabl:hover, .tree-env:hover { background: var(--primary-light); }
@@ -687,10 +688,10 @@ input[type="file"] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   border-radius: 4px;
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
   flex-shrink: 0;
   user-select: none;
@@ -758,13 +759,18 @@ input[type="file"] {
   margin: 0 .2rem;
 }
 
-/* Feuilles de positions (avec boutons éditer/suppr) */
+/* Feuilles de positions */
 .tree-pos-leaf {
-  padding-left: 3rem;
-  gap: .5rem;
+  padding-left: 2.25rem;
+  gap: .375rem;
   align-items: center;
+  font-size: 13px;
 }
 .tree-pos-leaf .tree-dot { margin-left: .25rem; }
+.tree-badge-pct { font-size: 10px; opacity: .7; margin-left: .25rem; }
+.tree-badge-warn { font-size: 11px; cursor: default; margin-left: .2rem; color: var(--warning); }
+.tree-badge-notes { font-size: 11px; cursor: default; margin-left: .2rem; opacity: .5; }
+.tree-debt-label { color: var(--danger); font-size: 11px; margin-left: .5rem; }
 .tree-inline-amount { cursor: pointer; border-bottom: 1px dashed var(--text-muted); }
 .tree-inline-amount:hover { border-bottom-color: var(--primary); color: var(--primary); }
 .tree-inline-input {
