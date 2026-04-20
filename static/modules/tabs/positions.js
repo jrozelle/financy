@@ -219,6 +219,31 @@ export function startInlineEdit(span) {
   });
 }
 
+function _posLeafHtml(p, { showHoldings = true } = {}) {
+  const pctBadge = (p.ownership_pct ?? 1) < 0.999
+    ? `<span class="tree-badge-pct badge badge-j27">${Math.round((p.ownership_pct ?? 1) * 100)}%</span>` : '';
+  const mobMark = p.mobilizable_pct_override != null
+    ? `<span class="tree-badge-warn" title="Mobilisabilite surchargee : ${Math.round(p.mobilizable_pct_override * 100)} %">&#9888;</span>` : '';
+  const notesMark = p.notes
+    ? `<span class="tree-badge-notes" title="${esc(p.notes)}">&#128203;</span>` : '';
+  const hasEntity = !!p.entity;
+  const inlineVal = hasEntity
+    ? `<span class="tree-amount ${p.net_attributed < 0 ? 'neg' : ''}">${fmt(p.net_attributed)}</span>`
+    : `<span class="tree-inline-amount ${p.net_attributed < 0 ? 'neg' : ''}" title="Cliquer pour editer" data-id="${p.id}" data-field="value" data-val="${p.value || 0}">${fmt(p.net_attributed)}</span>`;
+  return `
+    <div class="tree-row tree-pos-leaf" data-pos-id="${p.id}">
+      <span class="tree-dot"></span>
+      <span class="tree-label" title="${esc(p.label || p.category)}">${esc(p.label || p.category)}${pctBadge}${notesMark}${mobMark}</span>
+      <span class="tree-badges">${liqBadge(p.liquidity)}</span>
+      ${inlineVal}
+      <span class="tree-actions">
+        ${showHoldings ? `<button class="btn-icon" data-action="manage-holdings" data-id="${p.id}" title="Lignes">&#9776;</button>` : ''}
+        <button class="btn-icon edit" data-id="${p.id}" data-action="edit-pos" title="Editer">&#9998;</button>
+        <button class="btn-icon del" data-id="${p.id}" data-action="del-pos" title="Supprimer">&#10005;</button>
+      </span>
+    </div>`;
+}
+
 function renderPositionsTree(allPositions) {
   const container = document.getElementById('positions-tree-body');
   if (!allPositions.length) {
@@ -263,65 +288,20 @@ function renderPositionsTree(allPositions) {
           .map(([env, envPoses]) => {
             // Pas d'enveloppe (biens personnels) : afficher les positions directement
             if (env === '(Sans enveloppe)') {
-              const catHtml = [...envPoses]
+              return [...envPoses]
                 .sort((a, b) => (b.net_attributed||0) - (a.net_attributed||0))
-                .map(p => {
-                  const ownPct = p.ownership_pct ?? 1;
-                  const pctBadge = ownPct < 0.999
-                    ? `<span class="badge badge-j27" style="font-size:10px">${Math.round(ownPct*100)}%</span>` : '';
-                  const mobMark = p.mobilizable_pct_override != null
-                    ? `<span title="Mobilisabilité surchargée : ${Math.round(p.mobilizable_pct_override*100)} %" style="font-size:11px;cursor:default;margin-left:3px;color:var(--warning)">⚠</span>` : '';
-                  const hasEntity = !!p.entity;
-                  const inlineVal = hasEntity
-                    ? `<span class="tree-amount ${p.net_attributed < 0 ? 'neg' : ''}">${fmt(p.net_attributed)}</span>`
-                    : `<span class="tree-inline-amount ${p.net_attributed < 0 ? 'neg' : ''}" title="Cliquer pour éditer la valeur" data-id="${p.id}" data-field="value" data-val="${p.value || 0}">${fmt(p.net_attributed)}</span>`;
-                  return `
-                    <div class="tree-row tree-pos-leaf" data-pos-id="${p.id}">
-                      <span class="tree-dot"></span>
-                      <span class="tree-label">${esc(p.label || p.category)}${pctBadge}${mobMark}</span>
-                      <span class="tree-badges">${liqBadge(p.liquidity)}</span>
-                      ${inlineVal}
-                      <span class="tree-actions">
-                        <button class="btn-icon" data-action="edit-pos" data-id="${p.id}">Éditer</button>
-                        <button class="btn-icon del" data-action="del-pos" data-id="${p.id}">Supprimer</button>
-                      </span>
-                    </div>`;
-                }).join('');
-              return catHtml;
+                .map(p => _posLeafHtml(p, { showHoldings: false }))
+                .join('');
             }
             const envNet   = envPoses.reduce((s, p) => s + (p.net_attributed || 0), 0);
             const envDebt  = envPoses.reduce((s, p) => s + (p.debt_attributed || 0), 0);
 
             const catHtml = [...envPoses]
               .sort((a, b) => (b.net_attributed||0) - (a.net_attributed||0))
-              .map(p => {
-                const ownPct = p.ownership_pct ?? 1;
-                const pctBadge = ownPct < 0.999
-                  ? `<span class="badge badge-j27" style="font-size:10px">${Math.round(ownPct*100)}%</span>` : '';
-                const notesMark = p.notes
-                  ? `<span title="${esc(p.notes)}" style="font-size:11px;cursor:default;margin-left:3px">📋</span>` : '';
-                const mobMark = p.mobilizable_pct_override != null
-                  ? `<span title="Mobilisabilité surchargée : ${Math.round(p.mobilizable_pct_override*100)} %" style="font-size:11px;cursor:default;margin-left:3px;color:var(--warning)">⚠</span>` : '';
-                const hasEntity = !!p.entity;
-                const inlineVal = hasEntity
-                  ? `<span class="tree-amount ${p.net_attributed < 0 ? 'neg' : ''}">${fmt(p.net_attributed)}</span>`
-                  : `<span class="tree-inline-amount ${p.net_attributed < 0 ? 'neg' : ''}" title="Cliquer pour éditer la valeur" data-id="${p.id}" data-field="value" data-val="${p.value || 0}">${fmt(p.net_attributed)}</span>`;
-                return `
-                  <div class="tree-row tree-pos-leaf" data-pos-id="${p.id}">
-                    <span class="tree-dot"></span>
-                    <span class="tree-label">${esc(p.label || p.category)}${pctBadge}${mobMark}</span>
-                    <span class="tree-badges">${liqBadge(p.liquidity)}</span>
-                    ${inlineVal}
-                    <span class="tree-actions">
-                      <button class="btn-icon" data-action="history-pos" data-id="${p.id}" title="Évolution dans le temps">📈</button>
-                      <button class="btn-icon" data-action="manage-holdings" data-id="${p.id}" title="Gérer les lignes">Lignes</button>
-                      <button class="btn-icon edit" data-id="${p.id}" data-action="edit-pos">Éditer</button>
-                      <button class="btn-icon del"  data-id="${p.id}" data-action="del-pos">Supprimer</button>
-                    </span>
-                  </div>`;
-              }).join('');
+              .map(p => _posLeafHtml(p))
+              .join('');
 
-            const envDebtStr = envDebt > 0 ? `<span style="color:var(--danger);font-size:11px;margin-left:.5rem">dette ${fmt(envDebt)}</span>` : '';
+            const envDebtStr = envDebt > 0 ? `<span class="tree-debt-label">dette ${fmt(envDebt)}</span>` : '';
             const envEntity  = isEntity ? etabl.replace(/^Entité : /, '') : '';
             const envEtabl   = isEntity ? '' : etabl;
             return `
@@ -346,7 +326,7 @@ function renderPositionsTree(allPositions) {
           }).join('');
 
         const etablDebt    = ePoses.reduce((s, p) => s + (p.debt_attributed || 0), 0);
-        const etablDebtStr = etablDebt > 0 ? `<span style="color:var(--danger);font-size:11px;margin-left:.5rem">dette ${fmt(etablDebt)}</span>` : '';
+        const etablDebtStr = etablDebt > 0 ? `<span class="tree-debt-label">dette ${fmt(etablDebt)}</span>` : '';
         return `
           <div class="tree-row tree-etabl" data-key="petabl-${esc(owner)}-${esc(etabl)}">
             <span class="tree-toggle">▾</span>
