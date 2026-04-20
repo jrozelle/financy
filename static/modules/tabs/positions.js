@@ -297,12 +297,26 @@ function renderPositionsTree(allPositions) {
             const envDebt  = envPoses.reduce((s, p) => s + (p.debt_attributed || 0), 0);
             const envDebtStr = envDebt > 0 ? `<span class="tree-debt-label">dette ${fmt(envDebt)}</span>` : '';
 
-            // Fusion : si une seule position sous l'enveloppe, on merge la ligne
+            // Fusion : si une seule position sous l'enveloppe, merge en une ligne env
             if (envPoses.length === 1) {
               const p = envPoses[0];
               const label = (p.label || p.category) !== env
                 ? `${env} — ${p.label || p.category}` : env;
-              return _posLeafHtml({...p, _mergedLabel: label}, { showHoldings: true, mergedLabel: label });
+              const hasEntity = !!p.entity;
+              const inlineVal = hasEntity
+                ? `<span class="tree-amount ${p.net_attributed < 0 ? 'neg' : ''}">${fmt(p.net_attributed)}</span>`
+                : `<span class="tree-inline-amount ${p.net_attributed < 0 ? 'neg' : ''}" title="Cliquer pour editer" data-id="${p.id}" data-field="value" data-val="${p.value || 0}">${fmt(p.net_attributed)}</span>`;
+              return `
+                <div class="tree-row tree-env tree-env-merged" data-pos-id="${p.id}" data-key="penv-${esc(owner)}-${esc(etabl)}-${esc(env)}">
+                  <span class="tree-dot"></span>
+                  <span class="tree-label" title="${esc(label)}">${esc(label)}${envDebtStr}</span>
+                  <span class="tree-badges">${liqBadge(p.liquidity)}</span>
+                  ${inlineVal}
+                  <span class="tree-actions">
+                    <button class="btn-icon" data-action="manage-holdings" data-id="${p.id}" title="Lignes">&#9776;</button>
+                    <button class="btn-icon edit" data-id="${p.id}" data-action="edit-pos" title="Editer">&#9998;</button>
+                  </span>
+                </div>`;
             }
 
             const catHtml = [...envPoses]
