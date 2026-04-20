@@ -672,14 +672,15 @@ input[type="file"] {
   transition: background .1s;
 }
 .tree-owner  { font-weight: 700; font-size: 15px; padding: .6rem .5rem; border-bottom: 1px solid var(--border); margin-bottom: .25rem; }
-.tree-etabl  { font-weight: 600; font-size: 13.5px; cursor: pointer; padding-left: .75rem; }
-.tree-env    { font-size: 13px; cursor: pointer; padding-left: 1.5rem; color: var(--text); opacity: .75; }
-.tree-env:hover { opacity: 1; }
-.tree-cat    { font-size: 12.5px; padding-left: 2.5rem; }
-.tree-pos    { font-size: 12px; padding-left: 3.5rem; }
+.tree-etabl  { font-weight: 600; font-size: 13.5px; cursor: pointer; padding-left: 1.25rem; }
+.tree-env    { font-size: 13px; cursor: pointer; padding-left: 2.5rem; color: var(--text); font-weight: 500; }
+.tree-cat    { font-size: 12.5px; padding-left: 3.5rem; }
+.tree-pos    { font-size: 12px; padding-left: 4.5rem; }
 
 .tree-row:hover { background: var(--bg); }
 .tree-owner:hover, .tree-etabl:hover, .tree-env:hover { background: var(--primary-light); }
+.tree-etabl { margin-top: .25rem; border-top: 1px solid color-mix(in srgb, var(--border) 50%, transparent); padding-top: .5rem; }
+.tree-etabl:first-child { border-top: none; margin-top: 0; }
 
 .tree-root { margin-left: 0 !important; }
 .tree-children { margin-left: 0; }
@@ -761,10 +762,15 @@ input[type="file"] {
 
 /* Feuilles de positions */
 .tree-pos-leaf {
-  padding-left: 2.25rem;
+  padding-left: 3.5rem;
   gap: .375rem;
   align-items: center;
   font-size: 13px;
+}
+/* Feuille fusionnee (seule sous son enveloppe) : indentee comme une enveloppe */
+.tree-env + .tree-children > .tree-pos-leaf:only-child,
+.tree-etabl + .tree-children > .tree-pos-leaf {
+  padding-left: 2.5rem;
 }
 .tree-pos-leaf .tree-dot { margin-left: .25rem; }
 .tree-badge-pct { font-size: 10px; opacity: .7; margin-left: .25rem; }
