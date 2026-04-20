@@ -2,6 +2,7 @@ import { S } from '../state.js';
 import { fmt, fmtDate, esc, sortArr, updateSortIndicators, today } from '../utils.js';
 import { api } from '../api.js';
 import { confirmDialog, toast, closeModal } from '../dialogs.js';
+import { saveFilters, loadFilters, clearFilterKey, applyIfValid } from '../filter-persist.js';
 
 export async function loadFlux() {
   S.flux = await api('GET', '/api/flux');
@@ -27,16 +28,32 @@ function populateFluxFilters() {
   const cats   = [...new Set(S.flux.map(f => f.category).filter(Boolean))].sort();
   const years  = [...new Set(S.flux.map(f => f.date?.slice(0, 4)).filter(Boolean))].sort().reverse();
 
-  const sel = (id, placeholder, opts) => {
-    const cur = document.getElementById(id)?.value;
+  const saved = loadFilters('flux');
+  const sel = (id, placeholder, opts, savedKey) => {
+    const cur = document.getElementById(id)?.value || saved[savedKey] || '';
     document.getElementById(id).innerHTML =
       `<option value="">${placeholder}</option>` +
       opts.map(o => `<option value="${esc(o)}"${o === cur ? ' selected' : ''}>${esc(o)}</option>`).join('');
   };
-  sel('flux-filter-owner',    'Toutes les personnes',  owners);
-  sel('flux-filter-type',     'Tous les types',        types);
-  sel('flux-filter-category', 'Toutes les catégories', cats);
-  sel('flux-filter-year',     'Toutes les années',     years);
+  sel('flux-filter-owner',    'Toutes les personnes',  owners, 'owner');
+  sel('flux-filter-type',     'Tous les types',        types,  'type');
+  sel('flux-filter-category', 'Toutes les catégories', cats,   'category');
+  sel('flux-filter-year',     'Toutes les années',     years,  'year');
+}
+
+export function persistFluxFilters() {
+  saveFilters('flux', {
+    owner:    document.getElementById('flux-filter-owner')?.value    || '',
+    type:     document.getElementById('flux-filter-type')?.value     || '',
+    category: document.getElementById('flux-filter-category')?.value || '',
+    year:     document.getElementById('flux-filter-year')?.value     || '',
+  });
+}
+
+export function clearFluxFilters() {
+  ['flux-filter-owner', 'flux-filter-type', 'flux-filter-category', 'flux-filter-year']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  clearFilterKey('flux');
 }
 
 function filteredFlux() {

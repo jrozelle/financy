@@ -1,10 +1,67 @@
 import { S } from '../state.js';
-import { fmt, fmtDate, esc, liqBadge, sortArr, updateSortIndicators, today, wireTreeAccordion } from '../utils.js';
+import { fmt, fmtDate, esc, liqBadge, sortArr, updateSortIndicators, today, wireTreeAccordion, treeToggleRow } from '../utils.js';
 import { api, refreshEntitySelect } from '../api.js';
 import { confirmDialog, promptDialog, toast, closeModal } from '../dialogs.js';
 import { loadSynthese, loadHistorique } from './synthese.js';
 import { openHoldingsModal } from './holdings.js';
 import { refreshDates } from '../main.js';
+import { saveFilters, loadFilters, clearFilterKey, applyIfValid } from '../filter-persist.js';
+
+// ─── Persistance etat expand/collapse de l'arborescence positions ──────────
+// On persiste uniquement les rows COLLAPSED (par defaut tout est deplie) pour
+// que de nouveaux noeuds soient visibles par defaut.
+
+const TREE_STATE_KEY = 'financy_positions_tree_collapsed';
+
+function _loadCollapsedKeys() {
+  try { return new Set(JSON.parse(localStorage.getItem(TREE_STATE_KEY) || '[]')); }
+  catch { return new Set(); }
+}
+
+function _saveCollapsedKeys(container) {
+  const set = new Set();
+  container.querySelectorAll('.tree-row[data-key]').forEach(row => {
+    const children = row.nextElementSibling;
+    if (children && children.classList.contains('tree-children')
+        && children.style.display === 'none') {
+      set.add(row.dataset.key);
+    }
+  });
+  try { localStorage.setItem(TREE_STATE_KEY, JSON.stringify([...set])); } catch {}
+}
+
+function _restoreTreeState(container) {
+  const collapsed = _loadCollapsedKeys();
+  if (!collapsed.size) return;
+  container.querySelectorAll('.tree-row[data-key]').forEach(row => {
+    if (collapsed.has(row.dataset.key)) {
+      const children = row.nextElementSibling;
+      if (children && children.classList.contains('tree-children')
+          && children.style.display !== 'none') {
+        treeToggleRow(row, false);
+      }
+    }
+  });
+}
+
+function _bindTreePersist(container) {
+  if (container.dataset.persistBound) return;
+  container.dataset.persistBound = '1';
+  // Bubbling : s'execute apres les handlers per-row de wireTreeAccordion.
+  container.addEventListener('click', ev => {
+    if (ev.target.closest('.tree-actions')) return;
+    const row = ev.target.closest('.tree-row[data-key]');
+    if (!row) return;
+    // Delai 0 pour laisser le toggle se propager
+    setTimeout(() => _saveCollapsedKeys(container), 0);
+  });
+}
+
+export function persistPositionsTreeState() {
+  const container = document.getElementById('positions-tree-body');
+  if (container) _saveCollapsedKeys(container);
+}
+
 
 let _snapshotEnsured = false;
 async function ensureTodaySnapshot() {
@@ -37,19 +94,29 @@ function populateFilters() {
   const envelopes = [...new Set(S.positions.map(p => p.envelope).filter(Boolean))].sort();
   const estabs    = [...new Set(S.positions.map(p => p.establishment).filter(Boolean))].sort();
 
+  // Priorite : valeurs courantes DOM > filtres persistes en localStorage
+  const saved = loadFilters('positions');
   const cur = {
-    owner:         document.getElementById('filter-owner').value,
-    envelope:      document.getElementById('filter-envelope').value,
-    establishment: document.getElementById('filter-establishment').value,
+    owner:         document.getElementById('filter-owner').value         || saved.owner         || '',
+    envelope:      document.getElementById('filter-envelope').value      || saved.envelope      || '',
+    establishment: document.getElementById('filter-establishment').value || saved.establishment || '',
   };
 
   fillFilter('filter-owner',         'Toutes les personnes',       owners);
   fillFilter('filter-envelope',      'Toutes les enveloppes',      envelopes);
   fillFilter('filter-establishment', 'Tous les établissements',    estabs);
 
-  if (cur.owner    && owners.includes(cur.owner))    document.getElementById('filter-owner').value = cur.owner;
-  if (cur.envelope && envelopes.includes(cur.envelope)) document.getElementById('filter-envelope').value = cur.envelope;
-  if (cur.establishment && estabs.includes(cur.establishment)) document.getElementById('filter-establishment').value = cur.establishment;
+  applyIfValid('filter-owner',         cur.owner);
+  applyIfValid('filter-envelope',      cur.envelope);
+  applyIfValid('filter-establishment', cur.establishment);
+}
+
+export function persistPositionFilters() {
+  saveFilters('positions', {
+    owner:         document.getElementById('filter-owner')?.value         || '',
+    envelope:      document.getElementById('filter-envelope')?.value      || '',
+    establishment: document.getElementById('filter-establishment')?.value || '',
+  });
 }
 
 function fillFilter(id, placeholder, options) {
@@ -62,6 +129,7 @@ export function clearFilters() {
   document.getElementById('filter-owner').value         = '';
   document.getElementById('filter-envelope').value      = '';
   document.getElementById('filter-establishment').value = '';
+  clearFilterKey('positions');
   renderPositions();
 }
 
@@ -320,6 +388,8 @@ function renderPositionsTree(allPositions) {
 
   container.innerHTML = html;
   wireTreeAccordion(container);
+  _restoreTreeState(container);
+  _bindTreePersist(container);
 }
 
 export function renderPositions() {

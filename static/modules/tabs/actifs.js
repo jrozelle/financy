@@ -3,6 +3,7 @@ import { api } from '../api.js';
 import { esc, fmt, fmtDate, destroyChart, getColors, chartBorderColor, sortArr } from '../utils.js';
 import { openIsinPopover } from '../isin-popover.js';
 import { triggerPricesRefresh } from './tools.js';
+import { saveFilters, loadFilters } from '../filter-persist.js';
 
 let _classChart = null;
 let _envelopeChart = null;
@@ -11,8 +12,23 @@ let _sortCol = 'market_value';
 let _sortDesc = true;
 let _filter = { type: null, value: null }; // {type: 'asset_class'|'envelope', value: 'ETF'}
 
+// Restore tri et filtre chart depuis localStorage au premier load
+(function _restoreActifsState() {
+  const saved = loadFilters('actifs');
+  if (saved.sortCol) _sortCol = saved.sortCol;
+  if (typeof saved.sortDesc === 'boolean') _sortDesc = saved.sortDesc;
+  if (saved.filter && saved.filter.type && saved.filter.value) {
+    _filter = { type: saved.filter.type, value: saved.filter.value };
+  }
+})();
+
+function _persist() {
+  saveFilters('actifs', { sortCol: _sortCol, sortDesc: _sortDesc, filter: _filter });
+}
+
 export async function loadActifs() {
-  _filter = { type: null, value: null };
+  // Ne pas reinitialiser _filter : il a ete restaure au boot et maintenu
+  // volontairement entre visites. Clic sur camembert toggle ou reset.
   // Utiliser le filtre global owner
   const globalOwner = S.syntheseOwner;
   const owner = (globalOwner && globalOwner !== 'Famille') ? globalOwner : '';
@@ -141,6 +157,7 @@ function _pieOptions(filterType, labels) {
           _filter = { type: filterType, value: label };
         }
       }
+      _persist();
       if (_data) _renderTable(_data.lines);
     },
     plugins: {
@@ -154,6 +171,7 @@ function _pieOptions(filterType, labels) {
           } else {
             _filter = { type: filterType, value: label };
           }
+          _persist();
           if (_data) _renderTable(_data.lines);
         },
       },
@@ -220,6 +238,7 @@ export function wireActifsEvents() {
     const col = th.dataset.sort;
     if (col === _sortCol) _sortDesc = !_sortDesc;
     else { _sortCol = col; _sortDesc = true; }
+    _persist();
     if (_data) _renderTable(_data.lines);
   });
 }
