@@ -76,7 +76,7 @@ function renderRefCategories() {
                style="width:65px;text-align:right"> %
       </td>
       <td>
-        <button class="btn-icon del" data-section="categories" data-index="${i}">Suppr.</button>
+        <button class="btn-icon del" data-section="categories" data-index="${i}">Supprimer</button>
       </td>
     </tr>`).join('') + `
     <tr id="ref-cat-add-row">
@@ -155,7 +155,7 @@ function renderRefEnvelopes() {
         </select>
       </td>
       <td><input class="ref-input ref-env-friction" data-env="${esc(name)}" value="${esc(m.friction || '')}" style="width:100%"></td>
-      <td><button class="btn-icon del" data-section="envelopes" data-env="${esc(name)}">Suppr.</button></td>
+      <td><button class="btn-icon del" data-section="envelopes" data-env="${esc(name)}">Supprimer</button></td>
     </tr>`;
   }).join('') + `
     <tr>
@@ -287,7 +287,7 @@ function renderRefAlerts() {
           <option value=">" ${a.op === '>' ? 'selected' : ''}>&gt;</option>
         </select>
         <input class="ref-input alert-threshold" data-i="${i}" type="number" value="${a.threshold || 0}" style="width:80px">
-        <button class="btn-icon del alert-del" data-i="${i}">Suppr.</button>
+        <button class="btn-icon del alert-del" data-i="${i}">Supprimer</button>
       </div>`;
     }).join('');
   }

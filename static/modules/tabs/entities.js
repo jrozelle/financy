@@ -65,7 +65,7 @@ export function renderEntities() {
       <td style="white-space:nowrap">
         <button class="btn-icon add" data-action="add-pos-entity" data-name="${esc(e.name)}" title="Ajouter une position liée à cette entité">+ Position</button>
         <button class="btn-icon edit" data-id="${e.id}" data-action="edit-ent">Éditer</button>
-        <button class="btn-icon del"  data-id="${e.id}" data-action="del-ent">Suppr.</button>
+        <button class="btn-icon del"  data-id="${e.id}" data-action="del-ent">Supprimer</button>
       </td>
     </tr>`;
   }).join('');
@@ -99,7 +99,7 @@ function showEntitySnapshots(entityName) {
       <td class="num ${s.debt > 0 ? 'neg' : ''}">${s.debt > 0 ? fmt(s.debt) : '—'}</td>
       <td class="num ${net < 0 ? 'neg' : 'pos'}">${fmt(net)}</td>
       <td style="text-align:center">
-        <button class="btn-icon del" style="font-size:11px" data-sid="${s.id}" data-action="del-snap">Suppr.</button>
+        <button class="btn-icon del" style="font-size:11px" data-sid="${s.id}" data-action="del-snap">Supprimer</button>
       </td>
     </tr>`;
   }).join('') || '<tr><td colspan="5" style="color:var(--text-muted);padding:.75rem">Aucune valorisation enregistrée.</td></tr>';

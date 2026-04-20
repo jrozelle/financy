@@ -1103,7 +1103,8 @@ input[type="file"] {
   transition: background .1s;
 }
 .search-item:last-child { border-bottom: none; }
-.search-item:hover { background: var(--primary-light); }
+.search-item:hover,
+.search-item.is-active { background: var(--primary-light); }
 .search-item-label { flex: 1; min-width: 0; }
 .search-item-label strong { color: var(--primary); }
 .search-item-amount { font-weight: 600; white-space: nowrap; color: var(--text-muted); font-size: 12px; }
@@ -1797,6 +1798,24 @@ textarea:focus-visible {
     border-bottom-color: var(--primary);
   }
 }
+
+/* ── D1. Table d'aide raccourcis clavier ──────────────────────────────── */
+.kbd-help-table td { padding: .5rem .25rem; vertical-align: top; }
+.kbd-help-table td:first-child { width: 42%; white-space: nowrap; }
+.kbd-help-table tr + tr td { border-top: 1px solid var(--border); }
+kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  color: var(--text);
+}
+[data-theme="dark"] kbd { background: var(--card-hover); }
 
 /* ── C2. Badge mode démo / LLM mock dans la navbar ────────────────────── */
 .demo-badge {

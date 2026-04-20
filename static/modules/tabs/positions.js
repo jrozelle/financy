@@ -283,7 +283,7 @@ function renderPositionsTree(allPositions) {
                       ${inlineVal}
                       <span class="tree-actions">
                         <button class="btn-icon" data-action="edit-pos" data-id="${p.id}">Éditer</button>
-                        <button class="btn-icon del" data-action="del-pos" data-id="${p.id}">Suppr.</button>
+                        <button class="btn-icon del" data-action="del-pos" data-id="${p.id}">Supprimer</button>
                       </span>
                     </div>`;
                 }).join('');
@@ -316,7 +316,7 @@ function renderPositionsTree(allPositions) {
                       <button class="btn-icon" data-action="history-pos" data-id="${p.id}" title="Évolution dans le temps">📈</button>
                       <button class="btn-icon" data-action="manage-holdings" data-id="${p.id}" title="Gérer les lignes">Lignes</button>
                       <button class="btn-icon edit" data-id="${p.id}" data-action="edit-pos">Éditer</button>
-                      <button class="btn-icon del"  data-id="${p.id}" data-action="del-pos">Suppr.</button>
+                      <button class="btn-icon del"  data-id="${p.id}" data-action="del-pos">Supprimer</button>
                     </span>
                   </div>`;
               }).join('');
@@ -440,7 +440,7 @@ export function renderPositions() {
       <td style="white-space:nowrap">
         <button class="btn-icon" data-id="${p.id}" data-action="manage-holdings" title="Gérer les lignes">Lignes</button>
         <button class="btn-icon edit" data-id="${p.id}" data-action="edit-pos">Éditer</button>
-        <button class="btn-icon del"  data-id="${p.id}" data-action="del-pos">Suppr.</button>
+        <button class="btn-icon del"  data-id="${p.id}" data-action="del-pos">Supprimer</button>
       </td>
     </tr>`;
   }).join('');

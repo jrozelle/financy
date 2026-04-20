@@ -574,15 +574,20 @@ def export_data():
 @login_required
 @csrf_protect
 def reset_db():
+    tables = [
+        'positions', 'flux', 'entities', 'entity_snapshots', 'snapshot_notes',
+        'holdings', 'holdings_snapshots', 'price_history', 'securities',
+    ]
+    deleted = {}
     with get_db() as conn:
-        tables = [
-            'positions', 'flux', 'entities', 'entity_snapshots', 'snapshot_notes',
-            'holdings', 'holdings_snapshots', 'price_history', 'securities',
-        ]
         for t in tables:
             try:
+                row = conn.execute(f'SELECT COUNT(*) AS c FROM {t}').fetchone()
+                deleted[t] = int(row['c']) if row else 0
                 conn.execute(f'DELETE FROM {t}')
             except Exception:
-                pass  # Table peut ne pas exister si migration non appliquée
-    logger.warning('Database reset — all data deleted')
-    return jsonify({'ok': True})
+                deleted[t] = 0  # Table peut ne pas exister si migration non appliquée
+    total = sum(deleted.values())
+    logger.warning('Database reset — %d rows across %d tables deleted',
+                   total, len([v for v in deleted.values() if v]))
+    return jsonify({'ok': True, 'total': total, 'deleted': deleted})

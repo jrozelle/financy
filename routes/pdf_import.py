@@ -21,6 +21,25 @@ pdf_import_bp = Blueprint('pdf_import', __name__)
 
 MAX_PDF_SIZE = 5 * 1024 * 1024  # 5 MB
 
+CSV_TEMPLATE = (
+    "ISIN;Libellé;Quantité;PRU;Cours;Valorisation\n"
+    "FR0010315770;Amundi MSCI World UCITS ETF (CW8);20;400;490,50;9810,00\n"
+    "IE00B4L5Y983;iShares Core MSCI World UCITS ETF (IWDA);50;80;104,25;5212,50\n"
+    "FONDS_EUROS_LINXEA;Fonds Euros Linxea Spirit 2;1;10000;;10250\n"
+)
+
+
+@pdf_import_bp.route('/api/import/csv-template')
+@login_required
+def download_csv_template():
+    """Telecharge un CSV exemple pour l'import de holdings."""
+    from flask import Response
+    return Response(
+        CSV_TEMPLATE,
+        mimetype='text/csv',
+        headers={'Content-Disposition': 'attachment; filename=financy_holdings_template.csv'}
+    )
+
 
 def _enrich_with_prices(result):
     """Lookup live prices for lines missing market_value."""

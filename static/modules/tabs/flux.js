@@ -91,7 +91,7 @@ export function renderFlux() {
       <td>${esc(f.notes || '—')}</td>
       <td style="white-space:nowrap">
         <button class="btn-icon edit" data-id="${f.id}" data-action="edit-flux">Éditer</button>
-        <button class="btn-icon del"  data-id="${f.id}" data-action="del-flux">Suppr.</button>
+        <button class="btn-icon del"  data-id="${f.id}" data-action="del-flux">Supprimer</button>
       </td>
     </tr>`).join('');
 

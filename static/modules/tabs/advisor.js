@@ -158,7 +158,7 @@ function _renderObjectives(list) {
       </td>
       <td>
         <button type="button" class="btn-icon" data-action="save-obj">Enregistrer</button>
-        <button type="button" class="btn-icon del" data-action="del-obj">Suppr.</button>
+        <button type="button" class="btn-icon del" data-action="del-obj">Supprimer</button>
       </td>
     </tr>
   `).join('');
