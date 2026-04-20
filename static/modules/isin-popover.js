@@ -51,8 +51,9 @@ async function _loadAndRender() {
   document.getElementById('isin-popover-summary').innerHTML = _summaryHtml(data);
   document.getElementById('isin-popover-holding').innerHTML = _holdingHtml(data.holding);
 
-  // Ticker input
+  // Ticker + asset class inputs
   document.getElementById('isin-ticker-input').value = data.ticker || '';
+  document.getElementById('isin-asset-class').value = data.asset_class || 'autre';
 
   _renderChart(data);
 }
@@ -277,6 +278,16 @@ export function wireIsinPopoverEvents() {
         last_price: price,
       });
       toast('Prix mis a jour', 'success');
+      await _loadAndRender();
+    } catch {}
+  });
+
+  document.getElementById('isin-asset-class-save').addEventListener('click', async () => {
+    if (!_current.isin) return;
+    const ac = document.getElementById('isin-asset-class').value;
+    try {
+      await api('PATCH', `/api/securities/${encodeURIComponent(_current.isin)}`, { asset_class: ac });
+      toast('Classe mise a jour', 'success');
       await _loadAndRender();
     } catch {}
   });

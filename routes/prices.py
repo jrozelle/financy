@@ -66,7 +66,7 @@ def history(isin):
 
     with get_db() as conn:
         sec = conn.execute(
-            'SELECT isin, name, ticker, currency, is_priceable, last_price, last_price_date FROM securities WHERE isin=?',
+            'SELECT isin, name, ticker, currency, asset_class, is_priceable, last_price, last_price_date FROM securities WHERE isin=?',
             (isin,)
         ).fetchone()
         if not sec:
@@ -104,7 +104,7 @@ def history(isin):
                 ).fetchall()
                 # Recharger les metadonnees securities (last_price peut avoir change)
                 sec = conn.execute(
-                    'SELECT isin, name, ticker, currency, is_priceable, last_price, last_price_date FROM securities WHERE isin=?',
+                    'SELECT isin, name, ticker, currency, asset_class, is_priceable, last_price, last_price_date FROM securities WHERE isin=?',
                     (isin,)
                 ).fetchone()
             except Exception as e:
@@ -162,6 +162,7 @@ def history(isin):
         'name':            sec['name'],
         'ticker':          sec['ticker'],
         'currency':        sec['currency'],
+        'asset_class':     sec['asset_class'],
         'is_priceable':    bool(sec['is_priceable']),
         'period':          period,
         'points':          points,
