@@ -308,7 +308,7 @@ function renderPositionsTree(allPositions) {
                 : `<span class="tree-inline-amount ${p.net_attributed < 0 ? 'neg' : ''}" title="Cliquer pour editer" data-id="${p.id}" data-field="value" data-val="${p.value || 0}">${fmt(p.net_attributed)}</span>`;
               return `
                 <div class="tree-row tree-env tree-env-merged" data-pos-id="${p.id}" data-key="penv-${esc(owner)}-${esc(etabl)}-${esc(env)}">
-                  <span class="tree-toggle" style="visibility:hidden">▾</span>
+                  <span class="tree-dot tree-dot-env"></span>
                   <span class="tree-label" title="${esc(label)}">${esc(label)}${envDebtStr}</span>
                   <span class="tree-badges">${liqBadge(p.liquidity)}</span>
                   ${inlineVal}

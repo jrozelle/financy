@@ -660,27 +660,33 @@ input[type="file"] {
 .view-toggle-btn.active { background: var(--card); color: var(--primary); font-weight: 600; box-shadow: var(--shadow); }
 
 /* ── Arborescence (vue tree) ─────────────────────────────────────────────── */
-.tree-owner-section { margin-bottom: .25rem; }
+.tree-owner-section { margin-bottom: .125rem; }
 .tree-owner { cursor: pointer; }
 
 .tree-row {
   display: flex;
   align-items: baseline;
   gap: .5rem;
-  padding: .35rem .5rem;
+  padding: .25rem .5rem;
   border-radius: 5px;
   transition: background .1s;
 }
-.tree-owner  { font-weight: 700; font-size: 15px; padding: .6rem .5rem; border-bottom: 1px solid var(--border); margin-bottom: .25rem; }
+.tree-owner  { font-weight: 700; font-size: 15px; padding: .4rem .5rem; border-bottom: 1px solid var(--border); margin-bottom: .125rem; }
 .tree-etabl  { font-weight: 600; font-size: 13.5px; cursor: pointer; padding-left: 1.25rem; }
 .tree-env    { font-size: 13px; cursor: pointer; padding-left: 2rem; color: var(--text); font-weight: 500; }
 .tree-env-merged { cursor: default; }
+.tree-dot-env {
+  width: 8px; height: 8px;
+  /* Centrer dans l'espace du toggle (24px) : (24 - 8) / 2 = 8px de chaque cote */
+  margin: 0 8px;
+  /* Le gap .5rem s'ajoute apres, comme pour le toggle */
+}
 .tree-cat    { font-size: 12.5px; padding-left: 3.5rem; }
 .tree-pos    { font-size: 12px; padding-left: 4.5rem; }
 
 .tree-row:hover { background: var(--bg); }
 .tree-owner:hover, .tree-etabl:hover, .tree-env:hover { background: var(--primary-light); }
-.tree-etabl { margin-top: .25rem; border-top: 1px solid color-mix(in srgb, var(--border) 50%, transparent); padding-top: .5rem; }
+.tree-etabl { margin-top: .125rem; border-top: 1px solid color-mix(in srgb, var(--border) 40%, transparent); padding-top: .25rem; }
 .tree-etabl:first-child { border-top: none; margin-top: 0; }
 
 .tree-root { margin-left: 0 !important; }
