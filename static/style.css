@@ -675,7 +675,6 @@ input[type="file"] {
 .tree-etabl  { font-weight: 600; font-size: 13.5px; cursor: pointer; padding-left: 1.25rem; }
 .tree-env    { font-size: 13px; cursor: pointer; padding-left: 2rem; color: var(--text); font-weight: 500; }
 .tree-env-merged { cursor: default; }
-.tree-env-merged .tree-dot { width: 8px; height: 8px; margin-left: 8px; margin-right: calc(24px - 8px - 8px + .5rem); }
 .tree-cat    { font-size: 12.5px; padding-left: 3.5rem; }
 .tree-pos    { font-size: 12px; padding-left: 4.5rem; }
 
@@ -768,11 +767,6 @@ input[type="file"] {
   gap: .375rem;
   align-items: center;
   font-size: 13px;
-}
-/* Feuille fusionnee (seule sous son enveloppe) : indentee comme une enveloppe */
-.tree-env + .tree-children > .tree-pos-leaf:only-child,
-.tree-etabl + .tree-children > .tree-pos-leaf {
-  padding-left: 2.5rem;
 }
 .tree-pos-leaf .tree-dot { margin-left: .25rem; }
 .tree-badge-pct { font-size: 10px; opacity: .7; margin-left: .25rem; }
