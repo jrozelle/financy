@@ -4,6 +4,7 @@ import { esc, fmt, fmtDate, destroyChart, getColors, chartBorderColor, sortArr }
 import { openIsinPopover } from '../isin-popover.js';
 import { triggerPricesRefresh } from './tools.js';
 import { saveFilters, loadFilters } from '../filter-persist.js';
+import { reapplyColumns } from '../column-picker.js';
 
 let _classChart = null;
 let _envelopeChart = null;
@@ -106,6 +107,7 @@ function _renderTable(lines) {
       if (th.dataset.sort === _sortCol) th.classList.add(_sortDesc ? 'sort-desc' : 'sort-asc');
     });
   }
+  reapplyColumns('actifs', 'actifs-thead');
 }
 
 function _freshnessBadge(l) {

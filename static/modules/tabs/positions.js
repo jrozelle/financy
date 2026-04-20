@@ -6,6 +6,7 @@ import { loadSynthese, loadHistorique } from './synthese.js';
 import { openHoldingsModal } from './holdings.js';
 import { refreshDates } from '../main.js';
 import { saveFilters, loadFilters, clearFilterKey, applyIfValid } from '../filter-persist.js';
+import { reapplyColumns } from '../column-picker.js';
 
 // ─── Persistance etat expand/collapse de l'arborescence positions ──────────
 // On persiste uniquement les rows COLLAPSED (par defaut tout est deplie) pour
@@ -408,6 +409,7 @@ export function renderPositions() {
 
   const positions = sortArr(filteredPositions(), S.sort.positions.key, S.sort.positions.dir);
   updateSortIndicators('positions-thead', 'positions');
+  reapplyColumns('positions', 'positions-thead');
   if (!positions.length) {
     renderPositionsEmpty(S.positions.length ? 'Aucune position pour ce filtre.' : 'Aucune position pour ce snapshot.');
     return;
