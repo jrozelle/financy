@@ -617,7 +617,12 @@ def compute_position(pos, entity_map=None, ref=None, holdings_map=None):
     env              = env_meta.get(envelope, {'liquidity': '30J+', 'friction': 'Mixte'})
     override         = pos.get('mobilizable_pct_override')
     mobilizable_pct  = override if override is not None else cat_mob.get(category, 0.8)
-    mobilizable_val  = net_attributed * mobilizable_pct if net_attributed > 0 else 0
+    liquidity        = pos.get('liquidity_override') or env['liquidity']
+    # Bloque = pas mobilisable, quelle que soit la pct
+    if liquidity == 'Bloqué':
+        mobilizable_val = 0
+    else:
+        mobilizable_val = net_attributed * mobilizable_pct if net_attributed > 0 else 0
 
     result = {
         **pos,
