@@ -12,7 +12,8 @@ holdings_bp = Blueprint('holdings', __name__)
 _ASSET_CLASS_LABELS = {
     'etf': 'ETF', 'opcvm': 'OPCVM', 'scpi': 'SCPI', 'sci': 'SCI',
     'action': 'Action', 'fonds_euros': 'Fonds euros', 'cash': 'Cash',
-    'obligation': 'Obligation', 'autre': 'Autre',
+    'obligation': 'Obligation', 'produit_structure': 'Produit structure',
+    'autre': 'Autre',
 }
 
 
