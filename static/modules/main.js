@@ -582,8 +582,8 @@ function wireEvents() {
 
   // Column pickers
   initColumnPicker('positions', 'positions-col-picker', 'positions-thead', {
-    owner: 'Proprietaire', category: 'Categorie', envelope: 'Enveloppe',
-    establishment: 'Etablissement', gross_attributed: 'Actif attribue',
+    owner: 'Proprietaire', establishment: 'Etablissement', envelope: 'Enveloppe',
+    category: 'Categorie', gross_attributed: 'Actif attribue',
     debt_attributed: 'Dette', net_attributed: 'Net attribue',
     liquidity: 'Liquidite', mobilizable_value: 'Mobilisable',
   });

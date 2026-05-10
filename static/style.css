@@ -125,10 +125,11 @@ body {
 }
 
 /* ── Layout ────────────────────────────────────────────────────────────── */
-main { padding: 1.5rem; max-width: 1440px; width: 100%; margin: 0 auto; }
+main { padding: 1.5rem; max-width: min(1760px, 100vw); width: 100%; margin: 0 auto; }
 .tab-content { min-width: 0; }
 
 .hidden { display: none !important; }
+.context-hidden-col { display: none !important; }
 
 .page-header {
   display: flex;
@@ -2831,6 +2832,7 @@ kbd {
 
   #tab-positions .data-table th:first-child,
   #tab-positions .data-table td:first-child,
+  #tab-positions .data-table .mobile-sticky-col,
   #tab-flux .data-table th:first-child,
   #tab-flux .data-table td:first-child,
   #tab-entites .data-table th:first-child,
@@ -2843,6 +2845,7 @@ kbd {
   }
 
   #tab-positions .data-table thead th:first-child,
+  #tab-positions .data-table thead .mobile-sticky-col,
   #tab-flux .data-table thead th:first-child,
   #tab-entites .data-table thead th:first-child {
     z-index: 3;
