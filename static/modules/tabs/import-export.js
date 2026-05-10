@@ -181,9 +181,14 @@ export async function resetDb() {
     .map(([t, n]) => `<li>${n.toLocaleString('fr-FR')} ${esc(_TABLE_LABELS[t] || t)}</li>`)
     .join('');
   const total = result?.total || 0;
+  const backup = result?.backup;
+  const backupLine = backup?.filename
+    ? `<br>Backup automatique : <strong>${esc(backup.filename)}</strong> (${backup.size_kb} Ko).`
+    : '';
   document.getElementById('reset-result').innerHTML = `
     <div class="alert alert-success">
       Base vidée — <strong>${total.toLocaleString('fr-FR')}</strong> ligne(s) supprimée(s).
+      ${backupLine}
       ${lines ? `<ul style="margin:.4rem 0 0 1.1rem;font-size:12.5px">${lines}</ul>` : ''}
     </div>`;
   setTimeout(() => { document.getElementById('reset-result').innerHTML = ''; }, 8000);
