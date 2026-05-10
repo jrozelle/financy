@@ -63,9 +63,11 @@ function _render() {
 
 function _renderTable(lines) {
   const tbody = document.getElementById('actifs-tbody');
+  const cards = document.getElementById('actifs-cards');
   const empty = document.getElementById('actifs-empty');
   if (!lines.length) {
     tbody.innerHTML = '';
+    if (cards) cards.innerHTML = '';
     empty.style.display = '';
     return;
   }
@@ -100,6 +102,31 @@ function _renderTable(lines) {
       <td>${fresh}</td>
     </tr>`;
   }).join('');
+  if (cards) {
+    cards.innerHTML = sorted.map(l => {
+      const pnl = l.pnl;
+      const pnlCls = pnl == null ? '' : pnl >= 0 ? 'pos' : 'neg';
+      const pnlStr = pnl == null ? '—'
+        : `${pnl >= 0 ? '+' : ''}${fmt(pnl)}${l.pnl_pct != null ? ` (${l.pnl_pct.toFixed(1)}%)` : ''}`;
+      const fresh = _freshnessBadge(l);
+      return `<article class="actif-card">
+        <div class="actif-card-main">
+          <button type="button" class="h-isin-btn" data-action="open-popover" data-isin="${esc(l.isin)}">${esc(l.isin)}</button>
+          <strong>${esc(l.name || '—')}</strong>
+          <span>${esc(l.asset_class || '—')} · ${esc((l.envelopes || []).join(', ') || '—')}</span>
+        </div>
+        <dl class="actif-card-metrics">
+          <div><dt>Valo</dt><dd>${fmt(l.market_value)}</dd></div>
+          <div><dt>PRU</dt><dd>${l.avg_cost != null ? fmt(l.avg_cost) : '—'}</dd></div>
+          <div><dt>Qté</dt><dd>${new Intl.NumberFormat('fr-FR').format(l.quantity)}</dd></div>
+          <div><dt>+/-</dt><dd class="${pnlCls}">${pnlStr}</dd></div>
+          <div><dt>Poids</dt><dd>${l.weight_pct.toFixed(1)}%</dd></div>
+          <div><dt>Cours</dt><dd>${l.last_price != null ? fmt(l.last_price) : '—'}</dd></div>
+        </dl>
+        <div class="actif-card-freshness">${fresh}</div>
+      </article>`;
+    }).join('');
+  }
   const thead = document.getElementById('actifs-thead');
   if (thead) {
     thead.querySelectorAll('th[data-sort]').forEach(th => {
@@ -229,6 +256,10 @@ export function wireActifsEvents() {
   });
 
   document.getElementById('actifs-tbody')?.addEventListener('click', e => {
+    const btn = e.target.closest('[data-action="open-popover"]');
+    if (btn) openIsinPopover(btn.dataset.isin);
+  });
+  document.getElementById('actifs-cards')?.addEventListener('click', e => {
     const btn = e.target.closest('[data-action="open-popover"]');
     if (btn) openIsinPopover(btn.dataset.isin);
   });
