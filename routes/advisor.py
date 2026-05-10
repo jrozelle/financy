@@ -4,7 +4,8 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 from models import (get_db, compute_position, get_entity_map, get_holdings_map,
                     load_referential,
-                    validate_string, validate_number, validate_pct, validate_date)
+                    validate_string, validate_number, validate_pct, validate_date,
+                    parse_number)
 from services.advisor.allocation import (target_allocation, compute_actual_allocation,
                                          compute_gap, load_matrix)
 from services.advisor import macro as macro_svc
@@ -77,7 +78,7 @@ def upsert_profile(owner):
 
     d = request.json or {}
     horizon = d.get('horizon_years')
-    if horizon is not None and (not validate_number(horizon) or float(horizon) < 0 or float(horizon) > 100):
+    if horizon is not None and (not validate_number(horizon) or parse_number(horizon) < 0 or parse_number(horizon) > 100):
         return jsonify({'error': 'horizon_years invalide (0-100)'}), 400
     risk = d.get('risk_tolerance')
     if risk is not None:
@@ -91,7 +92,7 @@ def upsert_profile(owner):
     if employment not in VALID_EMPLOYMENTS:
         return jsonify({'error': f'employment_type invalide ({employment})'}), 400
     pension_age = d.get('pension_age')
-    if pension_age is not None and (not validate_number(pension_age) or float(pension_age) < 18 or float(pension_age) > 120):
+    if pension_age is not None and (not validate_number(pension_age) or parse_number(pension_age) < 18 or parse_number(pension_age) > 120):
         return jsonify({'error': 'pension_age invalide'}), 400
     children = d.get('children_count')
     if children is not None:
@@ -123,12 +124,12 @@ def upsert_profile(owner):
                  notes=excluded.notes,
                  updated_at=CURRENT_TIMESTAMP''',
             (owner,
-             int(horizon) if horizon is not None else None,
+             int(parse_number(horizon)) if horizon is not None else None,
              risk, employment or None,
              1 if d.get('has_lbo') else 0,
              children if children is not None else 0,
              1 if d.get('main_residence_owned') else 0,
-             int(pension_age) if pension_age is not None else None,
+             int(parse_number(pension_age)) if pension_age is not None else None,
              notes)
         )
         row = _get_profile_row(conn, owner)
@@ -193,8 +194,8 @@ def add_objective(owner):
             '''INSERT INTO owner_objectives (owner, label, target_amount, horizon_years, priority)
                VALUES (?,?,?,?,?)''',
             (owner, d['label'].strip(),
-             float(d['target_amount']) if d.get('target_amount') is not None else None,
-             int(d['horizon_years']) if d.get('horizon_years') is not None else None,
+             parse_number(d['target_amount']) if d.get('target_amount') is not None else None,
+             int(parse_number(d['horizon_years'])) if d.get('horizon_years') is not None else None,
              int(d.get('priority')) if d.get('priority') is not None else 3)
         )
         row = conn.execute('SELECT * FROM owner_objectives WHERE id=?', (cur.lastrowid,)).fetchone()
@@ -215,13 +216,13 @@ def update_objective(oid):
         if not row:
             return jsonify({'error': 'Objectif introuvable'}), 404
         fields, params = [], []
-        for key, cast in (('label', str), ('target_amount', float),
+        for key, cast in (('label', str), ('target_amount', parse_number),
                           ('horizon_years', int), ('priority', int)):
             if key in d:
                 val = d[key]
                 if val is not None:
                     try:
-                        val = cast(val)
+                        val = int(parse_number(val)) if cast is int else cast(val)
                     except (ValueError, TypeError):
                         return jsonify({'error': f'{key} invalide'}), 400
                 fields.append(f'{key}=?'); params.append(val)

@@ -1,7 +1,8 @@
 from flask import Blueprint, jsonify, request
 from models import (get_db, compute_position, get_entity_map, get_holdings_map,
                     load_referential, snapshot_holdings_to_date,
-                    validate_date, validate_number, validate_string, validate_pct)
+                    validate_date, validate_number, validate_string,
+                    validate_pct, parse_number)
 from auth import login_required, csrf_protect
 
 positions_bp = Blueprint('positions', __name__)
@@ -59,11 +60,11 @@ def add_position():
         return jsonify({'error': 'Notes trop longues (2000 car. max)'}), 400
     with get_db() as conn:
         entity = d.get('entity')
-        stored_value = 0 if entity else d.get('value', 0)
-        stored_debt  = 0 if entity else d.get('debt', 0)
+        stored_value = 0 if entity else parse_number(d.get('value'), 0)
+        stored_debt  = 0 if entity else parse_number(d.get('debt'), 0)
         mob_override = d.get('mobilizable_pct_override')
         if mob_override is not None:
-            mob_override = float(mob_override)
+            mob_override = parse_number(mob_override)
         liq_override = d.get('liquidity_override') or None
         cur = conn.execute(
             '''INSERT INTO positions
@@ -74,7 +75,8 @@ def add_position():
              d.get('envelope'), d.get('establishment'),
              stored_value, stored_debt,
              d.get('label'), d.get('notes'), entity,
-             d.get('ownership_pct', 1.0), d.get('debt_pct', 1.0), mob_override, liq_override)
+             parse_number(d.get('ownership_pct'), 1.0),
+             parse_number(d.get('debt_pct'), 1.0), mob_override, liq_override)
         )
         row          = conn.execute('SELECT * FROM positions WHERE id=?', (cur.lastrowid,)).fetchone()
         entity_map   = get_entity_map(conn)
@@ -98,11 +100,11 @@ def update_position(pid):
         return jsonify({'error': 'Notes trop longues (2000 car. max)'}), 400
     with get_db() as conn:
         entity = d.get('entity')
-        stored_value = 0 if entity else d.get('value', 0)
-        stored_debt  = 0 if entity else d.get('debt', 0)
+        stored_value = 0 if entity else parse_number(d.get('value'), 0)
+        stored_debt  = 0 if entity else parse_number(d.get('debt'), 0)
         mob_override = d.get('mobilizable_pct_override')
         if mob_override is not None:
-            mob_override = float(mob_override)
+            mob_override = parse_number(mob_override)
         liq_override = d.get('liquidity_override') or None
         conn.execute(
             '''UPDATE positions SET
@@ -114,7 +116,8 @@ def update_position(pid):
              d.get('envelope'), d.get('establishment'),
              stored_value, stored_debt,
              d.get('label'), d.get('notes'), entity,
-             d.get('ownership_pct', 1.0), d.get('debt_pct', 1.0), mob_override, liq_override, pid)
+             parse_number(d.get('ownership_pct'), 1.0),
+             parse_number(d.get('debt_pct'), 1.0), mob_override, liq_override, pid)
         )
         row          = conn.execute('SELECT * FROM positions WHERE id=?', (pid,)).fetchone()
         entity_map   = get_entity_map(conn)
@@ -180,14 +183,14 @@ def snapshot_update(pid):
                     'category': new_values['category'],
                     'envelope': new_values.get('envelope'),
                     'establishment': new_values.get('establishment'),
-                    'value': 0 if entity else new_values.get('value', 0),
-                    'debt': 0 if entity else new_values.get('debt', 0),
+                    'value': 0 if entity else parse_number(new_values.get('value'), 0),
+                    'debt': 0 if entity else parse_number(new_values.get('debt'), 0),
                     'label': new_values.get('label'),
                     'notes': new_values.get('notes'),
                     'entity': entity,
-                    'ownership_pct': new_values.get('ownership_pct', 1.0),
-                    'debt_pct': new_values.get('debt_pct', 1.0),
-                    'mobilizable_pct_override': new_values.get('mobilizable_pct_override'),
+                    'ownership_pct': parse_number(new_values.get('ownership_pct'), 1.0),
+                    'debt_pct': parse_number(new_values.get('debt_pct'), 1.0),
+                    'mobilizable_pct_override': parse_number(new_values.get('mobilizable_pct_override')) if new_values.get('mobilizable_pct_override') is not None else None,
                     'liquidity_override': new_values.get('liquidity_override'),
                 }
                 new_id = duplicate_position(conn, row, target_date, value_override=override)

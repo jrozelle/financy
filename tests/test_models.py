@@ -13,7 +13,7 @@ models._BASE_DIR = os.path.dirname(_tmp.name)
 
 from models import (
     compute_position, get_entity_map, get_db, init_db, load_referential,
-    validate_date, validate_number, validate_string, validate_pct,
+    validate_date, validate_number, validate_string, validate_pct, parse_number,
     DEFAULT_REFERENTIAL, CATEGORY_MOBILIZABLE, ENVELOPE_META,
 )
 
@@ -49,7 +49,14 @@ class TestValidation:
         assert validate_number(None) is True
         assert validate_number(-5) is False
         assert validate_number(-5, allow_negative=True) is True
+        assert validate_number('1 234,56') is True
+        assert validate_number('1\u202f234,56') is True
         assert validate_number('abc') is False
+
+    def test_parse_number_locale(self):
+        assert parse_number('1 234,56') == pytest.approx(1234.56)
+        assert parse_number('1\u202f234,56') == pytest.approx(1234.56)
+        assert parse_number('1,234.56') == pytest.approx(1234.56)
 
     def test_validate_string(self):
         assert validate_string('hello') is True

@@ -1,5 +1,6 @@
 """Integration tests for the holdings feature (phase 1)."""
 
+from datetime import datetime
 import pytest
 
 # Reuse fixtures & helpers from test_api
@@ -152,18 +153,56 @@ class TestComputePositionHoldings:
         assert p['holdings_count'] == 2
 
     def test_value_from_last_price(self, client):
-        """Avec un last_price connu, value = qty * last_price."""
+        """Avec un last_price recent, value = qty * last_price."""
         pos = _make_position_pea(client)
         client.put(f'/api/positions/{pos["id"]}/holdings', json={'holdings': [
             {'isin': 'FR0010315770', 'quantity': 20, 'cost_basis': 8000, 'market_value': 9800},
         ]}, headers=CSRF_HEADERS)
         # Simule un refresh de cours
         from models import get_db
+        today = datetime.now().strftime('%Y-%m-%d')
         with get_db() as conn:
-            conn.execute("UPDATE securities SET last_price=500, last_price_date='2024-06-01' WHERE isin='FR0010315770'")
+            conn.execute(
+                'UPDATE securities SET last_price=500, last_price_date=? WHERE isin=?',
+                (today, 'FR0010315770')
+            )
         r = client.get(f'/api/positions?date={pos["date"]}')
         p = next(x for x in r.get_json() if x['id'] == pos['id'])
         assert p['value'] == 10000  # 20 * 500
+
+    def test_manual_value_newer_than_price_wins(self, client):
+        """Une valo manuelle plus recente que le cours auto gagne."""
+        pos = _make_position_pea(client)
+        client.put(f'/api/positions/{pos["id"]}/holdings', json={'holdings': [
+            {'isin': 'FR0010315770', 'quantity': 20, 'cost_basis': 8000, 'market_value': 9800},
+        ]}, headers=CSRF_HEADERS)
+        from models import get_db
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE securities SET last_price=500, last_price_date='2024-06-01' WHERE isin='FR0010315770'"
+            )
+        r = client.get(f'/api/positions?date={pos["date"]}')
+        p = next(x for x in r.get_json() if x['id'] == pos['id'])
+        assert p['value'] == 9800
+
+    def test_missing_manual_date_uses_position_date(self, client):
+        """Compat donnees existantes : sans as_of_date, on utilise la date position."""
+        pos = _make_position_pea(client, date='2024-06-10')
+        client.put(f'/api/positions/{pos["id"]}/holdings', json={'holdings': [
+            {'isin': 'FR0010315770', 'quantity': 20, 'cost_basis': 8000, 'market_value': 9800},
+        ]}, headers=CSRF_HEADERS)
+        from models import get_db
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE holdings SET as_of_date=NULL WHERE position_id=?",
+                (pos['id'],)
+            )
+            conn.execute(
+                "UPDATE securities SET last_price=500, last_price_date='2024-06-01' WHERE isin='FR0010315770'"
+            )
+        r = client.get(f'/api/positions?date={pos["date"]}')
+        p = next(x for x in r.get_json() if x['id'] == pos['id'])
+        assert p['value'] == 9800
 
     def test_fonds_euros_manual(self, client):
         """Fonds euros (is_priceable=false) conserve market_value manuel."""

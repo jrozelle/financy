@@ -3,7 +3,7 @@ from flask import Blueprint, jsonify, request
 from datetime import datetime
 from io import BytesIO
 from models import (get_db, validate_date, validate_number, validate_pct,
-                    validate_string, validate_isin)
+                    validate_string, validate_isin, parse_number)
 from auth import login_required, csrf_protect
 
 MAX_IMPORT_ROWS = 10000
@@ -37,12 +37,7 @@ def import_xlsx():
             return s if s and validate_date(s) else None
 
         def _safe_float(val, default=0):
-            if val is None:
-                return default
-            try:
-                return float(val)
-            except (ValueError, TypeError):
-                return default
+            return parse_number(val, default)
 
         def _safe_pct(val, default=1.0):
             f = _safe_float(val, default)
@@ -301,17 +296,11 @@ def import_json():
                 'securities': 0, 'holdings': 0, 'holdings_snapshots': 0, 'skipped': 0}
 
     def _clamp_pct(v, default=1.0):
-        try:
-            f = float(v) if v is not None else default
-        except (ValueError, TypeError):
-            return default
+        f = parse_number(v, default)
         return max(0.0, min(f, 1.0))
 
     def _safe_num(v, default=0):
-        try:
-            return float(v) if v is not None else default
-        except (ValueError, TypeError):
-            return default
+        return parse_number(v, default)
 
     def _trunc(v, max_len):
         if v is None:

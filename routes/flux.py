@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from models import get_db, validate_date, validate_number, validate_string
+from models import get_db, validate_date, validate_number, validate_string, parse_number
 from auth import login_required, csrf_protect
 
 flux_bp = Blueprint('flux', __name__)
@@ -43,7 +43,7 @@ def add_flux():
         cur = conn.execute(
             'INSERT INTO flux (date, owner, envelope, type, amount, notes, category) VALUES (?,?,?,?,?,?,?)',
             (d['date'], d['owner'], d.get('envelope'), d.get('type'),
-             d['amount'], d.get('notes'), d.get('category'))
+             parse_number(d['amount']), d.get('notes'), d.get('category'))
         )
         row = conn.execute('SELECT * FROM flux WHERE id=?', (cur.lastrowid,)).fetchone()
     return jsonify(dict(row)), 201
@@ -64,7 +64,7 @@ def update_flux(fid):
         conn.execute(
             'UPDATE flux SET date=?, owner=?, envelope=?, type=?, amount=?, notes=?, category=? WHERE id=?',
             (d['date'], d['owner'], d.get('envelope'), d.get('type'),
-             d['amount'], d.get('notes'), d.get('category'), fid)
+             parse_number(d['amount']), d.get('notes'), d.get('category'), fid)
         )
         row = conn.execute('SELECT * FROM flux WHERE id=?', (fid,)).fetchone()
     return jsonify(dict(row))

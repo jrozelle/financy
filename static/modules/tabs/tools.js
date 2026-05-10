@@ -1,5 +1,5 @@
 import { S } from '../state.js';
-import { fmt, fmtDate, esc, getColors, chartBorderColor, destroyChart } from '../utils.js';
+import { fmt, fmtDate, esc, getColors, chartBorderColor, destroyChart, parseLocaleNumber } from '../utils.js';
 import { api } from '../api.js';
 import { toast } from '../dialogs.js';
 import { refreshDates } from '../main.js';
@@ -116,10 +116,10 @@ export function wireSimulation() {
   form.addEventListener('submit', async e => {
     e.preventDefault();
     const data = {
-      initial: parseFloat(document.getElementById('sim-initial').value) || 0,
-      monthly: parseFloat(document.getElementById('sim-monthly').value) || 0,
-      annual_rate: parseFloat(document.getElementById('sim-rate').value) || 5,
-      years: parseInt(document.getElementById('sim-years').value) || 10,
+      initial: parseLocaleNumber(document.getElementById('sim-initial').value, 0),
+      monthly: parseLocaleNumber(document.getElementById('sim-monthly').value, 0),
+      annual_rate: parseLocaleNumber(document.getElementById('sim-rate').value, 5),
+      years: parseInt(parseLocaleNumber(document.getElementById('sim-years').value, 10), 10),
     };
     try {
       const result = await api('POST', '/api/simulate', data);

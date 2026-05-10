@@ -179,6 +179,11 @@ class TestPositions:
         assert 'net_attributed' in data
         assert data['net_attributed'] == 10000
 
+    def test_create_position_with_spaced_number(self, client):
+        resp = _make_position(client, value='1 234,56')
+        assert resp.status_code == 201
+        assert resp.get_json()['value'] == pytest.approx(1234.56)
+
     def test_get_positions_empty(self, client):
         resp = client.get('/api/positions')
         assert resp.status_code == 200

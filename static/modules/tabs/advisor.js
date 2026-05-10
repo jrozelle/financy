@@ -1,6 +1,6 @@
 import { S } from '../state.js';
 import { api } from '../api.js';
-import { esc, fmt, destroyChart, getColors, chartBorderColor } from '../utils.js';
+import { esc, fmt, destroyChart, getColors, chartBorderColor, parseLocaleNumber } from '../utils.js';
 import { confirmDialog, toast } from '../dialogs.js';
 import { updateDemoBadge } from './import-export.js';
 
@@ -133,7 +133,7 @@ async function saveProfile(e) {
 function _num(id) {
   const v = document.getElementById(id).value;
   if (v === '' || v === null) return null;
-  const n = parseFloat(v);
+  const n = parseLocaleNumber(v);
   return isNaN(n) ? null : n;
 }
 
@@ -149,8 +149,8 @@ function _renderObjectives(list) {
   tbody.innerHTML = list.map(o => `
     <tr data-oid="${o.id}">
       <td><input type="text" class="obj-label" value="${esc(o.label || '')}" maxlength="200"></td>
-      <td class="num"><input type="number" class="obj-amount" value="${o.target_amount ?? ''}" step="100" min="0"></td>
-      <td class="num"><input type="number" class="obj-horizon" value="${o.horizon_years ?? ''}" step="1" min="0" max="100"></td>
+      <td class="num"><input type="text" inputmode="decimal" class="obj-amount" value="${o.target_amount ?? ''}" step="100" min="0"></td>
+      <td class="num"><input type="text" inputmode="numeric" class="obj-horizon" value="${o.horizon_years ?? ''}" step="1" min="0" max="100"></td>
       <td>
         <select class="obj-priority">
           ${[1,2,3,4,5].map(p => `<option value="${p}" ${o.priority===p?'selected':''}>${p}</option>`).join('')}
@@ -177,8 +177,8 @@ async function saveObjectiveRow(tr) {
   const oid = parseInt(tr.dataset.oid);
   const payload = {
     label:         tr.querySelector('.obj-label').value.trim(),
-    target_amount: tr.querySelector('.obj-amount').value ? parseFloat(tr.querySelector('.obj-amount').value) : null,
-    horizon_years: tr.querySelector('.obj-horizon').value ? parseInt(tr.querySelector('.obj-horizon').value) : null,
+    target_amount: tr.querySelector('.obj-amount').value ? parseLocaleNumber(tr.querySelector('.obj-amount').value) : null,
+    horizon_years: tr.querySelector('.obj-horizon').value ? parseInt(parseLocaleNumber(tr.querySelector('.obj-horizon').value), 10) : null,
     priority:      parseInt(tr.querySelector('.obj-priority').value),
   };
   if (!payload.label) { toast('Libellé requis', 'error'); return; }
