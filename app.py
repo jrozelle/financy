@@ -2,7 +2,6 @@ import os
 import hmac
 import logging
 import secrets
-import shutil
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -17,6 +16,7 @@ from flask import Flask, render_template, session, request, redirect, url_for, j
 from auth import AUTH_PASSWORD, login_required, csrf_protect
 from models import init_db, set_demo_mode, get_db_path, DEMO_DB_PATH
 from routes import all_blueprints
+from services.backups import create_db_backup
 
 # ─── Logging ──────────────────────────────────────────────────────────────────
 
@@ -184,26 +184,12 @@ def toggle_demo_mode():
 @csrf_protect
 def create_backup():
     db_path = get_db_path()
-    if not os.path.exists(db_path):
+    try:
+        backup = create_db_backup(db_path)
+    except FileNotFoundError:
         return jsonify({'error': 'Base de données introuvable'}), 404
-
-    backup_dir = os.path.join(os.path.dirname(db_path), 'backups')
-    os.makedirs(backup_dir, exist_ok=True)
-
-    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-    db_name = os.path.splitext(os.path.basename(db_path))[0]
-    backup_path = os.path.join(backup_dir, f'{db_name}_{ts}.db')
-
-    shutil.copy2(db_path, backup_path)
-    size_kb = round(os.path.getsize(backup_path) / 1024, 1)
-    backup_filename = f'{db_name}_{ts}.db'
-    logger.info('Backup created: %s (%.1f KB)', backup_filename, size_kb)
-    return jsonify({
-        'ok': True,
-        'filename': backup_filename,
-        'size_kb': size_kb,
-        'timestamp': ts,
-    })
+    logger.info('Backup created: %s (%.1f KB)', backup['filename'], backup['size_kb'])
+    return jsonify(backup)
 
 
 # ─── Register blueprints ─────────────────────────────────────────────────────

@@ -3,8 +3,9 @@ from flask import Blueprint, jsonify, request
 from datetime import datetime
 from io import BytesIO
 from models import (get_db, validate_date, validate_number, validate_pct,
-                    validate_string, validate_isin, parse_number)
+                    validate_string, validate_isin, parse_number, get_db_path)
 from auth import login_required, csrf_protect
+from services.backups import create_db_backup
 
 MAX_IMPORT_ROWS = 10000
 MAX_NOTE_LENGTH = 2000
@@ -572,6 +573,14 @@ def reset_db():
             'confirmation': RESET_CONFIRMATION,
         }), 400
 
+    try:
+        backup = create_db_backup(get_db_path())
+    except FileNotFoundError:
+        return jsonify({'error': 'Base de données introuvable'}), 404
+    except Exception:
+        logger.exception('Database reset aborted — backup failed')
+        return jsonify({'error': 'Backup préalable impossible, reset annulé'}), 500
+
     tables = [
         'positions', 'flux', 'entities', 'entity_snapshots', 'snapshot_notes',
         'holdings', 'holdings_snapshots', 'price_history', 'securities',
@@ -586,6 +595,6 @@ def reset_db():
             except Exception:
                 deleted[t] = 0  # Table peut ne pas exister si migration non appliquée
     total = sum(deleted.values())
-    logger.warning('Database reset — %d rows across %d tables deleted',
-                   total, len([v for v in deleted.values() if v]))
-    return jsonify({'ok': True, 'total': total, 'deleted': deleted})
+    logger.warning('Database reset — %d rows across %d tables deleted; backup=%s',
+                   total, len([v for v in deleted.values() if v]), backup['filename'])
+    return jsonify({'ok': True, 'total': total, 'deleted': deleted, 'backup': backup})

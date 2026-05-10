@@ -4,6 +4,7 @@ import pytest
 import os
 import json
 import tempfile
+import sqlite3
 
 # Patch DB_PATH before importing anything from models/app
 import models
@@ -881,7 +882,15 @@ class TestImportExport:
         _make_entity(client)
         resp = client.post('/api/reset', json={'confirm': 'VIDER'}, headers=CSRF_HEADERS)
         assert resp.status_code == 200
-        assert resp.get_json()['ok'] is True
+        data = resp.get_json()
+        assert data['ok'] is True
+        assert data['backup']['filename'].startswith('tmp')
+        backup_path = os.path.join(os.path.dirname(models.DB_PATH), 'backups',
+                                   data['backup']['filename'])
+        assert os.path.exists(backup_path)
+        with sqlite3.connect(backup_path) as conn:
+            row = conn.execute('SELECT COUNT(*) FROM positions').fetchone()
+        assert row[0] == 1
         # Verify everything is gone
         assert client.get('/api/positions').get_json() == []
         assert client.get('/api/flux').get_json() == []
