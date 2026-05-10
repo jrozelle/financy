@@ -7,6 +7,8 @@
  *   });
  */
 
+import { esc } from './utils.js';
+
 const STORAGE_PREFIX = 'financy_columns_';
 
 export function initColumnPicker(key, buttonId, theadId, columns) {
@@ -34,8 +36,8 @@ export function initColumnPicker(key, buttonId, theadId, columns) {
     dropdown.className = 'col-picker-dropdown';
     dropdown.innerHTML = Object.entries(columns).map(([col, label]) => `
       <label class="col-picker-item">
-        <input type="checkbox" data-col="${col}" ${state[col] ? 'checked' : ''}>
-        ${label}
+        <input type="checkbox" data-col="${esc(col)}" ${state[col] ? 'checked' : ''}>
+        ${esc(label)}
       </label>
     `).join('');
 
