@@ -33,7 +33,12 @@
     </div>
     <div class="nav-actions" style="display:flex;gap:.375rem;align-items:center">
       <div class="settings-menu" id="settings-menu">
-        <button class="settings-toggle" id="settings-toggle" title="Paramètres" aria-label="Paramètres">&#9881;</button>
+        <button class="settings-toggle nav-icon-btn" id="settings-toggle" title="Paramètres" aria-label="Paramètres">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"></path>
+            <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.05.05a2.1 2.1 0 0 1-2.97 2.97l-.05-.05a1.8 1.8 0 0 0-1.98-.36 1.8 1.8 0 0 0-1.1 1.66V21a2.1 2.1 0 0 1-4.2 0v-.08a1.8 1.8 0 0 0-1.08-1.64 1.8 1.8 0 0 0-1.98.36l-.05.05a2.1 2.1 0 0 1-2.97-2.97l.05-.05a1.8 1.8 0 0 0 .36-1.98 1.8 1.8 0 0 0-1.66-1.1H2a2.1 2.1 0 0 1 0-4.2h.08a1.8 1.8 0 0 0 1.64-1.08 1.8 1.8 0 0 0-.36-1.98l-.05-.05A2.1 2.1 0 0 1 6.28 3.3l.05.05a1.8 1.8 0 0 0 1.98.36A1.8 1.8 0 0 0 9.4 2.05V2a2.1 2.1 0 0 1 4.2 0v.08a1.8 1.8 0 0 0 1.08 1.64 1.8 1.8 0 0 0 1.98-.36l.05-.05a2.1 2.1 0 0 1 2.97 2.97l-.05.05a1.8 1.8 0 0 0-.36 1.98 1.8 1.8 0 0 0 1.66 1.1H21a2.1 2.1 0 0 1 0 4.2h-.08A1.8 1.8 0 0 0 19.4 15Z"></path>
+          </svg>
+        </button>
         <div class="settings-dropdown hidden" id="settings-dropdown">
           <button class="settings-item" id="btn-open-settings">&#128273; Cles API</button>
           <button class="settings-item" data-tab="referentiel">&#9881; Referentiel</button>
@@ -42,10 +47,22 @@
         </div>
       </div>
       <span id="demo-badge" class="demo-badge hidden" title="Mode demo / LLM mocke" aria-hidden="true"></span>
-      <button class="btn-icon" id="btn-keyboard-help" title="Raccourcis clavier (Shift+?)" aria-label="Raccourcis clavier">?</button>
-      <button class="theme-toggle" id="theme-toggle" title="Basculer clair/sombre" aria-label="Basculer clair/sombre">&#9790;</button>
+      <button class="btn-icon nav-icon-btn" id="btn-keyboard-help" title="Raccourcis clavier (Shift+?)" aria-label="Raccourcis clavier">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M9.1 9a3 3 0 1 1 4.7 2.45c-.92.6-1.8 1.25-1.8 2.55"></path>
+          <path d="M12 18h.01"></path>
+          <path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z"></path>
+        </svg>
+      </button>
+      <button class="theme-toggle nav-icon-btn" id="theme-toggle" title="Basculer clair/sombre" aria-label="Basculer clair/sombre">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 3v18"></path>
+          <path d="M12 21a9 9 0 0 0 0-18"></path>
+          <path d="M12 3a9 9 0 0 0 0 18"></path>
+        </svg>
+      </button>
       {% if has_auth %}
-      <a href="/logout" class="logout-link" title="Déconnexion" aria-label="Déconnexion">
+      <a href="/logout" class="logout-link nav-icon-btn" title="Déconnexion" aria-label="Déconnexion">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <path d="M10 17l5-5-5-5"></path>
           <path d="M15 12H3"></path>
