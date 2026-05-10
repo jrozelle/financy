@@ -148,14 +148,25 @@ function _closeNavDrawer() {
 // Ajoute/retire .has-overflow sur les .card-table selon leur scroll horizontal.
 // Appele une fois au boot + a chaque resize + a chaque changement d'onglet.
 function _installTableOverflowHints() {
+  let resizeTimer = null;
   const update = () => {
     document.querySelectorAll('.card-table').forEach(el => {
       const overflows = el.scrollWidth > el.clientWidth + 2;
       el.classList.toggle('has-overflow', overflows);
     });
   };
+  const resizeCharts = () => {
+    if (!window.Chart?.getChart) return;
+    document.querySelectorAll('canvas').forEach(canvas => {
+      window.Chart.getChart(canvas)?.resize();
+    });
+  };
   update();
-  window.addEventListener('resize', update);
+  window.addEventListener('resize', () => {
+    update();
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(resizeCharts, 120);
+  });
   // Re-check overflow apres chaque resize (pas de MutationObserver — risque de boucle)
   document.querySelectorAll('.card-table').forEach(el => {
     el.addEventListener('scroll', () => {
