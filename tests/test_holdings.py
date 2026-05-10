@@ -273,7 +273,7 @@ class TestHoldingsImportExport:
         assert len(export['securities']) == 2
         assert len(export['holdings']) == 2
 
-        client.post('/api/reset', headers=CSRF_HEADERS)
+        client.post('/api/reset', json={'confirm': 'VIDER'}, headers=CSRF_HEADERS)
         r = client.post('/api/import-json', json=export, headers=CSRF_HEADERS)
         imp = r.get_json()
         assert imp['positions'] == 1

@@ -1,7 +1,7 @@
 import { S } from '../state.js';
 import { esc, today } from '../utils.js';
 import { api, getCsrfToken } from '../api.js';
-import { confirmDialog, toast } from '../dialogs.js';
+import { confirmDialog, promptDialog, toast } from '../dialogs.js';
 import { loadTargets, saveTargets } from '../targets.js';
 import { refreshDates, renderDateSelects, reloadAll } from '../main.js';
 import { loadHistorique } from './synthese.js';
@@ -153,9 +153,20 @@ export async function resetDb() {
     'Positions, flux et entités seront supprimés <strong>définitivement</strong>.<br>Faites un export JSON avant si vous souhaitez conserver vos données.',
     { confirmText: 'Tout supprimer', danger: true }
   )) return;
+  const confirmation = await promptDialog(
+    'Confirmation requise',
+    {
+      placeholder: 'Tapez VIDER',
+      confirmText: 'Confirmer',
+    }
+  );
+  if (String(confirmation || '').trim().toUpperCase() !== 'VIDER') {
+    toast('Reset annulé : confirmation incorrecte', 'error');
+    return;
+  }
   let result;
   try {
-    result = await api('POST', '/api/reset');
+    result = await api('POST', '/api/reset', { confirm: 'VIDER' });
   } catch { return; }
   S.dates = []; S.syntheseDate = null; S.positionsDate = null;
   S.positions = []; S.flux = []; S.entities = []; S.historique = [];
