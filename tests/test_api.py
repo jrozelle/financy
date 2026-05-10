@@ -143,6 +143,22 @@ class TestAuth:
         })
         assert resp.status_code == 403
 
+    def test_csrf_required_for_patch(self, client):
+        created = client.post('/api/advisor/profiles/Personne 1/objectives',
+                              json={'label': 'RS', 'priority': 3},
+                              headers=CSRF_HEADERS)
+        assert created.status_code == 201
+        oid = created.get_json()['id']
+
+        resp = client.patch(f'/api/advisor/objectives/{oid}', json={'priority': 2})
+        assert resp.status_code == 403
+
+        resp = client.patch(f'/api/advisor/objectives/{oid}',
+                            json={'priority': 2},
+                            headers=CSRF_HEADERS)
+        assert resp.status_code == 200
+        assert resp.get_json()['priority'] == 2
+
     def test_csrf_token_endpoint(self, client):
         resp = client.get('/api/csrf-token')
         assert resp.status_code == 200

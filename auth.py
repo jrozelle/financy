@@ -4,6 +4,7 @@ from functools import wraps
 from flask import session, request, jsonify, redirect, url_for, render_template
 
 AUTH_PASSWORD = os.environ.get('FINANCY_PASSWORD')  # None = pas d'auth
+CSRF_PROTECTED_METHODS = {'POST', 'PUT', 'PATCH', 'DELETE'}
 
 
 def login_required(f):
@@ -20,7 +21,7 @@ def login_required(f):
 def csrf_protect(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        if request.method in ('POST', 'PUT', 'DELETE'):
+        if request.method in CSRF_PROTECTED_METHODS:
             token = request.headers.get('X-CSRF-Token', '')
             if not token or token != session.get('csrf_token'):
                 return jsonify({'error': 'CSRF token invalide'}), 403
