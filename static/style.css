@@ -2610,3 +2610,199 @@ kbd {
     font-size: 13px !important;
   }
 }
+
+/* ── Mobile tab surfaces: consistent toolbars, filters and tables ───────── */
+@media (max-width: 760px) {
+  main {
+    padding: .9rem .85rem calc(5rem + env(safe-area-inset-bottom));
+  }
+  .demo-badge {
+    display: none !important;
+  }
+  .tab-content:not(#tab-synthese) > .page-header {
+    display: block;
+    margin: 0 0 .85rem;
+  }
+  .tab-content:not(#tab-synthese) .header-actions,
+  #tab-actifs .page-filters,
+  .filters-bar {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .55rem !important;
+    align-items: stretch !important;
+    width: 100%;
+    margin: 0 0 .85rem;
+  }
+  .tab-content:not(#tab-synthese) .header-actions > *,
+  #tab-actifs .page-filters > *,
+  .filters-bar > * {
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+  .tab-content:not(#tab-synthese) .date-selector {
+    display: block;
+    width: 100%;
+  }
+  .tab-content:not(#tab-synthese) .date-selector label {
+    display: none;
+  }
+  .tab-content:not(#tab-synthese) .date-selector select,
+  .filter-select,
+  .tab-content:not(#tab-synthese) .btn,
+  .tree-search-input,
+  .view-toggle-btn,
+  #advisor-owner-select {
+    width: 100% !important;
+    min-height: 42px;
+    border-radius: 8px;
+    font-size: 14px;
+  }
+  .tab-content:not(#tab-synthese) .btn,
+  .view-toggle-btn {
+    justify-content: center;
+  }
+  #pos-view-toggle {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 0 !important;
+    padding: 3px;
+    border-radius: 10px;
+  }
+  #tab-positions .date-selector {
+    display: none !important;
+  }
+  #btn-duplicate {
+    grid-column: 1 / -1;
+  }
+  #positions-col-picker,
+  #actifs-col-picker {
+    width: 100%;
+  }
+  #tab-positions .filters-bar,
+  #tab-flux .filters-bar {
+    margin-top: -.15rem;
+  }
+  #tab-flux > .page-header > .btn,
+  #tab-entites > .page-header > .btn {
+    width: min(160px, 48%);
+    min-height: 42px;
+    margin-bottom: .85rem;
+    justify-content: center;
+  }
+  #tab-actifs .kpi-grid {
+    gap: .75rem !important;
+    margin-bottom: .85rem !important;
+  }
+  #tab-actifs .kpi-card {
+    min-height: 96px;
+    padding: 1rem;
+  }
+  #tab-actifs .kpi-label {
+    font-size: 10px;
+  }
+  #tab-actifs .kpi-value {
+    font-size: 21px;
+  }
+  #tab-actifs .charts-row {
+    gap: .85rem !important;
+    margin-bottom: .85rem !important;
+  }
+  #tab-actifs .card [style*="height:240px"] {
+    height: 250px !important;
+  }
+  .card.card-table {
+    border-radius: 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .data-table th,
+  .data-table td {
+    padding: .7rem .85rem;
+    font-size: 13.5px;
+  }
+  #tab-positions .data-table,
+  #tab-flux .data-table,
+  #tab-entites .data-table {
+    min-width: 620px;
+  }
+  #tab-entites .data-table td:not(.num) {
+    max-width: 180px;
+  }
+  #positions-tree-wrap {
+    padding: .85rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  #positions-tree-body {
+    min-width: 560px;
+  }
+  .tree-toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: .65rem;
+    align-items: stretch;
+  }
+  .tree-toolbar-sep {
+    display: none;
+  }
+  .tree-depth-bar {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: .4rem;
+  }
+  .tree-toolbar-label {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+  .tree-depth-btn {
+    min-width: 0;
+    min-height: 36px;
+    padding: .35rem .45rem;
+    text-align: center;
+  }
+  .advisor-disclaimer {
+    margin: 0 0 .85rem;
+    padding: .85rem 1rem;
+    font-size: 13.5px;
+  }
+  .advisor-sidebar {
+    margin: 0 -.85rem .85rem;
+    padding: 0 .85rem .2rem;
+  }
+  .advisor-content > .card {
+    border-radius: 12px;
+  }
+  #adv-profile > div:first-of-type {
+    display: grid;
+    grid-template-columns: 88px minmax(0, 1fr);
+    align-items: center;
+    gap: .75rem;
+  }
+  #adv-profile > div:first-of-type label {
+    margin: 0 !important;
+  }
+  #advisor-owner-select {
+    margin-left: 0 !important;
+  }
+}
+
+@media (max-width: 430px) {
+  .tab-content:not(#tab-synthese) .header-actions,
+  #tab-actifs .page-filters,
+  .filters-bar {
+    gap: .5rem !important;
+  }
+  .tab-content:not(#tab-synthese) .date-selector select,
+  .filter-select,
+  .tab-content:not(#tab-synthese) .btn {
+    font-size: 13.5px;
+  }
+  #tab-positions .header-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+  #btn-duplicate {
+    font-size: 13px;
+  }
+}
