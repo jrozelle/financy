@@ -5,6 +5,7 @@ import os
 import json
 import tempfile
 import sqlite3
+import sys
 
 # Patch DB_PATH before importing anything from models/app
 import models
@@ -18,6 +19,8 @@ os.environ['FINANCY_PASSWORD'] = 'testpass'
 
 from models import init_db, get_db
 from app import app
+
+app_module = sys.modules['app']
 
 
 # ─── Fixtures ────────────────────────────────────────────────────────────────
@@ -165,6 +168,14 @@ class TestAuth:
         assert resp.status_code == 200
         data = resp.get_json()
         assert 'token' in data
+
+    def test_auth_warning_only_when_production_auth_disabled(self, monkeypatch):
+        monkeypatch.setenv('FLASK_ENV', 'production')
+        monkeypatch.setattr(app_module, 'AUTH_PASSWORD', None)
+        assert app_module.app_auth_warning_enabled() is True
+
+        monkeypatch.setattr(app_module, 'AUTH_PASSWORD', 'testpass')
+        assert app_module.app_auth_warning_enabled() is False
 
 
 # ─── TestPositions ───────────────────────────────────────────────────────────
