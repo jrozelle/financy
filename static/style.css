@@ -1917,8 +1917,13 @@ textarea:focus-visible {
   background: linear-gradient(to right, transparent, rgba(0, 0, 0, .32));
 }
 
-/* Actifs dispose deja d'une vue cartes mobile dediee. */
+/* Masquer colonnes secondaires sur mobile pour garder lisibilite */
 @media (max-width: 600px) {
+  .data-table td:nth-child(n+6),
+  .data-table th:nth-child(n+6) {
+    display: none;
+  }
+  .data-table td:not(.num) { max-width: 150px; }
   #tab-actifs .card-table {
     overflow: visible;
   }
@@ -2800,105 +2805,5 @@ kbd {
   }
   #btn-duplicate {
     font-size: 13px;
-  }
-}
-
-/* ── Generic mobile table cards ─────────────────────────────────────────── */
-@media (max-width: 640px) {
-  .responsive-card-wrap {
-    overflow: visible !important;
-  }
-  .responsive-card-wrap::after {
-    display: none;
-  }
-  table.responsive-card-table {
-    display: block;
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-  }
-  table.responsive-card-table thead {
-    display: none;
-  }
-  table.responsive-card-table tbody,
-  table.responsive-card-table tfoot {
-    display: grid;
-    gap: .7rem;
-  }
-  table.responsive-card-table tfoot {
-    margin-top: .7rem;
-  }
-  table.responsive-card-table tr {
-    display: grid;
-    border: 1px solid var(--border);
-    border-left: 4px solid var(--primary);
-    border-radius: 12px;
-    background: var(--card);
-    box-shadow: var(--shadow);
-    overflow: hidden;
-  }
-  table.responsive-card-table tfoot tr,
-  table.responsive-card-table tr.total-row {
-    border-left-color: var(--text-muted);
-    background: color-mix(in srgb, var(--primary-light) 45%, var(--card));
-    font-weight: 700;
-  }
-  table.responsive-card-table td,
-  table.responsive-card-table th {
-    display: grid;
-    grid-template-columns: minmax(98px, 40%) minmax(0, 1fr);
-    align-items: start;
-    gap: .75rem;
-    width: 100%;
-    max-width: none !important;
-    padding: .58rem .75rem;
-    border: 0;
-    border-bottom: 1px solid var(--border);
-    text-align: right !important;
-    white-space: normal !important;
-    overflow: visible;
-    text-overflow: clip;
-  }
-  table.responsive-card-table td:last-child,
-  table.responsive-card-table th:last-child {
-    border-bottom: 0;
-  }
-  table.responsive-card-table td::before,
-  table.responsive-card-table th::before {
-    content: attr(data-label);
-    color: var(--text-muted);
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: .06em;
-    line-height: 1.35;
-    text-align: left;
-    text-transform: uppercase;
-  }
-  table.responsive-card-table td[colspan],
-  table.responsive-card-table th[colspan] {
-    display: block;
-    text-align: left !important;
-  }
-  table.responsive-card-table td[colspan]::before,
-  table.responsive-card-table th[colspan]::before {
-    content: none;
-  }
-  table.responsive-card-table td:last-child:has(.btn-icon),
-  table.responsive-card-table th:last-child:has(.btn-icon) {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: .35rem;
-  }
-  table.responsive-card-table td:last-child:has(.btn-icon)::before,
-  table.responsive-card-table th:last-child:has(.btn-icon)::before {
-    flex: 1 0 100%;
-  }
-  table.responsive-card-table .btn-icon {
-    min-height: 30px;
-    padding: .3rem .55rem;
-  }
-  table.responsive-card-table .num {
-    text-align: right !important;
   }
 }
