@@ -1,6 +1,7 @@
 import { api } from './api.js';
 import { closeModal } from './dialogs.js';
 import { toast } from './dialogs.js';
+import { esc } from './utils.js';
 
 let _current = null;
 
@@ -14,7 +15,7 @@ function _renderStatus() {
   const el = document.getElementById('settings-api-status');
   if (!el || !_current) return;
   if (_current.effective_source === 'db') {
-    el.innerHTML = `<span style="color:var(--success)">Active</span> (configuree ici) &mdash; ${_current.anthropic_api_key_masked}`;
+    el.innerHTML = `<span style="color:var(--success)">Active</span> (configuree ici) &mdash; ${esc(_current.anthropic_api_key_masked)}`;
   } else if (_current.effective_source === 'env') {
     el.innerHTML = `<span style="color:var(--success)">Active</span> (variable d'environnement)`;
   } else {

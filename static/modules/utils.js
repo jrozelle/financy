@@ -14,6 +14,8 @@ export const fmtDate = d => {
   return `${day}/${m}/${y}`;
 };
 
+export const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
 export const liqBadge = liq => {
   const map = {
     'J0\u2013J1':  'badge-j01',
@@ -22,10 +24,8 @@ export const liqBadge = liq => {
     '30J+':        'badge-30',
     'Bloqu\u00e9': 'badge-blk',
   };
-  return `<span class="badge ${map[liq] || 'badge-blk'}">${liq || '—'}</span>`;
+  return `<span class="badge ${map[liq] || 'badge-blk'}">${esc(liq) || '—'}</span>`;
 };
-
-export const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
 export const fmtDelta = (n, dec = 0) => {
   if (n == null || n === 0) return '';
