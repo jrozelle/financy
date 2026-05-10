@@ -1917,13 +1917,8 @@ textarea:focus-visible {
   background: linear-gradient(to right, transparent, rgba(0, 0, 0, .32));
 }
 
-/* Masquer colonnes secondaires sur mobile pour garder lisibilite */
+/* Actifs dispose deja d'une vue cartes mobile dediee. */
 @media (max-width: 600px) {
-  .data-table td:nth-child(n+6),
-  .data-table th:nth-child(n+6) {
-    display: none;
-  }
-  .data-table td:not(.num) { max-width: 150px; }
   #tab-actifs .card-table {
     overflow: visible;
   }
@@ -2805,5 +2800,58 @@ kbd {
   }
   #btn-duplicate {
     font-size: 13px;
+  }
+}
+
+/* ── Mobile tables: keep real tables, preserve all columns ──────────────── */
+@media (max-width: 760px) {
+  #tab-positions .data-table { min-width: 980px; }
+  #tab-flux .data-table { min-width: 820px; }
+  #tab-entites .data-table { min-width: 1120px; }
+  #advisor-objectives-table { min-width: 680px; }
+
+  #tab-positions .card-table,
+  #tab-flux .card-table,
+  #tab-entites .card-table,
+  .advisor-objectives-wrap,
+  .table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-inline: contain;
+  }
+
+  #tab-positions .data-table th,
+  #tab-positions .data-table td,
+  #tab-flux .data-table th,
+  #tab-flux .data-table td,
+  #tab-entites .data-table th,
+  #tab-entites .data-table td {
+    white-space: nowrap;
+  }
+
+  #tab-positions .data-table th:first-child,
+  #tab-positions .data-table td:first-child,
+  #tab-flux .data-table th:first-child,
+  #tab-flux .data-table td:first-child,
+  #tab-entites .data-table th:first-child,
+  #tab-entites .data-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--card);
+    box-shadow: 1px 0 0 var(--border);
+  }
+
+  #tab-positions .data-table thead th:first-child,
+  #tab-flux .data-table thead th:first-child,
+  #tab-entites .data-table thead th:first-child {
+    z-index: 3;
+    background: var(--bg);
+  }
+
+  #tab-positions .data-table td:not(.num),
+  #tab-flux .data-table td:not(.num),
+  #tab-entites .data-table td:not(.num) {
+    max-width: 240px;
   }
 }
