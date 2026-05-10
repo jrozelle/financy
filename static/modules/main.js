@@ -249,6 +249,51 @@ function _installTableOverflowHints() {
   });
 }
 
+function _cleanTableHeaderLabel(text) {
+  return (text || '')
+    .replace(/[↕↑↓]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function _annotateResponsiveTables(root = document) {
+  root.querySelectorAll('table.data-table, table.owners-table').forEach(table => {
+    if (table.closest('#tab-actifs')) return; // Actifs has a dedicated mobile card renderer.
+    const headers = [...table.querySelectorAll('thead tr:last-child th')]
+      .map(th => _cleanTableHeaderLabel(th.textContent) || 'Actions');
+    if (!headers.length) return;
+
+    table.classList.add('responsive-card-table');
+    table.closest('.card-table, .table-scroll')?.classList.add('responsive-card-wrap');
+
+    table.querySelectorAll('tbody tr, tfoot tr').forEach(row => {
+      const cells = [...row.children].filter(cell => cell.matches('td, th'));
+      if (!cells.length || cells.some(cell => Number(cell.getAttribute('colspan') || 1) > 1)) return;
+      cells.forEach((cell, index) => {
+        cell.dataset.label = headers[index] || 'Actions';
+      });
+    });
+  });
+}
+
+function _installResponsiveTables() {
+  let scheduled = false;
+  const run = () => {
+    scheduled = false;
+    _annotateResponsiveTables();
+  };
+  const schedule = () => {
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(run);
+  };
+  _annotateResponsiveTables();
+  new MutationObserver(schedule).observe(document.body, {
+    childList: true,
+    subtree: true,
+  });
+}
+
 function _tabFromUrl() {
   const path = location.pathname.replace(/^\//, '');
   return VALID_TABS.has(path) ? path : null;
@@ -289,6 +334,7 @@ export async function switchTab(tab, { pushHistory = true } = {}) {
     if (tab === 'conseil')     await loadAdvisor();
     if (tab === 'tools')       { await loadTimeline(); loadSchedulerStatus(); }
   } finally {
+    _annotateResponsiveTables(document.getElementById(tabId) || document);
     hideLoading(tabId);
   }
 }
@@ -601,6 +647,7 @@ function wireEvents() {
 
   // Indicateur visuel de scroll horizontal sur les tables
   _installTableOverflowHints();
+  _installResponsiveTables();
 
   // Keyboard shortcuts
   document.addEventListener('keydown', e => {
