@@ -249,11 +249,17 @@ def refresh_securities(conn, provider=None, only_stale=False, stale_hours=20):
     ).fetchall()
 
     if only_stale:
-        threshold = datetime.now() - timedelta(hours=stale_hours)
+        now = datetime.now()
+        threshold = now - timedelta(hours=stale_hours)
+        today = now.date()
         rows = [
             r for r in rows
             if not r['last_price_date']
-            or _parse_date_safe(r['last_price_date']) < threshold
+            or (
+                _parse_date_safe(r['last_price_date']).date() < today
+                if len(str(r['last_price_date'])) <= 10
+                else _parse_date_safe(r['last_price_date']) < threshold
+            )
         ]
 
     today = datetime.now().strftime('%Y-%m-%d')
