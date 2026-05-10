@@ -40,36 +40,20 @@
           </svg>
         </button>
         <div class="settings-dropdown hidden" id="settings-dropdown">
+          <button class="settings-item" id="btn-add-snapshot-note">&#128221; Note du snapshot</button>
+          <button class="settings-item" id="btn-print" title="Imprimer la synthèse">&#128424; Imprimer</button>
+          <button class="settings-item" id="theme-toggle">Thème</button>
+          <button class="settings-item" id="btn-keyboard-help">? Raccourcis clavier</button>
           <button class="settings-item" id="btn-open-settings">&#128273; Cles API</button>
           <button class="settings-item" data-tab="referentiel">&#9881; Referentiel</button>
           <button class="settings-item" data-tab="tools">&#128295; Outils</button>
           <button class="settings-item" data-tab="import">&#8645; Import / Export</button>
+          {% if has_auth %}
+          <a href="/logout" class="settings-item settings-item-danger">Déconnexion</a>
+          {% endif %}
         </div>
       </div>
       <span id="demo-badge" class="demo-badge hidden" title="Mode demo / LLM mocke" aria-hidden="true"></span>
-      <button class="btn-icon nav-icon-btn" id="btn-keyboard-help" title="Raccourcis clavier (Shift+?)" aria-label="Raccourcis clavier">
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="M9.1 9a3 3 0 1 1 4.7 2.45c-.92.6-1.8 1.25-1.8 2.55"></path>
-          <path d="M12 18h.01"></path>
-          <path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z"></path>
-        </svg>
-      </button>
-      <button class="theme-toggle nav-icon-btn" id="theme-toggle" title="Basculer clair/sombre" aria-label="Basculer clair/sombre">
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="M12 3v18"></path>
-          <path d="M12 21a9 9 0 0 0 0-18"></path>
-          <path d="M12 3a9 9 0 0 0 0 18"></path>
-        </svg>
-      </button>
-      {% if has_auth %}
-      <a href="/logout" class="logout-link nav-icon-btn" title="Déconnexion" aria-label="Déconnexion">
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="M10 17l5-5-5-5"></path>
-          <path d="M15 12H3"></path>
-          <path d="M12 3h6a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3h-6"></path>
-        </svg>
-      </a>
-      {% endif %}
     </div>
   </nav>
 
@@ -85,16 +69,13 @@
     <div id="tab-synthese" class="tab-content">
       <div class="page-header">
         <h1>Synthèse</h1>
-        <div style="display:flex;align-items:center;gap:.75rem">
+        <div class="page-header-actions">
           <div class="date-selector">
             <label>Date</label>
             <select id="synthese-date-select"></select>
           </div>
-          <button class="btn btn-secondary btn-sm" id="btn-print" title="Imprimer la synthèse" onclick="window.print()">&#128424; Imprimer</button>
         </div>
       </div>
-
-      <div class="analyse-person-tabs" id="synthese-person-tabs" style="margin-bottom:1rem"></div>
 
       <div id="entity-warnings-bar"></div>
 

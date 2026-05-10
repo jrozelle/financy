@@ -1,5 +1,5 @@
 import { S } from './state.js';
-import { fmtDate, treeFilter, treeExpandCollapse, treeToggleRow } from './utils.js';
+import { fmtDate, treeFilter, treeExpandCollapse, treeToggleRow, esc } from './utils.js';
 import { api, buildSelects } from './api.js';
 import { closeModal, trapModalFocus, installModalScrollLock } from './dialogs.js';
 import { wireDrilldownEvents, drilldownHistory } from './drilldown.js';
@@ -110,7 +110,7 @@ function _buildGlobalOwnerFilter() {
   if (!sel) return;
   const owners = S.config?.owners || [];
   sel.innerHTML = '<option value="Famille">Famille</option>' +
-    owners.map(o => `<option value="${o}">${o}</option>`).join('');
+    owners.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
   sel.value = S.syntheseOwner || 'Famille';
 }
 
@@ -242,6 +242,8 @@ function wireEvents() {
   document.getElementById('btn-keyboard-help')?.addEventListener('click', () => {
     document.getElementById('keyboard-help-modal')?.classList.remove('hidden');
   });
+
+  document.getElementById('btn-print')?.addEventListener('click', () => window.print());
 
   // Navbar hamburger mobile
   const navToggle = document.getElementById('navbar-toggle');
@@ -625,6 +627,7 @@ function applyTheme(mode) {
   const btn = document.getElementById('theme-toggle');
   if (btn) {
     const label = mode === 'auto' ? 'Thème : auto (système)' : mode === 'dark' ? 'Thème : sombre' : 'Thème : clair';
+    btn.textContent = label;
     btn.title = label;
     btn.setAttribute('aria-label', label);
     btn.dataset.themeMode = mode;

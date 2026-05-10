@@ -71,6 +71,7 @@ function _clearSyntheseEmpty() {
 
 export function renderSynthesePersonTabs() {
   const container = document.getElementById('synthese-person-tabs');
+  if (!container) return;
   container.innerHTML = ['Famille', ..._owners()].map(o => `
     <button class="person-tab-btn ${S.syntheseOwner === o ? 'active' : ''}"
             data-owner="${esc(o)}">${esc(o)}</button>
@@ -681,21 +682,9 @@ function renderSnapshotNote(syn) {
     bar.querySelector('#btn-edit-snapshot-note')?.addEventListener('click', () => openSnapshotNoteEditor(date, note));
   }
 
-  // Add/edit button in date selector area
   let noteBtn = document.getElementById('btn-add-snapshot-note');
-  if (!noteBtn) {
-    const header = document.querySelector('#tab-synthese .page-header > div');
-    if (header) {
-      noteBtn = document.createElement('button');
-      noteBtn.id = 'btn-add-snapshot-note';
-      noteBtn.className = 'btn btn-secondary btn-sm';
-      noteBtn.title = 'Annoter ce snapshot';
-      noteBtn.textContent = note ? '\u{1F4DD}' : '+ Note';
-      header.appendChild(noteBtn);
-    }
-  }
   if (noteBtn) {
-    noteBtn.textContent = note ? '\u{1F4DD}' : '+ Note';
+    noteBtn.innerHTML = note ? '&#128221; Modifier la note' : '&#128221; Note du snapshot';
     noteBtn.onclick = () => openSnapshotNoteEditor(date, note || '');
   }
 }
