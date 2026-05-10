@@ -76,13 +76,14 @@ function _apply(theadId, state) {
       // Masquer aussi les td correspondantes
       const table = thead.closest('table');
       if (table) {
-        table.querySelectorAll(`tbody tr`).forEach(tr => {
+        table.querySelectorAll(`tbody tr, tfoot tr`).forEach(tr => {
           const td = tr.children[idx];
           if (td) td.style.display = hidden ? 'none' : '';
         });
       }
     }
   });
+  thead.dispatchEvent(new CustomEvent('columns:changed', { bubbles: true }));
 }
 
 // Re-appliquer apres un re-render du tbody

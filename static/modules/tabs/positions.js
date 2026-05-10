@@ -13,6 +13,20 @@ import { reapplyColumns } from '../column-picker.js';
 // que de nouveaux noeuds soient visibles par defaut.
 
 const TREE_STATE_KEY = 'financy_positions_tree_collapsed';
+const POSITION_FILTER_COLUMNS = {
+  'filter-owner': 'owner',
+  'filter-establishment': 'establishment',
+  'filter-envelope': 'envelope',
+};
+const POSITION_STICKY_COLUMNS = [
+  'owner',
+  'establishment',
+  'envelope',
+  'category',
+  'gross_attributed',
+  'net_attributed',
+  'mobilizable_value',
+];
 
 function _loadCollapsedKeys() {
   try { return new Set(JSON.parse(localStorage.getItem(TREE_STATE_KEY) || '[]')); }
@@ -143,6 +157,34 @@ function filteredPositions() {
     (!env    || p.envelope      === env)   &&
     (!estab  || p.establishment === estab)
   );
+}
+
+function _activeFilteredColumns() {
+  return new Set(Object.entries(POSITION_FILTER_COLUMNS)
+    .filter(([id]) => !!document.getElementById(id)?.value)
+    .map(([, col]) => col));
+}
+
+function _applyPositionTableContext() {
+  const table = document.getElementById('positions-table');
+  if (!table) return;
+  const hiddenByFilter = _activeFilteredColumns();
+
+  table.querySelectorAll('[data-pos-col]').forEach(cell => {
+    const hide = hiddenByFilter.has(cell.dataset.posCol);
+    cell.classList.toggle('context-hidden-col', hide);
+    cell.classList.remove('mobile-sticky-col');
+  });
+
+  const stickyCol = POSITION_STICKY_COLUMNS.find(col => {
+    if (hiddenByFilter.has(col)) return false;
+    const th = table.querySelector(`#positions-thead [data-pos-col="${col}"]`);
+    return th && th.style.display !== 'none';
+  });
+  if (!stickyCol) return;
+  table.querySelectorAll(`[data-pos-col="${stickyCol}"]`).forEach(cell => {
+    if (cell.style.display !== 'none') cell.classList.add('mobile-sticky-col');
+  });
 }
 
 function renderPositionsEmpty(msg) {
@@ -400,6 +442,11 @@ export function renderPositions() {
   document.getElementById('positions-tree-wrap').style.display  = isTree ? '' : 'none';
   document.getElementById('positions-filters').style.display    = isTree ? 'none' : '';
   renderPosViewToggle();
+  const thead = document.getElementById('positions-thead');
+  if (thead && !thead.dataset.contextBound) {
+    thead.dataset.contextBound = '1';
+    thead.addEventListener('columns:changed', _applyPositionTableContext);
+  }
 
   if (isTree) {
     renderPositionsTree(filteredPositions());
@@ -408,9 +455,10 @@ export function renderPositions() {
 
   const positions = sortArr(filteredPositions(), S.sort.positions.key, S.sort.positions.dir);
   updateSortIndicators('positions-thead', 'positions');
-  reapplyColumns('positions', 'positions-thead');
   if (!positions.length) {
     renderPositionsEmpty(S.positions.length ? 'Aucune position pour ce filtre.' : 'Aucune position pour ce snapshot.');
+    reapplyColumns('positions', 'positions-thead');
+    _applyPositionTableContext();
     return;
   }
 
@@ -431,16 +479,16 @@ export function renderPositions() {
       ? `<span class="badge badge-j27" style="margin-left:4px;font-size:10px;vertical-align:middle" title="${p.holdings_count} ligne(s)">${p.holdings_count}L</span>`
       : '';
     return `<tr>
-      <td><strong>${esc(p.owner)}</strong></td>
-      <td>${esc(p.label || p.category)}${notesMark}${holdingsBadge}</td>
-      <td>${esc(p.envelope || '—')}</td>
-      <td>${esc(p.establishment || '—')}${entitySub}</td>
-      <td class="num">${fmt(p.gross_attributed)}${pctBadge}</td>
-      <td class="num ${p.debt_attributed > 0 ? 'neg' : ''}">${p.debt_attributed > 0 ? fmt(p.debt_attributed) : '—'}${debtBadge}</td>
-      <td class="num ${p.net_attributed < 0 ? 'neg' : ''}">${fmt(p.net_attributed)}</td>
-      <td>${liqBadge(p.liquidity)}</td>
-      <td class="num">${fmt(p.mobilizable_value)}${p.mobilizable_pct_override != null ? ` <span title="Mobilisabilité surchargée : ${Math.round(p.mobilizable_pct_override*100)} %" style="color:var(--warning);font-size:11px">⚠</span>` : ''}</td>
-      <td style="white-space:nowrap">
+      <td data-pos-col="owner"><strong>${esc(p.owner)}</strong></td>
+      <td data-pos-col="establishment">${esc(p.establishment || '—')}${entitySub}</td>
+      <td data-pos-col="envelope">${esc(p.envelope || '—')}</td>
+      <td data-pos-col="category">${esc(p.label || p.category)}${notesMark}${holdingsBadge}</td>
+      <td data-pos-col="gross_attributed" class="num">${fmt(p.gross_attributed)}${pctBadge}</td>
+      <td data-pos-col="debt_attributed" class="num ${p.debt_attributed > 0 ? 'neg' : ''}">${p.debt_attributed > 0 ? fmt(p.debt_attributed) : '—'}${debtBadge}</td>
+      <td data-pos-col="net_attributed" class="num ${p.net_attributed < 0 ? 'neg' : ''}">${fmt(p.net_attributed)}</td>
+      <td data-pos-col="liquidity">${liqBadge(p.liquidity)}</td>
+      <td data-pos-col="mobilizable_value" class="num">${fmt(p.mobilizable_value)}${p.mobilizable_pct_override != null ? ` <span title="Mobilisabilité surchargée : ${Math.round(p.mobilizable_pct_override*100)} %" style="color:var(--warning);font-size:11px">⚠</span>` : ''}</td>
+      <td data-pos-col="actions" style="white-space:nowrap">
         <button class="btn-icon" data-id="${p.id}" data-action="manage-holdings" title="Gérer les lignes">Lignes</button>
         <button class="btn-icon edit" data-id="${p.id}" data-action="edit-pos">Éditer</button>
         <button class="btn-icon del"  data-id="${p.id}" data-action="del-pos">Supprimer</button>
@@ -454,15 +502,20 @@ export function renderPositions() {
   const totMob   = positions.reduce((s, p) => s + (p.mobilizable_value|| 0), 0);
   document.getElementById('positions-tfoot').innerHTML = `
     <tr>
-      <td colspan="4">TOTAL</td>
-      <td class="num">${fmt(totGross)}</td>
-      <td class="num neg">${totDebt > 0 ? fmt(totDebt) : '—'}</td>
-      <td class="num">${fmt(totNet)}</td>
-      <td></td>
-      <td class="num">${fmt(totMob)}</td>
-      <td></td>
+      <td data-pos-col="owner">TOTAL</td>
+      <td data-pos-col="establishment"></td>
+      <td data-pos-col="envelope"></td>
+      <td data-pos-col="category"></td>
+      <td data-pos-col="gross_attributed" class="num">${fmt(totGross)}</td>
+      <td data-pos-col="debt_attributed" class="num neg">${totDebt > 0 ? fmt(totDebt) : '—'}</td>
+      <td data-pos-col="net_attributed" class="num">${fmt(totNet)}</td>
+      <td data-pos-col="liquidity"></td>
+      <td data-pos-col="mobilizable_value" class="num">${fmt(totMob)}</td>
+      <td data-pos-col="actions"></td>
     </tr>`;
 
+  reapplyColumns('positions', 'positions-thead');
+  _applyPositionTableContext();
   document.getElementById('positions-tbody').addEventListener('click', onPosTableClick, { once: true });
 }
 
