@@ -281,6 +281,25 @@ main { padding: 1.5rem; max-width: min(1760px, 100vw); width: 100%; margin: 0 au
 .data-table th[data-sort].sort-asc::after  { content: ' ▲'; opacity: 1; color: var(--primary); }
 .data-table th[data-sort].sort-desc::after { content: ' ▼'; opacity: 1; color: var(--primary); }
 
+@media (min-width: 761px) {
+  #positions-table-wrap.is-context-filtered {
+    display: inline-block;
+    width: auto;
+    max-width: 100%;
+    min-width: min(1040px, 100%);
+    vertical-align: top;
+  }
+  #positions-table.has-context-hidden-cols {
+    width: auto;
+    min-width: min(1040px, 100%);
+  }
+  #positions-table.has-context-hidden-cols th,
+  #positions-table.has-context-hidden-cols td {
+    padding-left: .8rem;
+    padding-right: .8rem;
+  }
+}
+
 /* Owners mini-table */
 #owners-table {
   max-width: 100%;
