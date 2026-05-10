@@ -2047,10 +2047,15 @@ kbd {
     width: 100%;
   }
   .nav-tabs {
-    order: 30;
     top: 52px;
+    width: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding: .5rem;
+  }
+  .nav-tabs .tab-btn {
+    width: 100%;
     flex: 0 0 auto;
-    width: auto;
   }
   #tab-actifs .kpi-grid { grid-template-columns: 1fr !important; }
   #tab-actifs .data-table { min-width: 920px; }
