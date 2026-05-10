@@ -865,7 +865,7 @@ class TestImportExport:
         export_resp = client.get('/api/export')
         exported = export_resp.get_json()
         # Reset
-        client.post('/api/reset', headers=CSRF_HEADERS)
+        client.post('/api/reset', json={'confirm': 'VIDER'}, headers=CSRF_HEADERS)
         # Verify empty
         assert client.get('/api/export').get_json()['positions'] == []
         # Re-import
@@ -879,13 +879,20 @@ class TestImportExport:
         _make_position(client)
         _make_flux(client)
         _make_entity(client)
-        resp = client.post('/api/reset', headers=CSRF_HEADERS)
+        resp = client.post('/api/reset', json={'confirm': 'VIDER'}, headers=CSRF_HEADERS)
         assert resp.status_code == 200
         assert resp.get_json()['ok'] is True
         # Verify everything is gone
         assert client.get('/api/positions').get_json() == []
         assert client.get('/api/flux').get_json() == []
         assert client.get('/api/entities').get_json() == []
+
+    def test_reset_db_requires_typed_confirmation(self, client):
+        _make_position(client)
+        resp = client.post('/api/reset', json={'confirm': 'NON'}, headers=CSRF_HEADERS)
+        assert resp.status_code == 400
+        assert resp.get_json()['confirmation'] == 'VIDER'
+        assert len(client.get('/api/positions').get_json()) == 1
 
 
 # ─── TestMigrations ──────────────────────────────────────────────────────────

@@ -8,6 +8,7 @@ from auth import login_required, csrf_protect
 
 MAX_IMPORT_ROWS = 10000
 MAX_NOTE_LENGTH = 2000
+RESET_CONFIRMATION = 'VIDER'
 
 logger = logging.getLogger('financy')
 
@@ -563,6 +564,14 @@ def export_data():
 @login_required
 @csrf_protect
 def reset_db():
+    data = request.get_json(silent=True) or {}
+    confirmation = str(data.get('confirm') or '').strip().upper()
+    if confirmation != RESET_CONFIRMATION:
+        return jsonify({
+            'error': f'Confirmation requise : tapez {RESET_CONFIRMATION}',
+            'confirmation': RESET_CONFIRMATION,
+        }), 400
+
     tables = [
         'positions', 'flux', 'entities', 'entity_snapshots', 'snapshot_notes',
         'holdings', 'holdings_snapshots', 'price_history', 'securities',
