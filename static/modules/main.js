@@ -116,13 +116,6 @@ function _buildGlobalOwnerFilter() {
 
 function _onGlobalOwnerChange(e) {
   S.syntheseOwner = e.target.value;
-  // Sync person tabs in synthese
-  const container = document.getElementById('synthese-person-tabs');
-  if (container) {
-    container.querySelectorAll('.person-tab-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.owner === S.syntheseOwner);
-    });
-  }
   // Sync actifs filter
   const actifsSel = document.getElementById('actifs-owner-filter');
   if (actifsSel) actifsSel.value = S.syntheseOwner === 'Famille' ? '' : S.syntheseOwner;
@@ -135,6 +128,43 @@ const VALID_TABS = new Set([
   'synthese', 'positions', 'actifs', 'flux', 'entites', 'conseil',
   'referentiel', 'tools', 'import',
 ]);
+
+function _normalizeLegacyLayout() {
+  const menu = document.getElementById('settings-dropdown');
+
+  // Old templates can remain cached by the running app process. Moving these
+  // controls here keeps refreshed static JS/CSS compatible with that HTML.
+  if (menu) {
+    const ensureMenuButton = (id, html) => {
+      let btn = document.getElementById(id);
+      if (!btn) {
+        btn = document.createElement('button');
+        btn.id = id;
+      }
+      btn.type = 'button';
+      btn.className = 'settings-item';
+      btn.innerHTML = html;
+      btn.removeAttribute('onclick');
+      menu.insertBefore(btn, menu.firstChild);
+      return btn;
+    };
+
+    ensureMenuButton('btn-keyboard-help', '? Raccourcis clavier');
+    ensureMenuButton('theme-toggle', 'Thème');
+    ensureMenuButton('btn-print', '&#128424; Imprimer');
+    ensureMenuButton('btn-add-snapshot-note', '&#128221; Note du snapshot');
+
+    const logout = menu.querySelector('a[href="/logout"]') || document.querySelector('a.logout-link[href="/logout"]');
+    if (logout) {
+      logout.className = 'settings-item settings-item-danger';
+      logout.textContent = 'Déconnexion';
+      menu.appendChild(logout);
+    }
+  }
+
+  document.getElementById('synthese-person-tabs')?.remove();
+  document.querySelectorAll('#tab-synthese .analyse-person-tabs').forEach(el => el.remove());
+}
 
 function _closeNavDrawer() {
   const navTabs = document.getElementById('nav-tabs');
@@ -627,7 +657,9 @@ function applyTheme(mode) {
   const btn = document.getElementById('theme-toggle');
   if (btn) {
     const label = mode === 'auto' ? 'Thème : auto (système)' : mode === 'dark' ? 'Thème : sombre' : 'Thème : clair';
-    btn.textContent = label;
+    if (btn.classList.contains('settings-item') || btn.closest('#settings-dropdown')) {
+      btn.textContent = label;
+    }
     btn.title = label;
     btn.setAttribute('aria-label', label);
     btn.dataset.themeMode = mode;
@@ -643,5 +675,6 @@ function applyTheme(mode) {
 
 // ─── Boot ─────────────────────────────────────────────────────────────────
 
+_normalizeLegacyLayout();
 initTheme();
 init().catch(err => console.error('Init error:', err));

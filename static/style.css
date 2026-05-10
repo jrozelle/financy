@@ -2352,6 +2352,13 @@ kbd {
 .settings-dropdown #btn-keyboard-help {
   display: block;
 }
+.nav-actions > #btn-keyboard-help.nav-icon-btn,
+.nav-actions > #theme-toggle.nav-icon-btn,
+.nav-actions > .logout-link.nav-icon-btn,
+#tab-synthese #synthese-person-tabs,
+#tab-synthese .page-header #btn-print {
+  display: none !important;
+}
 
 @media (max-width: 1280px) {
   .navbar {
