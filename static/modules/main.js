@@ -623,8 +623,12 @@ function initTheme() {
 function applyTheme(mode) {
   document.documentElement.dataset.theme = _resolveTheme(mode);
   const btn = document.getElementById('theme-toggle');
-  if (btn) btn.textContent = mode === 'auto' ? '\u25D0' : mode === 'dark' ? '\u2600' : '\u263E';
-  if (btn) btn.title = mode === 'auto' ? 'Thème : auto (système)' : mode === 'dark' ? 'Thème : sombre' : 'Thème : clair';
+  if (btn) {
+    const label = mode === 'auto' ? 'Thème : auto (système)' : mode === 'dark' ? 'Thème : sombre' : 'Thème : clair';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+    btn.dataset.themeMode = mode;
+  }
   if (S.currentTab === 'synthese' && S.synthese) renderSynthese();
 }
 
