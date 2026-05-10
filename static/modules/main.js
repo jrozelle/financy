@@ -11,7 +11,7 @@ import { wireSortableTable } from './utils.js';
 import { loadSynthese, renderSynthese, renderSyntheseHistory, loadHistorique } from './tabs/synthese.js';
 import { loadPositions, renderPositions, clearFilters, openPosModal, duplicateSnapshot,
          onEntitySelectChange, updatePosInfo, savePosition, startInlineEdit, deletePosition,
-         persistPositionFilters, persistPositionsTreeState } from './tabs/positions.js';
+         persistPositionFilters, persistPositionsTreeState, ensurePositionsTableScaffold } from './tabs/positions.js';
 import { openHoldingsModal, wireHoldingsEvents, confirmCloseHoldings } from './tabs/holdings.js';
 import { wireIsinPopoverEvents } from './isin-popover.js';
 import { loadAdvisor, wireAdvisorEvents } from './tabs/advisor.js';
@@ -535,6 +535,7 @@ function wireEvents() {
   document.getElementById('btn-backup')?.addEventListener('click', createBackup);
 
   // Tri des tableaux
+  ensurePositionsTableScaffold();
   wireSortableTable('positions-thead', 'positions', renderPositions);
   wireSortableTable('flux-thead',      'flux',      renderFlux);
   wireSortableTable('entities-thead',  'entities',  renderEntities);

@@ -27,6 +27,37 @@ const POSITION_STICKY_COLUMNS = [
   'net_attributed',
   'mobilizable_value',
 ];
+const POSITION_TABLE_COLUMNS = [
+  { key: 'owner', label: 'Propriétaire' },
+  { key: 'establishment', label: 'Établissement / Entité' },
+  { key: 'envelope', label: 'Enveloppe' },
+  { key: 'category', label: 'Catégorie' },
+  { key: 'gross_attributed', label: 'Actif attribué', num: true },
+  { key: 'debt_attributed', label: 'Dette attribuée', num: true },
+  { key: 'net_attributed', label: 'Net attribué', num: true },
+  { key: 'liquidity', label: 'Liquidité' },
+  { key: 'mobilizable_value', label: 'Mobilisable', num: true },
+  { key: 'actions', label: '' },
+];
+
+export function ensurePositionsTableScaffold() {
+  const thead = document.getElementById('positions-thead');
+  if (thead) {
+    const current = [...thead.querySelectorAll('[data-pos-col]')].map(th => th.dataset.posCol).join('|');
+    const expected = POSITION_TABLE_COLUMNS.map(c => c.key).join('|');
+    if (current !== expected) {
+      thead.innerHTML = `<tr>${POSITION_TABLE_COLUMNS.map(col => `
+        <th data-pos-col="${col.key}"${col.key !== 'actions' ? ` data-sort="${col.key}"` : ''}${col.num ? ' class="num"' : ''}>${esc(col.label)}</th>
+      `).join('')}</tr>`;
+    }
+  }
+
+  const envelope = document.getElementById('filter-envelope');
+  const establishment = document.getElementById('filter-establishment');
+  if (envelope && establishment && envelope.previousElementSibling !== establishment) {
+    envelope.parentElement.insertBefore(establishment, envelope);
+  }
+}
 
 function _loadCollapsedKeys() {
   try { return new Set(JSON.parse(localStorage.getItem(TREE_STATE_KEY) || '[]')); }
@@ -89,6 +120,7 @@ async function ensureTodaySnapshot() {
 }
 
 export async function loadPositions() {
+  ensurePositionsTableScaffold();
   if (!S.positionsDate && S.dates.length) S.positionsDate = S.dates[0];
   if (!S.positionsDate) {
     renderPositionsEmpty('Aucune donnée. Importez votre fichier Excel ou ajoutez une position.');
@@ -169,6 +201,10 @@ function _applyPositionTableContext() {
   const table = document.getElementById('positions-table');
   if (!table) return;
   const hiddenByFilter = _activeFilteredColumns();
+  const hasContextHiddenCols = hiddenByFilter.size > 0;
+
+  table.classList.toggle('has-context-hidden-cols', hasContextHiddenCols);
+  table.closest('.card-table')?.classList.toggle('is-context-filtered', hasContextHiddenCols);
 
   table.querySelectorAll('[data-pos-col]').forEach(cell => {
     const hide = hiddenByFilter.has(cell.dataset.posCol);
@@ -437,6 +473,7 @@ function renderPositionsTree(allPositions) {
 }
 
 export function renderPositions() {
+  ensurePositionsTableScaffold();
   const isTree = S.positionsView === 'tree';
   document.getElementById('positions-table-wrap').style.display = isTree ? 'none' : '';
   document.getElementById('positions-tree-wrap').style.display  = isTree ? '' : 'none';
