@@ -346,11 +346,22 @@ function wireEvents() {
   // Date selects (with spinner)
   document.getElementById('synthese-date-select').addEventListener('change', async e => {
     S.syntheseDate = e.target.value;
-    showLoading('tab-synthese');
-    try { await loadSynthese(); } finally { hideLoading('tab-synthese'); }
+    S.positionsDate = e.target.value;
+    const positionsSelect = document.getElementById('positions-date-select');
+    if (positionsSelect) positionsSelect.value = e.target.value;
+    if (S.currentTab === 'positions') {
+      showLoading('tab-positions');
+      try { await loadPositions(); } finally { hideLoading('tab-positions'); }
+    } else {
+      showLoading('tab-synthese');
+      try { await loadSynthese(); } finally { hideLoading('tab-synthese'); }
+    }
   });
   document.getElementById('positions-date-select').addEventListener('change', async e => {
     S.positionsDate = e.target.value;
+    S.syntheseDate = e.target.value;
+    const syntheseSelect = document.getElementById('synthese-date-select');
+    if (syntheseSelect) syntheseSelect.value = e.target.value;
     showLoading('tab-positions');
     try { await loadPositions(); } finally { hideLoading('tab-positions'); }
   });
