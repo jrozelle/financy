@@ -72,20 +72,7 @@ function _clearSyntheseEmpty() {
 export function renderSynthesePersonTabs() {
   const container = document.getElementById('synthese-person-tabs');
   if (!container) return;
-  container.innerHTML = ['Famille', ..._owners()].map(o => `
-    <button class="person-tab-btn ${S.syntheseOwner === o ? 'active' : ''}"
-            data-owner="${esc(o)}">${esc(o)}</button>
-  `).join('');
-  container.querySelectorAll('.person-tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      S.syntheseOwner = btn.dataset.owner;
-      // Sync global filter
-      const globalSel = document.getElementById('global-owner-filter');
-      if (globalSel) globalSel.value = S.syntheseOwner;
-      renderSynthesePersonTabs();
-      renderSynthese();
-    });
-  });
+  container.remove();
 }
 
 export function renderSynthese() {
