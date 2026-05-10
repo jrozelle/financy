@@ -700,15 +700,16 @@ export async function loadWealthTarget() {
 
 function renderWealthTarget(currentNet) {
   const bar = document.getElementById('wealth-target-bar');
+  const menuBtn = document.getElementById('btn-open-wealth-target');
+  if (menuBtn) {
+    menuBtn.innerHTML = _wealthTarget ? '&#127919; Modifier objectif patrimoine' : '&#127919; Objectif patrimoine';
+    menuBtn.onclick = openWealthTargetEditor;
+  }
   if (!bar) return;
 
   if (!_wealthTarget) {
     bar.style.display = 'none';
-    bar.innerHTML = `<div class="wealth-target-empty">
-      <button class="btn btn-secondary btn-sm" id="btn-set-wealth-target">Définir un objectif patrimoine</button>
-    </div>`;
-    bar.style.display = '';
-    bar.querySelector('#btn-set-wealth-target')?.addEventListener('click', openWealthTargetEditor);
+    bar.innerHTML = '';
     return;
   }
 

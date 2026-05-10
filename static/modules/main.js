@@ -131,11 +131,25 @@ const VALID_TABS = new Set([
 
 function _normalizeLegacyLayout() {
   const menu = document.getElementById('settings-dropdown');
+  const ownerFilter = document.querySelector('.nav-owner-filter');
+  let dateFilter = document.querySelector('.nav-date-filter');
+  const syntheseDate = document.getElementById('synthese-date-select');
+
+  if (ownerFilter && syntheseDate) {
+    if (!dateFilter) {
+      dateFilter = document.createElement('div');
+      dateFilter.className = 'nav-date-filter';
+      ownerFilter.after(dateFilter);
+    }
+    if (!dateFilter.contains(syntheseDate)) dateFilter.appendChild(syntheseDate);
+    syntheseDate.setAttribute('aria-label', 'Date du snapshot');
+    syntheseDate.closest('.date-selector')?.querySelector('label')?.remove();
+  }
 
   // Old templates can remain cached by the running app process. Moving these
   // controls here keeps refreshed static JS/CSS compatible with that HTML.
   if (menu) {
-    const ensureMenuButton = (id, html) => {
+    const ensureMenuButton = (id, html, attrs = {}) => {
       let btn = document.getElementById(id);
       if (!btn) {
         btn = document.createElement('button');
@@ -145,21 +159,50 @@ function _normalizeLegacyLayout() {
       btn.className = 'settings-item';
       btn.innerHTML = html;
       btn.removeAttribute('onclick');
-      menu.insertBefore(btn, menu.firstChild);
+      for (const [name, value] of Object.entries(attrs)) btn.setAttribute(name, value);
       return btn;
     };
-
-    ensureMenuButton('btn-keyboard-help', '? Raccourcis clavier');
-    ensureMenuButton('theme-toggle', 'Thème');
-    ensureMenuButton('btn-print', '&#128424; Imprimer');
-    ensureMenuButton('btn-add-snapshot-note', '&#128221; Note du snapshot');
+    const ensureTabButton = (tab, html) => {
+      let btn = menu.querySelector(`[data-tab="${tab}"]`);
+      if (!btn) {
+        btn = document.createElement('button');
+        btn.dataset.tab = tab;
+      }
+      btn.type = 'button';
+      btn.className = 'settings-item';
+      btn.innerHTML = html;
+      return btn;
+    };
+    const section = label => {
+      const el = document.createElement('div');
+      el.className = 'settings-section-label';
+      el.textContent = label;
+      return el;
+    };
 
     const logout = menu.querySelector('a[href="/logout"]') || document.querySelector('a.logout-link[href="/logout"]');
+    const items = [
+      section('Synthèse'),
+      ensureMenuButton('btn-add-snapshot-note', '&#128221; Note du snapshot'),
+      ensureMenuButton('btn-open-wealth-target', '&#127919; Objectif patrimoine'),
+      ensureMenuButton('btn-print', '&#128424; Imprimer', { title: 'Imprimer la synthèse' }),
+      section('Affichage'),
+      ensureMenuButton('theme-toggle', 'Thème'),
+      ensureMenuButton('btn-keyboard-help', '? Raccourcis clavier'),
+      section('Administration'),
+      ensureMenuButton('btn-open-settings', '&#128273; Clés API'),
+      ensureTabButton('referentiel', '&#9881; Référentiel'),
+      ensureTabButton('tools', '&#128295; Outils'),
+      ensureTabButton('import', '&#8645; Import / Export'),
+    ];
+
     if (logout) {
       logout.className = 'settings-item settings-item-danger';
       logout.textContent = 'Déconnexion';
-      menu.appendChild(logout);
+      items.push(section('Compte'), logout);
     }
+
+    menu.replaceChildren(...items);
   }
 
   document.getElementById('synthese-person-tabs')?.remove();
