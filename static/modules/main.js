@@ -18,7 +18,7 @@ import { loadAdvisor, wireAdvisorEvents } from './tabs/advisor.js';
 import { loadActifs, wireActifsEvents } from './tabs/actifs.js';
 import { loadFlux, renderFlux, openFluxModal, saveFlux, persistFluxFilters, clearFluxFilters } from './tabs/flux.js';
 import { loadEntities, renderEntities, openEntityModal, saveEntity, updateEntInfo } from './tabs/entities.js';
-import { importXlsx, importJson, exportJson, resetDb, initDemoToggle, createBackup } from './tabs/import-export.js';
+import { importXlsx, importJson, exportJson, resetDb, initDemoToggle, createBackup, updateDemoBadge } from './tabs/import-export.js';
 import { loadReferential, saveReferential, initTemplateSelect } from './tabs/referentiel.js';
 import { loadTimeline, wireSimulation, triggerAutoSnapshot, triggerPricesRefresh, loadSchedulerStatus } from './tabs/tools.js';
 import { wireGlobalSearch } from './search.js';
@@ -270,6 +270,7 @@ export async function switchTab(tab, { pushHistory = true } = {}) {
 
   const dd = document.getElementById('settings-dropdown');
   if (dd) dd.classList.add('hidden');
+  updateDemoBadge();
 
   const tabId = `tab-${tab}`;
   // Eviter de recharger l'onglet si on y est deja et qu'on ne force pas

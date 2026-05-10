@@ -11,12 +11,18 @@ import { renderSynthese } from './synthese.js';
 
 // ─── Demo mode ───────────────────────────────────────────────────────────────
 
+let _demoMode = false;
+let _llmMockMode = false;
+
 export function updateDemoBadge({ demo, llmMock } = {}) {
   const badge = document.getElementById('demo-badge');
   if (!badge) return;
+  if (typeof demo === 'boolean') _demoMode = demo;
+  if (typeof llmMock === 'boolean') _llmMockMode = llmMock;
+  const showLlmMock = _llmMockMode && S.currentTab === 'conseil';
   let label = '';
-  if (demo) label = 'Mode démo';
-  else if (llmMock) label = 'LLM mocké';
+  if (_demoMode) label = 'Mode démo';
+  else if (showLlmMock) label = 'LLM mocké';
   if (label) {
     badge.textContent = label;
     badge.classList.remove('hidden');
