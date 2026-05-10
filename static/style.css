@@ -1762,6 +1762,57 @@ textarea:focus-visible {
   white-space: nowrap;
 }
 
+.actifs-card-list {
+  display: none;
+  gap: .75rem;
+  padding: .75rem;
+}
+.actif-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  padding: .85rem;
+  box-shadow: var(--shadow);
+}
+.actif-card-main {
+  display: grid;
+  gap: .15rem;
+  margin-bottom: .75rem;
+}
+.actif-card-main strong {
+  font-size: 14px;
+  line-height: 1.25;
+}
+.actif-card-main span {
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.actif-card-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .5rem .75rem;
+  margin: 0;
+}
+.actif-card-metrics div {
+  min-width: 0;
+}
+.actif-card-metrics dt {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.actif-card-metrics dd {
+  margin: .05rem 0 0;
+  font-size: 13.5px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.actif-card-freshness {
+  margin-top: .75rem;
+}
+
 /* Indicateur visuel de scroll horizontal sur tables dans card-table */
 .card-table {
   position: relative;
@@ -1790,6 +1841,15 @@ textarea:focus-visible {
     display: none;
   }
   .data-table td:not(.num) { max-width: 150px; }
+  #tab-actifs .card-table {
+    overflow: visible;
+  }
+  #tab-actifs .card-table table {
+    display: none;
+  }
+  #tab-actifs .actifs-card-list {
+    display: grid;
+  }
 }
 
 /* ── B6. Onglet Conseil : layout avec nav laterale ─────────────────────── */
