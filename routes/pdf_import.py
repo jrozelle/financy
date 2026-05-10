@@ -9,8 +9,10 @@ Flux en 2 temps :
      fait un full replace des holdings de la position.
 """
 import logging
+from datetime import datetime
+
 from flask import Blueprint, jsonify, request
-from models import get_db, validate_isin, validate_number, validate_date
+from models import get_db, validate_isin, validate_number, validate_date, parse_number
 from services.parsers import parse_pdf, parse_csv, parse_pasted_text
 from services.parsers.common import PdfEncryptedError, PdfImageScanError
 from services.securities import upsert_security
@@ -181,7 +183,7 @@ def _commit(position_id):
         if not validate_isin(raw_isin):
             return jsonify({'error': f'Ligne {idx} : ISIN invalide ({raw_isin!r})'}), 400
         try:
-            qty = float(item.get('quantity') or 0)
+            qty = parse_number(item.get('quantity'), 0)
         except (ValueError, TypeError):
             return jsonify({'error': f'Ligne {idx} : quantite invalide'}), 400
         if qty <= 0:
@@ -195,12 +197,14 @@ def _commit(position_id):
         as_of = item.get('as_of_date')
         if as_of and not validate_date(as_of):
             return jsonify({'error': f'Ligne {idx} : as_of_date invalide'}), 400
+        if not as_of and mv is not None:
+            as_of = datetime.now().strftime('%Y-%m-%d')
         validated.append({
             'isin':         raw_isin,
             'name':         (item.get('name') or '').strip()[:200] or None,
             'quantity':     qty,
-            'cost_basis':   float(cost) if cost is not None else None,
-            'market_value': float(mv) if mv is not None else None,
+            'cost_basis':   parse_number(cost) if cost is not None else None,
+            'market_value': parse_number(mv) if mv is not None else None,
             'as_of_date':   as_of,
             'is_priceable': item.get('is_priceable'),
         })

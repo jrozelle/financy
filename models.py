@@ -2,6 +2,7 @@ import sqlite3
 import json
 import os
 import re
+import math
 from datetime import datetime
 from contextlib import contextmanager
 
@@ -50,13 +51,40 @@ def validate_number(v, allow_negative=False):
     """Vérifie que v est un nombre valide."""
     if v is None:
         return True
-    try:
-        n = float(v)
-        if not allow_negative and n < 0:
-            return False
-        return True
-    except (ValueError, TypeError):
+    n = parse_number(v)
+    if n is None:
         return False
+    if not allow_negative and n < 0:
+        return False
+    return True
+
+
+def parse_number(v, default=None):
+    """Parse un nombre saisi au format FR/US, avec espaces de milliers."""
+    if v is None:
+        return default
+    if isinstance(v, (int, float)):
+        n = float(v)
+        return n if math.isfinite(n) else default
+    if not isinstance(v, str):
+        return default
+    s = v.strip()
+    if not s:
+        return default
+    s = s.replace('\u2212', '-')
+    s = re.sub(r'[\s\u00a0\u202f_\'’]', '', s)
+    if ',' in s and '.' in s:
+        if s.rfind(',') > s.rfind('.'):
+            s = s.replace('.', '').replace(',', '.')
+        else:
+            s = s.replace(',', '')
+    else:
+        s = s.replace(',', '.')
+    try:
+        n = float(s)
+        return n if math.isfinite(n) else default
+    except (ValueError, TypeError):
+        return default
 
 def validate_string(s, max_length=500):
     """Vérifie que s est une chaîne non vide et raisonnable."""
@@ -68,11 +96,10 @@ def validate_pct(v):
     """Vérifie que v est un pourcentage entre 0 et 1."""
     if v is None:
         return True
-    try:
-        n = float(v)
-        return 0 <= n <= 1.0001  # petite marge pour les arrondis
-    except (ValueError, TypeError):
+    n = parse_number(v)
+    if n is None:
         return False
+    return 0 <= n <= 1.0001  # petite marge pour les arrondis
 
 
 # Pseudo-ISIN pour les fonds euros et actifs non cotés :
@@ -564,18 +591,40 @@ def init_db():
 
 # ─── Calculs ─────────────────────────────────────────────────────────────────
 
+def _parse_holding_date(value):
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, '%Y-%m-%d')
+    except (TypeError, ValueError):
+        return None
+
+
 def _holding_effective_value(h):
-    """Valorisation effective d'une ligne : qty*last_price si is_priceable et
-    last_price connu, sinon market_value saisi. Pour les fonds euros
-    (is_priceable=false) on utilise toujours market_value."""
+    """Valorisation effective d'une ligne.
+
+    Regle de priorite :
+    - Fonds euros / non cote : market_value manuel.
+    - Si market_value a une date plus recente que le dernier cours : manuel.
+    - Sinon, dernier cours automatique si disponible.
+    - Fallback : market_value.
+    """
     is_priceable = h.get('is_priceable')
     if is_priceable is None:
         is_priceable = True
     last_price = h.get('last_price')
     quantity   = h.get('quantity') or 0
-    if is_priceable and last_price is not None:
+    manual_value = h.get('market_value')
+    if not is_priceable:
+        return manual_value or 0
+
+    manual_date = _parse_holding_date(h.get('as_of_date') or h.get('position_date'))
+    price_date = _parse_holding_date(h.get('last_price_date'))
+    if manual_value is not None and manual_date and (not price_date or manual_date > price_date):
+        return manual_value
+    if last_price is not None:
         return quantity * last_price
-    return h.get('market_value') or 0
+    return manual_value or 0
 
 
 def compute_position(pos, entity_map=None, ref=None, holdings_map=None):
@@ -692,9 +741,11 @@ def get_holdings_map(conn, position_ids=None):
         base_query = '''
             SELECT h.id, h.position_id, h.isin, h.quantity, h.cost_basis,
                    h.market_value, h.as_of_date,
+                   p.date AS position_date,
                    s.name, s.ticker, s.currency, s.asset_class,
                    s.is_priceable, s.last_price, s.last_price_date
             FROM holdings h
+            JOIN positions p ON p.id = h.position_id
             LEFT JOIN securities s ON s.isin = h.isin
         '''
         if position_ids:

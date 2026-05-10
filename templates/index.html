@@ -452,7 +452,7 @@
           <div class="form-grid">
             <div class="form-group">
               <label>Horizon (années)</label>
-              <input type="number" id="adv-horizon" min="0" max="100" step="1">
+              <input type="text" inputmode="numeric" id="adv-horizon" min="0" max="100" step="1">
             </div>
             <div class="form-group">
               <label>Tolérance au risque</label>
@@ -477,11 +477,11 @@
             </div>
             <div class="form-group">
               <label>Âge de départ souhaité</label>
-              <input type="number" id="adv-pension-age" min="18" max="120" step="1" placeholder="ex: 65">
+              <input type="text" inputmode="numeric" id="adv-pension-age" min="18" max="120" step="1" placeholder="ex: 65">
             </div>
             <div class="form-group">
               <label>Enfants à charge</label>
-              <input type="number" id="adv-children" min="0" max="20" step="1" value="0">
+              <input type="text" inputmode="numeric" id="adv-children" min="0" max="20" step="1" value="0">
             </div>
             <div class="form-group" style="align-self:end">
               <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer">
@@ -633,19 +633,19 @@
           <div class="form-grid" style="margin-bottom:1rem">
             <div class="form-group">
               <label>Capital initial (€)</label>
-              <input type="number" id="sim-initial" value="10000" min="0" step="100">
+              <input type="text" inputmode="decimal" id="sim-initial" value="10000" min="0" step="100">
             </div>
             <div class="form-group">
               <label>Versement mensuel (€)</label>
-              <input type="number" id="sim-monthly" value="500" min="0" step="50">
+              <input type="text" inputmode="decimal" id="sim-monthly" value="500" min="0" step="50">
             </div>
             <div class="form-group">
               <label>Rendement annuel (%)</label>
-              <input type="number" id="sim-rate" value="5" min="-20" max="50" step="0.5">
+              <input type="text" inputmode="decimal" id="sim-rate" value="5" min="-20" max="50" step="0.5">
             </div>
             <div class="form-group">
               <label>Durée (années)</label>
-              <input type="number" id="sim-years" value="10" min="1" max="50">
+              <input type="text" inputmode="numeric" id="sim-years" value="10" min="1" max="50">
             </div>
           </div>
           <button type="submit" class="btn btn-primary">Simuler</button>
@@ -883,20 +883,20 @@
           <div class="form-group"><!-- spacer --></div>
           <div class="form-group">
             <label>Valeur brute (€)</label>
-            <input type="number" id="pos-value" step="0.01" min="0" value="0">
+            <input type="text" inputmode="decimal" id="pos-value" step="0.01" min="0" value="0">
           </div>
           <div class="form-group">
             <label>Dette restante (€)</label>
-            <input type="number" id="pos-debt" step="0.01" min="0" value="0">
+            <input type="text" inputmode="decimal" id="pos-debt" step="0.01" min="0" value="0">
           </div>
           <div id="pos-pct-fields" style="display:none">
           <div class="form-group">
             <label>% propriété (0–100)</label>
-            <input type="number" id="pos-ownership" step="1" min="0" max="100" value="100">
+            <input type="text" inputmode="decimal" id="pos-ownership" step="1" min="0" max="100" value="100">
           </div>
           <div class="form-group">
             <label>% dette (0–100)</label>
-            <input type="number" id="pos-debt-pct" step="1" min="0" max="100" value="100">
+            <input type="text" inputmode="decimal" id="pos-debt-pct" step="1" min="0" max="100" value="100">
           </div>
           </div>
           <div class="form-group">
@@ -914,7 +914,7 @@
             </label>
             <div id="pos-mob-override-field" style="display:none;margin-top:.4rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap">
               <div>
-                <input type="number" id="pos-mob-override-pct" step="1" min="0" max="100" value="100" style="width:90px">
+                <input type="text" inputmode="decimal" id="pos-mob-override-pct" step="1" min="0" max="100" value="100" style="width:90px">
                 <span style="font-size:13px;color:var(--text-muted);margin-left:.25rem">% mobilisable</span>
               </div>
               <div>
@@ -984,7 +984,7 @@
           </div>
           <div class="isin-ticker-row">
             <label>Prix manuel</label>
-            <input type="number" id="isin-price-input" placeholder="ex: 144.71" step="0.01" style="width:100px">
+            <input type="text" inputmode="decimal" id="isin-price-input" placeholder="ex: 144.71" step="0.01" style="width:100px">
             <button type="button" class="btn-icon" id="isin-price-save">OK</button>
           </div>
           <div class="isin-ticker-row">
@@ -1031,7 +1031,7 @@
                 <th>ISIN</th>
                 <th>Nom</th>
                 <th class="num">Quantité</th>
-                <th class="num">Prix de revient</th>
+                <th class="num">PRU</th>
                 <th class="num">Valorisation</th>
                 <th class="num">+/-</th>
                 <th></th>
@@ -1091,7 +1091,7 @@
           </div>
           <div class="form-group full-span">
             <label>Montant (€) * — positif = apport, négatif = sortie</label>
-            <input type="number" id="flux-amount" step="0.01" required placeholder="ex : 5000 ou -1200">
+            <input type="text" inputmode="decimal" id="flux-amount" step="0.01" required placeholder="ex : 5000 ou -1200">
           </div>
           <div class="form-group full-span">
             <label>Notes</label>
@@ -1133,11 +1133,11 @@
           </div>
           <div class="form-group">
             <label>Actif brut (€)</label>
-            <input type="number" id="ent-gross" step="0.01" min="0" value="0">
+            <input type="text" inputmode="decimal" id="ent-gross" step="0.01" min="0" value="0">
           </div>
           <div class="form-group">
             <label>Dette (€)</label>
-            <input type="number" id="ent-debt" step="0.01" min="0" value="0">
+            <input type="text" inputmode="decimal" id="ent-debt" step="0.01" min="0" value="0">
           </div>
           <div class="form-group full-span">
             <label>Commentaire</label>

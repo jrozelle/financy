@@ -54,6 +54,23 @@ export function kpiDelta(variation, deltaKey, pctKey = null, { invert = false, l
 
 export const today = () => new Date().toISOString().slice(0, 10);
 
+export function parseLocaleNumber(value, fallback = NaN) {
+  if (value == null) return fallback;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : fallback;
+  let s = String(value).trim();
+  if (!s) return fallback;
+  s = s.replace(/\u2212/g, '-').replace(/[\s\u00a0\u202f_'’]/g, '');
+  if (s.includes(',') && s.includes('.')) {
+    s = s.lastIndexOf(',') > s.lastIndexOf('.')
+      ? s.replace(/\./g, '').replace(',', '.')
+      : s.replace(/,/g, '');
+  } else {
+    s = s.replace(',', '.');
+  }
+  const n = Number(s);
+  return Number.isFinite(n) ? n : fallback;
+}
+
 export function sortArr(arr, key, dir) {
   if (!key) return arr;
   return [...arr].sort((a, b) => {

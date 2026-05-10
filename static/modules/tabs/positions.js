@@ -1,5 +1,5 @@
 import { S } from '../state.js';
-import { fmt, fmtDate, esc, liqBadge, sortArr, updateSortIndicators, today, wireTreeAccordion, treeToggleRow } from '../utils.js';
+import { fmt, fmtDate, esc, liqBadge, sortArr, updateSortIndicators, today, wireTreeAccordion, treeToggleRow, parseLocaleNumber } from '../utils.js';
 import { api, refreshEntitySelect } from '../api.js';
 import { confirmDialog, promptDialog, toast, closeModal } from '../dialogs.js';
 import { loadSynthese, loadHistorique } from './synthese.js';
@@ -180,14 +180,13 @@ export function renderPosViewToggle() {
 export function startInlineEdit(span) {
   if (span.querySelector('input')) return;
   const posId  = parseInt(span.dataset.id);
-  const curVal = parseFloat(span.dataset.val) || 0;
+  const curVal = parseLocaleNumber(span.dataset.val, 0);
   const pos    = S.positions.find(p => p.id === posId);
   if (!pos) return;
 
   const input = document.createElement('input');
-  input.type  = 'number';
-  input.step  = '0.01';
-  input.min   = '0';
+  input.type  = 'text';
+  input.inputMode = 'decimal';
   input.value = curVal;
   input.className = 'tree-inline-input';
   span.innerHTML = '';
@@ -196,7 +195,7 @@ export function startInlineEdit(span) {
   input.select();
 
   const commit = async () => {
-    const newVal = parseFloat(input.value);
+    const newVal = parseLocaleNumber(input.value);
     if (isNaN(newVal) || newVal === curVal) {
       await loadPositions(); return;
     }
@@ -629,10 +628,10 @@ export function onEntitySelectChange() {
 }
 
 export function updatePosInfo() {
-  const value       = parseFloat(document.getElementById('pos-value').value) || 0;
-  const debt        = parseFloat(document.getElementById('pos-debt').value) || 0;
-  const ownerPct    = (parseFloat(document.getElementById('pos-ownership').value) || 100) / 100;
-  const debtPct     = (parseFloat(document.getElementById('pos-debt-pct').value) || 100) / 100;
+  const value       = parseLocaleNumber(document.getElementById('pos-value').value, 0);
+  const debt        = parseLocaleNumber(document.getElementById('pos-debt').value, 0);
+  const ownerPct    = parseLocaleNumber(document.getElementById('pos-ownership').value, 100) / 100;
+  const debtPct     = parseLocaleNumber(document.getElementById('pos-debt-pct').value, 100) / 100;
   const envelope    = document.getElementById('pos-envelope').value;
   const category    = document.getElementById('pos-category').value;
 
@@ -643,7 +642,7 @@ export function updatePosInfo() {
   const envMeta    = S.config.envelope_meta[envelope] || { liquidity: '30J+', friction: 'Mixte' };
   const useOverride = document.getElementById('pos-mob-override-check').checked;
   const mobPct     = useOverride
-    ? (parseFloat(document.getElementById('pos-mob-override-pct').value) || 0) / 100
+    ? parseLocaleNumber(document.getElementById('pos-mob-override-pct').value, 0) / 100
     : (S.config.category_mobilizable[category] ?? 0.8);
   const mob      = net > 0 ? net * mobPct : 0;
   const overrideLabel = useOverride ? ' ⚠ surchargé' : '';
@@ -661,15 +660,15 @@ export async function savePosition(e) {
     category:      document.getElementById('pos-category').value,
     envelope:      document.getElementById('pos-envelope').value || null,
     establishment: document.getElementById('pos-establishment').value || null,
-    value:         parseFloat(document.getElementById('pos-value').value) || 0,
-    debt:          parseFloat(document.getElementById('pos-debt').value) || 0,
-    ownership_pct: (parseFloat(document.getElementById('pos-ownership').value) || 100) / 100,
-    debt_pct:      (parseFloat(document.getElementById('pos-debt-pct').value) || 100) / 100,
+    value:         parseLocaleNumber(document.getElementById('pos-value').value, 0),
+    debt:          parseLocaleNumber(document.getElementById('pos-debt').value, 0),
+    ownership_pct: parseLocaleNumber(document.getElementById('pos-ownership').value, 100) / 100,
+    debt_pct:      parseLocaleNumber(document.getElementById('pos-debt-pct').value, 100) / 100,
     entity:        document.getElementById('pos-entity-select').value || null,
     label:         document.getElementById('pos-label').value || null,
     notes:         document.getElementById('pos-notes').value || null,
     mobilizable_pct_override: document.getElementById('pos-mob-override-check').checked
-      ? (parseFloat(document.getElementById('pos-mob-override-pct').value) || 0) / 100
+      ? parseLocaleNumber(document.getElementById('pos-mob-override-pct').value, 0) / 100
       : null,
     liquidity_override: document.getElementById('pos-mob-override-check').checked
       ? (document.getElementById('pos-liquidity-override').value || null)

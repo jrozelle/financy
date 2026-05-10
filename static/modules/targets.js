@@ -1,6 +1,6 @@
 import { S, _targetsCache, setTargetsCache } from './state.js';
 import { api } from './api.js';
-import { esc, fmt } from './utils.js';
+import { esc, fmt, parseLocaleNumber } from './utils.js';
 import { closeModal } from './dialogs.js';
 
 export async function loadTargets() {
@@ -30,7 +30,7 @@ export function wireTargetsEvents() {
   document.getElementById('btn-save-targets').addEventListener('click', async () => {
     const targets = {};
     document.querySelectorAll('.target-input').forEach(inp => {
-      const val = parseFloat(inp.value);
+      const val = parseLocaleNumber(inp.value);
       if (!isNaN(val) && val > 0) targets[inp.dataset.cat] = val;
     });
     await saveTargets(targets);
@@ -46,7 +46,7 @@ async function openTargetsModal() {
     S.config.categories.map(cat => `
       <div class="target-row">
         <label>${esc(cat)}</label>
-        <input class="target-input" type="number" min="0" max="100" step="1"
+        <input class="target-input" type="text" inputmode="decimal" min="0" max="100" step="1"
                data-cat="${esc(cat)}" value="${targets[cat] || ''}">
         <span style="font-size:12px;color:var(--text-muted)">%</span>
       </div>`).join('');

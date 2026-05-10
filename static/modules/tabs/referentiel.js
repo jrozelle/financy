@@ -1,5 +1,5 @@
 import { S } from '../state.js';
-import { esc } from '../utils.js';
+import { esc, parseLocaleNumber } from '../utils.js';
 import { api, buildSelects, refreshEntitySelect } from '../api.js';
 import { confirmDialog } from '../dialogs.js';
 import { loadUserAlerts, saveUserAlerts } from '../alerts.js';
@@ -71,7 +71,7 @@ function renderRefCategories() {
     <tr>
       <td><input class="ref-input ref-cat-name" data-index="${i}" value="${esc(cat)}" style="width:100%"></td>
       <td style="text-align:right">
-        <input class="ref-input ref-cat-mob" data-cat="${esc(cat)}" type="number" min="0" max="100" step="5"
+        <input class="ref-input ref-cat-mob" data-cat="${esc(cat)}" type="text" inputmode="decimal" min="0" max="100" step="5"
                value="${Math.round((mob[cat] ?? 0.8) * 100)}"
                style="width:65px;text-align:right"> %
       </td>
@@ -82,7 +82,7 @@ function renderRefCategories() {
     <tr id="ref-cat-add-row">
       <td><input type="text" id="new-cat-name" class="ref-input" placeholder="Nouvelle catégorie" style="width:100%"></td>
       <td style="text-align:right">
-        <input type="number" id="new-cat-mob" class="ref-input" min="0" max="100" step="5" value="80"
+        <input type="text" inputmode="decimal" id="new-cat-mob" class="ref-input" min="0" max="100" step="5" value="80"
                style="width:65px;text-align:right"> %
       </td>
       <td><button class="btn btn-secondary btn-sm" id="btn-add-cat">+ Ajouter</button></td>
@@ -103,7 +103,7 @@ function renderRefCategories() {
   });
   el.querySelectorAll('.ref-cat-mob').forEach(inp => {
     inp.addEventListener('change', () => {
-      S.referential.category_mobilizable[inp.dataset.cat] = parseFloat(inp.value) / 100;
+      S.referential.category_mobilizable[inp.dataset.cat] = parseLocaleNumber(inp.value, 0) / 100;
     });
   });
   el.querySelectorAll('.btn-icon.del[data-section="categories"]').forEach(btn => {
@@ -129,7 +129,7 @@ function renderRefCategories() {
   });
   document.getElementById('btn-add-cat')?.addEventListener('click', () => {
     const name = document.getElementById('new-cat-name').value.trim();
-    const mob  = parseFloat(document.getElementById('new-cat-mob').value) / 100;
+    const mob  = parseLocaleNumber(document.getElementById('new-cat-mob').value) / 100;
     if (!name) return;
     S.referential.categories.push(name);
     S.referential.category_mobilizable[name] = isNaN(mob) ? 0.8 : mob;
@@ -286,7 +286,7 @@ function renderRefAlerts() {
           <option value="<" ${a.op === '<' ? 'selected' : ''}>&lt;</option>
           <option value=">" ${a.op === '>' ? 'selected' : ''}>&gt;</option>
         </select>
-        <input class="ref-input alert-threshold" data-i="${i}" type="number" value="${a.threshold || 0}" style="width:80px">
+        <input class="ref-input alert-threshold" data-i="${i}" type="text" inputmode="decimal" value="${a.threshold || 0}" style="width:80px">
         <button class="btn-icon del alert-del" data-i="${i}">Supprimer</button>
       </div>`;
     }).join('');
@@ -299,7 +299,7 @@ function renderRefAlerts() {
       if (inp.classList.contains('alert-metric'))    { alerts[i].metric  = inp.value; renderRefAlerts(); return; }
       if (inp.classList.contains('alert-cat'))       alerts[i].category  = inp.value;
       if (inp.classList.contains('alert-op'))        alerts[i].op        = inp.value;
-      if (inp.classList.contains('alert-threshold')) alerts[i].threshold = parseFloat(inp.value) || 0;
+      if (inp.classList.contains('alert-threshold')) alerts[i].threshold = parseLocaleNumber(inp.value, 0);
       saveUserAlerts(alerts);
     });
   });

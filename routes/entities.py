@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from datetime import datetime
-from models import get_db, validate_number, validate_string
+from models import get_db, validate_number, validate_string, parse_number
 
 MAX_COMMENT_LENGTH = 2000
 from auth import login_required, csrf_protect
@@ -40,8 +40,8 @@ def add_entity():
     if not validate_string(d.get('comment'), MAX_COMMENT_LENGTH):
         return jsonify({'error': f'Commentaire trop long ({MAX_COMMENT_LENGTH} car. max)'}), 400
     today = datetime.now().strftime('%Y-%m-%d')
-    gross = d.get('gross_assets', 0)
-    debt  = d.get('debt', 0)
+    gross = parse_number(d.get('gross_assets'), 0)
+    debt  = parse_number(d.get('debt'), 0)
     with get_db() as conn:
         cur = conn.execute(
             '''INSERT INTO entities (name, type, valuation_mode, gross_assets, debt, comment)
@@ -72,8 +72,8 @@ def update_entity(eid):
     if not validate_string(d.get('comment'), MAX_COMMENT_LENGTH):
         return jsonify({'error': f'Commentaire trop long ({MAX_COMMENT_LENGTH} car. max)'}), 400
     today = datetime.now().strftime('%Y-%m-%d')
-    gross = d.get('gross_assets', 0)
-    debt  = d.get('debt', 0)
+    gross = parse_number(d.get('gross_assets'), 0)
+    debt  = parse_number(d.get('debt'), 0)
     new_name = d['name']
     with get_db() as conn:
         # Fetch old name to cascade rename if changed

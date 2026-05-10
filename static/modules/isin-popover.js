@@ -1,5 +1,5 @@
 import { api } from './api.js';
-import { esc, fmt, fmtDate, destroyChart, getColors, chartBorderColor } from './utils.js';
+import { esc, fmt, fmtDate, destroyChart, getColors, chartBorderColor, parseLocaleNumber } from './utils.js';
 import { toast } from './dialogs.js';
 
 let _chart = null;
@@ -271,7 +271,7 @@ export function wireIsinPopoverEvents() {
     if (!_current.isin) return;
     const priceStr = document.getElementById('isin-price-input').value.trim();
     if (!priceStr) return;
-    const price = parseFloat(priceStr);
+    const price = parseLocaleNumber(priceStr);
     if (isNaN(price) || price <= 0) { toast('Prix invalide', 'error'); return; }
     try {
       await api('PATCH', `/api/securities/${encodeURIComponent(_current.isin)}`, {

@@ -1,6 +1,9 @@
+from datetime import datetime
+
 from flask import Blueprint, jsonify, request
 from models import (get_db, validate_isin, validate_number, validate_string,
-                    validate_date, snapshot_holdings_to_date)
+                    validate_date, snapshot_holdings_to_date,
+                    _holding_effective_value, parse_number)
 from services.securities import upsert_security as _upsert_security
 from auth import login_required, csrf_protect
 
@@ -39,7 +42,7 @@ def _validate_holding_payload(d):
     if not validate_number(d.get('quantity')):
         return None, 'Quantite invalide'
     try:
-        if float(d.get('quantity') or 0) <= 0:
+        if parse_number(d.get('quantity'), 0) <= 0:
             return None, 'Quantite doit etre > 0'
     except (ValueError, TypeError):
         return None, 'Quantite invalide'
@@ -54,6 +57,15 @@ def _validate_holding_payload(d):
     if not validate_string(d.get('ticker'), 50):
         return None, 'Ticker trop long (50 car. max)'
     return isin, None
+
+
+def _holding_as_of_date(d):
+    """Date de valorisation manuelle : explicite, ou aujourd'hui si valo saisie."""
+    if d.get('as_of_date'):
+        return d.get('as_of_date')
+    if d.get('market_value') is not None:
+        return datetime.now().strftime('%Y-%m-%d')
+    return None
 
 
 def _holding_row_to_dict(row):
@@ -144,10 +156,10 @@ def add_holding(position_id):
                (position_id, isin, quantity, cost_basis, market_value, as_of_date)
                VALUES (?,?,?,?,?,?)''',
             (position_id, isin,
-             float(d['quantity']),
-             float(d['cost_basis']) if d.get('cost_basis') is not None else None,
-             float(d['market_value']) if d.get('market_value') is not None else None,
-             d.get('as_of_date'))
+             parse_number(d['quantity']),
+             parse_number(d['cost_basis']) if d.get('cost_basis') is not None else None,
+             parse_number(d['market_value']) if d.get('market_value') is not None else None,
+             _holding_as_of_date(d))
         )
         holdings = _fetch_holdings(conn, position_id)
     created = next((h for h in holdings if h['id'] == cur.lastrowid), None)
@@ -197,10 +209,10 @@ def replace_holdings(position_id):
         split_items = [{
             'isin': isin,
             'name': item.get('name'),
-            'quantity': float(item['quantity']),
-            'cost_basis': float(item['cost_basis']) if item.get('cost_basis') is not None else None,
-            'market_value': float(item['market_value']) if item.get('market_value') is not None else None,
-            'as_of_date': item.get('as_of_date'),
+            'quantity': parse_number(item['quantity']),
+            'cost_basis': parse_number(item['cost_basis']) if item.get('cost_basis') is not None else None,
+            'market_value': parse_number(item['market_value']) if item.get('market_value') is not None else None,
+            'as_of_date': _holding_as_of_date(item),
         } for isin, item in validated]
 
         touched, split_cats = split_holdings_by_category(conn, position_id, split_items)
@@ -225,19 +237,22 @@ def update_holding(holding_id):
 
         updates, params = [], []
         if 'quantity' in d:
-            if not validate_number(d['quantity']) or float(d['quantity']) <= 0:
+            if not validate_number(d['quantity']) or parse_number(d['quantity'], 0) <= 0:
                 return jsonify({'error': 'Quantite invalide'}), 400
-            updates.append('quantity=?'); params.append(float(d['quantity']))
+            updates.append('quantity=?'); params.append(parse_number(d['quantity']))
         if 'cost_basis' in d:
             if d['cost_basis'] is not None and not validate_number(d['cost_basis']):
                 return jsonify({'error': 'Prix de revient invalide'}), 400
             updates.append('cost_basis=?')
-            params.append(float(d['cost_basis']) if d['cost_basis'] is not None else None)
+            params.append(parse_number(d['cost_basis']) if d['cost_basis'] is not None else None)
         if 'market_value' in d:
             if d['market_value'] is not None and not validate_number(d['market_value']):
                 return jsonify({'error': 'Valorisation invalide'}), 400
             updates.append('market_value=?')
-            params.append(float(d['market_value']) if d['market_value'] is not None else None)
+            params.append(parse_number(d['market_value']) if d['market_value'] is not None else None)
+            if 'as_of_date' not in d and d['market_value'] is not None:
+                updates.append('as_of_date=?')
+                params.append(datetime.now().strftime('%Y-%m-%d'))
         if 'as_of_date' in d:
             if d['as_of_date'] and not validate_date(d['as_of_date']):
                 return jsonify({'error': 'Date invalide'}), 400
@@ -322,7 +337,8 @@ def get_consolidated():
             params.append(owner)
 
         rows = conn.execute(
-            f'''SELECT h.isin, h.quantity, h.cost_basis, h.market_value,
+            f'''SELECT h.isin, h.quantity, h.cost_basis, h.market_value, h.as_of_date,
+                       p.date     AS position_date,
                        p.owner    AS pos_owner,
                        p.envelope AS pos_envelope,
                        p.category AS pos_category,
@@ -342,15 +358,18 @@ def get_consolidated():
         isin = r['isin']
         q  = r['quantity'] or 0
         mv = r['market_value'] if r['market_value'] is not None else None
-        # Valorisation effective : qty * last_price si is_priceable + last_price dispo,
-        # sinon market_value saisi
         is_priceable = r['is_priceable']
         if is_priceable is None:
             is_priceable = 1
-        if is_priceable and r['last_price'] is not None:
-            effective_mv = q * r['last_price']
-        else:
-            effective_mv = mv or 0
+        effective_mv = _holding_effective_value({
+            'is_priceable':    bool(is_priceable),
+            'last_price':      r['last_price'],
+            'last_price_date': r['last_price_date'],
+            'quantity':        q,
+            'market_value':    mv,
+            'as_of_date':      r['as_of_date'],
+            'position_date':   r['position_date'],
+        })
 
         rec = by_isin.setdefault(isin, {
             'isin':            isin,
@@ -497,7 +516,7 @@ def update_security(isin):
             params.append(int(bool(d['is_priceable'])))
         if 'last_price' in d:
             updates.append('last_price=?')
-            params.append(float(d['last_price']) if d['last_price'] is not None else None)
+            params.append(parse_number(d['last_price']) if d['last_price'] is not None else None)
         if 'last_price_date' in d:
             updates.append('last_price_date=?')
             params.append(d['last_price_date'])

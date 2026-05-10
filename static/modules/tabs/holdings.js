@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { esc, fmt } from '../utils.js';
+import { esc, fmt, parseLocaleNumber } from '../utils.js';
 import { closeModal, confirmDialog, toast } from '../dialogs.js';
 import { loadPositions } from './positions.js';
 import { openIsinPopover } from '../isin-popover.js';
@@ -52,6 +52,8 @@ function isPseudoIsin(isin) {
 }
 
 function makeRow(h = {}) {
+  const qty = parseLocaleNumber(h.quantity, 0);
+  const totalCost = h.cost_basis ?? '';
   return {
     draftId:         state.nextDraftId++,
     id:              h.id ?? null,
@@ -59,7 +61,7 @@ function makeRow(h = {}) {
     name:            h.name ?? '',
     ticker:          h.ticker ?? '',
     quantity:        h.quantity ?? '',
-    cost_basis:      h.cost_basis ?? '',
+    cost_basis:      qty > 0 && totalCost !== '' && totalCost != null ? (parseLocaleNumber(totalCost, 0) / qty) : '',
     market_value:    h.market_value ?? '',
     is_priceable:    h.is_priceable ?? null,
     last_price:      h.last_price ?? null,
@@ -67,6 +69,12 @@ function makeRow(h = {}) {
     confidence:      h.confidence ?? null,
     asset_class:     h.asset_class ?? null,
   };
+}
+
+function _totalCost(r) {
+  const qty = parseLocaleNumber(r.quantity, 0);
+  const unitCost = parseLocaleNumber(r.cost_basis);
+  return qty > 0 && !isNaN(unitCost) ? qty * unitCost : NaN;
 }
 
 function _freshnessFromDate(lastPriceDate) {
@@ -154,15 +162,15 @@ function rowHtml(r) {
                placeholder="Nom du titre" style="min-width:180px">
       </td>
       <td>
-        <input type="number" class="h-input h-qty num" value="${r.quantity}"
+        <input type="text" inputmode="decimal" class="h-input h-qty num" value="${r.quantity}"
                step="any" min="0" placeholder="0">
       </td>
       <td>
-        <input type="number" class="h-input h-cost num" value="${r.cost_basis ?? ''}"
-               step="0.01" min="0" placeholder="Coût total">
+        <input type="text" inputmode="decimal" class="h-input h-cost num" value="${r.cost_basis ?? ''}"
+               step="0.01" min="0" placeholder="PRU">
       </td>
       <td>
-        <input type="number" class="h-input h-mv num" value="${r.market_value ?? ''}"
+        <input type="text" inputmode="decimal" class="h-input h-mv num" value="${r.market_value ?? ''}"
                step="0.01" min="0" placeholder="Valo">
       </td>
       <td class="num">${_pnlCell(r)}</td>
@@ -189,9 +197,9 @@ function _freshnessBadge(r) {
 }
 
 function _pnlCell(r) {
-  const qty  = parseFloat(r.quantity) || 0;
-  const mv   = parseFloat(r.market_value);
-  const cost = parseFloat(r.cost_basis);
+  const qty  = parseLocaleNumber(r.quantity, 0);
+  const mv   = parseLocaleNumber(r.market_value);
+  const cost = _totalCost(r);
   if (!qty || isNaN(cost) || cost <= 0) return '—';
   const currentValue = !isNaN(mv) ? mv : (r.last_price != null ? qty * r.last_price : null);
   if (currentValue == null) return '—';
@@ -202,8 +210,8 @@ function _pnlCell(r) {
 }
 
 function renderTotals() {
-  const totalMv = state.rows.reduce((s, r) => s + (parseFloat(r.market_value) || 0), 0);
-  const totalCost = state.rows.reduce((s, r) => s + (parseFloat(r.cost_basis) || 0), 0);
+  const totalMv = state.rows.reduce((s, r) => s + parseLocaleNumber(r.market_value, 0), 0);
+  const totalCost = state.rows.reduce((s, r) => s + (isNaN(_totalCost(r)) ? 0 : _totalCost(r)), 0);
   const pnl = totalMv - totalCost;
   const pct = totalCost > 0 ? (pnl / totalCost * 100) : 0;
   const foot = document.getElementById('holdings-tfoot');
@@ -265,7 +273,7 @@ async function saveAll() {
       toast(`Ligne ${i + 1} : ISIN manquant`, 'error');
       return;
     }
-    const qty = parseFloat(r.quantity);
+    const qty = parseLocaleNumber(r.quantity);
     if (!qty || qty <= 0) {
       toast(`Ligne ${i + 1} : quantité doit être > 0`, 'error');
       return;
@@ -277,11 +285,11 @@ async function saveAll() {
       const isin = r.isin.trim().toUpperCase();
       const h = {
         isin,
-        quantity: parseFloat(r.quantity),
+        quantity: parseLocaleNumber(r.quantity),
       };
       if (r.name) h.name = r.name;
-      if (r.cost_basis !== '' && r.cost_basis != null) h.cost_basis = parseFloat(r.cost_basis);
-      if (r.market_value !== '' && r.market_value != null) h.market_value = parseFloat(r.market_value);
+      if (r.cost_basis !== '' && r.cost_basis != null) h.cost_basis = _totalCost(r);
+      if (r.market_value !== '' && r.market_value != null) h.market_value = parseLocaleNumber(r.market_value);
       if (isPseudoIsin(isin)) h.is_priceable = false;
       if (r.asset_class) h.asset_class = r.asset_class;
       return h;

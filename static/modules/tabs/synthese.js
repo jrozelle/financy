@@ -1,6 +1,6 @@
 import { S, catChart, histChart, syntheseEnvChart, syntheseHistChart,
          setCatChart, setHistChart, setSyntheseEnvChart, setSyntheseHistChart } from '../state.js';
-import { fmt, fmtDate, esc, kpiDelta, liqBadge, getColors, doughnutConfig, chartBorderColor, chartFamilyColors, destroyChart } from '../utils.js';
+import { fmt, fmtDate, esc, kpiDelta, liqBadge, getColors, doughnutConfig, chartBorderColor, chartFamilyColors, destroyChart, parseLocaleNumber } from '../utils.js';
 import { api } from '../api.js';
 import { drilldownPositions } from '../drilldown.js';
 import { loadUserAlerts } from '../alerts.js';
@@ -763,7 +763,7 @@ async function openWealthTargetEditor() {
     defaultValue: current, placeholder: 'Laisser vide pour supprimer', confirmText: 'Enregistrer'
   });
   if (val === null) return;
-  const target = val.trim() ? parseFloat(val.replace(/\s/g, '').replace(',', '.')) : null;
+  const target = val.trim() ? parseLocaleNumber(val) : null;
   if (val.trim() && (isNaN(target) || target <= 0)) { toast('Montant invalide', 'error'); return; }
   await api('PUT', '/api/wealth-target', { target });
   _wealthTarget = target;

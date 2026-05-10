@@ -1,5 +1,5 @@
 import { S } from '../state.js';
-import { fmt, fmtDate, esc, sortArr, updateSortIndicators, today, getColors, chartBorderColor, destroyChart } from '../utils.js';
+import { fmt, fmtDate, esc, sortArr, updateSortIndicators, today, getColors, chartBorderColor, destroyChart, parseLocaleNumber } from '../utils.js';
 import { api, refreshEntitySelect } from '../api.js';
 import { confirmDialog, toast, closeModal } from '../dialogs.js';
 import { switchTab } from '../main.js';
@@ -171,8 +171,8 @@ export function openEntityModal(id = null) {
 }
 
 export function updateEntInfo() {
-  const gross = parseFloat(document.getElementById('ent-gross').value) || 0;
-  const debt  = parseFloat(document.getElementById('ent-debt').value) || 0;
+  const gross = parseLocaleNumber(document.getElementById('ent-gross').value, 0);
+  const debt  = parseLocaleNumber(document.getElementById('ent-debt').value, 0);
   document.getElementById('ent-computed-info').textContent =
     `Actif net entité : ${fmt(gross - debt)}`;
 }
@@ -183,8 +183,8 @@ export async function saveEntity(e) {
     name:           document.getElementById('ent-name').value.trim(),
     type:           document.getElementById('ent-type').value || null,
     valuation_mode: document.getElementById('ent-valuation').value || null,
-    gross_assets:   parseFloat(document.getElementById('ent-gross').value) || 0,
-    debt:           parseFloat(document.getElementById('ent-debt').value) || 0,
+    gross_assets:   parseLocaleNumber(document.getElementById('ent-gross').value, 0),
+    debt:           parseLocaleNumber(document.getElementById('ent-debt').value, 0),
     comment:        document.getElementById('ent-comment').value || null,
   };
   try {

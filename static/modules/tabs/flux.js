@@ -1,5 +1,5 @@
 import { S } from '../state.js';
-import { fmt, fmtDate, esc, sortArr, updateSortIndicators, today } from '../utils.js';
+import { fmt, fmtDate, esc, sortArr, updateSortIndicators, today, parseLocaleNumber } from '../utils.js';
 import { api } from '../api.js';
 import { confirmDialog, toast, closeModal } from '../dialogs.js';
 import { saveFilters, loadFilters, clearFilterKey, applyIfValid } from '../filter-persist.js';
@@ -173,7 +173,7 @@ export async function saveFlux(e) {
     envelope: document.getElementById('flux-envelope').value || null,
     category: document.getElementById('flux-category').value || null,
     type:     document.getElementById('flux-type').value || null,
-    amount:   parseFloat(document.getElementById('flux-amount').value),
+    amount:   parseLocaleNumber(document.getElementById('flux-amount').value),
     notes:    document.getElementById('flux-notes').value || null,
   };
   if (S.editFluxId) {
