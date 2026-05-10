@@ -27,6 +27,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger('financy')
 
+
+def app_auth_warning_enabled():
+    return os.environ.get('FLASK_ENV') == 'production' and not AUTH_PASSWORD
+
 # ─── App ──────────────────────────────────────────────────────────────────────
 
 app = Flask(__name__)
@@ -145,7 +149,12 @@ TAB_ROUTES = ['synthese', 'positions', 'actifs', 'flux', 'entites', 'conseil',
 @app.route('/<tab>')
 @login_required
 def index(tab=None):
-    return render_template('index.html', has_auth=bool(AUTH_PASSWORD), csrf_token=session.get('csrf_token', ''))
+    return render_template(
+        'index.html',
+        has_auth=bool(AUTH_PASSWORD),
+        auth_warning=app_auth_warning_enabled(),
+        csrf_token=session.get('csrf_token', ''),
+    )
 
 
 @app.route('/api/csrf-token')

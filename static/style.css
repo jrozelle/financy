@@ -105,6 +105,21 @@ body {
 .tab-btn:hover  { background: var(--primary-light); color: var(--primary); }
 .tab-btn.active { background: var(--primary-light); color: var(--primary); }
 
+.security-warning {
+  max-width: 1440px;
+  margin: .75rem auto 0;
+  padding: .65rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--border));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--warning) 12%, var(--card));
+  color: var(--warning);
+  font-size: 13px;
+}
+.security-warning code {
+  font-weight: 700;
+  color: inherit;
+}
+
 /* ── Layout ────────────────────────────────────────────────────────────── */
 main { padding: 1.5rem; max-width: 1440px; margin: 0 auto; }
 

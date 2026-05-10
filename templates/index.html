@@ -50,6 +50,12 @@
     </div>
   </nav>
 
+  {% if auth_warning %}
+  <div class="security-warning" role="alert">
+    Auth applicative désactivée : définissez <code>FINANCY_PASSWORD</code> si l'accès n'est pas protégé par un proxy externe.
+  </div>
+  {% endif %}
+
   <main>
 
     <!-- ── SYNTHÈSE ─────────────────────────────────────────────────────── -->
