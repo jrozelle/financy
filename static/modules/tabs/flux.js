@@ -27,10 +27,13 @@ function populateFluxFilters() {
   const types  = [...new Set(S.flux.map(f => f.type).filter(Boolean))].sort();
   const cats   = [...new Set(S.flux.map(f => f.category).filter(Boolean))].sort();
   const years  = [...new Set(S.flux.map(f => f.date?.slice(0, 4)).filter(Boolean))].sort().reverse();
+  const globalOwner = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : '';
 
   const saved = loadFilters('flux');
   const sel = (id, placeholder, opts, savedKey) => {
-    const cur = document.getElementById(id)?.value || saved[savedKey] || '';
+    const cur = id === 'flux-filter-owner'
+      ? globalOwner
+      : document.getElementById(id)?.value || saved[savedKey] || '';
     document.getElementById(id).innerHTML =
       `<option value="">${placeholder}</option>` +
       opts.map(o => `<option value="${esc(o)}"${o === cur ? ' selected' : ''}>${esc(o)}</option>`).join('');
@@ -43,7 +46,6 @@ function populateFluxFilters() {
 
 export function persistFluxFilters() {
   saveFilters('flux', {
-    owner:    document.getElementById('flux-filter-owner')?.value    || '',
     type:     document.getElementById('flux-filter-type')?.value     || '',
     category: document.getElementById('flux-filter-category')?.value || '',
     year:     document.getElementById('flux-filter-year')?.value     || '',
@@ -51,8 +53,10 @@ export function persistFluxFilters() {
 }
 
 export function clearFluxFilters() {
-  ['flux-filter-owner', 'flux-filter-type', 'flux-filter-category', 'flux-filter-year']
+  ['flux-filter-type', 'flux-filter-category', 'flux-filter-year']
     .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  const owner = document.getElementById('flux-filter-owner');
+  if (owner) owner.value = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : '';
   clearFilterKey('flux');
 }
 

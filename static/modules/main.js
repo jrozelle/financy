@@ -134,9 +134,21 @@ function _normalizeLegacyLayout() {
   const ownerFilter = document.querySelector('.nav-owner-filter');
   let dateFilter = document.querySelector('.nav-date-filter');
   const syntheseDate = document.getElementById('synthese-date-select');
-  const navActions = document.querySelector('.nav-actions');
 
-  if (navActions && !document.getElementById('nav-add-button')) {
+  if (ownerFilter) {
+    let btn = document.getElementById('nav-add-button');
+    if (!btn) {
+      btn = document.createElement('button');
+      btn.id = 'nav-add-button';
+    }
+    btn.type = 'button';
+    btn.className = 'nav-icon-btn hidden';
+    btn.title = 'Ajouter';
+    btn.setAttribute('aria-label', 'Ajouter');
+    btn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"></path></svg>`;
+    ownerFilter.prepend(btn);
+  } else if (!document.getElementById('nav-add-button')) {
+    const navActions = document.querySelector('.nav-actions');
     const btn = document.createElement('button');
     btn.id = 'nav-add-button';
     btn.type = 'button';
@@ -144,7 +156,7 @@ function _normalizeLegacyLayout() {
     btn.title = 'Ajouter';
     btn.setAttribute('aria-label', 'Ajouter');
     btn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"></path></svg>`;
-    navActions.insertBefore(btn, navActions.firstChild);
+    navActions?.insertBefore(btn, navActions.firstChild);
   }
 
   if (ownerFilter && syntheseDate) {
@@ -243,11 +255,28 @@ function _normalizeLegacyLayout() {
   const positionsFilters = document.getElementById('positions-filters');
   if (positionsTab && positionsHeader && positionsFilters && !positionsTab.querySelector(':scope > .positions-toolbar')) {
     const toolbar = document.createElement('div');
-    toolbar.className = 'positions-toolbar';
+    toolbar.className = 'page-toolbar positions-toolbar';
     positionsTab.insertBefore(toolbar, positionsHeader);
     toolbar.append(positionsHeader, positionsFilters);
   }
   document.querySelectorAll('#tab-positions #btn-add-position').forEach(el => el.remove());
+
+  const fluxOwner = document.getElementById('flux-filter-owner');
+  if (fluxOwner) {
+    fluxOwner.classList.add('hidden');
+    fluxOwner.setAttribute('aria-hidden', 'true');
+    fluxOwner.setAttribute('tabindex', '-1');
+  }
+  const fluxTab = document.getElementById('tab-flux');
+  const fluxHeader = fluxTab?.querySelector(':scope > .page-header');
+  const fluxFilters = fluxTab?.querySelector(':scope > .filters-bar, :scope > #flux-filters');
+  if (fluxTab && fluxHeader && fluxFilters && !fluxTab.querySelector(':scope > .page-toolbar')) {
+    const toolbar = document.createElement('div');
+    toolbar.className = 'page-toolbar';
+    fluxTab.insertBefore(toolbar, fluxHeader);
+    toolbar.append(fluxHeader, fluxFilters);
+  }
+  document.querySelectorAll('#tab-flux #btn-add-flux, #tab-entites #btn-add-entity').forEach(el => el.remove());
 
   document.getElementById('synthese-person-tabs')?.remove();
   document.querySelectorAll('#tab-synthese .analyse-person-tabs').forEach(el => el.remove());
@@ -304,9 +333,14 @@ let _lastLoadedTab = null;
 function _updateNavAddButton(tab) {
   const btn = document.getElementById('nav-add-button');
   if (!btn) return;
-  const enabled = tab === 'positions';
+  const labels = {
+    positions: 'Ajouter une position',
+    flux: 'Ajouter un flux',
+    entites: 'Ajouter une entité',
+  };
+  const enabled = tab in labels;
   btn.classList.toggle('hidden', !enabled);
-  btn.title = enabled ? 'Ajouter une position' : 'Ajouter';
+  btn.title = labels[tab] || 'Ajouter';
   btn.setAttribute('aria-label', btn.title);
 }
 
@@ -425,6 +459,8 @@ function wireEvents() {
   // Positions buttons
   document.getElementById('nav-add-button')?.addEventListener('click', () => {
     if (S.currentTab === 'positions') openPosModal();
+    if (S.currentTab === 'flux') openFluxModal();
+    if (S.currentTab === 'entites') openEntityModal();
   });
   document.getElementById('btn-add-position')?.addEventListener('click', () => openPosModal());
   document.getElementById('btn-duplicate').addEventListener('click', duplicateSnapshot);
@@ -554,7 +590,7 @@ function wireEvents() {
   document.getElementById('synthese-history-group').addEventListener('change', renderSyntheseHistory);
 
   // Flux buttons
-  document.getElementById('btn-add-flux').addEventListener('click', () => openFluxModal());
+  document.getElementById('btn-add-flux')?.addEventListener('click', () => openFluxModal());
   ['flux-filter-owner','flux-filter-type','flux-filter-category','flux-filter-year'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('change', () => {
@@ -578,7 +614,7 @@ function wireEvents() {
   wireTargetsEvents();
 
   // Entités
-  document.getElementById('btn-add-entity').addEventListener('click', () => openEntityModal());
+  document.getElementById('btn-add-entity')?.addEventListener('click', () => openEntityModal());
   document.getElementById('entity-form').addEventListener('submit', saveEntity);
   document.getElementById('entity-modal-overlay').addEventListener('click', () => closeModal('entity-modal'));
   ['ent-gross','ent-debt'].forEach(id =>

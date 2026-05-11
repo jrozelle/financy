@@ -22,6 +22,11 @@
       <button class="tab-btn" data-tab="conseil">Conseil</button>
     </div>
     <div class="nav-owner-filter">
+      <button class="nav-icon-btn hidden" id="nav-add-button" type="button" title="Ajouter" aria-label="Ajouter">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 5v14M5 12h14"></path>
+        </svg>
+      </button>
       <select id="global-owner-filter" aria-label="Personne">
         <option value="Famille">Famille</option>
       </select>
@@ -35,11 +40,6 @@
       <div class="search-results" id="search-results"></div>
     </div>
     <div class="nav-actions" style="display:flex;gap:.375rem;align-items:center">
-      <button class="nav-icon-btn hidden" id="nav-add-button" type="button" title="Ajouter" aria-label="Ajouter">
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="M12 5v14M5 12h14"></path>
-        </svg>
-      </button>
       <div class="settings-menu" id="settings-menu">
         <button class="settings-toggle nav-icon-btn" id="settings-toggle" title="Paramètres" aria-label="Paramètres">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -174,7 +174,7 @@
     <!-- ── POSITIONS ────────────────────────────────────────────────────── -->
     <div id="tab-positions" class="tab-content hidden">
       <select id="positions-date-select" class="hidden" aria-hidden="true" tabindex="-1"></select>
-      <div class="positions-toolbar">
+      <div class="page-toolbar positions-toolbar">
         <div class="page-header">
           <h1>Positions</h1>
           <div class="header-actions"></div>
@@ -230,16 +230,18 @@
 
     <!-- ── FLUX ─────────────────────────────────────────────────────────── -->
     <div id="tab-flux" class="tab-content hidden">
-      <div class="page-header">
-        <h1>Flux externes</h1>
-        <button class="btn btn-primary" id="btn-add-flux">+ Ajouter</button>
-      </div>
-      <div class="filters-bar">
-        <select id="flux-filter-owner" class="filter-select"><option value="">Toutes les personnes</option></select>
-        <select id="flux-filter-type"  class="filter-select"><option value="">Tous les types</option></select>
-        <select id="flux-filter-category" class="filter-select"><option value="">Toutes les catégories</option></select>
-        <select id="flux-filter-year"  class="filter-select"><option value="">Toutes les années</option></select>
-        <button class="btn btn-secondary btn-sm" id="btn-clear-flux-filters">Effacer filtres</button>
+      <div class="page-toolbar">
+        <div class="page-header">
+          <h1>Flux externes</h1>
+          <button class="btn btn-primary" id="btn-add-flux">+ Ajouter</button>
+        </div>
+        <div class="filters-bar" id="flux-filters">
+          <select id="flux-filter-owner" class="filter-select hidden" aria-hidden="true" tabindex="-1"><option value="">Toutes les personnes</option></select>
+          <select id="flux-filter-type"  class="filter-select"><option value="">Tous les types</option></select>
+          <select id="flux-filter-category" class="filter-select"><option value="">Toutes les catégories</option></select>
+          <select id="flux-filter-year"  class="filter-select"><option value="">Toutes les années</option></select>
+          <button class="btn btn-secondary btn-sm" id="btn-clear-flux-filters">Effacer filtres</button>
+        </div>
       </div>
       <div class="card card-table">
         <table class="data-table">
