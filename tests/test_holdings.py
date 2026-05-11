@@ -170,6 +170,24 @@ class TestComputePositionHoldings:
         p = next(x for x in r.get_json() if x['id'] == pos['id'])
         assert p['value'] == 10000  # 20 * 500
 
+    def test_same_day_divergent_price_keeps_manual_value(self, client):
+        """Si le cours auto du meme jour diverge fortement, la valo broker gagne."""
+        today = datetime.now().strftime('%Y-%m-%d')
+        pos = _make_position_pea(client, date=today)
+        client.put(f'/api/positions/{pos["id"]}/holdings', json={'holdings': [
+            {'isin': 'IE000BI8OT95', 'quantity': 10, 'cost_basis': 1200,
+             'market_value': 1500, 'as_of_date': today},
+        ]}, headers=CSRF_HEADERS)
+        from models import get_db
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE securities SET last_price=177, last_price_date=? WHERE isin='IE000BI8OT95'",
+                (today,)
+            )
+        r = client.get(f'/api/positions?date={today}')
+        p = next(x for x in r.get_json() if x['id'] == pos['id'])
+        assert p['value'] == 1500
+
     def test_manual_value_newer_than_price_wins(self, client):
         """Une valo manuelle plus recente que le cours auto gagne."""
         pos = _make_position_pea(client)

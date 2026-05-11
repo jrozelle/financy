@@ -24,6 +24,15 @@ BATCH_DELAY = 1.0  # secondes entre batches
 HTTP_TIMEOUT = 5.0
 YF_TIMEOUT = 10.0        # timeout par appel yfinance
 REFRESH_MAX_SECONDS = 90  # duree max totale d'un refresh global
+MANUAL_PRICE_DIVERGENCE_THRESHOLD = 0.15
+MANUAL_PRICE_RECENCY_DAYS = 10
+
+# Yahoo resout parfois certains ETF europeens vers une cotation/NAV USD alors
+# que l'app valorise les portefeuilles en EUR. Ces overrides privilegient la
+# cotation EUR utilisee par les courtiers francais.
+ISIN_TICKER_OVERRIDES = {
+    'IE000BI8OT95': ('MWRD.PA', 'ETF'),  # Amundi Core MSCI World UCITS ETF Acc
+}
 
 
 # ─── Interface ───────────────────────────────────────────────────────────────
@@ -106,6 +115,10 @@ class YahooProvider(PriceProvider):
 
         Retourne (ticker, quote_type) ou (None, None).
         """
+        override = ISIN_TICKER_OVERRIDES.get((isin or '').strip().upper())
+        if override:
+            return override
+
         ticker, qt = self._yahoo_search(isin)
         if ticker:
             return ticker, qt
@@ -275,6 +288,17 @@ def refresh_securities(conn, provider=None, only_stale=False, stale_hours=20):
         isin = row['isin']
         ticker = row['ticker']
 
+        override = ISIN_TICKER_OVERRIDES.get(isin)
+        if override and ticker != override[0]:
+            ticker = override[0]
+            conn.execute(
+                '''UPDATE securities SET ticker=?, last_price=NULL, last_price_date=NULL,
+                   updated_at=CURRENT_TIMESTAMP WHERE isin=?''',
+                (ticker, isin)
+            )
+            conn.execute('DELETE FROM price_history WHERE isin=?', (isin,))
+            stats.setdefault('corrected_tickers', []).append({'isin': isin, 'ticker': ticker})
+
         # Resolution lazy du ticker si absent
         if not ticker:
             ticker, quote_type = provider.resolve_ticker(isin, name=row['name'])
@@ -298,6 +322,18 @@ def refresh_securities(conn, provider=None, only_stale=False, stale_hours=20):
             stats['errors'] += 1
             continue
         price, price_date = result
+
+        manual_ref = None if getattr(provider, 'name', None) == 'mock' else _latest_manual_unit_price(conn, isin)
+        if manual_ref and _is_price_divergent_from_recent_manual(price, price_date, *manual_ref):
+            logger.warning('refresh: %s prix divergent de la valo manuelle recente (%.2f vs %.2f) — IGNORE',
+                           isin, price, manual_ref[0])
+            stats.setdefault('divergent', []).append({
+                'isin': isin, 'ticker': ticker,
+                'manual_price': manual_ref[0], 'new_price': price,
+                'reason': 'manual_reference',
+            })
+            stats['skipped'] += 1
+            continue
 
         # Garde-fou : si le prix diverge trop du market_value existant, ne pas ecrire
         existing_price = conn.execute(
@@ -354,6 +390,15 @@ def refresh_history(conn, isin, period='30d', provider=None):
     if not row or not row['is_priceable']:
         return []
     ticker = row['ticker']
+    override = ISIN_TICKER_OVERRIDES.get(isin)
+    if override and ticker != override[0]:
+        ticker = override[0]
+        conn.execute(
+            '''UPDATE securities SET ticker=?, last_price=NULL, last_price_date=NULL,
+               updated_at=CURRENT_TIMESTAMP WHERE isin=?''',
+            (ticker, isin)
+        )
+        conn.execute('DELETE FROM price_history WHERE isin=?', (isin,))
     if not ticker:
         sec_name = row['name'] if row else None
         ticker, _ = provider.resolve_ticker(isin, name=sec_name)
@@ -383,6 +428,33 @@ def refresh_history(conn, isin, period='30d', provider=None):
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def _latest_manual_unit_price(conn, isin):
+    row = conn.execute(
+        '''SELECT h.market_value, h.quantity, COALESCE(h.as_of_date, p.date) AS d
+           FROM holdings h
+           JOIN positions p ON p.id = h.position_id
+           WHERE h.isin=? AND h.market_value IS NOT NULL AND h.quantity > 0
+           ORDER BY d DESC
+           LIMIT 1''',
+        (isin,)
+    ).fetchone()
+    if not row or not row['market_value'] or not row['quantity']:
+        return None
+    return (row['market_value'] / row['quantity'], row['d'])
+
+
+def _is_price_divergent_from_recent_manual(price, price_date, manual_price, manual_date):
+    if not price or not manual_price or manual_price <= 0:
+        return False
+    pdt = _parse_date_safe(price_date)
+    mdt = _parse_date_safe(manual_date)
+    if pdt == datetime.min or mdt == datetime.min:
+        return False
+    if abs((pdt - mdt).days) > MANUAL_PRICE_RECENCY_DAYS:
+        return False
+    return abs(price - manual_price) / manual_price > MANUAL_PRICE_DIVERGENCE_THRESHOLD
+
 
 def _parse_date_safe(s):
     if not s:

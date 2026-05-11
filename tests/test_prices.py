@@ -1,6 +1,7 @@
 """Integration tests for the prices feature (phase 2)."""
 
 import os
+from datetime import datetime
 import pytest
 
 # Force le provider mock pour tous les tests — aucun appel reseau.
@@ -46,6 +47,13 @@ class TestMockProvider:
         from services.prices import MockProvider
         p = MockProvider()
         assert p.fetch_last_price('MOCK_A')[0] != p.fetch_last_price('MOCK_Z')[0]
+
+
+class TestYahooProviderOverrides:
+    def test_amundi_world_uses_eur_paris_ticker(self):
+        from services.prices import YahooProvider
+        p = YahooProvider()
+        assert p.resolve_ticker('IE000BI8OT95')[0] == 'MWRD.PA'
 
 
 # ─── Freshness ───────────────────────────────────────────────────────────────
@@ -206,3 +214,37 @@ class TestDivergenceGuard:
         data = r.get_json()
         assert data['refreshed'] >= 1
         assert not data.get('divergent')
+
+    def test_recent_manual_unit_price_rejects_wrong_auto_price(self, client):
+        """Un cours auto incoherent avec une valo broker recente est ignore."""
+        today = datetime.now().strftime('%Y-%m-%d')
+        r = _make_position(client, date=today, category='Actions', envelope='PER',
+                           value=0, debt=0)
+        pid = r.get_json()['id']
+        client.put(f'/api/positions/{pid}/holdings', json={'holdings': [
+            {'isin': 'IE000BI8OT95', 'name': 'Amundi Core MSCI World ETF Acc',
+             'quantity': 10, 'cost_basis': 1200, 'market_value': 1500,
+             'as_of_date': today},
+        ]}, headers=CSRF_HEADERS)
+
+        from services.prices import refresh_securities
+
+        class BadProvider:
+            name = 'bad'
+            def resolve_ticker(self, isin, name=None):
+                return ('WRONG', 'ETF')
+            def fetch_last_price(self, ticker):
+                return (177, today)
+            def fetch_history(self, ticker, period='30d'):
+                return []
+
+        from models import get_db
+        with get_db() as conn:
+            stats = refresh_securities(conn, provider=BadProvider())
+            row = conn.execute(
+                "SELECT last_price FROM securities WHERE isin='IE000BI8OT95'"
+            ).fetchone()
+
+        assert stats['refreshed'] == 0
+        assert any(d['isin'] == 'IE000BI8OT95' for d in stats.get('divergent', []))
+        assert row['last_price'] is None
