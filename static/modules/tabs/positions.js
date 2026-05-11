@@ -240,7 +240,6 @@ export function renderPosViewToggle() {
   const toggle = document.createElement('div');
   toggle.id = 'pos-view-toggle';
   toggle.className = 'analyse-view-toggle';
-  toggle.style.marginLeft = '.5rem';
   toggle.innerHTML = `
     <button class="view-toggle-btn ${S.positionsView === 'table' ? 'active' : ''}" data-view="table">&#9776; Tableau</button>
     <button class="view-toggle-btn ${S.positionsView === 'tree'  ? 'active' : ''}" data-view="tree">&#9638; Arborescence</button>`;

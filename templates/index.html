@@ -35,6 +35,11 @@
       <div class="search-results" id="search-results"></div>
     </div>
     <div class="nav-actions" style="display:flex;gap:.375rem;align-items:center">
+      <button class="nav-icon-btn hidden" id="nav-add-button" type="button" title="Ajouter" aria-label="Ajouter">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 5v14M5 12h14"></path>
+        </svg>
+      </button>
       <div class="settings-menu" id="settings-menu">
         <button class="settings-toggle nav-icon-btn" id="settings-toggle" title="Paramètres" aria-label="Paramètres">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -50,6 +55,9 @@
           <div class="settings-section-label">Positions</div>
           <button class="settings-item" id="btn-duplicate">Dupliquer snapshot</button>
           <button class="settings-item" id="positions-col-picker">Colonnes positions</button>
+          <div class="settings-section-label">Actifs</div>
+          <button class="settings-item" id="actifs-refresh-prices">Rafraîchir cours</button>
+          <button class="settings-item" id="actifs-col-picker">Colonnes actifs</button>
           <div class="settings-section-label">Affichage</div>
           <button class="settings-item" id="theme-toggle">Thème</button>
           <button class="settings-item" id="btn-keyboard-help">? Raccourcis clavier</button>
@@ -169,9 +177,7 @@
       <div class="positions-toolbar">
         <div class="page-header">
           <h1>Positions</h1>
-          <div class="header-actions">
-            <button class="btn btn-primary" id="btn-add-position">+ Ajouter</button>
-          </div>
+          <div class="header-actions"></div>
         </div>
         <div class="filters-bar" id="positions-filters">
           <select id="filter-owner" class="filter-select hidden" aria-hidden="true" tabindex="-1">
@@ -375,10 +381,6 @@
     <div id="tab-actifs" class="tab-content hidden">
       <div class="page-header">
         <h1>Actifs</h1>
-        <div class="page-filters" style="display:flex;gap:.5rem;align-items:center">
-          <button class="btn btn-secondary btn-sm" id="actifs-refresh-prices" title="Rafraichir tous les cours">Rafraichir cours</button>
-          <span style="position:relative"><button class="btn btn-secondary btn-sm" id="actifs-col-picker">Colonnes</button></span>
-        </div>
       </div>
 
       <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:1rem">
