@@ -238,6 +238,17 @@ function _normalizeLegacyLayout() {
     positionsOwner.setAttribute('tabindex', '-1');
   }
 
+  const positionsTab = document.getElementById('tab-positions');
+  const positionsHeader = positionsTab?.querySelector(':scope > .page-header');
+  const positionsFilters = document.getElementById('positions-filters');
+  if (positionsTab && positionsHeader && positionsFilters && !positionsTab.querySelector(':scope > .positions-toolbar')) {
+    const toolbar = document.createElement('div');
+    toolbar.className = 'positions-toolbar';
+    positionsTab.insertBefore(toolbar, positionsHeader);
+    toolbar.append(positionsHeader, positionsFilters);
+  }
+  document.querySelectorAll('#tab-positions #btn-add-position').forEach(el => el.remove());
+
   document.getElementById('synthese-person-tabs')?.remove();
   document.querySelectorAll('#tab-synthese .analyse-person-tabs').forEach(el => el.remove());
   document.querySelector('#tab-actifs .page-filters')?.classList.add('hidden');
@@ -636,7 +647,8 @@ function wireEvents() {
     liquidity: 'Liquidite', mobilizable_value: 'Mobilisable',
   });
   initColumnPicker('actifs', 'actifs-col-picker', 'actifs-thead', {
-    isin: 'ISIN', name: 'Nom', asset_class: 'Classe', quantity: 'Qty',
+    isin: 'ISIN', name: 'Nom', establishments: 'Etablissement',
+    asset_class: 'Classe', quantity: 'Qty',
     avg_cost: 'PRU', last_price: 'Cours', market_value: 'Valo',
     pnl: '+/-', weight_pct: 'Poids', envelopes: 'Enveloppes',
   });

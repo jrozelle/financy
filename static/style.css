@@ -626,6 +626,9 @@ input[type="file"] {
   #tab-positions #pos-view-toggle {
     margin-left: 0 !important;
   }
+  #tab-positions #btn-add-position {
+    display: none !important;
+  }
   #tab-positions .filters-bar {
     display: grid;
     grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto;

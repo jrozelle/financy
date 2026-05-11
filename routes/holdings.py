@@ -340,6 +340,7 @@ def get_consolidated():
             f'''SELECT h.isin, h.quantity, h.cost_basis, h.market_value, h.as_of_date,
                        p.date     AS position_date,
                        p.owner    AS pos_owner,
+                       p.establishment AS pos_establishment,
                        p.envelope AS pos_envelope,
                        p.category AS pos_category,
                        s.name, s.ticker, s.currency, s.asset_class, s.is_priceable,
@@ -385,14 +386,16 @@ def get_consolidated():
             'market_value':    0,
             'positions_count': 0,
             'owners':          set(),
+            'establishments':  set(),
             'envelopes':       set(),
         })
         rec['quantity']         += q
         rec['cost_basis']       += r['cost_basis'] or 0
         rec['market_value']     += effective_mv
         rec['positions_count']  += 1
-        if r['pos_owner']:    rec['owners'].add(r['pos_owner'])
-        if r['pos_envelope']: rec['envelopes'].add(r['pos_envelope'])
+        if r['pos_owner']:         rec['owners'].add(r['pos_owner'])
+        if r['pos_establishment']: rec['establishments'].add(r['pos_establishment'])
+        if r['pos_envelope']:      rec['envelopes'].add(r['pos_envelope'])
 
     total_mv   = sum(v['market_value'] for v in by_isin.values())
     # P&L : ne compter que les lignes avec un vrai cost_basis
@@ -410,6 +413,7 @@ def get_consolidated():
         lines.append({
             **v,
             'owners':          sorted(v['owners']),
+            'establishments':  sorted(v['establishments']),
             'envelopes':       sorted(v['envelopes']),
             'avg_cost':        round(avg_cost, 4) if avg_cost is not None else None,
             'pnl':             round(pnl, 2) if pnl is not None else None,
