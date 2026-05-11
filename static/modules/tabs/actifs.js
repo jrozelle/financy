@@ -12,6 +12,31 @@ let _data = null;
 let _sortCol = 'market_value';
 let _sortDesc = true;
 let _filter = { type: null, value: null }; // {type: 'asset_class'|'envelope', value: 'ETF'}
+const ACTIFS_TABLE_COLUMNS = [
+  { key: 'isin', label: 'ISIN' },
+  { key: 'name', label: 'Nom' },
+  { key: 'establishments', label: 'Établissement' },
+  { key: 'asset_class', label: 'Classe' },
+  { key: 'quantity', label: 'Qty', num: true },
+  { key: 'avg_cost', label: 'PRU', num: true },
+  { key: 'last_price', label: 'Cours', num: true },
+  { key: 'market_value', label: 'Valo', num: true },
+  { key: 'pnl', label: '+/-', num: true },
+  { key: 'weight_pct', label: 'Poids', num: true },
+  { key: 'envelopes', label: 'Enveloppes' },
+  { key: 'freshness', label: 'Fraicheur' },
+];
+
+function ensureActifsTableScaffold() {
+  const thead = document.getElementById('actifs-thead');
+  if (!thead) return;
+  const current = [...thead.querySelectorAll('th')].map(th => th.dataset.sort || 'freshness').join('|');
+  const expected = ACTIFS_TABLE_COLUMNS.map(c => c.key).join('|');
+  if (current === expected) return;
+  thead.innerHTML = `<tr>${ACTIFS_TABLE_COLUMNS.map(col => `
+    <th${col.key !== 'freshness' ? ` data-sort="${col.key}"` : ''}${col.num ? ' class="num"' : ''}>${esc(col.label)}</th>
+  `).join('')}</tr>`;
+}
 
 // Restore tri et filtre chart depuis localStorage au premier load
 (function _restoreActifsState() {
@@ -28,6 +53,7 @@ function _persist() {
 }
 
 export async function loadActifs() {
+  ensureActifsTableScaffold();
   // Ne pas reinitialiser _filter : il a ete restaure au boot et maintenu
   // volontairement entre visites. Clic sur camembert toggle ou reset.
   // Utiliser le filtre global owner
@@ -62,6 +88,7 @@ function _render() {
 }
 
 function _renderTable(lines) {
+  ensureActifsTableScaffold();
   const tbody = document.getElementById('actifs-tbody');
   const cards = document.getElementById('actifs-cards');
   const empty = document.getElementById('actifs-empty');
@@ -91,6 +118,7 @@ function _renderTable(lines) {
     return `<tr>
       <td><button type="button" class="h-isin-btn" data-action="open-popover" data-isin="${esc(l.isin)}">${esc(l.isin)}</button></td>
       <td>${esc(l.name || '—')}</td>
+      <td>${esc((l.establishments || []).join(', ') || '—')}</td>
       <td>${esc(l.asset_class || '—')}</td>
       <td class="num">${new Intl.NumberFormat('fr-FR').format(l.quantity)}</td>
       <td class="num">${l.avg_cost != null ? fmt(l.avg_cost) : '—'}</td>
@@ -113,7 +141,7 @@ function _renderTable(lines) {
         <div class="actif-card-main">
           <button type="button" class="h-isin-btn" data-action="open-popover" data-isin="${esc(l.isin)}">${esc(l.isin)}</button>
           <strong>${esc(l.name || '—')}</strong>
-          <span>${esc(l.asset_class || '—')} · ${esc((l.envelopes || []).join(', ') || '—')}</span>
+          <span>${esc((l.establishments || []).join(', ') || '—')} · ${esc((l.envelopes || []).join(', ') || '—')} · ${esc(l.asset_class || '—')}</span>
         </div>
         <dl class="actif-card-metrics">
           <div><dt>Valo</dt><dd>${fmt(l.market_value)}</dd></div>

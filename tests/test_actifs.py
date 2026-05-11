@@ -9,9 +9,11 @@ from tests.test_api import client, fresh_db, CSRF_HEADERS, _make_position  # noq
 
 
 def _seed_two_positions_one_shared_isin(client):
-    r = _make_position(client, owner='Alice', category='Actions', envelope='PEA', value=0, debt=0)
+    r = _make_position(client, owner='Alice', category='Actions', envelope='PEA',
+                       establishment='Boursorama', value=0, debt=0)
     pea_id = r.get_json()['id']
-    r = _make_position(client, owner='Alice', category='Actions', envelope='CTO', value=0, debt=0)
+    r = _make_position(client, owner='Alice', category='Actions', envelope='CTO',
+                       establishment='Fortuneo', value=0, debt=0)
     cto_id = r.get_json()['id']
     client.put(f'/api/positions/{pea_id}/holdings', json={'holdings': [
         {'isin': 'FR0010315770', 'name': 'CW8', 'quantity': 20, 'cost_basis': 8000, 'market_value': 9800},
@@ -41,6 +43,7 @@ class TestConsolidated:
         assert cw8['cost_basis'] == 12500
         assert cw8['market_value'] == 14700
         assert cw8['pnl'] == 2200
+        assert sorted(cw8['establishments']) == ['Boursorama', 'Fortuneo']
         assert sorted(cw8['envelopes']) == ['CTO', 'PEA']
         assert cw8['positions_count'] == 2
 
