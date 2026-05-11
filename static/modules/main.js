@@ -134,6 +134,18 @@ function _normalizeLegacyLayout() {
   const ownerFilter = document.querySelector('.nav-owner-filter');
   let dateFilter = document.querySelector('.nav-date-filter');
   const syntheseDate = document.getElementById('synthese-date-select');
+  const navActions = document.querySelector('.nav-actions');
+
+  if (navActions && !document.getElementById('nav-add-button')) {
+    const btn = document.createElement('button');
+    btn.id = 'nav-add-button';
+    btn.type = 'button';
+    btn.className = 'nav-icon-btn hidden';
+    btn.title = 'Ajouter';
+    btn.setAttribute('aria-label', 'Ajouter');
+    btn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"></path></svg>`;
+    navActions.insertBefore(btn, navActions.firstChild);
+  }
 
   if (ownerFilter && syntheseDate) {
     if (!dateFilter) {
@@ -189,6 +201,9 @@ function _normalizeLegacyLayout() {
       section('Positions'),
       ensureMenuButton('btn-duplicate', 'Dupliquer snapshot'),
       ensureMenuButton('positions-col-picker', 'Colonnes positions'),
+      section('Actifs'),
+      ensureMenuButton('actifs-refresh-prices', 'Rafraîchir cours'),
+      ensureMenuButton('actifs-col-picker', 'Colonnes actifs'),
       section('Affichage'),
       ensureMenuButton('theme-toggle', 'Thème'),
       ensureMenuButton('btn-keyboard-help', '? Raccourcis clavier'),
@@ -225,6 +240,7 @@ function _normalizeLegacyLayout() {
 
   document.getElementById('synthese-person-tabs')?.remove();
   document.querySelectorAll('#tab-synthese .analyse-person-tabs').forEach(el => el.remove());
+  document.querySelector('#tab-actifs .page-filters')?.classList.add('hidden');
 }
 
 function _closeNavDrawer() {
@@ -274,6 +290,15 @@ function _tabFromUrl() {
 
 let _lastLoadedTab = null;
 
+function _updateNavAddButton(tab) {
+  const btn = document.getElementById('nav-add-button');
+  if (!btn) return;
+  const enabled = tab === 'positions';
+  btn.classList.toggle('hidden', !enabled);
+  btn.title = enabled ? 'Ajouter une position' : 'Ajouter';
+  btn.setAttribute('aria-label', btn.title);
+}
+
 export async function switchTab(tab, { pushHistory = true } = {}) {
   S.currentTab = tab;
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
@@ -289,6 +314,7 @@ export async function switchTab(tab, { pushHistory = true } = {}) {
   const dd = document.getElementById('settings-dropdown');
   if (dd) dd.classList.add('hidden');
   updateDemoBadge();
+  _updateNavAddButton(tab);
 
   const tabId = `tab-${tab}`;
   // Eviter de recharger l'onglet si on y est deja et qu'on ne force pas
@@ -386,7 +412,10 @@ function wireEvents() {
   });
 
   // Positions buttons
-  document.getElementById('btn-add-position').addEventListener('click', () => openPosModal());
+  document.getElementById('nav-add-button')?.addEventListener('click', () => {
+    if (S.currentTab === 'positions') openPosModal();
+  });
+  document.getElementById('btn-add-position')?.addEventListener('click', () => openPosModal());
   document.getElementById('btn-duplicate').addEventListener('click', duplicateSnapshot);
   document.getElementById('filter-owner').addEventListener('change', () => {
     const val = document.getElementById('filter-owner').value;
