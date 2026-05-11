@@ -140,11 +140,12 @@ function populateFilters() {
   const owners    = [...new Set(S.positions.map(p => p.owner))].sort();
   const envelopes = [...new Set(S.positions.map(p => p.envelope).filter(Boolean))].sort();
   const estabs    = [...new Set(S.positions.map(p => p.establishment).filter(Boolean))].sort();
+  const globalOwner = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : '';
 
   // Priorite : valeurs courantes DOM > filtres persistes en localStorage
   const saved = loadFilters('positions');
   const cur = {
-    owner:         document.getElementById('filter-owner').value         || saved.owner         || '',
+    owner:         globalOwner,
     envelope:      document.getElementById('filter-envelope').value      || saved.envelope      || '',
     establishment: document.getElementById('filter-establishment').value || saved.establishment || '',
   };
@@ -160,7 +161,6 @@ function populateFilters() {
 
 export function persistPositionFilters() {
   saveFilters('positions', {
-    owner:         document.getElementById('filter-owner')?.value         || '',
     envelope:      document.getElementById('filter-envelope')?.value      || '',
     establishment: document.getElementById('filter-establishment')?.value || '',
   });
@@ -173,7 +173,7 @@ function fillFilter(id, placeholder, options) {
 }
 
 export function clearFilters() {
-  document.getElementById('filter-owner').value         = '';
+  document.getElementById('filter-owner').value         = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : '';
   document.getElementById('filter-envelope').value      = '';
   document.getElementById('filter-establishment').value = '';
   clearFilterKey('positions');

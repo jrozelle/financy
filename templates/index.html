@@ -47,6 +47,9 @@
           <button class="settings-item" id="btn-add-snapshot-note">&#128221; Note du snapshot</button>
           <button class="settings-item" id="btn-open-wealth-target">&#127919; Objectif patrimoine</button>
           <button class="settings-item" id="btn-print" title="Imprimer la synthèse">&#128424; Imprimer</button>
+          <div class="settings-section-label">Positions</div>
+          <button class="settings-item" id="btn-duplicate">Dupliquer snapshot</button>
+          <button class="settings-item" id="positions-col-picker">Colonnes positions</button>
           <div class="settings-section-label">Affichage</div>
           <button class="settings-item" id="theme-toggle">Thème</button>
           <button class="settings-item" id="btn-keyboard-help">? Raccourcis clavier</button>
@@ -162,29 +165,26 @@
 
     <!-- ── POSITIONS ────────────────────────────────────────────────────── -->
     <div id="tab-positions" class="tab-content hidden">
-      <div class="page-header">
-        <h1>Positions</h1>
-        <div class="header-actions">
-          <div class="date-selector">
-            <label>Snapshot</label>
-            <select id="positions-date-select"></select>
+      <select id="positions-date-select" class="hidden" aria-hidden="true" tabindex="-1"></select>
+      <div class="positions-toolbar">
+        <div class="page-header">
+          <h1>Positions</h1>
+          <div class="header-actions">
+            <button class="btn btn-primary" id="btn-add-position">+ Ajouter</button>
           </div>
-          <button class="btn btn-secondary" id="btn-duplicate">Dupliquer snapshot</button>
-          <span style="position:relative"><button class="btn btn-secondary btn-sm" id="positions-col-picker">Colonnes</button></span>
-          <button class="btn btn-primary" id="btn-add-position">+ Ajouter</button>
         </div>
-      </div>
-      <div class="filters-bar" id="positions-filters">
-        <select id="filter-owner" class="filter-select">
-          <option value="">Toutes les personnes</option>
-        </select>
-        <select id="filter-establishment" class="filter-select">
-          <option value="">Tous les établissements</option>
-        </select>
-        <select id="filter-envelope" class="filter-select">
-          <option value="">Toutes les enveloppes</option>
-        </select>
-        <button class="btn btn-secondary btn-sm" id="btn-clear-filters">Effacer filtres</button>
+        <div class="filters-bar" id="positions-filters">
+          <select id="filter-owner" class="filter-select hidden" aria-hidden="true" tabindex="-1">
+            <option value="">Toutes les personnes</option>
+          </select>
+          <select id="filter-establishment" class="filter-select">
+            <option value="">Tous les établissements</option>
+          </select>
+          <select id="filter-envelope" class="filter-select">
+            <option value="">Toutes les enveloppes</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" id="btn-clear-filters">Effacer filtres</button>
+        </div>
       </div>
       <div id="positions-table-wrap" class="card card-table">
         <table class="data-table" id="positions-table">

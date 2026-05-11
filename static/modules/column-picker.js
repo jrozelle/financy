@@ -32,8 +32,10 @@ export function initColumnPicker(key, buttonId, theadId, columns) {
     e.stopPropagation();
     if (dropdown) { dropdown.remove(); dropdown = null; return; }
 
+    const inlineMenu = btn.closest('.settings-dropdown');
     dropdown = document.createElement('div');
     dropdown.className = 'col-picker-dropdown';
+    if (inlineMenu) dropdown.classList.add('col-picker-dropdown-inline');
     dropdown.innerHTML = Object.entries(columns).map(([col, label]) => `
       <label class="col-picker-item">
         <input type="checkbox" data-col="${esc(col)}" ${state[col] ? 'checked' : ''}>
@@ -49,8 +51,12 @@ export function initColumnPicker(key, buttonId, theadId, columns) {
       _save(key, state);
     });
 
-    btn.parentElement.style.position = 'relative';
-    btn.parentElement.appendChild(dropdown);
+    if (inlineMenu) {
+      btn.after(dropdown);
+    } else {
+      btn.parentElement.style.position = 'relative';
+      btn.parentElement.appendChild(dropdown);
+    }
 
     const close = ev => {
       if (dropdown && !dropdown.contains(ev.target) && ev.target !== btn) {
