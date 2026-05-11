@@ -186,6 +186,9 @@ function _normalizeLegacyLayout() {
       ensureMenuButton('btn-add-snapshot-note', '&#128221; Note du snapshot'),
       ensureMenuButton('btn-open-wealth-target', '&#127919; Objectif patrimoine'),
       ensureMenuButton('btn-print', '&#128424; Imprimer', { title: 'Imprimer la synthèse' }),
+      section('Positions'),
+      ensureMenuButton('btn-duplicate', 'Dupliquer snapshot'),
+      ensureMenuButton('positions-col-picker', 'Colonnes positions'),
       section('Affichage'),
       ensureMenuButton('theme-toggle', 'Thème'),
       ensureMenuButton('btn-keyboard-help', '? Raccourcis clavier'),
@@ -203,6 +206,21 @@ function _normalizeLegacyLayout() {
     }
 
     menu.replaceChildren(...items);
+  }
+
+  const positionsDate = document.getElementById('positions-date-select');
+  if (positionsDate) {
+    positionsDate.classList.add('hidden');
+    positionsDate.setAttribute('aria-hidden', 'true');
+    positionsDate.setAttribute('tabindex', '-1');
+    positionsDate.closest('#tab-positions .date-selector')?.classList.add('hidden');
+  }
+
+  const positionsOwner = document.getElementById('filter-owner');
+  if (positionsOwner) {
+    positionsOwner.classList.add('hidden');
+    positionsOwner.setAttribute('aria-hidden', 'true');
+    positionsOwner.setAttribute('tabindex', '-1');
   }
 
   document.getElementById('synthese-person-tabs')?.remove();
