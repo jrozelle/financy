@@ -619,6 +619,7 @@ input[type="file"] {
   }
   #tab-flux .page-toolbar {
     grid-template-columns: minmax(0, 1fr);
+    max-width: 100%;
   }
   #tab-positions .page-header {
     margin: 0;
