@@ -344,7 +344,7 @@ def get_consolidated():
                        p.envelope AS pos_envelope,
                        p.category AS pos_category,
                        s.name, s.ticker, s.currency, s.asset_class, s.is_priceable,
-                       s.last_price, s.last_price_date
+                       s.last_price, s.last_price_date, s.data_source
                 FROM holdings h
                 JOIN positions p ON p.id = h.position_id
                 LEFT JOIN securities s ON s.isin = h.isin
@@ -366,6 +366,7 @@ def get_consolidated():
             'is_priceable':    bool(is_priceable),
             'last_price':      r['last_price'],
             'last_price_date': r['last_price_date'],
+            'data_source':      r['data_source'],
             'quantity':        q,
             'market_value':    mv,
             'as_of_date':      r['as_of_date'],

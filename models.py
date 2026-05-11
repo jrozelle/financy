@@ -9,6 +9,7 @@ from contextlib import contextmanager
 _BASE_DIR = os.path.dirname(__file__)
 DB_PATH = os.environ.get('DB_PATH') or os.path.join(_BASE_DIR, 'patrimoine.db')
 DEMO_DB_PATH = os.path.join(_BASE_DIR, 'demo.db')
+HOLDING_PRICE_DIVERGENCE_THRESHOLD = 0.15
 
 _demo_mode = False
 
@@ -622,6 +623,14 @@ def _holding_effective_value(h):
     price_date = _parse_holding_date(h.get('last_price_date'))
     if manual_value is not None and manual_date and (not price_date or manual_date > price_date):
         return manual_value
+    if (
+        manual_value is not None and last_price is not None and quantity
+        and h.get('data_source') != 'mock'
+        and manual_date and price_date and manual_date >= price_date
+    ):
+        manual_unit = manual_value / quantity
+        if manual_unit > 0 and abs(last_price - manual_unit) / manual_unit > HOLDING_PRICE_DIVERGENCE_THRESHOLD:
+            return manual_value
     if last_price is not None:
         return quantity * last_price
     return manual_value or 0
@@ -743,7 +752,7 @@ def get_holdings_map(conn, position_ids=None):
                    h.market_value, h.as_of_date,
                    p.date AS position_date,
                    s.name, s.ticker, s.currency, s.asset_class,
-                   s.is_priceable, s.last_price, s.last_price_date
+                   s.is_priceable, s.last_price, s.last_price_date, s.data_source
             FROM holdings h
             JOIN positions p ON p.id = h.position_id
             LEFT JOIN securities s ON s.isin = h.isin
