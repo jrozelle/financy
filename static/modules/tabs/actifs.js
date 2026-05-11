@@ -12,6 +12,8 @@ let _data = null;
 let _sortCol = 'market_value';
 let _sortDesc = true;
 let _filter = { type: null, value: null }; // {type: 'asset_class'|'envelope', value: 'ETF'}
+const ACTIFS_COLUMNS_STORAGE_KEY = 'financy_columns_actifs';
+const ACTIFS_ESTABLISHMENTS_MIGRATION_KEY = 'financy_columns_actifs_establishments_v1';
 const ACTIFS_TABLE_COLUMNS = [
   { key: 'isin', label: 'ISIN' },
   { key: 'name', label: 'Nom' },
@@ -38,6 +40,16 @@ function ensureActifsTableScaffold() {
   `).join('')}</tr>`;
 }
 
+function ensureEstablishmentColumnPreference() {
+  try {
+    if (localStorage.getItem(ACTIFS_ESTABLISHMENTS_MIGRATION_KEY)) return;
+    const saved = JSON.parse(localStorage.getItem(ACTIFS_COLUMNS_STORAGE_KEY) || '{}');
+    saved.establishments = true;
+    localStorage.setItem(ACTIFS_COLUMNS_STORAGE_KEY, JSON.stringify(saved));
+    localStorage.setItem(ACTIFS_ESTABLISHMENTS_MIGRATION_KEY, '1');
+  } catch {}
+}
+
 // Restore tri et filtre chart depuis localStorage au premier load
 (function _restoreActifsState() {
   const saved = loadFilters('actifs');
@@ -53,6 +65,7 @@ function _persist() {
 }
 
 export async function loadActifs() {
+  ensureEstablishmentColumnPreference();
   ensureActifsTableScaffold();
   // Ne pas reinitialiser _filter : il a ete restaure au boot et maintenu
   // volontairement entre visites. Clic sur camembert toggle ou reset.
@@ -275,6 +288,7 @@ function _renderEnvelopeChart(breakdown) {
 // ─── Wiring ─────────────────────────────────────────────────────────────────
 
 export function wireActifsEvents() {
+  ensureEstablishmentColumnPreference();
   const sel = document.getElementById('actifs-owner-filter');
   sel?.addEventListener('change', loadActifs);
 
