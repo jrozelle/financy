@@ -24,6 +24,7 @@
   --chart-border: #ffffff;
   --chart-family: #111827;
   --chart-family-bg: rgba(17,24,39,.06);
+  --navbar-fixed-offset: 58px;
   color-scheme: light dark;
 }
 
@@ -68,13 +69,20 @@ body {
   color: var(--text);
   font-size: 14px;
   line-height: 1.5;
+  padding-top: var(--navbar-fixed-offset);
+}
+
+html {
+  scroll-padding-top: calc(var(--navbar-fixed-offset) + .75rem);
 }
 
 /* ── Navbar ────────────────────────────────────────────────────────────── */
 .navbar {
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 100;
+  left: 0;
+  right: 0;
+  z-index: 1000;
   background: var(--card);
   border-bottom: 1px solid var(--border);
   box-shadow: var(--shadow);
@@ -1357,7 +1365,7 @@ input[type="file"] {
 @media print {
   /* Preserve colors */
   *, *::before, *::after { color-adjust: exact; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { background: #fff !important; color: #000 !important; font-size: 11px; }
+  body { background: #fff !important; color: #000 !important; font-size: 11px; padding-top: 0 !important; }
 
   /* Hide non-printable UI */
   .navbar, .btn, .btn-icon, .filters-bar, .header-actions,
@@ -3115,5 +3123,23 @@ kbd {
   #synthese-date-select {
     font-size: 12px !important;
     padding: 0 .35rem !important;
+  }
+}
+
+/* Keep the main navigation visible during page scroll. The JS boot code keeps
+   --navbar-fixed-offset in sync with the actual responsive navbar height. */
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+}
+
+@media (max-width: 760px) {
+  .nav-tabs {
+    top: var(--navbar-fixed-offset) !important;
+    max-height: calc(100vh - var(--navbar-fixed-offset)) !important;
+    max-height: calc(100dvh - var(--navbar-fixed-offset)) !important;
   }
 }

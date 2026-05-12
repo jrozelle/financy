@@ -283,6 +283,30 @@ function _normalizeLegacyLayout() {
   document.querySelector('#tab-actifs .page-filters')?.classList.add('hidden');
 }
 
+let _navbarOffsetInstalled = false;
+
+function _installNavbarOffsetSync() {
+  if (_navbarOffsetInstalled) return;
+  const navbar = document.querySelector('.navbar');
+  if (!navbar) return;
+  _navbarOffsetInstalled = true;
+
+  const apply = () => {
+    const height = Math.ceil(navbar.getBoundingClientRect().height || 0);
+    if (height > 0) {
+      document.documentElement.style.setProperty('--navbar-fixed-offset', `${height}px`);
+    }
+  };
+
+  apply();
+  requestAnimationFrame(apply);
+  window.addEventListener('resize', apply, { passive: true });
+  window.addEventListener('orientationchange', () => setTimeout(apply, 250), { passive: true });
+  if ('ResizeObserver' in window) {
+    new ResizeObserver(apply).observe(navbar);
+  }
+}
+
 function _closeNavDrawer() {
   const navTabs = document.getElementById('nav-tabs');
   const navToggle = document.getElementById('navbar-toggle');
@@ -830,5 +854,6 @@ function applyTheme(mode) {
 // ─── Boot ─────────────────────────────────────────────────────────────────
 
 _normalizeLegacyLayout();
+_installNavbarOffsetSync();
 initTheme();
 init().catch(err => console.error('Init error:', err));
