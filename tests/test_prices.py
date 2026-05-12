@@ -50,10 +50,15 @@ class TestMockProvider:
 
 
 class TestYahooProviderOverrides:
-    def test_amundi_world_uses_eur_paris_ticker(self):
+    @pytest.mark.parametrize('isin, expected_ticker', [
+        ('IE000BI8OT95', 'MWRD.PA'),
+        ('IE00B53QG562', 'CEMU.AS'),
+        ('IE00BKM4GZ66', 'EMIM.AS'),
+    ])
+    def test_known_isins_use_eur_ticker(self, isin, expected_ticker):
         from services.prices import YahooProvider
         p = YahooProvider()
-        assert p.resolve_ticker('IE000BI8OT95')[0] == 'MWRD.PA'
+        assert p.resolve_ticker(isin)[0] == expected_ticker
 
 
 # ─── Freshness ───────────────────────────────────────────────────────────────
