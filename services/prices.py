@@ -32,6 +32,8 @@ MANUAL_PRICE_RECENCY_DAYS = 10
 # cotation EUR utilisee par les courtiers francais.
 ISIN_TICKER_OVERRIDES = {
     'IE000BI8OT95': ('MWRD.PA', 'ETF'),  # Amundi Core MSCI World UCITS ETF Acc
+    'IE00B53QG562': ('CEMU.AS', 'ETF'),  # iShares Core MSCI EMU UCITS ETF EUR Acc
+    'IE00BKM4GZ66': ('EMIM.AS', 'ETF'),  # iShares Core MSCI EM IMI UCITS ETF EUR Acc
 }
 
 
