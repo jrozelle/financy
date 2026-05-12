@@ -72,7 +72,12 @@ export async function loadActifs() {
   // Utiliser le filtre global owner
   const globalOwner = S.syntheseOwner;
   const owner = (globalOwner && globalOwner !== 'Famille') ? globalOwner : '';
-  const url = owner ? `/api/holdings/consolidated?owner=${encodeURIComponent(owner)}` : '/api/holdings/consolidated';
+  const params = new URLSearchParams();
+  const date = S.syntheseDate || S.positionsDate || S.dates?.[0];
+  if (date) params.set('date', date);
+  if (owner) params.set('owner', owner);
+  const qs = params.toString();
+  const url = `/api/holdings/consolidated${qs ? `?${qs}` : ''}`;
   try {
     _data = await api('GET', url, null, { silent: true });
   } catch { return; }
@@ -181,6 +186,9 @@ function _renderTable(lines) {
 function _freshnessBadge(l) {
   if (!l.is_priceable) {
     return '<span class="h-badge h-badge-muted" title="Non coté">non coté</span>';
+  }
+  if (!l.ticker && !l.last_price_date) {
+    return '<span class="h-badge h-badge-expired" title="Aucun ticker configuré">ticker ?</span>';
   }
   if (!l.last_price_date) return '<span class="h-badge h-badge-expired" title="Jamais rafraichi">inconnu</span>';
   const ageMs = Date.now() - new Date(l.last_price_date + 'T23:59:59').getTime();

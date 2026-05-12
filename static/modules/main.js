@@ -442,6 +442,9 @@ function wireEvents() {
     if (S.currentTab === 'positions') {
       showLoading('tab-positions');
       try { await loadPositions(); } finally { hideLoading('tab-positions'); }
+    } else if (S.currentTab === 'actifs') {
+      showLoading('tab-actifs');
+      try { await loadActifs(); } finally { hideLoading('tab-actifs'); }
     } else {
       showLoading('tab-synthese');
       try { await loadSynthese(); } finally { hideLoading('tab-synthese'); }

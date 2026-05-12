@@ -47,6 +47,33 @@ class TestConsolidated:
         assert sorted(cw8['envelopes']) == ['CTO', 'PEA']
         assert cw8['positions_count'] == 2
 
+    def test_date_param_uses_requested_snapshot(self, client):
+        old = _make_position(client, date='2024-05-01', owner='Alice',
+                             category='Actions', envelope='PEA',
+                             establishment='Old Bank', value=0, debt=0)
+        new = _make_position(client, date='2024-06-01', owner='Alice',
+                             category='Actions', envelope='PEA',
+                             establishment='New Bank', value=0, debt=0)
+        old_id = old.get_json()['id']
+        new_id = new.get_json()['id']
+        client.put(f'/api/positions/{old_id}/holdings', json={'holdings': [
+            {'isin': 'FR0010315770', 'name': 'CW8', 'quantity': 10,
+             'cost_basis': 4000, 'market_value': 5000},
+        ]}, headers=CSRF_HEADERS)
+        client.put(f'/api/positions/{new_id}/holdings', json={'holdings': [
+            {'isin': 'FR0010315770', 'name': 'CW8', 'quantity': 20,
+             'cost_basis': 8000, 'market_value': 10000},
+        ]}, headers=CSRF_HEADERS)
+
+        requested = client.get('/api/holdings/consolidated?date=2024-05-01').get_json()
+        latest = client.get('/api/holdings/consolidated').get_json()
+
+        assert requested['snapshot_date'] == '2024-05-01'
+        assert requested['lines'][0]['quantity'] == 10
+        assert requested['lines'][0]['establishments'] == ['Old Bank']
+        assert latest['snapshot_date'] == '2024-06-01'
+        assert latest['lines'][0]['establishments'] == ['New Bank']
+
     def test_totals_and_pnl(self, client):
         _seed_two_positions_one_shared_isin(client)
         data = client.get('/api/holdings/consolidated').get_json()
