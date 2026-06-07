@@ -111,6 +111,37 @@ FR001400T779     27/05/2026
     29.36744     -     103,05 €     3 026,31 €     -8,10 €     -0,27 %'''
 
 
+class TestSeparatorRobustness:
+    """Le parsing ne doit pas dependre du separateur de colonnes (copie HTML
+    reelle = tabulations ; parfois espaces simples ou insecables)."""
+
+    def _check(self, text):
+        r = parse_pasted_text(text)
+        assert r.format == 'anae_paste'
+        assert len(r.lines) == 4
+        assert all(l.market_value for l in r.lines)
+        assert all(l.cost_basis for l in r.lines)
+        d = _by_isin(r.lines)
+        assert d['FR0013297546'].market_value == 6398.79
+        assert d['FR0013297546'].cost_basis == 5715.92
+
+    def test_tabs(self):
+        self._check(SAMPLE.replace('     ', '\t'))
+
+    def test_single_space(self):
+        self._check(SAMPLE.replace('     ', ' '))
+
+    def test_nbsp_thousands(self):
+        # separateur de milliers en espace insecable (U+00A0)
+        nb = chr(0x00a0)
+        t = SAMPLE.replace('6 398', '6' + nb + '398').replace('1 526', '1' + nb + '526')
+        self._check(t)
+
+    def test_without_header(self):
+        # selection qui ne contient pas la ligne d'en-tete
+        self._check('\n'.join(SAMPLE.split('\n')[1:]))
+
+
 class TestFullImport:
     """Flux reel : preview (paste) -> save (PUT /holdings) -> auto-split par classe."""
 

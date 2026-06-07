@@ -24,17 +24,60 @@ from __future__ import annotations
 import re
 from typing import List, Optional
 
-from .common import DetectedLine, ISIN_RE, parse_number, isin_luhn_ok
+from .common import DetectedLine, ISIN_RE, NUMBER_RE, parse_number, isin_luhn_ok
 
 _DATE_RE = re.compile(r'\b(\d{2})/(\d{2})/(\d{4})\b')
-_DASHES = {'', '-', '–', '—'}
+# Un montant suivi du symbole €, separateur de milliers quelconque (espace,
+# espace insecable, fine), decimale , ou .
+_EURO_RE = re.compile(r'(-?\d[\d\s  .,]*?)\s*€')
+# Ligne ISIN + date (detection structurelle, meme sans en-tete dans la selection)
+_ISIN_DATE_RE = re.compile(r'[A-Z]{2}[A-Z0-9]{9}[0-9]\s+\d{2}/\d{2}/\d{4}')
+
+
+def _normalize_ws(text: str) -> str:
+    """Remplace les espaces speciaux par des espaces normaux."""
+    return text.replace(' ', ' ').replace(' ', ' ').replace('\t', ' ')
 
 
 def looks_like_anae_paste(text: str) -> bool:
-    """Empreinte du format : en-tete avec 'Px. Revient' et '+/- latentes'."""
-    low = text.lower()
-    has_pxr = 'px. revient' in low or 'px revient' in low
-    return has_pxr and 'latentes' in low
+    """Empreinte du format Anae.
+
+    Soit l'en-tete (Px. Revient + latentes), soit, si la selection ne contient
+    pas l'en-tete, la structure : plusieurs lignes 'ISIN  date' + des montants €.
+    """
+    low = _normalize_ws(text).lower()
+    if ('px. revient' in low or 'px revient' in low) and 'latentes' in low:
+        return True
+    if len(_ISIN_DATE_RE.findall(text)) >= 2 and '€' in text:
+        return True
+    return False
+
+
+def _parse_amounts(amount_line):
+    """Extrait (qty, px_revient, cours, montant, latentes) d'une ligne de chiffres.
+
+    Agnostique au separateur : on s'appuie sur la position des montants en euros.
+    Ordre des colonnes Anae : Quantite | Px.Revient | Cours | Montant | +/- latentes | +/- %.
+    Les colonnes en euros sont, de gauche a droite : [Px.Revient?] Cours? Montant Latentes.
+    On lit donc depuis la fin : latentes = dernier €, montant = avant-dernier, etc.
+    """
+    euros = [parse_number(m.group(1)) for m in _EURO_RE.finditer(amount_line)]
+    euros = [e for e in euros if e is not None]
+
+    # Quantite : premier nombre avant le premier symbole €
+    head = amount_line.split('€', 1)[0]
+    qty = None
+    for m in NUMBER_RE.finditer(head):
+        n = parse_number(m.group(0))
+        if n is not None:
+            qty = n
+            break
+
+    latentes   = euros[-1] if len(euros) >= 1 else None
+    montant    = euros[-2] if len(euros) >= 2 else (euros[-1] if euros else None)
+    cours      = euros[-3] if len(euros) >= 3 else None
+    px_revient = euros[-4] if len(euros) >= 4 else None
+    return qty, px_revient, cours, montant, latentes
 
 
 def _to_iso(text: str) -> Optional[str]:
@@ -45,32 +88,13 @@ def _to_iso(text: str) -> Optional[str]:
     return f'{y}-{mo}-{d}'
 
 
-def _clean_num(token: Optional[str]) -> Optional[float]:
-    """Nettoie un token de colonne (€, %, tiret) et le convertit en float."""
-    if token is None:
-        return None
-    t = token.replace('€', '').replace('%', '').strip()
-    if t in _DASHES:
-        return None
-    return parse_number(t)
-
-
-def _split_columns(line: str) -> List[str]:
-    """Decoupe la ligne de chiffres en colonnes.
-
-    Le separateur de colonnes est une tabulation ou >=2 espaces ; l'espace
-    simple a l'interieur des nombres (« 6 398,79 ») est ainsi preserve.
-    """
-    return [c for c in re.split(r'\t+| {2,}', line.strip()) if c != '']
-
-
 def _slug(name: str) -> str:
     s = re.sub(r'[^A-Za-z0-9]+', '_', name.upper()).strip('_')
     return s or 'FONDS_EUROS'
 
 
 def _is_header(line: str) -> bool:
-    low = line.lower()
+    low = _normalize_ws(line).lower()
     if 'px. revient' in low or 'px revient' in low:
         return True
     if 'date de derni' in low and 'valorisation' in low:
@@ -109,35 +133,7 @@ def _build_entry(buffer: List[str], amount_line: str) -> Optional[DetectedLine]:
             break
 
     # Colonnes : Quantite | Px. Revient | Cours | Montant | +/- latentes | +/- %
-    cols = _split_columns(amount_line)
-    euro_vals = [_clean_num(c) for c in cols if '€' in c]
-    euro_vals = [v for v in euro_vals if v is not None]
-
-    qty = px_revient = cours = montant = latentes = None
-    if len(cols) >= 6:
-        qty        = _clean_num(cols[0])
-        px_revient = _clean_num(cols[1])
-        cours      = _clean_num(cols[2])
-        montant    = _clean_num(cols[3])
-        latentes   = _clean_num(cols[4])
-    else:
-        # Fallback robuste si le decoupage en colonnes echoue :
-        # Montant = plus grand montant en euros (la valorisation totale domine
-        # toujours le cours unitaire et la +/- latente).
-        if euro_vals:
-            montant = max(euro_vals)
-        # quantite = premier nombre non-euro de la ligne
-        for c in cols:
-            if '€' not in c and c.strip() not in _DASHES:
-                n = _clean_num(c)
-                if n is not None:
-                    qty = n
-                    break
-
-    # Garde-fou : si le decoupage positionnel a pris le montant pour le cours
-    # (cas separateur inhabituel), on recale sur le plus gros euro.
-    if euro_vals and montant is not None and montant < max(euro_vals):
-        montant = max(euro_vals)
+    qty, px_revient, cours, montant, latentes = _parse_amounts(amount_line)
 
     fonds_euros = isin is None
     if fonds_euros:
