@@ -291,18 +291,22 @@ class TestHoldingsImportExport:
         assert len(export['securities']) == 2
         assert len(export['holdings']) == 2
 
+        # Auto-split par classe : l'ETF (Actions) et le fonds euros (Fond Euro)
+        # sont separes en deux positions des le PUT /holdings initial.
+        assert len(export['positions']) == 2
+
         client.post('/api/reset', json={'confirm': 'VIDER'}, headers=CSRF_HEADERS)
         r = client.post('/api/import-json', json=export, headers=CSRF_HEADERS)
         imp = r.get_json()
-        assert imp['positions'] == 1
+        assert imp['positions'] == 2
         assert imp['holdings'] == 2
         assert imp['securities'] == 2
         assert imp['skipped'] == 0
 
-        # La valeur recalculee est correcte apres round-trip
+        # La valeur recalculee est correcte apres round-trip (somme des 2 positions)
         r = client.get('/api/positions?date=2024-06-01')
-        p = r.get_json()[0]
-        assert p['value'] == 9800 + 10250
+        total = sum(p['value'] for p in r.get_json())
+        assert total == 9800 + 10250
 
 
 # ─── Securities ──────────────────────────────────────────────────────────────

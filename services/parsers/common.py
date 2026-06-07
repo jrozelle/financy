@@ -89,6 +89,7 @@ class DetectedLine:
     confidence: float = 0.0
     source: str = ''
     asset_class: Optional[str] = None
+    as_of_date: Optional[str] = None  # date de valorisation (AAAA-MM-JJ)
 
     def to_dict(self):
         return asdict(self)

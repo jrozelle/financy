@@ -207,6 +207,7 @@ def _commit(position_id):
             'market_value': parse_number(mv) if mv is not None else None,
             'as_of_date':   as_of,
             'is_priceable': item.get('is_priceable'),
+            'asset_class':  item.get('asset_class'),
         })
 
     with get_db() as conn:
@@ -230,7 +231,9 @@ def _commit(position_id):
         # Grouper les holdings par categorie inferee
         by_category = {}
         for item in validated:
-            cat = infer_category(item['name'])
+            cat = infer_category(item['name'],
+                                 asset_class=item.get('asset_class'),
+                                 isin=item['isin'])
             by_category.setdefault(cat, []).append(item)
 
         categories = list(by_category.keys())
