@@ -22,8 +22,18 @@ ASSET_CLASS_TO_CATEGORY = {
 }
 
 
-def infer_category(name):
-    """Infere la categorie position depuis le nom du holding."""
+def infer_category(name, asset_class=None, isin=None):
+    """Infere la categorie position d'un holding.
+
+    Priorite :
+    1. Pseudo-ISIN FONDS_EUROS_* -> Fond Euro (signal le plus fiable).
+    2. asset_class explicite (fourni par le parser ou la saisie) si connu.
+    3. Inference depuis le nom (fallback).
+    """
+    if isin and isin.upper().startswith('FONDS_EUROS_'):
+        return ASSET_CLASS_TO_CATEGORY['fonds_euros']
+    if asset_class and asset_class in ASSET_CLASS_TO_CATEGORY:
+        return ASSET_CLASS_TO_CATEGORY[asset_class]
     ac = _infer_asset_class(name)
     return ASSET_CLASS_TO_CATEGORY.get(ac, 'Actions')
 
@@ -66,7 +76,9 @@ def split_holdings_by_category(conn, position_id, items):
     # Grouper par categorie inferee
     by_category = {}
     for item in items:
-        cat = infer_category(item.get('name'))
+        cat = infer_category(item.get('name'),
+                             asset_class=item.get('asset_class'),
+                             isin=item.get('isin'))
         by_category.setdefault(cat, []).append(item)
 
     categories = list(by_category.keys())

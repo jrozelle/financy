@@ -47,7 +47,22 @@ def _classify_amf(lines):
 
 
 def parse_pasted_text(text: str) -> ParseResult:
-    """Parse un texte colle depuis le navigateur."""
+    """Parse un texte colle depuis le navigateur.
+
+    Detecte d'abord le format tabulaire Credit Agricole / Anae (Predica),
+    sinon retombe sur le format a blocs « Voir la fiche » (Bourso Vie, CA).
+    """
+    from .anae_paste import looks_like_anae_paste, parse_anae_paste
+
+    if looks_like_anae_paste(text):
+        result = ParseResult(format='anae_paste',
+                             source_label='Credit Agricole / Anae — copier-coller')
+        result.lines = parse_anae_paste(text)
+        result.total_market_value = sum(l.market_value or 0 for l in result.lines)
+        if not result.lines:
+            result.warnings.append('Aucune ligne detectee dans le tableau Anae colle.')
+        return result
+
     result = ParseResult(format='paste', source_label='Import par copier-coller')
 
     # Split en blocs par "NOM\nVoir la fiche"

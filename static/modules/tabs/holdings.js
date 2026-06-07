@@ -68,6 +68,7 @@ function makeRow(h = {}) {
     last_price_date: h.last_price_date ?? null,
     confidence:      h.confidence ?? null,
     asset_class:     h.asset_class ?? null,
+    as_of_date:      h.as_of_date ?? null,
   };
 }
 
@@ -292,6 +293,7 @@ async function saveAll() {
       if (r.market_value !== '' && r.market_value != null) h.market_value = parseLocaleNumber(r.market_value);
       if (isPseudoIsin(isin)) h.is_priceable = false;
       if (r.asset_class) h.asset_class = r.asset_class;
+      if (r.as_of_date) h.as_of_date = r.as_of_date;
       return h;
     }),
   };
@@ -369,7 +371,7 @@ async function openPasteDialog() {
     state.rows = (data.lines || []).map(l => makeRow({
       isin: l.isin, name: l.name, quantity: l.quantity,
       cost_basis: l.cost_basis, market_value: l.market_value,
-      asset_class: l.asset_class,
+      asset_class: l.asset_class, as_of_date: l.as_of_date,
     }));
     renderHoldingsTable();
     if (status) {
@@ -437,6 +439,7 @@ async function onPdfSelected(e) {
     market_value: l.market_value,
     confidence:   l.confidence,
     asset_class:  l.asset_class,
+    as_of_date:   l.as_of_date,
   }));
   _markDirty();
   renderHoldingsTable();

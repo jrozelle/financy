@@ -16,8 +16,10 @@ def _infer_asset_class(name):
         return 'scpi'
     if re.search(r'\bSCI\b', upper):
         return 'sci'
-    if re.search(r'\bFONDS?\s*(EURO|EUR\b|EN\s*EURO)', upper):
+    if re.search(r'\bFONDS?\s*(EURO|EUR\b|EN\s*EURO)|\bACTIF\s+EURO\b', upper):
         return 'fonds_euros'
+    if re.search(r'\bOBLIG\w*|\bBONDS?\b', upper):
+        return 'obligation'
     # Actions individuelles : pas de keyword ETF/OPCVM, ISIN FR/US/DE + nom court
     return 'action'
 

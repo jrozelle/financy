@@ -209,6 +209,7 @@ def replace_holdings(position_id):
         split_items = [{
             'isin': isin,
             'name': item.get('name'),
+            'asset_class': item.get('asset_class'),
             'quantity': parse_number(item['quantity']),
             'cost_basis': parse_number(item['cost_basis']) if item.get('cost_basis') is not None else None,
             'market_value': parse_number(item['market_value']) if item.get('market_value') is not None else None,
