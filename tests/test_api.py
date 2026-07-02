@@ -578,6 +578,33 @@ class TestSynthese:
         # Objets de valeur -> autre
         assert round(m['Patrimoine autre']['gross']) == 2000
 
+    def test_snapshot_diff_movements(self, client):
+        # Snapshot précédent
+        _make_position(client, date='2026-05-01', owner='Alice', category='Actions',
+                       envelope='PEA', value=10000)
+        _make_position(client, date='2026-05-01', owner='Alice', category='Immobilier',
+                       envelope='Immobilier', value=300000, debt=200000)
+        _make_position(client, date='2026-05-01', owner='Alice', category='Cash & dépôts',
+                       envelope='Livret A', value=5000)
+        # Snapshot courant : Actions +2000, dette immo -10000, Crypto nouvelle, Livret clôturé
+        _make_position(client, date='2026-06-01', owner='Alice', category='Actions',
+                       envelope='PEA', value=12000)
+        _make_position(client, date='2026-06-01', owner='Alice', category='Immobilier',
+                       envelope='Immobilier', value=300000, debt=190000)
+        _make_position(client, date='2026-06-01', owner='Alice', category='Crypto',
+                       envelope='Crypto', value=5000)
+        d = client.get('/api/snapshot-diff?date=2026-06-01').get_json()
+        assert d['from_date'] == '2026-05-01'
+        assert d['to_date'] == '2026-06-01'
+        by_cat = {m['category']: m for m in d['movements']}
+        assert by_cat['Actions']['delta'] == 2000
+        assert by_cat['Immobilier']['delta'] == 10000        # dette réduite -> net +10000
+        assert by_cat['Cash & dépôts']['status'] == 'closed'
+        assert by_cat['Cash & dépôts']['delta'] == -5000
+        assert by_cat['Crypto']['status'] == 'new'
+        assert by_cat['Crypto']['delta'] == 5000
+        assert d['totals']['delta'] == 12000
+
     def test_tri_insufficient_data(self, client):
         _make_position(client, date='2024-06-01', owner='Alice', value=10000)
         resp = client.get('/api/tri')

@@ -144,6 +144,7 @@ export function renderSynthese() {
   renderEntitiesSynthese();
   renderAllocationTargets();
   renderMacroSynthesis(syn.totals_by_macro, syn._positions_cache, owner, isFamily);
+  renderSnapshotDiff(owner, isFamily);
   renderSnapshotNote(syn);
   renderWealthTarget(kpi.net);
 }
@@ -645,6 +646,45 @@ function renderMacroSynthesis(byMacro, posCache, owner, isFamily) {
       drilldownPositions(bucketPos, bucket, 'Poche patrimoniale', { showOwner: isFamily });
     });
   });
+}
+
+async function renderSnapshotDiff(owner, isFamily) {
+  const el = document.getElementById('snapshot-diff');
+  if (!el) return;
+  const params = new URLSearchParams({ date: S.syntheseDate || '' });
+  if (!isFamily && owner) params.set('owner', owner);
+  let data;
+  try { data = await api('GET', `/api/snapshot-diff?${params}`, null, { silent: true }); }
+  catch { el.innerHTML = ''; return; }
+  if (!data || !data.from_date) {
+    el.innerHTML = '<p class="text-muted" style="font-size:13px">Aucun snapshot précédent à comparer.</p>';
+    return;
+  }
+  const moves = (data.movements || []).filter(m => Math.abs(m.delta) >= 1 || m.status !== 'changed');
+  if (!moves.length) {
+    el.innerHTML = `<p class="text-muted" style="font-size:13px">Aucun mouvement depuis le ${fmtDate(data.from_date)}.</p>`;
+    return;
+  }
+  const t = data.totals || {};
+  const badge = s => s === 'new' ? ' <span class="h-badge h-badge-fresh">nouveau</span>'
+    : s === 'closed' ? ' <span class="h-badge h-badge-expired">clôturé</span>' : '';
+  const sub = m => [isFamily ? m.owner : null, m.envelope, m.establishment, m.entity].filter(Boolean).join(' · ');
+  el.innerHTML = `
+    <div class="text-muted" style="font-size:12px;margin-bottom:.5rem">
+      ${fmtDate(data.from_date)} → ${fmtDate(data.to_date)} · variation nette
+      <strong class="${(t.delta || 0) >= 0 ? 'pos' : 'neg'}">${(t.delta || 0) >= 0 ? '+' : ''}${fmt(t.delta || 0)}</strong>
+    </div>
+    <table class="data-table" style="width:100%">
+      <thead><tr><th>Position</th><th class="num">Avant</th><th class="num">Après</th><th class="num">Variation</th></tr></thead>
+      <tbody>
+        ${moves.map(m => `<tr>
+          <td>${esc(m.label || m.envelope || m.category || '—')}${badge(m.status)}<div class="dd-row-sub">${esc(sub(m))}</div></td>
+          <td class="num">${fmt(m.net_before)}</td>
+          <td class="num">${fmt(m.net_after)}</td>
+          <td class="num ${m.delta >= 0 ? 'pos' : 'neg'}">${m.delta >= 0 ? '+' : ''}${fmt(m.delta)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
 }
 
 // ─── Snapshot notes ──────────────────────────────────────────────────────
