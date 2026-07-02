@@ -216,7 +216,7 @@ def get_synthese():
 @synthese_bp.route('/api/snapshot-diff')
 @login_required
 def get_snapshot_diff():
-    """Compare deux snapshots agreges PAR ENVELOPPE.
+    """Compare deux snapshots agreges PAR ENVELOPPE + ETABLISSEMENT.
 
     Par defaut : la date fournie (ou la derniere) vs le snapshot precedent.
     Valorisation IDENTIQUE a la synthese/KPI (compute_position AVEC holdings_map,
@@ -254,21 +254,26 @@ def get_snapshot_diff():
         agg = {}
         for p in positions:
             env = p.get('envelope') or 'Autre'
-            agg[env] = agg.get(env, 0.0) + (p.get('net_attributed', 0) or 0)
+            est = p.get('establishment') or ''
+            e = agg.setdefault((env, est), {'net': 0.0, 'envelope': env, 'establishment': est})
+            e['net'] += p.get('net_attributed', 0) or 0
         return agg
 
     b, a = _agg(before), _agg(after)
     movements = []
-    for env in set(b) | set(a):
-        in_b, in_a = env in b, env in a
-        net_before, net_after = b.get(env, 0.0), a.get(env, 0.0)
+    for key in set(b) | set(a):
+        in_b, in_a = key in b, key in a
+        rep = a.get(key) or b.get(key)
+        net_before = b[key]['net'] if in_b else 0.0
+        net_after = a[key]['net'] if in_a else 0.0
         movements.append({
-            'label':      env,
-            'envelope':   env,
-            'net_before': round(net_before, 2),
-            'net_after':  round(net_after, 2),
-            'delta':      round(net_after - net_before, 2),
-            'status':     'new' if not in_b else 'closed' if not in_a else 'changed',
+            'label':         rep['envelope'],
+            'envelope':      rep['envelope'],
+            'establishment': rep['establishment'],
+            'net_before':    round(net_before, 2),
+            'net_after':     round(net_after, 2),
+            'delta':         round(net_after - net_before, 2),
+            'status':        'new' if not in_b else 'closed' if not in_a else 'changed',
         })
     movements.sort(key=lambda m: -abs(m['delta']))
     net_b = round(sum(m['net_before'] for m in movements), 2)
