@@ -596,13 +596,14 @@ class TestSynthese:
         d = client.get('/api/snapshot-diff?date=2026-06-01').get_json()
         assert d['from_date'] == '2026-05-01'
         assert d['to_date'] == '2026-06-01'
-        by_cat = {m['category']: m for m in d['movements']}
-        assert by_cat['Actions']['delta'] == 2000
-        assert by_cat['Immobilier']['delta'] == 10000        # dette réduite -> net +10000
-        assert by_cat['Cash & dépôts']['status'] == 'closed'
-        assert by_cat['Cash & dépôts']['delta'] == -5000
-        assert by_cat['Crypto']['status'] == 'new'
-        assert by_cat['Crypto']['delta'] == 5000
+        # Agrégation PAR ENVELOPPE
+        by_env = {m['envelope']: m for m in d['movements']}
+        assert by_env['PEA']['delta'] == 2000
+        assert by_env['Immobilier']['delta'] == 10000        # dette réduite -> net +10000
+        assert by_env['Livret A']['status'] == 'closed'
+        assert by_env['Livret A']['delta'] == -5000
+        assert by_env['Crypto']['status'] == 'new'
+        assert by_env['Crypto']['delta'] == 5000
         assert d['totals']['delta'] == 12000
 
     def test_tri_insufficient_data(self, client):
