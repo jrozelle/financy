@@ -764,7 +764,7 @@ input[type="file"] {
 }
 .drilldown-content {
   position: absolute;
-  right: 0; top: 0; bottom: 0;
+  right: 0; top: var(--navbar-fixed-offset); bottom: 0;
   width: 480px;
   max-width: 96vw;
   background: var(--card);
