@@ -355,3 +355,33 @@ class TestCryptoHolding:
         from models import validate_isin
         assert validate_isin('CRYPTO_BTC') is True
         assert validate_isin('CRYPTO_ETH') is True
+
+
+class TestPositionValueSync:
+    """positions.value reste synchronise avec Σ holdings.market_value."""
+
+    def test_value_synced_on_put_and_add(self, client):
+        from models import get_db
+        pid = _make_position(client, category='Actions', envelope='PEA',
+                             value=0, debt=0).get_json()['id']
+        client.put(f'/api/positions/{pid}/holdings', json={'holdings': [
+            {'isin': 'FR0010315770', 'name': 'CW8', 'quantity': 10,
+             'cost_basis': 4000, 'market_value': 5000},
+        ]}, headers=CSRF_HEADERS)
+        with get_db() as conn:
+            assert conn.execute('SELECT value FROM positions WHERE id=?', (pid,)).fetchone()[0] == 5000
+        client.post(f'/api/positions/{pid}/holdings', json={
+            'isin': 'IE00B4L5Y983', 'name': 'IWDA', 'quantity': 5,
+            'cost_basis': 2000, 'market_value': 2500,
+        }, headers=CSRF_HEADERS)
+        with get_db() as conn:
+            assert conn.execute('SELECT value FROM positions WHERE id=?', (pid,)).fetchone()[0] == 7500
+
+    def test_manual_position_value_untouched(self, client):
+        # Une position SANS holdings garde sa value saisie (source de verite)
+        from models import get_db, sync_position_value
+        pid = _make_position(client, category='Immobilier', envelope='Immobilier',
+                             value=300000, debt=0).get_json()['id']
+        with get_db() as conn:
+            sync_position_value(conn, pid)
+            assert conn.execute('SELECT value FROM positions WHERE id=?', (pid,)).fetchone()[0] == 300000

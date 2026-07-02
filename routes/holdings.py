@@ -3,7 +3,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 from models import (get_db, validate_isin, validate_number, validate_string,
                     validate_date, snapshot_holdings_to_date,
-                    _holding_effective_value, parse_number)
+                    _holding_effective_value, parse_number, sync_position_value)
 from services.securities import upsert_security as _upsert_security
 from auth import login_required, csrf_protect
 
@@ -161,6 +161,7 @@ def add_holding(position_id):
              parse_number(d['market_value']) if d.get('market_value') is not None else None,
              _holding_as_of_date(d))
         )
+        sync_position_value(conn, position_id)
         holdings = _fetch_holdings(conn, position_id)
     created = next((h for h in holdings if h['id'] == cur.lastrowid), None)
     return jsonify(created), 201
@@ -217,6 +218,8 @@ def replace_holdings(position_id):
         } for isin, item in validated]
 
         touched, split_cats = split_holdings_by_category(conn, position_id, split_items)
+        for pid in touched:
+            sync_position_value(conn, pid)
         holdings = _fetch_holdings(conn, position_id)
 
     result = {'position_id': position_id, 'holdings': holdings}
@@ -264,6 +267,7 @@ def update_holding(holding_id):
 
         params.append(holding_id)
         conn.execute(f'UPDATE holdings SET {", ".join(updates)} WHERE id=?', params)
+        sync_position_value(conn, row['position_id'])
         holdings = _fetch_holdings(conn, row['position_id'])
     updated = next((h for h in holdings if h['id'] == holding_id), None)
     return jsonify(updated)
@@ -274,9 +278,11 @@ def update_holding(holding_id):
 @csrf_protect
 def delete_holding(holding_id):
     with get_db() as conn:
-        cur = conn.execute('DELETE FROM holdings WHERE id=?', (holding_id,))
-        if cur.rowcount == 0:
+        row = conn.execute('SELECT position_id FROM holdings WHERE id=?', (holding_id,)).fetchone()
+        if not row:
             return jsonify({'error': 'Ligne introuvable'}), 404
+        conn.execute('DELETE FROM holdings WHERE id=?', (holding_id,))
+        sync_position_value(conn, row['position_id'])
     return '', 204
 
 

@@ -12,7 +12,8 @@ import logging
 from datetime import datetime
 
 from flask import Blueprint, jsonify, request
-from models import get_db, validate_isin, validate_number, validate_date, parse_number
+from models import (get_db, validate_isin, validate_number, validate_date,
+                    parse_number, sync_position_value)
 from services.parsers import parse_pdf, parse_csv, parse_pasted_text
 from services.parsers.common import PdfEncryptedError, PdfImageScanError
 from services.securities import upsert_security
@@ -268,6 +269,9 @@ def _commit(position_id):
                          item['cost_basis'], item['market_value'], item['as_of_date'])
                     )
                 touched_positions.append(pid)
+
+        for pid in touched_positions:
+            sync_position_value(conn, pid)
 
         # Retourner les holdings de la position principale
         holdings = conn.execute(
