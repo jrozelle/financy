@@ -27,6 +27,16 @@ def _macro_bucket(category):
     return 'Patrimoine autre'
 
 
+def _freeze_holdings(holdings_map):
+    """Neutralise le cours du jour (last_price) pour valoriser un snapshot
+    historique a la market_value ENREGISTREE de ses holdings (valeur du jour du
+    snapshot), et non au cours actuel. Le snapshot le plus recent garde son
+    last_price (cours du jour) pour rester aligne sur le KPI live."""
+    for holdings in holdings_map.values():
+        for h in holdings:
+            h['last_price'] = None
+
+
 @synthese_bp.route('/api/synthese')
 @login_required
 def get_synthese():
@@ -40,10 +50,12 @@ def get_synthese():
         rows         = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
         entity_map   = get_entity_map(conn, date)
         ref          = load_referential(conn)
-        # Cours du jour pour le snapshot le plus recent ; valeur figee (stockee)
-        # pour l'historique -> reflete la vraie valeur enregistree a chaque date.
-        holdings_map = (get_holdings_map(conn, [r['id'] for r in rows])
-                        if date == latest_date else None)
+        # Cours du jour pour le snapshot le plus recent ; market_value figee des
+        # holdings pour l'historique -> vraie valeur enregistree a chaque date
+        # (et non positions.value qui peut etre perimee sur une ligne a holdings).
+        holdings_map = get_holdings_map(conn, [r['id'] for r in rows])
+        if date != latest_date:
+            _freeze_holdings(holdings_map)
         linked       = conn.execute(
             '''SELECT entity,
                       SUM(ownership_pct) as total_own,
@@ -123,8 +135,9 @@ def get_synthese():
             snap_rows        = c.execute('SELECT * FROM positions WHERE date=?', (snap_date,)).fetchall()
             snap_entity_map  = get_entity_map(c, snap_date)
             snap_ref         = load_referential(c)
-            snap_holdings    = (get_holdings_map(c, [r['id'] for r in snap_rows])
-                                 if snap_date == latest_date else None)
+            snap_holdings    = get_holdings_map(c, [r['id'] for r in snap_rows])
+            if snap_date != latest_date:
+                _freeze_holdings(snap_holdings)
         snap_positions = [compute_position(dict(r), snap_entity_map, snap_ref, snap_holdings) for r in snap_rows]
         fam = {
             'net':   sum(p['net_attributed'] for p in snap_positions),
@@ -252,8 +265,9 @@ def get_snapshot_diff():
                 return []
             rows = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
             emap = get_entity_map(conn, date)
-            hmap = (get_holdings_map(conn, [r['id'] for r in rows])
-                    if date == latest_date else None)
+            hmap = get_holdings_map(conn, [r['id'] for r in rows])
+            if date != latest_date:
+                _freeze_holdings(hmap)
             ps = [compute_position(dict(r), emap, ref, hmap) for r in rows]
             return [p for p in ps if not owner or p['owner'] == owner]
 
@@ -311,9 +325,10 @@ def get_historique():
         for date in dates:
             rows         = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
             entity_map   = get_entity_map(conn, date)
-            # Cours du jour pour le dernier snapshot ; valeur figee pour l'historique.
-            holdings_map = (get_holdings_map(conn, [r['id'] for r in rows])
-                            if date == latest_date else None)
+            # Cours du jour pour le dernier snapshot ; market_value figee sinon.
+            holdings_map = get_holdings_map(conn, [r['id'] for r in rows])
+            if date != latest_date:
+                _freeze_holdings(holdings_map)
             positions    = [compute_position(dict(r), entity_map, ref, holdings_map) for r in rows]
             if owner:
                 positions = [p for p in positions if p['owner'] == owner]
