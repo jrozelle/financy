@@ -677,7 +677,7 @@ async function renderSnapshotDiff(owner, isFamily) {
       <thead><tr><th>Enveloppe</th><th class="num">Avant</th><th class="num">Après</th><th class="num">Variation</th></tr></thead>
       <tbody>
         ${moves.map(m => `<tr>
-          <td>${esc(m.label || '—')}${badge(m.status)}</td>
+          <td>${esc(m.label || '—')}${badge(m.status)}${m.establishment ? `<div class="dd-row-sub">${esc(m.establishment)}</div>` : ''}</td>
           <td class="num">${fmt(m.net_before)}</td>
           <td class="num">${fmt(m.net_after)}</td>
           <td class="num ${m.delta >= 0 ? 'pos' : 'neg'}">${m.delta >= 0 ? '+' : ''}${fmt(m.delta)}</td>
