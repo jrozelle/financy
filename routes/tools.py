@@ -2,7 +2,7 @@ import logging
 from flask import Blueprint, jsonify, request
 from datetime import datetime
 from models import (get_db, compute_position, get_entity_map, get_holdings_map,
-                    load_referential, snapshot_holdings_to_date)
+                    load_referential, snapshot_holdings_to_date, validate_date)
 from auth import login_required, csrf_protect
 
 logger = logging.getLogger('financy')
@@ -234,3 +234,55 @@ def auto_snapshot():
 
     logger.info('Auto-snapshot: %s → %s (%s)', last_date, target_date, stats)
     return jsonify({'ok': True, **stats, 'from_date': last_date, 'to_date': target_date})
+
+
+@tools_bp.route('/api/snapshots/duplicate', methods=['POST'])
+@login_required
+@csrf_protect
+def duplicate_snapshot_route():
+    """Duplique un snapshot (positions ET holdings) d'une date source vers une cible.
+
+    Remplace l'ancien chemin front-end qui recreait les positions une a une via
+    POST /api/positions sans copier les holdings — d'ou des actifs vides apres
+    duplication. On s'appuie ici sur le helper robuste `duplicate_snapshot`,
+    seul point de verite pour copier positions + holdings + figer holdings_snapshots.
+
+    Ecrasement : si la date cible existe deja, ses positions et leurs holdings
+    sont purgees d'abord. Le ON DELETE CASCADE n'etant pas actif (PRAGMA
+    foreign_keys non positionne sur la connexion), on supprime les holdings
+    explicitement pour ne pas laisser d'orphelins.
+    """
+    d = request.json or {}
+    source_date = d.get('source_date')
+    target_date = d.get('target_date')
+    if not validate_date(source_date) or not validate_date(target_date):
+        return jsonify({'error': 'Dates invalides (format AAAA-MM-JJ attendu)'}), 400
+    if source_date == target_date:
+        return jsonify({'error': 'Les dates source et cible doivent etre differentes'}), 400
+
+    from services.snapshot import duplicate_snapshot
+
+    with get_db() as conn:
+        conn.execute('BEGIN IMMEDIATE')
+
+        src_count = conn.execute(
+            'SELECT COUNT(*) AS c FROM positions WHERE date=?', (source_date,)
+        ).fetchone()['c']
+        if src_count == 0:
+            return jsonify({'error': f'Aucune position a la date {source_date}'}), 404
+
+        # Ecrasement de la cible : purge explicite holdings puis positions.
+        target_ids = [r['id'] for r in conn.execute(
+            'SELECT id FROM positions WHERE date=?', (target_date,)
+        ).fetchall()]
+        if target_ids:
+            placeholders = ','.join('?' * len(target_ids))
+            conn.execute(
+                f'DELETE FROM holdings WHERE position_id IN ({placeholders})', target_ids
+            )
+            conn.execute('DELETE FROM positions WHERE date=?', (target_date,))
+
+        stats = duplicate_snapshot(conn, source_date, target_date)
+
+    logger.info('Duplicate snapshot: %s → %s (%s)', source_date, target_date, stats)
+    return jsonify({'ok': True, **stats, 'from_date': source_date, 'to_date': target_date})

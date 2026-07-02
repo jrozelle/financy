@@ -584,16 +584,11 @@ export async function duplicateSnapshot() {
   if (S.dates.includes(newDate) && !await confirmDialog('Snapshot existant',
     `Un snapshot du ${fmtDate(newDate)} existe déjà. L'écraser ?`,
     { confirmText: 'Écraser', danger: true })) return;
-  const src = await api('GET', `/api/positions?date=${S.positionsDate}`);
-  await Promise.all(src.map(p => {
-    const { id, created_at, net_value, gross_attributed, debt_attributed,
-            net_attributed, liquidity, friction, mobilizable_pct, mobilizable_value,
-            has_holdings, holdings_count, ...rest } = p;
-    return api('POST', '/api/positions', { ...rest, date: newDate });
-  }));
-  // Fige l'etat des holdings a la nouvelle date
-  try { await api('POST', '/api/holdings/snapshot', { date: newDate }, { silent: true }); }
-  catch {}
+  // Duplication cote serveur : copie positions ET holdings via le helper
+  // robuste, et fige holdings_snapshots. Evite de reconstruire les positions
+  // sans leurs holdings (bug : actifs vides apres duplication).
+  await api('POST', '/api/snapshots/duplicate',
+            { source_date: S.positionsDate, target_date: newDate });
   S.positionsDate = newDate;
   await refreshDates();
   await loadPositions();
