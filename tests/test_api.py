@@ -557,6 +557,27 @@ class TestSynthese:
         assert len(data) == 1
         assert data[0]['family_net'] == 10000
 
+    def test_synthese_macro_buckets_brut_net(self, client):
+        _make_position(client, date='2026-06-01', owner='Alice',
+                       category='Actions', envelope='PEA', value=10000, debt=0)
+        _make_position(client, date='2026-06-01', owner='Alice',
+                       category='Crypto', envelope='Crypto', value=5000, debt=0)
+        _make_position(client, date='2026-06-01', owner='Alice',
+                       category='Immobilier', envelope='Immobilier',
+                       value=300000, debt=200000)
+        _make_position(client, date='2026-06-01', owner='Alice',
+                       category='Objets de valeur', envelope='Autre', value=2000, debt=0)
+        m = client.get('/api/synthese?date=2026-06-01').get_json()['totals_by_macro']
+        # Actions + Crypto -> financier ; brut = net (aucune dette)
+        assert round(m['Patrimoine financier']['gross']) == 15000
+        assert round(m['Patrimoine financier']['net']) == 15000
+        # Immobilier -> immo ; net = brut - dette
+        assert round(m['Patrimoine immobilier']['gross']) == 300000
+        assert round(m['Patrimoine immobilier']['debt']) == 200000
+        assert round(m['Patrimoine immobilier']['net']) == 100000
+        # Objets de valeur -> autre
+        assert round(m['Patrimoine autre']['gross']) == 2000
+
     def test_tri_insufficient_data(self, client):
         _make_position(client, date='2024-06-01', owner='Alice', value=10000)
         resp = client.get('/api/tri')
