@@ -107,8 +107,8 @@ export function drilldownPositions(positions, title, subtitle, { showOwner = fal
         return `<div class="dd-row dd-row-clickable" data-pos-id="${p.id}"
                      data-category="${esc(p.category)}">
           <div class="dd-row-left">
-            <div class="dd-row-name">${esc(p.envelope || p.category)}</div>
-            <div class="dd-row-sub">${esc([showOwner ? p.owner : null, p.establishment, p.entity, liqText(p.liquidity)].filter(Boolean).join(' · '))}</div>
+            <div class="dd-row-name">${esc(p.label || p.envelope || p.category)}</div>
+            <div class="dd-row-sub">${esc([showOwner ? p.owner : null, p.category, p.establishment, p.entity, liqText(p.liquidity)].filter(Boolean).join(' · '))}</div>
             ${bar}
           </div>
           <div class="dd-row-right">
@@ -157,8 +157,8 @@ export function drilldownMobilizable() {
             const pct = total > 0 ? (v / total) * 100 : 0;
             return `<div class="dd-row dd-row-clickable" data-pos-id="${p.id}" data-category="${esc(p.category)}">
               <div class="dd-row-left">
-                <div class="dd-row-name">${esc(p.envelope || p.category)}</div>
-                <div class="dd-row-sub">${esc([p.owner, p.establishment].filter(Boolean).join(' · '))}</div>
+                <div class="dd-row-name">${esc(p.label || p.envelope || p.category)}</div>
+                <div class="dd-row-sub">${esc([p.owner, p.category, p.establishment].filter(Boolean).join(' · '))}</div>
                 <div class="dd-bar-wrap"><div class="dd-bar" style="width:${Math.min(100, pct).toFixed(1)}%"></div></div>
               </div>
               <div class="dd-row-right">
