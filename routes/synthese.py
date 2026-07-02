@@ -32,15 +32,18 @@ def _macro_bucket(category):
 def get_synthese():
     date = request.args.get('date')
     with get_db() as conn:
+        latest_date = conn.execute('SELECT MAX(date) as d FROM positions').fetchone()['d']
         if not date:
-            row = conn.execute('SELECT MAX(date) as d FROM positions').fetchone()
-            date = row['d']
+            date = latest_date
         if not date:
             return jsonify({'date': None})
         rows         = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
         entity_map   = get_entity_map(conn, date)
         ref          = load_referential(conn)
-        holdings_map = get_holdings_map(conn, [r['id'] for r in rows])
+        # Cours du jour pour le snapshot le plus recent ; valeur figee (stockee)
+        # pour l'historique -> reflete la vraie valeur enregistree a chaque date.
+        holdings_map = (get_holdings_map(conn, [r['id'] for r in rows])
+                        if date == latest_date else None)
         linked       = conn.execute(
             '''SELECT entity,
                       SUM(ownership_pct) as total_own,
@@ -73,8 +76,11 @@ def get_synthese():
         if ops:
             totals_by_category[cat] = {
                 'net':      sum(p['net_attributed'] for p in ops),
+                'gross':    sum(p['gross_attributed'] for p in ops),
                 'by_owner': {o: sum(p['net_attributed'] for p in ops if p['owner'] == o)
                              for o in owners},
+                'by_owner_gross': {o: sum(p['gross_attributed'] for p in ops if p['owner'] == o)
+                                   for o in owners},
             }
 
     # Synthese en 3 poches patrimoniales, brut (gross_attributed) et net
@@ -117,7 +123,8 @@ def get_synthese():
             snap_rows        = c.execute('SELECT * FROM positions WHERE date=?', (snap_date,)).fetchall()
             snap_entity_map  = get_entity_map(c, snap_date)
             snap_ref         = load_referential(c)
-            snap_holdings    = get_holdings_map(c, [r['id'] for r in snap_rows])
+            snap_holdings    = (get_holdings_map(c, [r['id'] for r in snap_rows])
+                                 if snap_date == latest_date else None)
         snap_positions = [compute_position(dict(r), snap_entity_map, snap_ref, snap_holdings) for r in snap_rows]
         fam = {
             'net':   sum(p['net_attributed'] for p in snap_positions),
@@ -219,10 +226,10 @@ def get_snapshot_diff():
     """Compare deux snapshots agreges PAR ENVELOPPE + ETABLISSEMENT.
 
     Par defaut : la date fournie (ou la derniere) vs le snapshot precedent.
-    Valorisation IDENTIQUE a la synthese/KPI (compute_position AVEC holdings_map,
-    cours actuel des deux cotes) : le total des mouvements = la variation nette
-    affichee en KPI. Retourne les mouvements par enveloppe tries par |Δ net|,
-    enveloppes nouvelles et cloturees incluses.
+    Valorisation alignee sur la synthese : cours du jour pour le snapshot le plus
+    recent, valeur figee (stockee) pour l'historique -> la variation inclut donc
+    l'effet marche, et le total = la variation nette affichee en KPI. Retourne les
+    mouvements par enveloppe+etablissement tries par |Δ net|, nouvelles/cloturees.
     """
     to_date = request.args.get('date')
     owner = request.args.get('owner')
@@ -238,12 +245,15 @@ def get_snapshot_diff():
         from_date = prev[-1] if prev else None
         ref = load_referential(conn)
 
+        latest_date = dates[-1]
+
         def _positions_at(date):
             if date is None:
                 return []
             rows = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
             emap = get_entity_map(conn, date)
-            hmap = get_holdings_map(conn, [r['id'] for r in rows])
+            hmap = (get_holdings_map(conn, [r['id'] for r in rows])
+                    if date == latest_date else None)
             ps = [compute_position(dict(r), emap, ref, hmap) for r in rows]
             return [p for p in ps if not owner or p['owner'] == owner]
 
@@ -296,11 +306,14 @@ def get_historique():
             'SELECT DISTINCT date FROM positions ORDER BY date'
         ).fetchall()]
         ref = load_referential(conn)
+        latest_date = dates[-1] if dates else None
         history = []
         for date in dates:
             rows         = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
             entity_map   = get_entity_map(conn, date)
-            holdings_map = get_holdings_map(conn, [r['id'] for r in rows])
+            # Cours du jour pour le dernier snapshot ; valeur figee pour l'historique.
+            holdings_map = (get_holdings_map(conn, [r['id'] for r in rows])
+                            if date == latest_date else None)
             positions    = [compute_position(dict(r), entity_map, ref, holdings_map) for r in rows]
             if owner:
                 positions = [p for p in positions if p['owner'] == owner]
