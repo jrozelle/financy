@@ -53,40 +53,61 @@ async function openTargetsModal() {
   document.getElementById('targets-modal').classList.remove('hidden');
 }
 
+let _allocMode = 'net';  // 'net' | 'brut'
+
+function _wireAllocMode(host) {
+  host.querySelectorAll('[data-alloc-mode]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _allocMode = btn.dataset.allocMode;
+      renderAllocationTargets();
+    });
+  });
+}
+
 export async function renderAllocationTargets() {
+  const host = document.getElementById('allocation-targets');
   const syn = S.synthese;
   if (!syn?.totals_by_category) {
-    document.getElementById('allocation-targets').innerHTML =
-      '<p class="text-muted" style="font-size:13px">Aucune donnée.</p>';
+    host.innerHTML = '<p class="text-muted" style="font-size:13px">Aucune donnée.</p>';
     return;
   }
   const targets  = await loadTargets();
   const owner    = S.syntheseOwner;
   const isFamily = owner === 'Famille';
-  const totalNet = isFamily
-    ? syn.family.net
-    : (syn.totals_by_owner[owner]?.net || 0);
+  const useGross = _allocMode === 'brut';
+
+  const totalBase = useGross
+    ? (isFamily ? (syn.family.gross || 0) : (syn.totals_by_owner[owner]?.gross || 0))
+    : (isFamily ? (syn.family.net   || 0) : (syn.totals_by_owner[owner]?.net   || 0));
+
+  const valOf = cd => useGross
+    ? (isFamily ? (cd.gross || 0) : (cd.by_owner_gross?.[owner] || 0))
+    : (isFamily ? (cd.net   || 0) : (cd.by_owner?.[owner]       || 0));
 
   const rows = S.config.categories
     .map(cat => {
-      const net = isFamily
-        ? (syn.totals_by_category[cat]?.net || 0)
-        : (syn.totals_by_category[cat]?.by_owner?.[owner] || 0);
-      const actual = totalNet > 0 ? (net / totalNet) * 100 : 0;
+      const val = valOf(syn.totals_by_category[cat] || {});
+      const actual = totalBase > 0 ? (val / totalBase) * 100 : 0;
       const target = targets[cat] || 0;
-      const delta  = actual - target;
-      return { cat, net, actual, target, delta };
+      return { cat, val, actual, target, delta: actual - target };
     })
-    .filter(r => r.net > 0 || r.target > 0)
-    .sort((a, b) => b.net - a.net);
+    .filter(r => r.val > 0 || r.target > 0)
+    .sort((a, b) => b.val - a.val);
+
+  const switchHtml = `<div style="display:flex;justify-content:flex-end;margin-bottom:.6rem">
+    <div style="display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;font-size:12px">
+      ${['net', 'brut'].map(m => `<button type="button" data-alloc-mode="${m}" style="padding:.25rem .7rem;border:none;cursor:pointer;background:${m === _allocMode ? 'var(--primary)' : 'transparent'};color:${m === _allocMode ? '#fff' : 'var(--text)'}">${m === 'net' ? 'Net' : 'Brut'}</button>`).join('')}
+    </div>
+  </div>`;
 
   if (!rows.length) {
-    document.getElementById('allocation-targets').innerHTML =
+    host.innerHTML = switchHtml +
       '<p class="text-muted" style="font-size:13px">Cliquez sur "Modifier cibles" pour configurer.</p>';
+    _wireAllocMode(host);
     return;
   }
 
-  document.getElementById('allocation-targets').innerHTML = `
+  host.innerHTML = switchHtml + `
     <div style="display:grid;grid-template-columns:130px 1fr 55px 55px 55px;gap:.5rem;padding:.35rem 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);border-bottom:2px solid var(--border)">
       <div>Catégorie</div><div></div><div style="text-align:right">Réel</div><div style="text-align:right">Cible</div><div style="text-align:right">Écart</div>
     </div>
@@ -106,4 +127,5 @@ export async function renderAllocationTargets() {
         <div style="text-align:right" class="${deltaClass}">${deltaStr}</div>
       </div>`;
     }).join('')}`;
+  _wireAllocMode(host);
 }
