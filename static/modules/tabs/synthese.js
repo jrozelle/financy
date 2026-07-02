@@ -143,7 +143,7 @@ export function renderSynthese() {
   renderLiqBars(liqFiltered);
   renderEntitiesSynthese();
   renderAllocationTargets();
-  renderMacroSynthesis(syn.totals_by_macro, owner, isFamily);
+  renderMacroSynthesis(syn.totals_by_macro, syn._positions_cache, owner, isFamily);
   renderSnapshotNote(syn);
   renderWealthTarget(kpi.net);
 }
@@ -194,7 +194,8 @@ function renderOwnersTable(byOwner, family, totalMob) {
 }
 
 function renderCatChart(byCat) {
-  const cats = Object.keys(byCat).filter(c => byCat[c].net > 0);
+  const cats = Object.keys(byCat).filter(c => byCat[c].net > 0)
+    .sort((a, b) => byCat[b].net - byCat[a].net);   // poids décroissant
   const vals = cats.map(c => byCat[c].net);
 
   destroyChart(catChart);
@@ -260,7 +261,8 @@ function renderEnvChart(posCache, owner) {
     const k = p.envelope || 'Autre';
     byEnv[k] = (byEnv[k] || 0) + (p.net_attributed || 0);
   }
-  const labels = Object.keys(byEnv).filter(k => byEnv[k] > 0);
+  const labels = Object.keys(byEnv).filter(k => byEnv[k] > 0)
+    .sort((a, b) => byEnv[b] - byEnv[a]);   // poids décroissant
   const vals   = labels.map(k => byEnv[k]);
 
   destroyChart(syntheseEnvChart);
@@ -589,7 +591,22 @@ function renderLiqBars(byLiq) {
   document.getElementById('liquidity-bars').innerHTML = `<div class="liq-grid">${rows}</div>`;
 }
 
-function renderMacroSynthesis(byMacro, owner, isFamily) {
+// Mapping categorie -> poche patrimoniale (miroir de MACRO_BUCKETS dans
+// routes/synthese.py — garder les deux synchronises). Categorie non listee -> autre.
+const MACRO_BUCKETS = {
+  'Patrimoine financier':  ['Cash & dépôts', 'Monétaire', 'Obligations', 'Actions', 'Fond Euro', 'Produits Structurés', 'Crypto'],
+  'Patrimoine immobilier': ['Immobilier', 'SCPI'],
+  'Patrimoine autre':      ['Objets de valeur', 'Société', 'Autre'],
+};
+
+function _macroBucket(category) {
+  for (const [bucket, cats] of Object.entries(MACRO_BUCKETS)) {
+    if (cats.includes(category)) return bucket;
+  }
+  return 'Patrimoine autre';
+}
+
+function renderMacroSynthesis(byMacro, posCache, owner, isFamily) {
   const el = document.getElementById('macro-synthese');
   if (!el) return;
   if (!byMacro) { el.innerHTML = ''; return; }
@@ -607,7 +624,8 @@ function renderMacroSynthesis(byMacro, owner, isFamily) {
   el.innerHTML = `<table class="data-table" style="width:100%">
     <thead><tr><th>Poche</th><th class="num">Brut</th><th class="num">%</th><th class="num">Net</th><th class="num">%</th></tr></thead>
     <tbody>
-      ${rows.map(r => `<tr><td>${esc(r.label)}</td>${cell(r.gross, totGross)}${cell(r.net, totNet)}</tr>`).join('')}
+      ${rows.map(r => `<tr class="dd-row-clickable" data-macro="${esc(r.label)}" style="cursor:pointer" title="Voir le détail des positions">
+        <td>${esc(r.label)}</td>${cell(r.gross, totGross)}${cell(r.net, totNet)}</tr>`).join('')}
     </tbody>
     <tfoot><tr>
       <td><strong>Total</strong></td>
@@ -615,6 +633,18 @@ function renderMacroSynthesis(byMacro, owner, isFamily) {
       <td class="num"><strong>${fmt(totNet)}</strong></td><td class="num">100 %</td>
     </tr></tfoot>
   </table>`;
+
+  // Drill-down : clic sur une poche -> positions de cette poche
+  const positions = isFamily
+    ? Object.values(posCache || {}).flat()
+    : (posCache?.[owner] || []);
+  el.querySelectorAll('tr[data-macro]').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const bucket = tr.dataset.macro;
+      const bucketPos = positions.filter(p => _macroBucket(p.category) === bucket);
+      drilldownPositions(bucketPos, bucket, 'Poche patrimoniale', { showOwner: isFamily });
+    });
+  });
 }
 
 // ─── Snapshot notes ──────────────────────────────────────────────────────
