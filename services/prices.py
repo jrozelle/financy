@@ -203,6 +203,7 @@ _QUOTE_TYPE_MAP = {
     'EQUITY': 'action',
     'MUTUALFUND': 'opcvm',
     'INDEX': 'autre',
+    'CRYPTOCURRENCY': 'crypto',
 }
 
 

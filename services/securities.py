@@ -34,21 +34,32 @@ def upsert_security(conn, isin, name=None, ticker=None, currency=None,
     - routes/pdf_import.py   (commit PDF)
 
     Regles :
-    - Les pseudo-ISIN (FONDS_EUROS_*, CUSTOM_*) ont is_priceable=0 par defaut.
-    - Si `is_priceable` est fourni, il prevaut, sauf pour pseudo-ISIN ou il est force a 0.
+    - Les pseudo-ISIN manuels (FONDS_EUROS_*, CUSTOM_*) ont is_priceable=0 par defaut.
+    - Les pseudo-ISIN crypto (CRYPTO_*) sont TOUJOURS cotes : ticker Yahoo <SYM>-EUR
+      derive du symbole (CRYPTO_BTC -> BTC-EUR), asset_class 'crypto'.
+    - Sinon si `is_priceable` est fourni, il prevaut.
     - Ne touche jamais `last_price` / `last_price_date` (reserve au refresh provider).
     """
     isin = (isin or '').strip().upper()
     if not validate_isin(isin):
         raise ValueError(f'ISIN invalide : {isin!r}')
 
+    is_crypto = isin.startswith('CRYPTO_')
     is_pseudo = isin.startswith(('FONDS_EUROS_', 'CUSTOM_'))
     if is_pseudo:
         effective_priceable = 0
+    elif is_crypto:
+        effective_priceable = 1  # crypto : toujours cote via Yahoo <SYM>-EUR
     elif is_priceable is None:
         effective_priceable = None  # ne pas forcer de valeur si pas fournie
     else:
         effective_priceable = 0 if not is_priceable else 1
+
+    # Crypto : ticker Yahoo par defaut <SYM>-EUR (ex CRYPTO_BTC -> BTC-EUR)
+    if is_crypto and not ticker:
+        sym = isin[len('CRYPTO_'):]
+        if sym:
+            ticker = f'{sym}-EUR'
 
     row = conn.execute('SELECT isin FROM securities WHERE isin=?', (isin,)).fetchone()
     if row is None:
@@ -60,7 +71,9 @@ def upsert_security(conn, isin, name=None, ticker=None, currency=None,
              name,
              ticker,
              currency or 'EUR',
-             asset_class or ('fonds_euros' if isin.startswith('FONDS_EUROS_') else _infer_asset_class(name)),
+             asset_class or ('fonds_euros' if isin.startswith('FONDS_EUROS_')
+                             else 'crypto' if is_crypto
+                             else _infer_asset_class(name)),
              1 if effective_priceable is None else effective_priceable,
              data_source)
         )
