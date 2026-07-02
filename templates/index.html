@@ -157,9 +157,12 @@
           <div id="liquidity-bars"></div>
         </div>
         <div class="card">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.875rem">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.875rem;gap:.5rem">
             <h2 style="margin:0">Allocation cible vs réelle</h2>
-            <button class="btn btn-secondary btn-sm" id="btn-edit-targets">Modifier cibles</button>
+            <div style="display:flex;align-items:center;gap:.5rem">
+              <span id="alloc-mode-switch"></span>
+              <button class="btn btn-secondary btn-sm" id="btn-edit-targets">Modifier cibles</button>
+            </div>
           </div>
           <div id="allocation-targets"></div>
         </div>

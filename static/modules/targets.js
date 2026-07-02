@@ -94,20 +94,22 @@ export async function renderAllocationTargets() {
     .filter(r => r.val > 0 || r.target > 0)
     .sort((a, b) => b.val - a.val);
 
-  const switchHtml = `<div style="display:flex;justify-content:flex-end;margin-bottom:.6rem">
-    <div style="display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;font-size:12px">
-      ${['net', 'brut'].map(m => `<button type="button" data-alloc-mode="${m}" style="padding:.25rem .7rem;border:none;cursor:pointer;background:${m === _allocMode ? 'var(--primary)' : 'transparent'};color:${m === _allocMode ? '#fff' : 'var(--text)'}">${m === 'net' ? 'Net' : 'Brut'}</button>`).join('')}
-    </div>
-  </div>`;
+  // Switch Net/Brut dans l'en-tete de la carte (a cote de "Modifier cibles")
+  const switchEl = document.getElementById('alloc-mode-switch');
+  if (switchEl) {
+    switchEl.innerHTML = `<span style="display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;font-size:12px;vertical-align:middle">
+      ${['net', 'brut'].map(m => `<button type="button" data-alloc-mode="${m}" style="padding:.2rem .6rem;border:none;cursor:pointer;background:${m === _allocMode ? 'var(--primary)' : 'transparent'};color:${m === _allocMode ? '#fff' : 'var(--text)'}">${m === 'net' ? 'Net' : 'Brut'}</button>`).join('')}
+    </span>`;
+    _wireAllocMode(switchEl);
+  }
 
   if (!rows.length) {
-    host.innerHTML = switchHtml +
+    host.innerHTML =
       '<p class="text-muted" style="font-size:13px">Cliquez sur "Modifier cibles" pour configurer.</p>';
-    _wireAllocMode(host);
     return;
   }
 
-  host.innerHTML = switchHtml + `
+  host.innerHTML = `
     <div style="display:grid;grid-template-columns:130px 1fr 55px 55px 55px;gap:.5rem;padding:.35rem 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);border-bottom:2px solid var(--border)">
       <div>Catégorie</div><div></div><div style="text-align:right">Réel</div><div style="text-align:right">Cible</div><div style="text-align:right">Écart</div>
     </div>
@@ -127,5 +129,4 @@ export async function renderAllocationTargets() {
         <div style="text-align:right" class="${deltaClass}">${deltaStr}</div>
       </div>`;
     }).join('')}`;
-  _wireAllocMode(host);
 }
