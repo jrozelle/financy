@@ -779,6 +779,26 @@ def get_holdings_map(conn, position_ids=None):
     return result
 
 
+def sync_position_value(conn, position_id):
+    """Re-synchronise positions.value = Σ holdings.market_value pour une position
+    A HOLDINGS, afin que la valeur stockee suive les holdings (leur source de
+    verite). A appeler apres toute mutation de holdings (ajout/remplacement/
+    suppression/import).
+
+    NE TOUCHE PAS une position sans holdings : la value y est la saisie manuelle
+    (immobilier, cash, fonds euros...), qui reste la source de verite du modele.
+    Utilise market_value (valeur enregistree) et non le cours du jour, pour ne pas
+    corrompre la valeur d'un snapshot historique lors d'un backfill.
+    """
+    row = conn.execute(
+        'SELECT COUNT(*) AS n, COALESCE(SUM(market_value), 0) AS v '
+        'FROM holdings WHERE position_id=?', (position_id,)
+    ).fetchone()
+    if row['n'] > 0:
+        conn.execute('UPDATE positions SET value=? WHERE id=?',
+                     (round(row['v'] or 0, 2), position_id))
+
+
 def get_entity_map(conn, date=None):
     if date:
         rows = conn.execute('''
