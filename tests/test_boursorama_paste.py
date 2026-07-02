@@ -118,6 +118,44 @@ IE000BI8OT95     02/06/2026
     44.5548     -     135,73 €     6 790,20 €     -     11,40 %'''
 
 
+# CTO : noms d'actions courts en majuscules + ISIN a la ligne, % journalier
+# intercale entre Cours et Montant, quantite collee au Px.Revient par l'espace.
+CTO = '''    Valeur    Quantité    Px. Revient    Cours    Montant    +/- Latentes    +/- %    Notification
+
+ADOBE
+US00724F1012
+
+10
+
+156,51 €
+
+161,25 €
+2,91 %
+
+1 574,12 €
+
+47,41 €
+
+2,64 %
+
+
+APPLE
+US0378331005
+
+8
+
+150,00 €
+
+152,42 €
+0,80 %
+
+1 219,39 €
+
+175,39 €
+
+14,62 %'''
+
+
 def _by_isin(lines):
     return {l.isin: l for l in lines}
 
@@ -209,6 +247,34 @@ class TestLucya:
         assert l.quantity == 44.5548
         assert l.market_value == 6950.99
         assert l.unit_price == 135.73
+
+
+class TestCTO:
+    """Compte-titres : noms d'actions courts (ADOBE, APPLE) suivis de leur ISIN."""
+
+    def test_detected(self):
+        assert looks_like_boursorama_paste(CTO) is True
+
+    def test_short_uppercase_names_parsed(self):
+        d = _by_isin(parse_boursorama_paste(CTO))
+        # Sans le fix, ADOBE/APPLE sont pris pour des codes -> 0 ligne detectee
+        assert set(d) == {'US00724F1012', 'US0378331005'}
+        assert {l.name for l in d.values()} == {'ADOBE', 'APPLE'}
+
+    def test_quantity_not_merged_with_px_revient(self):
+        d = _by_isin(parse_boursorama_paste(CTO))
+        adobe = d['US00724F1012']
+        assert adobe.quantity == 10          # pas 8856,51
+        assert adobe.unit_price == 161.25    # Cours, pas le % journalier 2,91
+        assert adobe.market_value == 1574.12
+        assert adobe.cost_basis == 1565.1    # Px.Revient 156,51 x 10
+        apple = d['US0378331005']
+        assert apple.quantity == 8           # pas 7090,50
+        assert apple.market_value == 1219.39
+
+    def test_no_false_fonds_euros(self):
+        assert all(not l.isin.startswith('FONDS_EUROS_')
+                   for l in parse_boursorama_paste(CTO))
 
 
 class TestSeparatorRobustness:
