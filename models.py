@@ -719,12 +719,16 @@ def snapshot_holdings_to_date(conn, snapshot_date):
         if not in_txn:
             conn.execute('BEGIN IMMEDIATE')
         conn.execute('DELETE FROM holdings_snapshots WHERE snapshot_date=?', (snapshot_date,))
+        # Ne capturer QUE les holdings des positions de CETTE date (sinon on
+        # ré-empile tout l'historique sous chaque snapshot_date -> sur-capture).
         rows = conn.execute('''
             SELECT h.position_id, h.isin, h.quantity, h.cost_basis, h.market_value,
                    s.is_priceable, s.last_price
             FROM holdings h
+            JOIN positions p ON p.id = h.position_id
             LEFT JOIN securities s ON s.isin = h.isin
-        ''').fetchall()
+            WHERE p.date = ?
+        ''', (snapshot_date,)).fetchall()
         for r in rows:
             is_priceable = r['is_priceable'] if r['is_priceable'] is not None else 1
             price = r['last_price'] if is_priceable else None

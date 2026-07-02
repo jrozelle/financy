@@ -274,6 +274,25 @@ class TestHoldingsSnapshot:
                          headers=CSRF_HEADERS)
         assert r1.get_json()['count'] == r2.get_json()['count']
 
+    def test_snapshot_captures_only_that_date(self, client):
+        # Anti sur-capture : la capture d'une date ne prend QUE ses holdings.
+        from models import get_db
+        a = _make_position_pea(client, date='2024-06-01')
+        client.put(f'/api/positions/{a["id"]}/holdings', json={'holdings': [
+            {'isin': 'FR0010315770', 'quantity': 10, 'cost_basis': 4000, 'market_value': 5000},
+        ]}, headers=CSRF_HEADERS)
+        b = _make_position_pea(client, date='2024-07-01')
+        client.put(f'/api/positions/{b["id"]}/holdings', json={'holdings': [
+            {'isin': 'FR0010315770', 'quantity': 20, 'cost_basis': 8000, 'market_value': 9800},
+            {'isin': 'IE00B4L5Y983', 'quantity': 5, 'cost_basis': 2000, 'market_value': 2500},
+        ]}, headers=CSRF_HEADERS)
+        client.post('/api/holdings/snapshot', json={'date': '2024-06-01'}, headers=CSRF_HEADERS)
+        with get_db() as conn:
+            n = conn.execute(
+                "SELECT COUNT(*) FROM holdings_snapshots WHERE snapshot_date='2024-06-01'"
+            ).fetchone()[0]
+        assert n == 1  # seulement le holding du 2024-06-01, pas les 3
+
 
 # ─── Import/export JSON ──────────────────────────────────────────────────────
 
