@@ -404,3 +404,16 @@ class TestPositionValueSync:
         with get_db() as conn:
             sync_position_value(conn, pid)
             assert conn.execute('SELECT value FROM positions WHERE id=?', (pid,)).fetchone()[0] == 300000
+
+
+class TestDeletePositionCleansHoldings:
+    def test_delete_position_removes_its_holdings(self, client):
+        from models import get_db
+        pid = _make_position_pea(client)['id']
+        client.put(f'/api/positions/{pid}/holdings', json={'holdings': [
+            {'isin': 'FR0010315770', 'quantity': 10, 'cost_basis': 4000, 'market_value': 5000},
+        ]}, headers=CSRF_HEADERS)
+        client.delete(f'/api/positions/{pid}', headers=CSRF_HEADERS)
+        with get_db() as conn:
+            n = conn.execute('SELECT COUNT(*) FROM holdings WHERE position_id=?', (pid,)).fetchone()[0]
+        assert n == 0  # pas d'orphelins

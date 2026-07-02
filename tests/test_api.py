@@ -606,6 +606,25 @@ class TestSynthese:
         assert by_env['Crypto']['delta'] == 5000
         assert d['totals']['delta'] == 12000
 
+    def test_rename_snapshot(self, client):
+        _make_position(client, date='2026-05-01', owner='Alice', category='Actions',
+                       envelope='PEA', value=10000)
+        r = client.post('/api/snapshots/rename',
+                        json={'from_date': '2026-05-01', 'to_date': '2026-05-15'},
+                        headers=CSRF_HEADERS)
+        assert r.status_code == 200, r.get_json()
+        assert client.get('/api/positions?date=2026-05-01').get_json() == []
+        moved = client.get('/api/positions?date=2026-05-15').get_json()
+        assert len(moved) == 1 and moved[0]['owner'] == 'Alice'
+
+    def test_rename_snapshot_rejects_existing_target(self, client):
+        _make_position(client, date='2026-05-01', owner='Alice', value=1000)
+        _make_position(client, date='2026-06-01', owner='Alice', value=2000)
+        r = client.post('/api/snapshots/rename',
+                        json={'from_date': '2026-05-01', 'to_date': '2026-06-01'},
+                        headers=CSRF_HEADERS)
+        assert r.status_code == 409
+
     def test_tri_insufficient_data(self, client):
         _make_position(client, date='2024-06-01', owner='Alice', value=10000)
         resp = client.get('/api/tri')

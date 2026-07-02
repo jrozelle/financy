@@ -595,6 +595,34 @@ export async function duplicateSnapshot() {
   await loadHistorique();
 }
 
+export async function renameSnapshot() {
+  if (!S.positionsDate) return;
+  const newDate = await promptDialog(
+    `Nouvelle date pour le snapshot du ${fmtDate(S.positionsDate)}`,
+    { placeholder: 'AAAA-MM-JJ', defaultValue: S.positionsDate, confirmText: 'Modifier' }
+  );
+  if (!newDate) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
+    toast('Format invalide. Utilisez AAAA-MM-JJ (ex: 2026-07-01)', 'error');
+    return;
+  }
+  if (newDate === S.positionsDate) return;
+  if (S.dates.includes(newDate)) {
+    toast(`Un snapshot du ${fmtDate(newDate)} existe déjà`, 'error');
+    return;
+  }
+  try {
+    await api('POST', '/api/snapshots/rename',
+              { from_date: S.positionsDate, to_date: newDate });
+  } catch { return; }
+  S.positionsDate = newDate;
+  S.syntheseDate  = newDate;
+  await refreshDates();
+  await loadPositions();
+  await loadHistorique();
+  toast('Date du snapshot modifiée');
+}
+
 export function openPosModal(id = null, prefill = {}) {
   S.editPosId = id;
   document.getElementById('position-modal-title').textContent =
@@ -737,7 +765,11 @@ export function updatePosInfo() {
 
 export async function savePosition(e) {
   e.preventDefault();
-  await ensureTodaySnapshot();
+  // Edition en place d'une position existante -> ne PAS auto-creer un snapshot
+  // "aujourd'hui" (evite un point parasite lors d'une correction a posteriori,
+  // ex. actualisation des dettes quelques jours apres).
+  const editingInPlace = S.editPosId && !document.getElementById('pos-snapshot-check').checked;
+  if (!editingInPlace) await ensureTodaySnapshot();
   const data = {
     date:          document.getElementById('pos-date').value,
     owner:         document.getElementById('pos-owner').value,
