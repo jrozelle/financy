@@ -7,6 +7,25 @@ from auth import login_required, csrf_protect
 
 synthese_bp = Blueprint('synthese', __name__)
 
+# Regroupement des categories de positions en 3 poches patrimoniales pour la
+# synthese brut/net. Toute categorie non listee tombe dans "Patrimoine autre".
+MACRO_ORDER = ['Patrimoine financier', 'Patrimoine immobilier', 'Patrimoine autre']
+MACRO_BUCKETS = {
+    'Patrimoine financier': {
+        'Cash & dépôts', 'Monétaire', 'Obligations', 'Actions',
+        'Fond Euro', 'Produits Structurés', 'Crypto',
+    },
+    'Patrimoine immobilier': {'Immobilier', 'SCPI'},
+    'Patrimoine autre': {'Objets de valeur', 'Société', 'Autre'},
+}
+
+
+def _macro_bucket(category):
+    for bucket, cats in MACRO_BUCKETS.items():
+        if category in cats:
+            return bucket
+    return 'Patrimoine autre'
+
 
 @synthese_bp.route('/api/synthese')
 @login_required
@@ -57,6 +76,19 @@ def get_synthese():
                 'by_owner': {o: sum(p['net_attributed'] for p in ops if p['owner'] == o)
                              for o in owners},
             }
+
+    # Synthese en 3 poches patrimoniales, brut (gross_attributed) et net
+    # (net_attributed = brut - dette attribuee), avec detail par owner.
+    totals_by_macro = {b: {'gross': 0.0, 'net': 0.0, 'debt': 0.0, 'by_owner': {}}
+                       for b in MACRO_ORDER}
+    for p in positions:
+        m = totals_by_macro[_macro_bucket(p['category'])]
+        m['gross'] += p['gross_attributed']
+        m['net']   += p['net_attributed']
+        m['debt']  += p['debt_attributed']
+        ob = m['by_owner'].setdefault(p['owner'], {'gross': 0.0, 'net': 0.0})
+        ob['gross'] += p['gross_attributed']
+        ob['net']   += p['net_attributed']
 
     mobilizable_by_liquidity = {
         liq: sum(p['mobilizable_value'] for p in positions if p['liquidity'] == liq)
@@ -172,6 +204,7 @@ def get_synthese():
         'family':                  family,
         'totals_by_owner':         totals_by_owner,
         'totals_by_category':      totals_by_category,
+        'totals_by_macro':         totals_by_macro,
         'mobilizable_by_liquidity': mobilizable_by_liquidity,
         'entity_warnings':         entity_warnings,
         'variation':               variation,

@@ -143,8 +143,7 @@ export function renderSynthese() {
   renderLiqBars(liqFiltered);
   renderEntitiesSynthese();
   renderAllocationTargets();
-  renderPerf();
-  renderTRI();
+  renderMacroSynthesis(syn.totals_by_macro, owner, isFamily);
   renderSnapshotNote(syn);
   renderWealthTarget(kpi.net);
 }
@@ -590,62 +589,32 @@ function renderLiqBars(byLiq) {
   document.getElementById('liquidity-bars').innerHTML = `<div class="liq-grid">${rows}</div>`;
 }
 
-export async function renderPerf() {
-  const hist = S.historique;
-  const el   = document.getElementById('perf-section');
-  if (hist.length < 2) {
-    el.innerHTML = '<p class="text-muted" style="font-size:13px">Au moins 2 snapshots nécessaires.</p>';
-    return;
-  }
-
-  const owner    = S.syntheseOwner;
-  const isFamily = owner === 'Famille';
-
-  const netOf = h => isFamily ? h.family_net : (h.by_owner?.[owner] || 0);
-
-  const last  = hist[hist.length - 1];
-  const first = hist[0];
-  const prev  = hist[hist.length - 2];
-
-  const lastNet  = netOf(last);
-  const firstNet = netOf(first);
-  const prevNet  = netOf(prev);
-
-  const variation = (curr, ref) => ref !== 0
-    ? ((curr - ref) / Math.abs(ref)) * 100
-    : null;
-
-  let fluxTotal = 0;
-  try {
-    const flux = await api('GET', `/api/flux?date_from=${first.date}&date_to=${last.date}`);
-    const filtered = isFamily ? flux : flux.filter(f => f.owner === owner);
-    fluxTotal = filtered.reduce((s, f) => s + (f.amount || 0), 0);
-  } catch { /* api() already shows toast on GET failure; continue with fluxTotal=0 */ }
-
-  const totalGain = lastNet - firstNet - fluxTotal;
-  const varLast   = variation(lastNet, prevNet);
-  const varTotal  = variation(lastNet, firstNet);
-
-  const perfLabel = isFamily ? '' : ` — ${owner}`;
-
-  el.innerHTML = `<div class="perf-grid">
-    <div class="perf-row">
-      <span class="perf-label">${fmtDate(prev.date)} → ${fmtDate(last.date)}${perfLabel}</span>
-      <span class="perf-val ${varLast >= 0 ? 'pos' : 'neg'}">${varLast != null ? (varLast > 0 ? '+' : '') + varLast.toFixed(2) + ' %' : '—'}</span>
-    </div>
-    <div class="perf-row">
-      <span class="perf-label">Depuis le début (${fmtDate(first.date)})${perfLabel}</span>
-      <span class="perf-val ${varTotal >= 0 ? 'pos' : 'neg'}">${varTotal != null ? (varTotal > 0 ? '+' : '') + varTotal.toFixed(2) + ' %' : '—'}</span>
-    </div>
-    <div class="perf-row">
-      <span class="perf-label">Gain / perte hors flux${perfLabel}</span>
-      <span class="perf-val ${totalGain >= 0 ? 'pos' : 'neg'}">${(totalGain >= 0 ? '+' : '') + fmt(totalGain)}</span>
-    </div>
-    <div class="perf-row">
-      <span class="perf-label">Flux cumulés (${fmtDate(first.date)} → ${fmtDate(last.date)})${perfLabel}</span>
-      <span class="perf-val">${fmt(fluxTotal)}</span>
-    </div>
-  </div>`;
+function renderMacroSynthesis(byMacro, owner, isFamily) {
+  const el = document.getElementById('macro-synthese');
+  if (!el) return;
+  if (!byMacro) { el.innerHTML = ''; return; }
+  const order = ['Patrimoine financier', 'Patrimoine immobilier', 'Patrimoine autre'];
+  const rows = order.map(label => {
+    const m = byMacro[label] || { gross: 0, net: 0, by_owner: {} };
+    const gross = isFamily ? (m.gross || 0) : (m.by_owner?.[owner]?.gross || 0);
+    const net   = isFamily ? (m.net   || 0) : (m.by_owner?.[owner]?.net   || 0);
+    return { label, gross, net };
+  });
+  const totGross = rows.reduce((s, r) => s + r.gross, 0);
+  const totNet   = rows.reduce((s, r) => s + r.net, 0);
+  const pct  = (v, t) => t ? (v / t * 100) : 0;
+  const cell = (v, t) => `<td class="num">${fmt(v)}</td><td class="num text-muted">${pct(v, t).toFixed(1)} %</td>`;
+  el.innerHTML = `<table class="data-table" style="width:100%">
+    <thead><tr><th>Poche</th><th class="num">Brut</th><th class="num">%</th><th class="num">Net</th><th class="num">%</th></tr></thead>
+    <tbody>
+      ${rows.map(r => `<tr><td>${esc(r.label)}</td>${cell(r.gross, totGross)}${cell(r.net, totNet)}</tr>`).join('')}
+    </tbody>
+    <tfoot><tr>
+      <td><strong>Total</strong></td>
+      <td class="num"><strong>${fmt(totGross)}</strong></td><td class="num">100 %</td>
+      <td class="num"><strong>${fmt(totNet)}</strong></td><td class="num">100 %</td>
+    </tr></tfoot>
+  </table>`;
 }
 
 // ─── Snapshot notes ──────────────────────────────────────────────────────
@@ -747,51 +716,4 @@ async function openWealthTargetEditor() {
   const kpiNet = S.synthese?.family?.net || 0;
   renderWealthTarget(kpiNet);
   toast(target ? 'Objectif enregistré' : 'Objectif supprimé');
-}
-
-// ─── TRI ─────────────────────────────────────────────────────────────────
-
-async function renderTRI() {
-  const el = document.getElementById('tri-section');
-  if (!el) return;
-  const owner = S.syntheseOwner;
-  const isFamily = owner === 'Famille';
-  const url = isFamily ? '/api/tri' : `/api/tri?owner=${encodeURIComponent(owner)}`;
-
-  try {
-    const data = await api('GET', url);
-    if (!data.tri || Object.keys(data.tri).length === 0) {
-      el.innerHTML = '<p class="text-muted" style="font-size:13px">Pas assez de données (min. 2 snapshots + flux).</p>';
-      return;
-    }
-    const globalTri = data.tri._global;
-    const envs = Object.entries(data.tri)
-      .filter(([k]) => k !== '_global')
-      .sort((a, b) => b[1] - a[1]);
-
-    let html = '<div class="tri-grid">';
-    if (globalTri != null) {
-      const cls = globalTri >= 0 ? 'pos' : 'neg';
-      const label = isFamily ? 'TRI global' : `TRI global — ${esc(owner)}`;
-      html += `<div class="tri-row tri-global">
-        <span class="tri-label">${label}</span>
-        <span class="tri-val ${cls}">${globalTri > 0 ? '+' : ''}${globalTri.toFixed(2)}\u202f%</span>
-      </div>`;
-    }
-    html += `<div class="tri-period text-muted" style="font-size:12px;margin-bottom:.5rem">${fmtDate(data.first_date)} → ${fmtDate(data.date)}</div>`;
-    for (const [env, tri] of envs) {
-      const cls = tri >= 0 ? 'pos' : 'neg';
-      html += `<div class="tri-row">
-        <span class="tri-label">${esc(env)}</span>
-        <span class="tri-val ${cls}">${tri > 0 ? '+' : ''}${tri.toFixed(2)}\u202f%</span>
-      </div>`;
-    }
-    if (data.excluded_flux) {
-      html += `<div class="text-muted" style="font-size:11px;margin-top:.5rem">⚠ ${data.excluded_flux} flux hors plage ignoré(s) dans le calcul.</div>`;
-    }
-    html += '</div>';
-    el.innerHTML = html;
-  } catch {
-    el.innerHTML = '<p class="text-muted" style="font-size:13px">Erreur lors du calcul du TRI.</p>';
-  }
 }
