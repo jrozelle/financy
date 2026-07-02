@@ -213,6 +213,83 @@ def get_synthese():
     })
 
 
+@synthese_bp.route('/api/snapshot-diff')
+@login_required
+def get_snapshot_diff():
+    """Compare deux snapshots position par position (apparie par cle metier).
+
+    Par defaut : la date fournie (ou la derniere) vs le snapshot precedent.
+    Valeurs FIGEES (compute_position sans holdings_map -> value/debt stockes),
+    pour refleter la photo de chaque snapshot et faire ressortir les mouvements
+    de cours entre les deux dates. Retourne les mouvements tries par |Δ net|,
+    positions nouvelles et cloturees incluses.
+    """
+    to_date = request.args.get('date')
+    owner = request.args.get('owner')
+    with get_db() as conn:
+        dates = [r['date'] for r in conn.execute(
+            'SELECT DISTINCT date FROM positions ORDER BY date').fetchall()]
+        if not dates:
+            return jsonify({'from_date': None, 'to_date': None,
+                            'movements': [], 'totals': {}})
+        if not to_date or to_date not in dates:
+            to_date = dates[-1]
+        prev = [d for d in dates if d < to_date]
+        from_date = prev[-1] if prev else None
+        ref = load_referential(conn)
+
+        def _frozen_positions(date):
+            if date is None:
+                return []
+            rows = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
+            emap = get_entity_map(conn, date)
+            ps = [compute_position(dict(r), emap, ref, None) for r in rows]
+            return [p for p in ps if not owner or p['owner'] == owner]
+
+        before = _frozen_positions(from_date)
+        after = _frozen_positions(to_date)
+
+    def _key(p):
+        return '|'.join(str(p.get(k) or '') for k in
+                        ('owner', 'category', 'envelope', 'establishment', 'entity', 'label'))
+
+    def _agg(positions):
+        agg = {}
+        for p in positions:
+            e = agg.setdefault(_key(p), {'net': 0.0, 'p': p})
+            e['net'] += p.get('net_attributed', 0) or 0
+        return agg
+
+    b, a = _agg(before), _agg(after)
+    movements = []
+    for k in set(b) | set(a):
+        be, ae = b.get(k), a.get(k)
+        src = (ae or be)['p']
+        net_before = be['net'] if be else 0.0
+        net_after = ae['net'] if ae else 0.0
+        movements.append({
+            'label':         src.get('label') or src.get('envelope') or src.get('category'),
+            'owner':         src.get('owner'),
+            'category':      src.get('category'),
+            'envelope':      src.get('envelope'),
+            'establishment': src.get('establishment'),
+            'entity':        src.get('entity'),
+            'net_before':    round(net_before, 2),
+            'net_after':     round(net_after, 2),
+            'delta':         round(net_after - net_before, 2),
+            'status':        'new' if not be else 'closed' if not ae else 'changed',
+        })
+    movements.sort(key=lambda m: -abs(m['delta']))
+    net_b = round(sum(m['net_before'] for m in movements), 2)
+    net_a = round(sum(m['net_after'] for m in movements), 2)
+    return jsonify({
+        'from_date': from_date, 'to_date': to_date,
+        'movements': movements,
+        'totals': {'net_before': net_b, 'net_after': net_a,
+                   'delta': round(net_a - net_b, 2)},
+    })
+
+
 @synthese_bp.route('/api/historique')
 @login_required
 def get_historique():
