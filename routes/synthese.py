@@ -216,13 +216,13 @@ def get_synthese():
 @synthese_bp.route('/api/snapshot-diff')
 @login_required
 def get_snapshot_diff():
-    """Compare deux snapshots position par position (apparie par cle metier).
+    """Compare deux snapshots agreges PAR ENVELOPPE.
 
     Par defaut : la date fournie (ou la derniere) vs le snapshot precedent.
-    Valeurs FIGEES (compute_position sans holdings_map -> value/debt stockes),
-    pour refleter la photo de chaque snapshot et faire ressortir les mouvements
-    de cours entre les deux dates. Retourne les mouvements tries par |Δ net|,
-    positions nouvelles et cloturees incluses.
+    Valorisation IDENTIQUE a la synthese/KPI (compute_position AVEC holdings_map,
+    cours actuel des deux cotes) : le total des mouvements = la variation nette
+    affichee en KPI. Retourne les mouvements par enveloppe tries par |Δ net|,
+    enveloppes nouvelles et cloturees incluses.
     """
     to_date = request.args.get('date')
     owner = request.args.get('owner')
@@ -238,46 +238,37 @@ def get_snapshot_diff():
         from_date = prev[-1] if prev else None
         ref = load_referential(conn)
 
-        def _frozen_positions(date):
+        def _positions_at(date):
             if date is None:
                 return []
             rows = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
             emap = get_entity_map(conn, date)
-            ps = [compute_position(dict(r), emap, ref, None) for r in rows]
+            hmap = get_holdings_map(conn, [r['id'] for r in rows])
+            ps = [compute_position(dict(r), emap, ref, hmap) for r in rows]
             return [p for p in ps if not owner or p['owner'] == owner]
 
-        before = _frozen_positions(from_date)
-        after = _frozen_positions(to_date)
-
-    def _key(p):
-        return '|'.join(str(p.get(k) or '') for k in
-                        ('owner', 'category', 'envelope', 'establishment', 'entity', 'label'))
+        before = _positions_at(from_date)
+        after = _positions_at(to_date)
 
     def _agg(positions):
         agg = {}
         for p in positions:
-            e = agg.setdefault(_key(p), {'net': 0.0, 'p': p})
-            e['net'] += p.get('net_attributed', 0) or 0
+            env = p.get('envelope') or 'Autre'
+            agg[env] = agg.get(env, 0.0) + (p.get('net_attributed', 0) or 0)
         return agg
 
     b, a = _agg(before), _agg(after)
     movements = []
-    for k in set(b) | set(a):
-        be, ae = b.get(k), a.get(k)
-        src = (ae or be)['p']
-        net_before = be['net'] if be else 0.0
-        net_after = ae['net'] if ae else 0.0
+    for env in set(b) | set(a):
+        in_b, in_a = env in b, env in a
+        net_before, net_after = b.get(env, 0.0), a.get(env, 0.0)
         movements.append({
-            'label':         src.get('label') or src.get('envelope') or src.get('category'),
-            'owner':         src.get('owner'),
-            'category':      src.get('category'),
-            'envelope':      src.get('envelope'),
-            'establishment': src.get('establishment'),
-            'entity':        src.get('entity'),
-            'net_before':    round(net_before, 2),
-            'net_after':     round(net_after, 2),
-            'delta':         round(net_after - net_before, 2),
-            'status':        'new' if not be else 'closed' if not ae else 'changed',
+            'label':      env,
+            'envelope':   env,
+            'net_before': round(net_before, 2),
+            'net_after':  round(net_after, 2),
+            'delta':      round(net_after - net_before, 2),
+            'status':     'new' if not in_b else 'closed' if not in_a else 'changed',
         })
     movements.sort(key=lambda m: -abs(m['delta']))
     net_b = round(sum(m['net_before'] for m in movements), 2)

@@ -668,17 +668,16 @@ async function renderSnapshotDiff(owner, isFamily) {
   const t = data.totals || {};
   const badge = s => s === 'new' ? ' <span class="h-badge h-badge-fresh">nouveau</span>'
     : s === 'closed' ? ' <span class="h-badge h-badge-expired">clôturé</span>' : '';
-  const sub = m => [isFamily ? m.owner : null, m.envelope, m.establishment, m.entity].filter(Boolean).join(' · ');
   el.innerHTML = `
     <div class="text-muted" style="font-size:12px;margin-bottom:.5rem">
       ${fmtDate(data.from_date)} → ${fmtDate(data.to_date)} · variation nette
       <strong class="${(t.delta || 0) >= 0 ? 'pos' : 'neg'}">${(t.delta || 0) >= 0 ? '+' : ''}${fmt(t.delta || 0)}</strong>
     </div>
     <table class="data-table" style="width:100%">
-      <thead><tr><th>Position</th><th class="num">Avant</th><th class="num">Après</th><th class="num">Variation</th></tr></thead>
+      <thead><tr><th>Enveloppe</th><th class="num">Avant</th><th class="num">Après</th><th class="num">Variation</th></tr></thead>
       <tbody>
         ${moves.map(m => `<tr>
-          <td>${esc(m.label || m.envelope || m.category || '—')}${badge(m.status)}<div class="dd-row-sub">${esc(sub(m))}</div></td>
+          <td>${esc(m.label || '—')}${badge(m.status)}</td>
           <td class="num">${fmt(m.net_before)}</td>
           <td class="num">${fmt(m.net_after)}</td>
           <td class="num ${m.delta >= 0 ? 'pos' : 'neg'}">${m.delta >= 0 ? '+' : ''}${fmt(m.delta)}</td>
