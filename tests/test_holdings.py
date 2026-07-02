@@ -332,3 +332,26 @@ class TestSecurities:
                          headers=CSRF_HEADERS)
         assert r.status_code == 200
         assert r.get_json()['ticker'] == 'CW8.PA'
+
+
+class TestCryptoHolding:
+    """Pseudo-ISIN CRYPTO_* : coté automatiquement via Yahoo <SYM>-EUR."""
+
+    def test_crypto_isin_is_priceable_with_ticker(self, client):
+        pos = _make_position(client, category='Crypto', envelope='Crypto',
+                             value=0, debt=0).get_json()
+        r = client.post(f"/api/positions/{pos['id']}/holdings", json={
+            'isin': 'CRYPTO_BTC', 'name': 'Bitcoin',
+            'quantity': 0.03624751, 'cost_basis': 2539.12,
+        }, headers=CSRF_HEADERS)
+        assert r.status_code == 201, r.get_json()
+        h = r.get_json()
+        assert h['is_priceable'] is True         # crypto forcé coté
+        assert h['ticker'] == 'BTC-EUR'          # ticker Yahoo dérivé
+        assert h['asset_class'] == 'Crypto'
+
+    def test_crypto_isin_accepted_without_luhn(self, client):
+        # validate_isin doit accepter le pseudo-ISIN crypto (bypass checksum)
+        from models import validate_isin
+        assert validate_isin('CRYPTO_BTC') is True
+        assert validate_isin('CRYPTO_ETH') is True

@@ -103,9 +103,10 @@ def validate_pct(v):
     return 0 <= n <= 1.0001  # petite marge pour les arrondis
 
 
-# Pseudo-ISIN pour les fonds euros et actifs non cotés :
-# format 'FONDS_EUROS_<slug>' ou 'CUSTOM_<slug>', longueur libre, bypass du checksum.
-_PSEUDO_ISIN_PREFIXES = ('FONDS_EUROS_', 'CUSTOM_')
+# Pseudo-ISIN pour les fonds euros, actifs non cotés et cryptos :
+# format 'FONDS_EUROS_<slug>' / 'CUSTOM_<slug>' / 'CRYPTO_<SYM>', longueur libre,
+# bypass du checksum. CRYPTO_* est traité à part (coté via Yahoo <SYM>-EUR).
+_PSEUDO_ISIN_PREFIXES = ('FONDS_EUROS_', 'CUSTOM_', 'CRYPTO_')
 _ISIN_RE = re.compile(r'^[A-Z]{2}[A-Z0-9]{9}[0-9]$')
 
 

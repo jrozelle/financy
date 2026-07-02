@@ -16,7 +16,7 @@ _ASSET_CLASS_LABELS = {
     'etf': 'ETF', 'opcvm': 'OPCVM', 'scpi': 'SCPI', 'sci': 'SCI',
     'action': 'Action', 'fonds_euros': 'Fonds euros', 'cash': 'Cash',
     'obligation': 'Obligation', 'produit_structure': 'Produit structure',
-    'autre': 'Autre',
+    'crypto': 'Crypto', 'autre': 'Autre',
 }
 
 
