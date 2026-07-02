@@ -23,7 +23,8 @@ import re
 import unicodedata
 from typing import List, Optional
 
-from .common import DetectedLine, ISIN_RE, NUMBER_RE, parse_number, isin_luhn_ok
+from .common import (DetectedLine, ISIN_RE, NUMBER_RE, parse_number,
+                     isin_luhn_ok, line_has_isin)
 
 _DATE_RE = re.compile(r'\b(\d{2})/(\d{2})/(\d{4})\b')
 # Montant monetaire : milliers = groupes de 3 chiffres exactement (evite de fusionner
@@ -87,13 +88,21 @@ def _is_header(line: str) -> bool:
     return 'date de' in low and ('valorisation' in low or 'valeur' in low)
 
 
-def _is_name_line(line: str) -> bool:
-    """Ligne de nom de support : contient des lettres, sans etre un code ni un en-tete."""
+def _is_name_line(line: str, next_line: str = '') -> bool:
+    """Ligne de nom de support : contient des lettres, sans etre un code ni un en-tete.
+
+    Cas CTO : un nom d'action court en majuscules (ADOBE, TESLA...) ressemble a un
+    code interne (`_CODE_RE`), mais il est TOUJOURS suivi de son ISIN sur la ligne
+    d'apres. On le promeut alors en nom. Un vrai code interne de fonds (ex FGPERIN,
+    fonds euro Lucya) n'est PAS suivi d'un ISIN -> reste un code.
+    """
     s = line.strip()
     if not s or not _NO_LETTER_RE.search(s):
         return False
-    if _is_header(s) or _is_code_line(s):
+    if _is_header(s):
         return False
+    if _is_code_line(s):
+        return ISIN_RE.search(s) is None and line_has_isin(next_line) is not None
     return True
 
 
@@ -114,20 +123,29 @@ def _build(name: str, rest: List[str]) -> Optional[DetectedLine]:
             as_of_date = d
             break
 
-    # Texte des valeurs : on exclut les lignes de code, on retire les dates
-    value_text = ' '.join(l for l in rest if not _is_code_line(l))
+    # Texte des valeurs : on exclut les lignes de code, on retire les dates.
+    # On conserve les retours a la ligne d'origine : _EURO_RE utilise un espace
+    # LITTERAL pour les milliers (pas \s), donc un \n empeche de fusionner deux
+    # nombres voisins situes sur des lignes distinctes (layout CTO : la quantite
+    # "10" et le Px.Revient "179,90 €" ne doivent pas donner "10 179,90 €").
+    value_text = '\n'.join(l for l in rest if not _is_code_line(l))
     value_text = _DATE_RE.sub(' ', value_text)
 
     euros = [parse_number(m.group(1)) for m in _EURO_RE.finditer(value_text)]
     euros = [e for e in euros if e is not None]
 
-    # Quantite : premier nombre avant le premier symbole €
+    # Quantite : premier nombre du head (avant le premier €), scanne ligne par
+    # ligne pour ne pas fusionner avec le Px.Revient de la ligne suivante
+    # (NUMBER_RE, lui, considere \n comme un espace de milliers).
     head = value_text.split('€', 1)[0]
     qty = None
-    for m in NUMBER_RE.finditer(head):
-        n = parse_number(m.group(0))
-        if n is not None:
-            qty = n
+    for seg in head.split('\n'):
+        for m in NUMBER_RE.finditer(seg):
+            n = parse_number(m.group(0))
+            if n is not None:
+                qty = n
+                break
+        if qty is not None:
             break
 
     # Montant = plus grand €, puis Cours/Px avant, +/- latente apres
@@ -199,11 +217,13 @@ def parse_boursorama_paste(text: str) -> List[DetectedLine]:
     results: List[DetectedLine] = []
     name: Optional[str] = None
     rest: List[str] = []
-    for l in lines:
+    n = len(lines)
+    for i, l in enumerate(lines):
         if _is_header(l):
             name, rest = None, []
             continue
-        if _is_name_line(l):
+        next_line = lines[i + 1] if i + 1 < n else ''
+        if _is_name_line(l, next_line):
             if name is not None:
                 entry = _build(name, rest)
                 if entry:
