@@ -131,6 +131,9 @@ def update_position(pid):
 @csrf_protect
 def delete_position(pid):
     with get_db() as conn:
+        # ON DELETE CASCADE inactif (PRAGMA foreign_keys off) -> purge explicite
+        # des holdings pour ne pas laisser d'orphelins.
+        conn.execute('DELETE FROM holdings WHERE position_id=?', (pid,))
         conn.execute('DELETE FROM positions WHERE id=?', (pid,))
     return '', 204
 

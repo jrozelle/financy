@@ -286,3 +286,39 @@ def duplicate_snapshot_route():
 
     logger.info('Duplicate snapshot: %s → %s (%s)', source_date, target_date, stats)
     return jsonify({'ok': True, **stats, 'from_date': source_date, 'to_date': target_date})
+
+
+@tools_bp.route('/api/snapshots/rename', methods=['POST'])
+@login_required
+@csrf_protect
+def rename_snapshot():
+    """Renomme la date d'un snapshot ENTIER (positions + entites + holdings_snapshots
+    + note) d'une date vers une autre. Deplace le point, sans en creer un nouveau.
+    La date cible ne doit pas deja exister (pas de fusion silencieuse).
+    """
+    d = request.json or {}
+    from_date = d.get('from_date')
+    to_date = d.get('to_date')
+    if not validate_date(from_date) or not validate_date(to_date):
+        return jsonify({'error': 'Dates invalides (format AAAA-MM-JJ attendu)'}), 400
+    if from_date == to_date:
+        return jsonify({'error': 'La nouvelle date doit etre differente'}), 400
+
+    with get_db() as conn:
+        conn.execute('BEGIN IMMEDIATE')
+        src = conn.execute('SELECT COUNT(*) AS c FROM positions WHERE date=?',
+                           (from_date,)).fetchone()['c']
+        if src == 0:
+            return jsonify({'error': f'Aucun snapshot a la date {from_date}'}), 404
+        exists = conn.execute('SELECT COUNT(*) AS c FROM positions WHERE date=?',
+                              (to_date,)).fetchone()['c']
+        if exists > 0:
+            return jsonify({'error': f'Un snapshot existe deja au {to_date}'}), 409
+        conn.execute('UPDATE positions SET date=? WHERE date=?', (to_date, from_date))
+        conn.execute('UPDATE entity_snapshots SET date=? WHERE date=?', (to_date, from_date))
+        conn.execute('UPDATE holdings_snapshots SET snapshot_date=? WHERE snapshot_date=?',
+                     (to_date, from_date))
+        conn.execute('UPDATE snapshot_notes SET date=? WHERE date=?', (to_date, from_date))
+
+    logger.info('Rename snapshot: %s → %s (%d positions)', from_date, to_date, src)
+    return jsonify({'ok': True, 'from_date': from_date, 'to_date': to_date, 'count': src})
