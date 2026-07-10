@@ -9,7 +9,7 @@ import { loadTargets, saveTargets } from './targets.js';
 import { wireSortableTable } from './utils.js';
 
 import { loadSynthese, renderSynthese, renderSyntheseHistory, loadHistorique } from './tabs/synthese.js';
-import { loadPositions, renderPositions, clearFilters, openPosModal, duplicateSnapshot, renameSnapshot,
+import { loadPositions, renderPositions, clearFilters, openPosModal, duplicateSnapshot, renameSnapshot, deleteSnapshot,
          onEntitySelectChange, updatePosInfo, savePosition, startInlineEdit, deletePosition,
          persistPositionFilters, persistPositionsTreeState, ensurePositionsTableScaffold } from './tabs/positions.js';
 import { openHoldingsModal, wireHoldingsEvents, confirmCloseHoldings } from './tabs/holdings.js';
@@ -213,6 +213,7 @@ function _normalizeLegacyLayout() {
       section('Positions'),
       ensureMenuButton('btn-duplicate', 'Dupliquer snapshot'),
       ensureMenuButton('btn-rename-snapshot', 'Modifier la date du snapshot'),
+      ensureMenuButton('btn-delete-snapshot', 'Supprimer ce snapshot'),
       ensureMenuButton('positions-col-picker', 'Colonnes positions'),
       section('Actifs'),
       ensureMenuButton('actifs-refresh-prices', 'Rafraîchir cours'),
@@ -493,6 +494,7 @@ function wireEvents() {
   document.getElementById('btn-add-position')?.addEventListener('click', () => openPosModal());
   document.getElementById('btn-duplicate').addEventListener('click', duplicateSnapshot);
   document.getElementById('btn-rename-snapshot')?.addEventListener('click', renameSnapshot);
+  document.getElementById('btn-delete-snapshot')?.addEventListener('click', deleteSnapshot);
   document.getElementById('filter-owner').addEventListener('change', () => {
     const val = document.getElementById('filter-owner').value;
     S.syntheseOwner = val || 'Famille';
