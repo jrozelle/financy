@@ -606,6 +606,22 @@ class TestSynthese:
         assert by_env['Crypto']['delta'] == 5000
         assert d['totals']['delta'] == 12000
 
+    def test_delete_snapshot(self, client):
+        _make_position(client, date='2026-05-01', owner='Alice', value=1000)
+        _make_position(client, date='2026-06-01', owner='Alice', value=2000)
+        r = client.post('/api/snapshots/delete', json={'date': '2026-05-01'},
+                        headers=CSRF_HEADERS)
+        assert r.status_code == 200, r.get_json()
+        assert client.get('/api/positions?date=2026-05-01').get_json() == []
+        # l'autre snapshot est conserve
+        assert len(client.get('/api/positions?date=2026-06-01').get_json()) == 1
+
+    def test_delete_snapshot_unknown_date(self, client):
+        _make_position(client, date='2026-05-01', owner='Alice', value=1000)
+        r = client.post('/api/snapshots/delete', json={'date': '2099-01-01'},
+                        headers=CSRF_HEADERS)
+        assert r.status_code == 404
+
     def test_rename_snapshot(self, client):
         _make_position(client, date='2026-05-01', owner='Alice', category='Actions',
                        envelope='PEA', value=10000)

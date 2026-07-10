@@ -623,6 +623,31 @@ export async function renameSnapshot() {
   toast('Date du snapshot modifiée');
 }
 
+export async function deleteSnapshot() {
+  if (!S.positionsDate) return;
+  const date = S.positionsDate;
+  const ok = await confirmDialog(
+    'Supprimer ce snapshot',
+    `Supprimer définitivement le snapshot du ${fmtDate(date)} ` +
+    `(positions, holdings, archives, note) ? ` +
+    `L'historique des autres dates est conservé.`,
+    { confirmText: 'Supprimer', danger: true }
+  );
+  if (!ok) return;
+  try {
+    await api('POST', '/api/snapshots/delete', { date });
+  } catch { return; }
+  // Repli sur la date restante la plus recente (S.dates est trie DESC).
+  const fallback = S.dates.filter(d => d !== date)[0] || null;
+  S.positionsDate = fallback;
+  S.syntheseDate  = fallback;
+  await refreshDates();
+  await loadPositions();
+  await loadHistorique();
+  await loadSynthese();
+  toast('Snapshot supprimé');
+}
+
 export function openPosModal(id = null, prefill = {}) {
   S.editPosId = id;
   document.getElementById('position-modal-title').textContent =

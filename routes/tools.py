@@ -322,3 +322,30 @@ def rename_snapshot():
 
     logger.info('Rename snapshot: %s → %s (%d positions)', from_date, to_date, src)
     return jsonify({'ok': True, 'from_date': from_date, 'to_date': to_date, 'count': src})
+
+
+@tools_bp.route('/api/snapshots/delete', methods=['POST'])
+@login_required
+@csrf_protect
+def delete_snapshot():
+    """Supprime un snapshot ENTIER a une date (positions + holdings + archives +
+    note). L'historique des autres dates est conserve."""
+    d = request.json or {}
+    date = d.get('date')
+    if not validate_date(date):
+        return jsonify({'error': 'Date invalide (format AAAA-MM-JJ attendu)'}), 400
+    with get_db() as conn:
+        conn.execute('BEGIN IMMEDIATE')
+        n = conn.execute('SELECT COUNT(*) AS c FROM positions WHERE date=?',
+                         (date,)).fetchone()['c']
+        if n == 0:
+            return jsonify({'error': f'Aucun snapshot a la date {date}'}), 404
+        # ON DELETE CASCADE inactif -> purge explicite des holdings + archives.
+        conn.execute('DELETE FROM holdings WHERE position_id IN '
+                     '(SELECT id FROM positions WHERE date=?)', (date,))
+        conn.execute('DELETE FROM holdings_snapshots WHERE snapshot_date=?', (date,))
+        conn.execute('DELETE FROM entity_snapshots WHERE date=?', (date,))
+        conn.execute('DELETE FROM snapshot_notes WHERE date=?', (date,))
+        conn.execute('DELETE FROM positions WHERE date=?', (date,))
+    logger.info('Delete snapshot: %s (%d positions)', date, n)
+    return jsonify({'ok': True, 'date': date, 'count': n})
