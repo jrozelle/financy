@@ -334,10 +334,10 @@ export async function renderSyntheseHistory() {
   const colors = getColors();
   const datasets = groupList.map((g, i) => ({
     label: g,
-    data:  history.map(h => Math.round(h.by_group?.[g] || 0)),
+    data:  history.map(h => ({ x: _ts(h.date), y: Math.round(h.by_group?.[g] || 0) })),
     backgroundColor: colors[i % colors.length] + 'cc',
     borderColor:     colors[i % colors.length],
-    borderWidth: 1.5,
+    borderWidth: 1.5, tension: .25, pointRadius: 2,
     fill: true,
   }));
 
@@ -345,8 +345,8 @@ export async function renderSyntheseHistory() {
   setSyntheseHistChart(new Chart(
     document.getElementById('synthese-history-detail-chart').getContext('2d'),
     {
-      type: 'bar',
-      data: { labels: dates, datasets },
+      type: 'line',
+      data: { datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -365,7 +365,7 @@ export async function renderSyntheseHistory() {
           });
         },
         scales: {
-          x: { stacked: true, ticks: { font: { size: 11 } } },
+          x: { type: 'linear', ticks: { font: { size: 11 }, maxRotation: 0, autoSkip: true, callback: _tsTick } },
           y: { stacked: true, ticks: {
             font: { size: 11 },
             callback: v => new Intl.NumberFormat('fr-FR', { notation: 'compact' }).format(v) + '\u202f€'
@@ -374,7 +374,8 @@ export async function renderSyntheseHistory() {
         plugins: {
           legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 8, boxWidth: 12 } },
           tooltip: { callbacks: {
-            label: ctx => ` ${ctx.dataset.label} : ${new Intl.NumberFormat('fr-FR').format(ctx.raw)}\u202f€`,
+            title: _tsTitle,
+            label: ctx => ` ${ctx.dataset.label} : ${new Intl.NumberFormat('fr-FR').format(ctx.parsed.y)}\u202f€`,
             afterBody: () => 'Cliquer pour détailler',
           }},
         },
@@ -388,25 +389,30 @@ export async function loadHistorique() {
   if (S.currentTab === 'synthese') renderHistChart();
 }
 
+// ─── Axe temporel (Chart.js sans adaptateur) : axe X 'linear' + timestamps
+// -> espacement proportionnel au temps (points a leur vraie date).
+const _ts      = d => new Date(d + 'T12:00:00').getTime();
+const _tsTick  = v => new Date(v).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+const _tsTitle = items => items.length ? new Date(items[0].parsed.x).toLocaleDateString('fr-FR') : '';
+
 function renderHistChart(filterOwner = 'Famille') {
   if (!S.historique.length) return;
-  const labels = S.historique.map(h => fmtDate(h.date));
+  const pt = (h, y) => ({ x: _ts(h.date), y });
 
   const colors = getColors();
   const fam = chartFamilyColors();
   let datasets;
   if (filterOwner === 'Famille') {
-    const famData = S.historique.map(h => h.family_net);
     const ownerSets = _owners().map((o, i) => ({
       label: o,
-      data: S.historique.map(h => h.by_owner[o] || 0),
+      data: S.historique.map(h => pt(h, h.by_owner[o] || 0)),
       borderColor: colors[i],
       backgroundColor: colors[i] + '18',
       tension: .35, borderWidth: 2, pointRadius: 4, fill: false,
     }));
     datasets = [
-      { label: 'Famille', data: famData, borderColor: fam.line,
-        backgroundColor: fam.bg, tension: .35,
+      { label: 'Famille', data: S.historique.map(h => pt(h, h.family_net)),
+        borderColor: fam.line, backgroundColor: fam.bg, tension: .35,
         borderWidth: 3, pointRadius: 5, fill: true },
       ...ownerSets,
     ];
@@ -414,7 +420,7 @@ function renderHistChart(filterOwner = 'Famille') {
     const i = _owners().indexOf(filterOwner);
     datasets = [{
       label: filterOwner,
-      data: S.historique.map(h => h.by_owner[filterOwner] || 0),
+      data: S.historique.map(h => pt(h, h.by_owner[filterOwner] || 0)),
       borderColor: colors[i] || colors[0],
       backgroundColor: (colors[i] || colors[0]) + '18',
       tension: .35, borderWidth: 3, pointRadius: 5, fill: true,
@@ -425,7 +431,7 @@ function renderHistChart(filterOwner = 'Famille') {
   const ctx = document.getElementById('history-chart').getContext('2d');
   setHistChart(new Chart(ctx, {
     type: 'line',
-    data: { labels, datasets },
+    data: { datasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
@@ -449,6 +455,7 @@ function renderHistChart(filterOwner = 'Famille') {
         legend: { labels: { font: { size: 11 }, boxWidth: 12 } },
         tooltip: {
           callbacks: {
+            title: _tsTitle,
             label: ctx =>
               ` ${ctx.dataset.label} : ${new Intl.NumberFormat('fr-FR').format(Math.round(ctx.parsed.y))}\u202f€`,
             afterBody: () => 'Cliquer pour voir la composition',
@@ -456,6 +463,10 @@ function renderHistChart(filterOwner = 'Famille') {
         },
       },
       scales: {
+        x: {
+          type: 'linear',
+          ticks: { font: { size: 11 }, maxRotation: 0, autoSkip: true, callback: _tsTick },
+        },
         y: {
           ticks: {
             callback: v =>
