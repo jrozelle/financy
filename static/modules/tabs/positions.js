@@ -571,14 +571,35 @@ function _openHoldingsForPosition(id) {
   openHoldingsModal(id, label);
 }
 
+/** Date du snapshot sur lequel agissent les actions du menu global.
+ *
+ * Ces actions (dupliquer / renommer / supprimer) vivent dans le menu ⚙, donc
+ * cliquables depuis n'importe quel onglet, alors que `S.positionsDate` n'est
+ * renseigne qu'au premier rendu de l'onglet Positions. Sans repli, un clic
+ * depuis la Synthese (onglet par defaut) ne faisait strictement rien.
+ * `S.dates` est trie DESC et charge des l'init : [0] = snapshot le plus recent.
+ */
+function currentSnapshotDate() {
+  return S.positionsDate || S.syntheseDate || S.dates?.[0] || null;
+}
+
 export async function duplicateSnapshot() {
-  if (!S.positionsDate) return;
-  const newDate = await promptDialog('Nouvelle date pour le snapshot', {
-    placeholder: 'AAAA-MM-JJ', defaultValue: today(), confirmText: 'Dupliquer'
-  });
+  const sourceDate = currentSnapshotDate();
+  if (!sourceDate) {
+    toast('Aucun snapshot à dupliquer', 'error');
+    return;
+  }
+  const newDate = await promptDialog(
+    `Nouvelle date pour la copie du snapshot du ${fmtDate(sourceDate)}`,
+    { placeholder: 'AAAA-MM-JJ', defaultValue: today(), confirmText: 'Dupliquer' }
+  );
   if (!newDate) return;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
     toast('Format invalide. Utilisez AAAA-MM-JJ (ex: 2026-04-01)', 'error');
+    return;
+  }
+  if (newDate === sourceDate) {
+    toast('La date de la copie doit différer de celle du snapshot source', 'error');
     return;
   }
   if (S.dates.includes(newDate) && !await confirmDialog('Snapshot existant',
@@ -587,33 +608,42 @@ export async function duplicateSnapshot() {
   // Duplication cote serveur : copie positions ET holdings via le helper
   // robuste, et fige holdings_snapshots. Evite de reconstruire les positions
   // sans leurs holdings (bug : actifs vides apres duplication).
-  await api('POST', '/api/snapshots/duplicate',
-            { source_date: S.positionsDate, target_date: newDate });
+  try {
+    await api('POST', '/api/snapshots/duplicate',
+              { source_date: sourceDate, target_date: newDate });
+  } catch { return; }
   S.positionsDate = newDate;
+  S.syntheseDate  = newDate;
   await refreshDates();
   await loadPositions();
   await loadHistorique();
+  await loadSynthese();
+  toast(`Snapshot dupliqué au ${fmtDate(newDate)}`);
 }
 
 export async function renameSnapshot() {
-  if (!S.positionsDate) return;
+  const fromDate = currentSnapshotDate();
+  if (!fromDate) {
+    toast('Aucun snapshot à modifier', 'error');
+    return;
+  }
   const newDate = await promptDialog(
-    `Nouvelle date pour le snapshot du ${fmtDate(S.positionsDate)}`,
-    { placeholder: 'AAAA-MM-JJ', defaultValue: S.positionsDate, confirmText: 'Modifier' }
+    `Nouvelle date pour le snapshot du ${fmtDate(fromDate)}`,
+    { placeholder: 'AAAA-MM-JJ', defaultValue: fromDate, confirmText: 'Modifier' }
   );
   if (!newDate) return;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
     toast('Format invalide. Utilisez AAAA-MM-JJ (ex: 2026-07-01)', 'error');
     return;
   }
-  if (newDate === S.positionsDate) return;
+  if (newDate === fromDate) return;
   if (S.dates.includes(newDate)) {
     toast(`Un snapshot du ${fmtDate(newDate)} existe déjà`, 'error');
     return;
   }
   try {
     await api('POST', '/api/snapshots/rename',
-              { from_date: S.positionsDate, to_date: newDate });
+              { from_date: fromDate, to_date: newDate });
   } catch { return; }
   S.positionsDate = newDate;
   S.syntheseDate  = newDate;
@@ -624,8 +654,11 @@ export async function renameSnapshot() {
 }
 
 export async function deleteSnapshot() {
-  if (!S.positionsDate) return;
-  const date = S.positionsDate;
+  const date = currentSnapshotDate();
+  if (!date) {
+    toast('Aucun snapshot à supprimer', 'error');
+    return;
+  }
   const ok = await confirmDialog(
     'Supprimer ce snapshot',
     `Supprimer définitivement le snapshot du ${fmtDate(date)} ` +
