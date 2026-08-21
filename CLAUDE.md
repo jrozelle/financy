@@ -41,9 +41,12 @@
   muet a masque des mois durant deux titres du Nasdaq cotes en dollars et
   declares EUR — la valorisation n'etait juste que parce que l'ecart depassait
   le seuil de divergence.
-- Aucune conversion de devise dans `models.py` : un cours libelle hors euro ne
-  doit donc JAMAIS servir a valoriser une ligne. La devise vient du provider
-  (`fetch_currency`), pas du defaut du schema.
+- **Devises** : la devise d'un titre vient du provider (`fetch_currency`), pas
+  du defaut EUR du schema. Un cours hors euro est converti par le taux de
+  `fx_rates` ; a defaut de taux il ne valorise RIEN — additionner des dollars a
+  des euros surevalue la ligne du change. Les taux se rafraichissent dans le
+  meme cycle que les cours (`refresh_fx_rates`), une requete par devise
+  effectivement detenue, jamais en tache de fond.
 - Ne comptent comme flux EXTERNES ni les dividendes ni les frais : les premiers
   sont produits par les actifs detenus, les seconds preleves a l'interieur du
   contrat. Tous deux appartiennent au rendement, pas aux apports.

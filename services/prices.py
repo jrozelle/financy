@@ -68,6 +68,10 @@ class PriceProvider(ABC):
         """
         return None
 
+    def fetch_fx_rate(self, devise):
+        """(taux, date) pour un euro en `devise`, ou None. 'USD' -> 1,1545."""
+        return None
+
 
 # ─── Yahoo Finance (prod) ────────────────────────────────────────────────────
 
@@ -166,6 +170,11 @@ class YahooProvider(PriceProvider):
         except Exception as e:
             logger.debug('fetch_currency(%s) failed: %s', ticker, e)
             return None
+
+    def fetch_fx_rate(self, devise):
+        # Yahoo cote les paires en 'EURUSD=X' : combien de devise pour un euro.
+        res = self.fetch_last_price(f'EUR{devise.upper()}=X')
+        return (res[0], res[1]) if res else None
 
     def fetch_history(self, ticker, period='30d'):
         yf_period = {
@@ -410,6 +419,32 @@ def refresh_securities(conn, provider=None, only_stale=False, stale_hours=20):
 
     logger.info('refresh_securities done: %s', stats)
     return stats
+
+
+def refresh_fx_rates(conn, provider=None):
+    """Rafraichit les cours de change des devises effectivement detenues.
+
+    Une seule requete par devise, et seulement pour celles qui portent un titre
+    en portefeuille : rien n'est appele pour une devise que l'utilisateur ne
+    detient pas. Retourne {devise: (taux, date)}.
+    """
+    if provider is None:
+        provider = get_provider()
+    devises = [r[0] for r in conn.execute(
+        "SELECT DISTINCT UPPER(s.currency) FROM securities s "
+        "JOIN holdings h ON h.isin = s.isin "
+        "WHERE s.currency IS NOT NULL AND UPPER(s.currency) <> 'EUR'")]
+    out = {}
+    for d in devises:
+        res = provider.fetch_fx_rate(d)
+        if not res:
+            logger.warning('refresh_fx_rates : taux EUR%s indisponible', d)
+            continue
+        taux, date = res
+        conn.execute('INSERT OR REPLACE INTO fx_rates (pair, date, rate) VALUES (?,?,?)',
+                     (f'EUR{d}', date, taux))
+        out[d] = (taux, date)
+    return out
 
 
 def refresh_history(conn, isin, period='30d', provider=None):

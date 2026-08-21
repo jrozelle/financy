@@ -27,13 +27,14 @@ def is_enabled():
 def _job_refresh_prices():
     """Job APScheduler : refresh de tous les cours priceables."""
     from models import get_db
-    from services.prices import refresh_securities, get_provider
+    from services.prices import refresh_securities, refresh_fx_rates, get_provider
 
     start = time.monotonic()
     provider = get_provider()
     try:
         with get_db() as conn:
             stats = refresh_securities(conn, provider=provider)
+            refresh_fx_rates(conn, provider=provider)
     except Exception:
         logger.exception('Scheduled prices refresh failed')
         return
