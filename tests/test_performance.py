@@ -80,8 +80,26 @@ class TestFluxSigned:
     def test_retrait_negatif(self):
         assert _flux_signed({'type': 'Retrait', 'amount': 100}) == -100
 
-    def test_frais_negatif(self):
-        assert _flux_signed({'type': 'Frais', 'amount': 30}) == -30
+    def test_frais_pesent_sur_la_performance(self):
+        """Des frais preleves dans le contrat ne sont pas un flux externe.
+
+        Les traiter comme une sortie les neutralisait : la TWR affichait le
+        rendement AVANT frais. La performance qui interesse est celle qui reste
+        une fois les frais payes, donc ils doivent amputer le resultat.
+        """
+        assert _flux_signed({'type': 'Frais', 'amount': 30}) == 0
+
+    def test_frais_amputent_le_rendement(self, client):
+        """Bout en bout : 10 000 -> 10 100 dont 100 EUR de frais preleves.
+
+        Les frais ayant deja reduit la valeur finale, le rendement est de +1 % :
+        c'est le rendement NET. Les compter en plus comme une sortie le portait
+        a +2 %, soit le rendement brut, que rien ne vient encaisser.
+        """
+        _seed([('2026-01-01', 10000), ('2026-08-01', 10100)],
+              flux=[('2026-04-01', 'Frais', 100)])
+        g = client.get('/api/performance').get_json()['groups'][0]
+        assert g['twr'] == pytest.approx(0.01)
 
     def test_dividende_non_externe(self):
         # Un dividende est produit par les actifs detenus : il fait partie du

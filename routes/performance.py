@@ -75,15 +75,21 @@ SUSPECT_JUMP = 0.30
 GROUPINGS = ('account', 'envelope')
 
 _FLUX_IN = ('Versement',)
-_FLUX_OUT = ('Retrait', 'Frais')
+_FLUX_OUT = ('Retrait',)
 
 
 def _flux_signed(f):
     """Flux externe signe : positif s'il entre, negatif s'il sort.
 
-    Un dividende encaisse n'est PAS un flux externe : il est produit par les
-    actifs deja detenus, donc il fait partie du rendement. L'inclure comme
-    apport le retirerait de la performance.
+    Ni les dividendes ni les frais ne sont des flux EXTERNES, et tous deux
+    valent donc zero ici :
+
+    - un dividende encaisse est produit par les actifs deja detenus ; l'inclure
+      comme apport le retirerait de la performance ;
+    - des frais de gestion sont preleves A L'INTERIEUR du contrat. Les traiter
+      comme une sortie les neutralisait, alors qu'ils amputent bel et bien le
+      rendement : la performance mesuree est celle qui reste une fois les frais
+      payes, c'est ce qu'on cherche a connaitre.
     """
     t = f.get('type') or ''
     a = abs(f.get('amount') or 0)

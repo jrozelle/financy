@@ -450,7 +450,13 @@ def _period_return(cashflows):
 
 
 def _flux_to_cashflow(f):
-    """Convertit un flux en cashflow signé pour le XIRR."""
+    """Convertit un flux en cashflow signé pour le XIRR.
+
+    Les frais de gestion ne sont pas un cashflow : preleves a l'interieur du
+    contrat, ils reduisent sa valeur finale, et c'est ainsi qu'ils doivent
+    peser sur le rendement. Les compter en plus comme un decaissement les
+    facturait deux fois.
+    """
     ftype = f.get('type', '')
     amount = f.get('amount', 0)
     if ftype == 'Versement':
@@ -458,7 +464,7 @@ def _flux_to_cashflow(f):
     elif ftype in ('Retrait', 'Dividende/Intérêt'):
         return (f['date'], abs(amount))
     elif ftype == 'Frais':
-        return (f['date'], -abs(amount))
+        return (f['date'], 0.0)
     return (f['date'], amount)
 
 
