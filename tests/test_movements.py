@@ -306,3 +306,25 @@ class TestImportEndpoint:
     def test_document_rejete_signale(self, client):
         r = self._post(client, 'preview', [('facture', 'Facture EDF 42,00 EUR')])
         assert r.get_json()['summary']['rejected'][0]['file'] == 'facture.pdf'
+
+    def test_enveloppe_alignee_sur_les_positions(self, client):
+        """"Compte-titres" lu dans le document doit devenir "CTO" si c'est le nom employe.
+
+        Sinon les flux ne se rattachent a aucun compte et l'enveloppe affiche un
+        rendement qui absorbe les versements : un CTO ressortait a +114 %.
+        """
+        with get_db() as conn:
+            conn.execute("""INSERT INTO positions (date, owner, category, envelope,
+                establishment, value, debt, ownership_pct, debt_pct)
+                VALUES ('2026-01-01','Alice','Actions','CTO','X',1,0,1.0,1.0)""")
+            conn.commit()
+        r = self._post(client, 'commit', [('avis', AVIS_DEVISE)])
+        assert r.status_code == 200
+        with get_db() as conn:
+            assert conn.execute(
+                'SELECT envelope FROM transactions').fetchone()[0] == 'CTO'
+
+    def test_enveloppe_inconnue_signalee(self, client):
+        r = self._post(client, 'preview', [('avis', AVIS_DEVISE)])
+        # Aucune position : l'enveloppe lue ne correspond a rien de connu
+        assert 'Compte-titres' in r.get_json()['summary']['unresolved_envelopes']
