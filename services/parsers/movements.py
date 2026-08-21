@@ -32,6 +32,12 @@ from typing import List, Optional
 _PEA_MARKERS = ('COMPTE PEA', 'P.E.A', 'PEA')
 DEFAULT_ENVELOPE = 'Compte-titres'
 
+# Etablissement propose par defaut. Ce n'est qu'une suggestion : il DOIT
+# correspondre a l'orthographe employee dans `positions`, sinon les flux
+# importes ne se rattachent a aucun compte et leur enveloppe affiche un
+# rendement qui absorbe les versements. L'appelant le surcharge.
+DEFAULT_ESTABLISHMENT = 'BoursoBank'
+
 
 def detect_envelope(text: str, account_map: Optional[dict] = None) -> Optional[str]:
     """Enveloppe du document : correspondance explicite, sinon marqueur textuel."""
@@ -88,7 +94,7 @@ class DetectedMovement:
     kind: str                      # 'transaction' | 'flux'
     date: str                      # AAAA-MM-JJ, date d'execution
     envelope: Optional[str] = None
-    establishment: str = 'BoursoBank'
+    establishment: str = DEFAULT_ESTABLISHMENT
     # transaction
     isin: Optional[str] = None
     name: Optional[str] = None

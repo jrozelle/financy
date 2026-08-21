@@ -94,16 +94,18 @@ function renderKpi(d) {
   if (!g) { host.innerHTML = ''; return; }
   // Meme gabarit que la synthese (.kpi-card + lisere colore) : deux onglets qui
   // presentent des indicateurs doivent se ressembler.
+  const comptes = g.accounts || (V.data.groups || []).filter(x => x.status === 'ok').length;
   const tiles = [
-    ['', 'Valeur suivie', fmt(g.value), esc(g.label || 'Ensemble mesurable')],
-    ['kpi-gross', 'TWR cumulée', pct(g.twr), duree(g.days), sign(g.twr)],
+    ['', `Valeur au ${fmtDate(d.date)}`, fmt(g.value),
+      V.focus ? esc(g.label) : `${comptes} compte${comptes > 1 ? 's' : ''} mesuré${comptes > 1 ? 's' : ''}`],
+    ['kpi-gross', 'TWR cumulée', pct(g.twr), `sur ${duree(g.days)}`, sign(g.twr)],
     ['kpi-mobilizable', 'TWR annualisée',
       g.annualisable ? pct(g.twr_annualise) : '—',
-      g.annualisable ? 'pondérée par le temps'
+      g.annualisable ? 'équivalent par an'
         : `moins de ${d.min_days_annualise} j d'historique`,
       g.annualisable ? sign(g.twr_annualise) : ''],
-    ['kpi-debt', 'Capital net apporté', fmt(g.flux_net),
-      `${g.flux_count} flux externe${g.flux_count > 1 ? 's' : ''}`],
+    ['kpi-debt', 'Apports nets de la période', fmt(g.flux_net),
+      `${g.flux_count} versement${g.flux_count > 1 ? 's' : ''} et retrait${g.flux_count > 1 ? 's' : ''}, hors dividendes`],
   ];
   host.innerHTML = tiles.map(([variant, k, v, s, cl = '']) => `
     <div class="kpi-card ${variant}">

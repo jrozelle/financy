@@ -277,9 +277,25 @@ function _owner() {
   return document.getElementById('flux-import-owner')?.value || _defaultOwner();
 }
 
-async function _send(files, step, owner = null) {
+/** Etablissement propose : celui que le parseur a devine s'il figure deja dans
+ *  les positions, sinon le premier connu. Une variante d'orthographe creerait un
+ *  compte distinct de celui des positions, et les flux ne s'y rattacheraient pas. */
+function _defaultEtab(summary) {
+  const known = summary?.known_establishments || [];
+  const devine = _staged?.data?.transactions?.[0]?.establishment
+              || _staged?.data?.flux?.[0]?.establishment;
+  return known.includes(devine) ? devine : (known[0] || '');
+}
+
+function _etab() {
+  return document.getElementById('flux-import-etab')?.value || '';
+}
+
+async function _send(files, step, owner = null, etab = null) {
   const fd = new FormData();
   fd.append('owner', owner || _owner());
+  const e = etab !== null ? etab : _etab();
+  if (e) fd.append('establishment', e);
   files.forEach(f => fd.append('files', f));
   const meta = document.querySelector('meta[name="csrf-token"]');
   const res = await fetch(`/api/import/movements?step=${step}`, {
@@ -297,7 +313,7 @@ async function _preview(files) {
   const zone = document.getElementById('flux-drop');
   zone.classList.add('is-busy');
   try {
-    const d = await _send(pdfs, 'preview', _defaultOwner());
+    const d = await _send(pdfs, 'preview', _defaultOwner(), '');
     _staged = { files: pdfs, data: d };
     _renderReport(d, pdfs.length);
   } catch (e) {
@@ -357,6 +373,13 @@ function _renderReport(d, nfiles) {
             `<option value="${esc(o)}"${o === _defaultOwner() ? ' selected' : ''}>${esc(o)}</option>`).join('')}
         </select>
       </label>
+      <label class="import-owner">Établissement
+        <select id="flux-import-etab" class="filter-select"
+          title="Doit correspondre à l'orthographe employée dans vos positions : une variante créerait un compte distinct, et les versements ne neutraliseraient plus le rendement.">
+          ${(s.known_establishments || []).map(e =>
+            `<option value="${esc(e)}"${e === _defaultEtab(s) ? ' selected' : ''}>${esc(e)}</option>`).join('')}
+        </select>
+      </label>
     </div>`;
   host.classList.remove('hidden');
   document.getElementById('flux-import-cancel').addEventListener('click', _clear);
@@ -375,7 +398,7 @@ async function _commit() {
   btn.disabled = true;
   btn.textContent = 'Enregistrement…';
   try {
-    const d = await _send(_staged.files, 'commit', _owner());
+    const d = await _send(_staged.files, 'commit', _owner(), _etab());
     const i = d.inserted;
     toast(`${i.flux} flux et ${i.transactions} opération${i.transactions > 1 ? 's' : ''} enregistré${i.transactions > 1 ? 's' : ''}`, 'success');
     _clear();
