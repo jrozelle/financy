@@ -6,6 +6,7 @@ importe est detecte et ignore — `transactions.source_doc` porte un index uniqu
 et les flux sont dedoublonnes sur (date, enveloppe, type, montant).
 """
 import hashlib
+from datetime import date as _date
 
 from flask import Blueprint, jsonify, request
 
@@ -74,23 +75,51 @@ def _known_operations(conn):
                                   'FROM transactions')}
 
 
-def _flux_signature(conn):
-    """Signature des flux existants, pour ne pas reinserer deux fois le meme.
+# Marqueur d'un flux saisi de memoire, que le document de reference n'a pas
+# encore atteste : un virement programme dont on connait le montant et la
+# cadence, mais dont le releve annuel ne paraitra qu'en fin d'exercice.
+# L'import du releve vient alors le corriger au lieu de le doubler.
+PROVISIONAL = '[provisoire]'
 
-    Le titulaire et l'etablissement en font partie : sans eux, deux contrats
-    d'enfants recevant le meme versement programme de 75 EUR le meme jour
-    partageaient une signature, et la moitie des flux etait ecartee comme
-    doublon.
+# Ecart de date en deca duquel deux enregistrements decrivent le meme mouvement.
+# Deux documents ne le datent pas pareil : le releve du compte courant porte le
+# jour du prelevement, en debut de mois, et la situation de l'assureur celui de
+# l'investissement, une dizaine de jours plus tard. Un virement programme
+# mensuel ne peut pas se trouver a quinze jours d'un autre identique, si bien
+# que la tolerance ne risque pas de confondre deux mouvements distincts.
+TOLERANCE_JOURS = 15
+
+
+def _flux_existants(conn):
+    """Flux en base, indexes par identite hors date.
+
+    Le titulaire et l'etablissement font partie de l'identite : sans eux, deux
+    contrats d'enfants recevant le meme versement programme de 75 EUR le meme
+    jour se confondaient, et la moitie des flux etait ecartee comme doublon.
     """
-    return {_sig(r) for r in conn.execute(
-        'SELECT date, owner, envelope, establishment, type, amount FROM flux')}
+    par = {}
+    for r in conn.execute('SELECT id, date, owner, envelope, establishment, '
+                          'type, amount, notes FROM flux'):
+        par.setdefault(_sig(r), []).append(
+            {'id': r['id'], 'date': r['date'],
+             'provisoire': PROVISIONAL in (r['notes'] or '')})
+    return par
 
 
 def _sig(r, kind_key='type', amount_key='amount'):
-    """Signature d'un flux. Accepte une ligne SQLite comme un dict d'import."""
-    return (r['date'], r['owner'] or '', r['envelope'] or '',
-            r['establishment'] or '', r[kind_key] or '',
-            round(r[amount_key] or 0, 2))
+    """Identite d'un flux, hors date. Accepte une ligne SQLite ou un dict."""
+    return (r['owner'] or '', r['envelope'] or '', r['establishment'] or '',
+            r[kind_key] or '', round(r[amount_key] or 0, 2))
+
+
+def _jours(a, b):
+    return abs((_date.fromisoformat(a) - _date.fromisoformat(b)).days)
+
+
+def _rapprocher(candidats, date):
+    """Le flux existant le plus proche en date, dans la tolerance. Sinon None."""
+    proches = [c for c in candidats if _jours(c['date'], date) <= TOLERANCE_JOURS]
+    return min(proches, key=lambda c: _jours(c['date'], date)) if proches else None
 
 
 # Un compte-titres ordinaire se nomme "CTO" chez l'un, "Compte-titres" chez
@@ -198,7 +227,7 @@ def import_movements():
     with get_db() as conn:
         known = _known_docs(conn)
         known_ops = _known_operations(conn)
-        signatures = _flux_signature(conn)
+        existants = _flux_existants(conn)
         secs = {r['isin'] for r in conn.execute('SELECT isin FROM securities')}
 
     tx = [i for i in items if i['kind'] == 'transaction']
@@ -216,18 +245,28 @@ def import_movements():
         i['unknown_isin'] = bool(i['isin']) and i['isin'] not in secs
         if not i['duplicate']:
             seen_ops.add(op)
-    seen_fx = set()
+    vus = {}
     for i in fx:
         sig = _sig(i, kind_key='flux_type', amount_key='net_eur')
-        i['duplicate'] = sig in signatures or sig in seen_fx
-        i['duplicate_reason'] = 'flux déjà enregistré' if i['duplicate'] else None
+        match = (_rapprocher(existants.get(sig, []), i['date'])
+                 or _rapprocher(vus.get(sig, []), i['date']))
+        # Un flux provisoire n'est pas un doublon : le document l'atteste et le
+        # corrige, en lui donnant sa vraie date.
+        i['corrects'] = match['id'] if match and match.get('provisoire') else None
+        i['duplicate'] = bool(match) and not i['corrects']
+        i['duplicate_reason'] = (
+            f"flux déjà enregistré le {match['date']}" if i['duplicate'] else None)
+        if i['corrects']:
+            i['correction_reason'] = f"corrige le flux provisoire du {match['date']}"
         if not i['duplicate']:
-            seen_fx.add(sig)
+            vus.setdefault(sig, []).append(
+                {'id': None, 'date': i['date'], 'provisoire': False})
 
     summary = {
         'files': len(files),
         'transactions': sum(1 for i in tx if not i['duplicate']),
-        'flux': sum(1 for i in fx if not i['duplicate']),
+        'flux': sum(1 for i in fx if not i['duplicate'] and not i['corrects']),
+        'corrections': sum(1 for i in fx if i.get('corrects')),
         'duplicates': sum(1 for i in items if i.get('duplicate')),
         'warnings': sum(1 for i in items if i.get('warnings')),
         'unknown_isins': sorted({i['isin'] for i in tx if i.get('unknown_isin')}),
@@ -241,7 +280,7 @@ def import_movements():
         return jsonify({'step': 'preview', 'summary': summary,
                         'transactions': tx, 'flux': fx})
 
-    inserted = {'transactions': 0, 'flux': 0, 'securities': 0}
+    inserted = {'transactions': 0, 'flux': 0, 'securities': 0, 'corrections': 0}
     with get_db() as conn:
         cur = conn.cursor()
         cur.execute('BEGIN IMMEDIATE')
@@ -265,11 +304,19 @@ def import_movements():
         for i in fx:
             if i['duplicate']:
                 continue
+            note = f"[import] {i['label'] or ''}".strip()
+            if i['corrects']:
+                # Le document fait foi : il redate le flux provisoire et lui
+                # retire sa mention, sans creer de second enregistrement.
+                cur.execute('UPDATE flux SET date=?, notes=? WHERE id=?',
+                            (i['date'], note, i['corrects']))
+                inserted['corrections'] += cur.rowcount
+                continue
             cur.execute('''INSERT INTO flux
                 (date, owner, envelope, establishment, type, amount, notes)
                 VALUES (?,?,?,?,?,?,?)''',
                 (i['date'], i['owner'] or owner, i['envelope'], i['establishment'],
-                 i['flux_type'], i['net_eur'], f"[import] {i['label'] or ''}".strip()))
+                 i['flux_type'], i['net_eur'], note))
             inserted['flux'] += 1
         conn.commit()
     return jsonify({'step': 'commit', 'summary': summary, 'inserted': inserted})

@@ -23,6 +23,21 @@
   sans quoi le mode d'interaction `index` regroupe les points par position dans
   le tableau et melange les dates.
 
+## Donnees financieres
+- **Flux provisoires** : un mouvement connu mais pas encore atteste par un
+  document se saisit avec la mention `[provisoire]` dans ses notes (constante
+  `PROVISIONAL`, `routes/movements_import.py`). L'import du document de
+  reference le REDATE et lui retire la mention, sans creer de doublon. Sans
+  cette mention, un flux equivalent est traite comme doublon et laisse intact.
+- Le rapprochement de deux flux se fait sur `(personne, enveloppe,
+  etablissement, type, montant)` a `TOLERANCE_JOURS` pres, jamais sur la date
+  exacte : deux documents ne datent pas le meme mouvement pareil — prelevement
+  en debut de mois sur le compte courant, investissement une dizaine de jours
+  plus tard chez l'assureur.
+- Ne comptent comme flux EXTERNES ni les dividendes ni les frais : les premiers
+  sont produits par les actifs detenus, les seconds preleves a l'interieur du
+  contrat. Tous deux appartiennent au rendement, pas aux apports.
+
 ## Code
 - Pas d'emojis dans le code
 - Dark mode cohérent dans toutes les nouvelles modales et popovers
