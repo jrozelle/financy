@@ -151,7 +151,8 @@ function renderList(d) {
       <div class="perf-item${V.focus === g.key ? ' is-focus' : ''}" data-key="${esc(g.key)}"
            tabindex="0" role="button" aria-pressed="${V.focus === g.key}">
         <div class="perf-name">
-          <span class="perf-title">${esc(g.envelope || g.label)}</span>
+          <span class="perf-title">${esc(g.envelope || g.label)}${
+            g.account_label ? ` <span class="perf-account">${esc(g.account_label)}</span>` : ''}</span>
           ${sub ? `<span class="perf-sub">${esc(sub)}</span>` : ''}
         </div>
         <div class="perf-bar" aria-hidden="true">

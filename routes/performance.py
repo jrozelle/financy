@@ -86,19 +86,27 @@ def annualise(cumul, days, min_days=MIN_DAYS_ANNUALISE):
 
 
 def _key(row, grouping):
-    """Cle d'agregation d'une position ou d'un flux."""
+    """Cle d'agregation d'une position.
+
+    `label` fait partie de la cle : deux comptes de meme nature peuvent coexister
+    chez le meme etablissement — un compte-titres ferme et son remplacant, deux
+    contrats chez le meme assureur. Sans lui, la cloture de l'un se lit comme une
+    chute de l'autre. C'est l'usage prevu du champ, deja employe pour distinguer
+    des biens ("Montres", "Voiture") sous une meme enveloppe.
+    """
     env = row.get('envelope') or 'Autre'
     if grouping == 'envelope':
         return (env,)
-    return (env, row.get('establishment') or None, row.get('owner') or None)
+    return (env, row.get('establishment') or None, row.get('owner') or None,
+            (row.get('label') or '').strip() or None)
 
 
 def _label(key, grouping):
     if grouping == 'envelope':
         return key[0]
-    env, etab, owner = key
-    parts = [env] + [p for p in (etab, owner) if p]
-    return ' · '.join(parts)
+    env, etab, owner, name = key
+    tete = f'{env} — {name}' if name else env
+    return ' · '.join([tete] + [p for p in (etab, owner) if p])
 
 
 def _values_by_group(conn, dates, grouping, owner=None):
@@ -129,7 +137,8 @@ def _values_by_group(conn, dates, grouping, owner=None):
             cats.setdefault(k, set()).add(p.get('category'))
             meta.setdefault(k, {'envelope': p.get('envelope') or 'Autre',
                                 'establishment': p.get('establishment'),
-                                'owner': p.get('owner')})
+                                'owner': p.get('owner'),
+                                'account_label': (p.get('label') or '').strip() or None})
         by_date[d] = vals
     return by_date, cats, meta
 
@@ -310,6 +319,7 @@ def get_performance():
             'envelope': gk[0],
             'establishment': None if grouping == 'envelope' else m.get('establishment'),
             'owner': None if grouping == 'envelope' else m.get('owner'),
+            'account_label': None if grouping == 'envelope' else m.get('account_label'),
             'serie': serie, 'twr': cumul, 'days': days,
             'twr_annualise': annualise(cumul, days),
             'annualisable': bool(days) and days >= MIN_DAYS_ANNUALISE,

@@ -450,3 +450,50 @@ class TestEpargne:
             conn.commit()
         g = client.get('/api/performance').get_json()['groups'][0]
         assert g['status'] == 'non_measurable'
+
+
+class TestComptesHomonymes:
+    """Deux comptes de meme nature chez le meme etablissement.
+
+    Constate en prod : un compte-titres ferme et son remplacant, tous deux chez
+    la meme banque. Sous une cle commune, la cloture du premier se lisait comme
+    une chute de 82 % du second, puis sa reprise comme un bond de 114 %. Le champ
+    `label` les distingue.
+    """
+
+    def _deux_cto(self):
+        with get_db() as conn:
+            lignes = [
+                ('2026-01-01', 'Ancien CTO', 11000), ('2026-03-01', 'Ancien CTO', 11500),
+                ('2026-06-01', None, 2000), ('2026-08-01', None, 2100),
+            ]
+            for d, label, v in lignes:
+                conn.execute("""INSERT INTO positions (date, owner, category, envelope,
+                    establishment, label, value, debt, ownership_pct, debt_pct)
+                    VALUES (?,'Alice','Actions','CTO','Ma Banque',?,?,0,1.0,1.0)""",
+                    (d, label, v))
+            conn.commit()
+
+    def test_comptes_separes_par_leur_libelle(self, client):
+        self._deux_cto()
+        d = client.get('/api/performance').get_json()
+        par = {g['account_label']: g for g in d['groups']}
+        assert set(par) == {'Ancien CTO', None}
+        assert par['Ancien CTO']['twr'] == pytest.approx(0.0455, abs=0.01)
+        assert par[None]['twr'] == pytest.approx(0.05, abs=0.01)
+
+    def test_libelle_visible_dans_le_nom(self, client):
+        self._deux_cto()
+        d = client.get('/api/performance').get_json()
+        assert any(g['label'] == 'CTO — Ancien CTO · Ma Banque · Alice' for g in d['groups'])
+
+    def test_maille_enveloppe_les_regroupe(self, client):
+        """A la maille enveloppe, les deux comptes se retrouvent — et la
+        disparition de l'un est neutralisee comme un retrait."""
+        self._deux_cto()
+        d = client.get('/api/performance?group=envelope').get_json()
+        assert len(d['groups']) == 1
+        g = d['groups'][0]
+        assert g['accounts'] == 2
+        # Sans neutralisation : 11 500 -> 2 000 se lirait comme -83 %
+        assert g['twr'] > -0.2
