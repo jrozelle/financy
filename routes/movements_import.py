@@ -71,6 +71,33 @@ def _flux_signature(conn):
             for r in conn.execute('SELECT date, envelope, type, amount FROM flux')}
 
 
+# Un compte-titres ordinaire se nomme "CTO" chez l'un, "Compte-titres" chez
+# l'autre. Le parseur lit le document, pas le referentiel de l'utilisateur : si
+# le nom qu'il produit ne figure pas dans `positions`, les flux importes ne se
+# rattachent a aucun compte et l'enveloppe affiche un rendement qui absorbe les
+# versements — un CTO ressortait a +114 % au lieu de +5 %.
+_ENVELOPE_SYNONYMS = {
+    'Compte-titres': ('CTO', 'Compte-titres', 'Compte titres', 'CTO ordinaire'),
+    'PEA': ('PEA', 'P.E.A.'),
+}
+
+
+def _map_envelopes(items, known):
+    """Aligne l'enveloppe lue sur celle employee dans les positions."""
+    known = set(known or ())
+    unresolved = set()
+    for it in items:
+        env = it.get('envelope')
+        if not env or env in known:
+            continue
+        match = next((c for c in _ENVELOPE_SYNONYMS.get(env, ()) if c in known), None)
+        if match:
+            it['envelope'] = match
+        else:
+            unresolved.add(env)
+    return sorted(unresolved)
+
+
 def _read(files, owner, establishment=None):
     """Parse les fichiers recus et renvoie (mouvements, rejets)."""
     items, rejets = [], []
@@ -116,6 +143,8 @@ def import_movements():
         known_etabs = sorted({r['establishment'] for r in conn.execute(
             'SELECT DISTINCT establishment FROM positions '
             'WHERE establishment IS NOT NULL AND establishment <> ?', ('',))})
+        known_envs = sorted({r['envelope'] for r in conn.execute(
+            'SELECT DISTINCT envelope FROM positions WHERE envelope IS NOT NULL')})
     files = request.files.getlist('files') or request.files.getlist('file')
     if not files:
         return jsonify({'error': 'Aucun fichier reçu'}), 400
@@ -124,6 +153,7 @@ def import_movements():
 
     items, rejets = _read(files, owner, request.form.get('establishment')
                           or request.args.get('establishment'))
+    unresolved_envs = _map_envelopes(items, known_envs)
     with get_db() as conn:
         known = _known_docs(conn)
         known_ops = _known_operations(conn)
@@ -163,6 +193,7 @@ def import_movements():
         'unknown_isins': sorted({i['isin'] for i in tx if i.get('unknown_isin')}),
         'rejected': rejets,
         'known_establishments': known_etabs,
+        'unresolved_envelopes': unresolved_envs,
     }
     if step != 'commit':
         return jsonify({'step': 'preview', 'summary': summary,
