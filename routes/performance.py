@@ -22,7 +22,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 
 from models import (get_db, load_referential, compute_position, get_entity_map,
-                    get_holdings_map, freeze_holdings_prices)
+                    get_holdings_map, freeze_holdings_prices, holding_price_warning)
 from auth import login_required
 
 performance_bp = Blueprint('performance', __name__)
@@ -143,7 +143,7 @@ def _values_by_group(conn, dates, grouping, owner=None):
     +4000 %. Les dates sans valorisation sont donc omises, pas mises a zero.
     """
     ref = load_referential(conn)
-    by_date, cats, meta = {}, {}, {}
+    by_date, cats, meta, alertes = {}, {}, {}, {}
     for d in dates:
         rows = conn.execute('SELECT * FROM positions WHERE date=?', (d,)).fetchall()
         emap = get_entity_map(conn, d)
@@ -158,6 +158,14 @@ def _values_by_group(conn, dates, grouping, owner=None):
         vals = {}
         for p in positions:
             k = _key(p, grouping)
+            # Les alertes de valorisation ne valent que sur le dernier arrete :
+            # sur les precedents le cours vivant est neutralise, donc il n'y a
+            # rien a comparer.
+            if d == dates[-1]:
+                for h in (hmap.get(p['id']) or []):
+                    a = holding_price_warning(h)
+                    if a:
+                        alertes.setdefault(k, []).append(a)
             vals[k] = vals.get(k, 0.0) + (p['net_attributed'] or 0)
             cats.setdefault(k, set()).add(p.get('category'))
             meta.setdefault(k, {'envelope': p.get('envelope') or 'Autre',
@@ -165,7 +173,7 @@ def _values_by_group(conn, dates, grouping, owner=None):
                                 'owner': p.get('owner'),
                                 'account_label': (p.get('label') or '').strip() or None})
         by_date[d] = vals
-    return by_date, cats, meta
+    return by_date, cats, meta, alertes
 
 
 def _composition_flux(dates, members):
@@ -262,7 +270,7 @@ def get_performance():
         # Toujours calcule a la maille compte : c'est le grain le plus fin, et
         # les changements de composition d'un agregat ne sont visibles qu'a ce
         # niveau.
-        by_date, cats, meta = _values_by_group(conn, dates, 'account', owner)
+        by_date, cats, meta, alertes = _values_by_group(conn, dates, 'account', owner)
         flux = [dict(r) for r in conn.execute('SELECT * FROM flux ORDER BY date')]
     if owner:
         flux = [f for f in flux if f['owner'] == owner]
@@ -371,6 +379,10 @@ def get_performance():
             'value': g_values[g_dates[-1]], 'dates_count': len(g_dates),
             'last_date': g_dates[-1],
             'gaps': gaps, 'accounts': len(members),
+            # Le modele arbitre en silence entre le cours et la valeur
+            # enregistree : cet arbitrage doit se voir, il a masque une devise
+            # non convertie pendant des mois.
+            'price_warnings': [a for m in members for a in (alertes.get(m) or [])],
             'flux_count': len(window),
             'flux_net': round(sum(a for _, a in window), 2),
             'flux_approx': approx,

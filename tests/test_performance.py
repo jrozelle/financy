@@ -17,6 +17,7 @@ from models import init_db, get_db  # noqa: E402
 from app import app  # noqa: E402
 
 from routes.performance import annualise, _flux_signed, _chain, MIN_DAYS_ANNUALISE  # noqa: E402
+from models import holding_price_warning  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -607,3 +608,79 @@ class TestComptesHomonymes:
         vivant = lambda d: next(g for g in d['groups'] if g['status'] == 'ok')
         assert vivant(env)['twr'] == pytest.approx(vivant(cpt)['twr'])
         assert env['global']['twr'] == pytest.approx(cpt['global']['twr'])
+
+
+class TestAlerteValorisation:
+    """Le modele arbitre en silence entre le cours et la valeur enregistree.
+
+    Cet arbitrage a masque pendant des mois deux titres du Nasdaq dont le cours
+    arrivait en dollars et dont la devise etait declaree EUR : l'ecart valait
+    exactement le taux de change, et la valorisation n'etait juste que parce que
+    ce taux depassait le seuil de divergence.
+    """
+
+    def test_devise_etrangere_signalee(self):
+        a = holding_price_warning({'isin': 'US0000000001', 'name': 'ADOBE',
+                                   'quantity': 10, 'market_value': 2241.23,
+                                   'last_price': 258.75, 'currency': 'USD',
+                                   'is_priceable': True})
+        assert a and a['kind'] == 'devise' and 'USD' in a['reason']
+
+    def test_divergence_signalee(self):
+        """Meme devise declaree EUR, l'ecart de 15,5 % doit se voir."""
+        a = holding_price_warning({'isin': 'US0000000001', 'name': 'ADOBE',
+                                   'quantity': 10, 'market_value': 2241.23,
+                                   'last_price': 258.75, 'currency': 'EUR',
+                                   'is_priceable': True})
+        assert a and a['kind'] == 'divergence'
+        assert a['gap'] == pytest.approx(0.1545, abs=0.001)
+
+    def test_ecart_normal_silencieux(self):
+        a = holding_price_warning({'isin': 'X', 'quantity': 10, 'market_value': 1000,
+                                   'last_price': 101, 'currency': 'EUR',
+                                   'is_priceable': True})
+        assert a is None
+
+    def test_non_cote_silencieux(self):
+        """Un fonds euros n'a pas de cours : rien a comparer."""
+        a = holding_price_warning({'isin': 'X', 'quantity': 1, 'market_value': 50000,
+                                   'last_price': 1, 'currency': 'EUR',
+                                   'is_priceable': False})
+        assert a is None
+
+    def test_alerte_remontee_par_l_api(self, client):
+        with get_db() as conn:
+            conn.execute("""INSERT INTO securities (isin, name, currency, is_priceable,
+                last_price, last_price_date, data_source)
+                VALUES ('US0000000001','ADOBE','USD',1,258.75,'2026-08-01','yahoo')""")
+            for d, v in (('2026-01-01', 2000), ('2026-08-01', 2241.23)):
+                cur = conn.execute("""INSERT INTO positions (date, owner, category,
+                    envelope, establishment, value, debt, ownership_pct, debt_pct)
+                    VALUES (?,'Alice','Actions','CTO','X',?,0,1.0,1.0)""", (d, v))
+                conn.execute("""INSERT INTO holdings (position_id, isin, quantity,
+                    market_value, as_of_date) VALUES (?,'US0000000001',10,?,?)""",
+                    (cur.lastrowid, v, d))
+            conn.commit()
+        g = client.get('/api/performance').get_json()['groups'][0]
+        assert len(g['price_warnings']) == 1
+        assert g['price_warnings'][0]['currency'] == 'USD'
+
+    def test_devise_etrangere_ne_surevalue_pas(self, client):
+        """La valeur enregistree est retenue, pas quantite x cours en dollars."""
+        with get_db() as conn:
+            conn.execute("""INSERT INTO securities (isin, name, currency, is_priceable,
+                last_price, last_price_date, data_source)
+                VALUES ('US0000000001','ADOBE','USD',1,258.75,'2026-08-01','yahoo')""")
+            cur = conn.execute("""INSERT INTO positions (date, owner, category, envelope,
+                establishment, value, debt, ownership_pct, debt_pct)
+                VALUES ('2026-08-01','Alice','Actions','CTO','X',2241.23,0,1.0,1.0)""")
+            conn.execute("""INSERT INTO holdings (position_id, isin, quantity,
+                market_value, as_of_date) VALUES (?,'US0000000001',10,2241.23,'2026-08-01')""",
+                (cur.lastrowid,))
+            conn.execute("""INSERT INTO positions (date, owner, category, envelope,
+                establishment, value, debt, ownership_pct, debt_pct)
+                VALUES ('2026-01-01','Alice','Actions','CTO','X',2000,0,1.0,1.0)""")
+            conn.commit()
+        d = client.get('/api/performance').get_json()
+        # 10 x 258,75 = 2 587,50 si le dollar passait pour de l euro
+        assert d['groups'][0]['value'] == pytest.approx(2241.23, abs=1)
