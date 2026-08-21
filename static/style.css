@@ -3148,6 +3148,26 @@ kbd {
 #perf-controls { display: flex; align-items: center; gap: .9rem; flex-wrap: wrap; margin: .25rem 0 1rem; }
 .perf-meta { margin-left: auto; font-size: .78rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .perf-meta span { border-bottom: 1px dotted var(--border); cursor: help; }
+.perf-excl-toggle { background: none; border: 0; padding: 0; font: inherit; color: inherit;
+  border-bottom: 1px dotted var(--border); cursor: pointer; }
+.perf-excl-toggle:hover { color: var(--text); }
+.perf-excl-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* Panneau des comptes ecartes. Onze comptes ne tiennent pas dans une infobulle
+   native : la liste est depliable, lisible et imprimable. */
+.perf-excluded { margin-top: .7rem; border-top: 1px solid var(--border); padding-top: .55rem; }
+.perf-excluded-head { font-size: .68rem; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-muted); padding: 0 .9rem .4rem; }
+.perf-excluded-row { display: grid; gap: 1rem; align-items: baseline;
+  grid-template-columns: minmax(10rem, 2fr) minmax(9rem, 1.5fr) 8rem;
+  padding: .26rem .9rem; font-size: .84rem; }
+.perf-excluded-row .num { text-align: right; font-variant-numeric: tabular-nums;
+  color: var(--text-muted); }
+.perf-excl-why { color: var(--text-muted); font-size: .76rem; }
+@media (max-width: 720px) {
+  .perf-excluded-row { grid-template-columns: 1fr auto; gap: .2rem .7rem; }
+  .perf-excl-why { grid-column: 1 / -1; }
+}
 #perf-kpi .kpi-sub { font-size: .74rem; color: var(--text-muted); margin-top: .2rem; }
 #perf-kpi .kpi-value.positive { color: var(--success); }
 #perf-kpi .kpi-value.negative { color: var(--danger); }

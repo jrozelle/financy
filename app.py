@@ -221,6 +221,14 @@ def security_headers(response):
         "img-src 'self' data:; "
         "font-src 'self'"
     )
+    # Les modules ES sont importes par main.js sans numero de version : le
+    # navigateur les garde alors en cache pour la session, et un deploiement
+    # par `git pull` — les dossiers static et templates etant montes dans le
+    # conteneur — ne se voyait qu'apres un rechargement force. `no-cache`
+    # n'interdit pas le stockage, il impose la revalidation : l'ETag repond 304
+    # et le transfert reste nul quand le fichier n'a pas bouge.
+    if request.path.startswith('/static/'):
+        response.headers['Cache-Control'] = 'no-cache'
     if response.status_code >= 400 and request.path.startswith('/api/'):
         logger.warning('%s %s → %s', request.method, request.path, response.status_code)
     return response

@@ -8,7 +8,7 @@ import { fmt, esc, fmtDate, getColors, chartBorderColor, destroyChart } from '..
 // rapport. Il survit au rechargement des donnees : reordonner puis changer de
 // maille ne doit pas ramener a l'ordre initial.
 const V = { data: null, focus: null, group: 'account',
-            sort: { col: 'value', dir: 'desc' } };
+            sort: { col: 'value', dir: 'desc' }, showExcluded: false };
 
 // Cles de tri. Le nom concatene l'enveloppe et le libelle de compte, dans
 // l'ordre ou la ligne les affiche.
@@ -114,11 +114,9 @@ function renderHeader(d) {
     </div>
     ${V.focus ? `<button type="button" class="btn btn-sm" id="perf-reset">↩ Tout afficher</button>` : ''}
     <span class="perf-meta">${d.dates.length} arrêtés · ${fmtDate(d.first_date)} → ${fmtDate(d.date)}${
-      d.excluded?.length ? ` · <span title="${esc(d.excluded.map(e =>
-        `${e.label} — ${LABELS[e.status] || e.status}${
-          e.status === 'closed' ? ` (dernière valeur le ${fmtDate(e.last_date)})` : ''}`
-        ).join(' · '))}">${
-        d.excluded.length} compte${d.excluded.length > 1 ? 's' : ''} hors calcul</span>` : ''}</span>`;
+      d.excluded?.length ? ` · <button type="button" class="perf-excl-toggle" id="perf-excl"
+        aria-expanded="${V.showExcluded}">${d.excluded.length} compte${
+        d.excluded.length > 1 ? 's' : ''} hors calcul ${V.showExcluded ? '▴' : '▾'}</button>` : ''}</span>`;
   host.querySelectorAll('[data-group]').forEach(b => b.addEventListener('click', () => {
     if (V.group === b.dataset.group) return;
     V.group = b.dataset.group;
@@ -126,6 +124,9 @@ function renderHeader(d) {
   }));
   document.getElementById('perf-reset')?.addEventListener('click', () => {
     V.focus = null; renderPerformance();
+  });
+  document.getElementById('perf-excl')?.addEventListener('click', () => {
+    V.showExcluded = !V.showExcluded; renderPerformance();
   });
 }
 
@@ -242,6 +243,17 @@ function renderList(d) {
         <span class="perf-num-sub">${g.annualisable ? pct(g.twr_annualise) + ' /an' : duree(g.days)}</span></div>
       <div class="perf-val">${fmt(g.value)}</div>
     </div>` : ''}
+    ${V.showExcluded && d.excluded?.length ? `<div class="perf-excluded">
+      <div class="perf-excluded-head">Hors calcul — ${d.excluded.length} compte${
+        d.excluded.length > 1 ? 's' : ''}, présents dans la synthèse mais sans rendement mesurable</div>
+      ${d.excluded.map(e => `<div class="perf-excluded-row">
+        <span>${esc(e.label)}</span>
+        <span class="perf-excl-why">${esc(LABELS[e.status] || e.status)}${
+          e.status === 'closed' && e.last_date
+            ? ` · dernière valeur le ${fmtDate(e.last_date)}` : ''}</span>
+        <span class="num">${fmt(e.value)}</span>
+      </div>`).join('')}
+    </div>` : ''}
     <p class="perf-note">TWR annualisée à partir de ${d.min_days_annualise} jours d'historique —
     en dessous, la durée est indiquée à la place. Cliquez une ligne pour l'isoler,
     un en-tête pour trier.</p>`;
@@ -277,15 +289,22 @@ function renderChart(d) {
   const series = (V.focus ? shown.filter(g => g.key === V.focus) : shown)
     .filter(g => g.serie?.length > 1);
   const labels = [...new Set(series.flatMap(g => g.serie.map(p => p.date)))].sort();
+  // Abscisse en millisecondes sur une echelle lineaire, et non une echelle
+  // categorielle : les arretes ne sont pas equidistants dans le temps — 15
+  // jours entre les deux premiers, 47 entre les suivants — et les espacer
+  // regulierement faussait la pente des courbes, donc la lecture du rendement.
+  // Une echelle `time` demanderait un adaptateur de dates, absent du vendor.
+  const ms = iso => Date.parse(`${iso}T00:00:00Z`);
+  const xs = labels.map(ms);
   // Chaque serie est alignee sur la liste complete des arretes, un trou valant
   // null. Les series n'ont pas toutes la meme longueur — un compte ouvert en
   // cours de periode en a moins — et le mode d'interaction `index` de Chart.js
-  // regroupe les points par POSITION dans le tableau, pas par date : la crypto,
-  // apparue plus tard, voyait sa valeur du 13/05 s'afficher sous le titre
-  // 07/06. `spanGaps` garde le trait continu par-dessus les trous.
+  // regroupe les points par POSITION dans le tableau, pas par abscisse : la
+  // crypto, apparue plus tard, voyait sa valeur du 13/05 s'afficher sous le
+  // titre 07/06. `spanGaps` garde le trait continu par-dessus les trous.
   const aligned = serie => {
     const par = new Map(serie.map(p => [p.date, p.index]));
-    return labels.map(l => (par.has(l) ? par.get(l) : null));
+    return labels.map((l, i) => ({ x: xs[i], y: par.has(l) ? par.get(l) : null }));
   };
   const datasets = series.map(g => ({
     label: g.label, borderColor: hue(g), backgroundColor: hue(g),
@@ -307,7 +326,7 @@ function renderChart(d) {
   };
   setPerfChart(new Chart(el.getContext('2d'), {
     type: 'line',
-    data: { labels, datasets },
+    data: { datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
@@ -315,9 +334,13 @@ function renderChart(d) {
         if (els.length) toggle(this.data.datasets[els[0].datasetIndex].label);
       },
       scales: {
-        x: { type: 'category', grid: { display: false },
-             ticks: { autoSkip: true, maxRotation: 0,
-                      callback(v) { return fmtDate(this.getLabelForValue(v)); } } },
+        x: { type: 'linear', min: xs[0], max: xs[xs.length - 1],
+             grid: { display: false },
+             // Graduations aux seuls arretes : entre deux, aucune date n'a ete
+             // relevee, et une graduation intermediaire suggererait le contraire.
+             afterBuildTicks: a => { a.ticks = xs.map(value => ({ value })); },
+             ticks: { autoSkip: true, maxRotation: 0, includeBounds: true,
+                      callback: v => fmtDate(new Date(v).toISOString().slice(0, 10)) } },
         y: { title: { display: true, text: 'base 100 au premier arrêté' },
              grid: { color: border } },
       },

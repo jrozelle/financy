@@ -7,6 +7,22 @@
 - Ne crée jamais de PR sans demande explicite
 - Après chaque phase : rappeler la checklist de test local et attendre le feedback
 
+## Interface
+- **Jamais d'attribut `title` natif pour une information necessaire.** Il ne
+  s'affiche pas de facon fiable (Firefox, mobile, lecteurs d'ecran), et une
+  liste de plusieurs elements y est illisible. Une information indispensable
+  s'affiche : ligne visible, panneau depliable (`aria-expanded` + bouton), ou
+  popover maison. Le `title` reste acceptable pour une precision purement
+  facultative sur un element deja explicite.
+- Un element ecarte d'un calcul ne disparait jamais sans explication : il figure
+  dans un decompte, et le detail est consultable (statut, valeur, date).
+- Colonnes de liste triables au clic, avec `aria-sort` et acces clavier.
+- Chart.js : jamais d'echelle `category` pour une serie temporelle — les points
+  seraient equidistants et la pente faussee. Echelle numerique sur l'epoch, et
+  toutes les series alignees sur la meme liste d'abscisses (les trous a `null`),
+  sans quoi le mode d'interaction `index` regroupe les points par position dans
+  le tableau et melange les dates.
+
 ## Code
 - Pas d'emojis dans le code
 - Dark mode cohérent dans toutes les nouvelles modales et popovers
