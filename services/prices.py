@@ -370,7 +370,16 @@ def refresh_securities(conn, provider=None, only_stale=False, stale_hours=20):
         price, price_date = result
 
         manual_ref = None if getattr(provider, 'name', None) == 'mock' else _latest_manual_unit_price(conn, isin)
-        if manual_ref and _is_price_divergent_from_recent_manual(price, price_date, *manual_ref):
+        # Le `market_value` enregistre est en euros, le cours dans la devise de
+        # cotation : il faut ramener le second au premier avant de les comparer.
+        # Sans cela le garde-fou voyait un dollar diverger d'un euro et refusait
+        # tout rafraichissement des titres americains — leur cours restait fige.
+        devise_cmp = (conn.execute('SELECT currency FROM securities WHERE isin=?',
+                                   (isin,)).fetchone() or {'currency': 'EUR'})['currency']
+        taux_cmp = _fx_rate_for(conn, devise_cmp)
+        prix_cmp = (price / taux_cmp) if taux_cmp else None
+        if manual_ref and prix_cmp is not None and _is_price_divergent_from_recent_manual(
+                prix_cmp, price_date, *manual_ref):
             logger.warning('refresh: %s prix divergent de la valo manuelle recente (%.2f vs %.2f) — IGNORE',
                            isin, price, manual_ref[0])
             stats.setdefault('divergent', []).append({
@@ -514,6 +523,15 @@ def _latest_manual_unit_price(conn, isin):
     if not row or not row['market_value'] or not row['quantity']:
         return None
     return (row['market_value'] / row['quantity'], row['d'])
+
+
+def _fx_rate_for(conn, devise):
+    """Taux EURxxx le plus recent, ou None. 1 pour l'euro."""
+    if not devise or devise.upper() == 'EUR':
+        return 1.0
+    row = conn.execute('SELECT rate FROM fx_rates WHERE pair=? ORDER BY date DESC LIMIT 1',
+                       (f'EUR{devise.upper()}',)).fetchone()
+    return row['rate'] if row and row['rate'] else None
 
 
 def _is_price_divergent_from_recent_manual(price, price_date, manual_price, manual_date):
