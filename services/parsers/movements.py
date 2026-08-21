@@ -29,7 +29,19 @@ from typing import List, Optional
 # releves du PEA et dans aucun de ceux du compte-titres.
 # Un utilisateur peut affiner via une correspondance stockee en base
 # (`config.account_map`), passee en argument : elle a priorite.
-_PEA_MARKERS = ('COMPTE PEA', 'P.E.A', 'PEA')
+# Enveloppe deduite d'un libelle porte par le document : "Compte d'epargne :
+# Livret Bourso+", "Compte a vue P.E.A.". Le plus specifique d'abord — un
+# releve de livret peut mentionner le PEA ailleurs dans la page.
+_ENVELOPE_MARKERS = (
+    ('LIVRET BOURSO', 'Livret Bourso+'),
+    ('LIVRET A', 'Livret A'),
+    ('LIVRET DE DEVELOPPEMENT', 'LDDS'),
+    ('LDDS', 'LDDS'),
+    ('PLAN EPARGNE LOGEMENT', 'PEL/CEL'),
+    ('COMPTE PEA', 'PEA'),
+    ('P.E.A', 'PEA'),
+    ('PEA', 'PEA'),
+)
 DEFAULT_ENVELOPE = 'Compte-titres'
 
 # Etablissement propose par defaut. Ce n'est qu'une suggestion : il DOIT
@@ -46,11 +58,16 @@ def detect_envelope(text: str, account_map: Optional[dict] = None) -> Optional[s
             if account and str(account) in text:
                 return envelope
     flat = _flat(text)
-    if any(m in flat for m in _PEA_MARKERS):
-        return 'PEA'
+    for marker, envelope in _ENVELOPE_MARKERS:
+        if marker in flat:
+            return envelope
     return DEFAULT_ENVELOPE
 
-_AMOUNT = re.compile(r'(\d{1,3}(?:[ .  ]\d{3})*,\d{2}|\d+,\d{2})')
+# La garde arriere evite de coller la date de valeur au montant : sur le
+# gabarit 2026, ou la date de valeur precede immediatement le montant,
+# "27/02/2026 100,00" se lisait 26 100,00 EUR — le "026" de l'annee etant pris
+# pour un groupe de milliers.
+_AMOUNT = re.compile(r'(?<![\d/.,])(\d{1,3}(?:[ \u202f\u00a0.]\d{3})*,\d{2})')
 # Le cours de change porte 6 a 8 decimales : la regex des montants, qui en
 # impose exactement deux, le tronquerait a 1,13 et faussait la contrevaleur.
 _FX = re.compile(r'\b(\d{1,2},\d{4,})\b')
@@ -241,17 +258,31 @@ def _check_avis(mv: DetectedMovement):
 # l'extracteur : on cherche donc des prefixes, sans frontiere de mot a droite.
 _FLUX_LABEL = [
     (r'\bVIR|VIREMENT', 'Versement'),
-    (r'COUPON|DIVIDENDE|REMBOURSEMENT', 'Dividende/Intérêt'),
+    (r'COUPON|DIVIDENDE|REMBOURSEMENT|INTER\.?BRUTS|INTERETS', 'Dividende/Intérêt'),
     (r'FRAIS|COMMISSION|DROITS DE GARDE|TAXE', 'Frais'),
 ]
 
 
+# Les prelevements fiscaux et sociaux sur les interets ne sont pas des flux
+# externes : ils reduisent le rendement, ils n'en sortent pas. Les compter comme
+# des retraits gonflerait la performance de leur montant.
+_IGNORED_LABELS = (r'PRELEVEMENT', r'\bCSG\b', r'\bCRDS\b')
+
+
 def _flux_type(label: str, sens: str) -> Optional[str]:
     up = _ascii(label)
-    if re.search(r'ACHAT|VENTE|SOUSCRIPTION|REPRISE', up.replace(' ', '')):
-        return None          # mouvement de titres, deja porte par l'avis
-    if 'OUVERTURE' in up:
+    if any(re.search(pat, up) for pat in _IGNORED_LABELS):
         return None
+    if re.search(r'OUVERTURE\s*(DE\s*)?COMPTE', up):
+        return None
+    # Un libelle prefixe VIR designe un virement, meme quand il nomme ce qu'il
+    # finance : "VIR Achat crypto" sort bien de l'especes du livret. La
+    # regle suivante, qui ecarte les mouvements de titres deja portes par un
+    # avis d'opere, ne doit donc pas le happer.
+    virement = re.match(r'\*?\s*(VIR\b|VIREMENT)', up)
+    if not virement and re.search(r'ACHAT|VENTE|SOUSCRIPTION|REPRISE',
+                                  up.replace(' ', '')):
+        return None          # mouvement de titres, deja porte par l'avis
     for pattern, kind in _FLUX_LABEL:
         if re.search(pattern, up):
             if kind == 'Versement' and sens == 'debit':
@@ -278,95 +309,157 @@ def _balances(lines):
     return first, last
 
 
-def _split_columns(rows):
-    """Separe debit et credit sans en-tete, par la position des montants.
+# Ecart minimal, en points PDF, entre la colonne debit et la colonne credit.
+# Mesure sur les releves BoursoBank : debit cale a droite sur x=479, credit sur
+# x=546, soit 66 points. Un ecart sous ce seuil signale une colonne unique.
+COLUMN_GAP_PT = 20
+# Tolerance d'alignement a droite d'une meme colonne : les glyphes varient de
+# moins d'un point d'un montant a l'autre.
+COLUMN_TOL_PT = 3
+# Ecart d'ordonnee en deca duquel deux mots appartiennent a la meme ligne.
+LINE_TOL_PT = 2.5
 
-    Le format 2026 perd son en-tete a l'extraction : impossible de s'appuyer sur
-    la position des libelles "Debit"/"Credit". Les montants, eux, restent
-    alignes en deux colonnes ; on cherche donc la plus large coupure dans leurs
-    abscisses. Retourne le seuil, ou None si tout tient dans une seule colonne.
+
+def _split_columns(rights):
+    """Seuil separant debit et credit d'apres les bords droits des montants.
+
+    Les deux colonnes sont calees a droite. Le texte mis en page par pdfplumber
+    ne conserve pas cet alignement — il place chaque jeton d'apres son bord
+    GAUCHE, si bien qu'un montant a six chiffres et un montant a trois d'une
+    meme colonne finissent a sept caracteres d'ecart. Les coordonnees, elles,
+    separent les colonnes de 66 points : on travaille donc sur elles.
+    Retourne le seuil, ou None si tout tient dans une seule colonne.
     """
-    centres = sorted({round(c) for _, _, c, _ in rows})
-    if len(centres) < 2:
+    uniq = sorted(set(rights))
+    if len(uniq) < 2:
         return None
-    gaps = [(centres[k + 1] - centres[k], centres[k]) for k in range(len(centres) - 1)]
+    gaps = [(uniq[k + 1] - uniq[k], uniq[k]) for k in range(len(uniq) - 1)]
     width, at = max(gaps)
-    # Une coupure franche vaut plusieurs caracteres ; en dessous, les montants
-    # sont dans la meme colonne et le sens ne peut pas etre deduit ainsi.
-    return at + width / 2 if width >= 6 else None
+    return at + width / 2 if width >= COLUMN_GAP_PT else None
 
 
-def parse_releve_especes(text: str, account_map: Optional[dict] = None) -> List[DetectedMovement]:
-    """Un releve = N mouvements de tresorerie. Retourne [] si ce n'en est pas un."""
+def _lines_from_words(pages):
+    """Regroupe les mots d'un PDF en lignes, page par page.
+
+    Le regroupement se fait par balayage et non par tranches fixes : deux mots
+    d'une meme ligne peuvent differer d'un point d'ordonnee, et une tranche de
+    largeur fixe les separe des qu'ils tombent de part et d'autre d'une borne —
+    c'est ainsi que le libelle "Nouveau solde en EUR" se retrouvait sans son
+    montant, et le controle des soldes sans son terme final.
+    """
+    out = []
+    for words in pages:
+        courante, repere = [], None
+        for w in sorted(words, key=lambda w: (float(w['top']), float(w['x0']))):
+            haut = float(w['top'])
+            if repere is None or haut - repere <= LINE_TOL_PT:
+                courante.append(w)
+                repere = haut if repere is None else repere
+            else:
+                out.append(sorted(courante, key=lambda w: float(w['x0'])))
+                courante, repere = [w], haut
+        if courante:
+            out.append(sorted(courante, key=lambda w: float(w['x0'])))
+    return out
+
+
+def _rows_from_words(pages):
+    """(rows, soldes) extraits des coordonnees plutot que du texte mis en page.
+
+    rows : (date ISO, libelle, montant, bord droit du montant).
+    soldes : (solde initial, solde final) quand le releve les porte.
+
+    Seules les lignes situees entre le solde initial et le solde final sont
+    retenues. L'en-tete du releve porte lui aussi une date et un montant — la
+    periode et un "0,00" de frais — dans une colonne a lui : le prendre pour un
+    mouvement creait un troisieme alignement qui faussait la frontiere
+    debit/credit, et donc le sens de tous les mouvements de la page.
+    """
+    rows, first, last, dans_table = [], None, None, False
+    for line in _lines_from_words(pages):
+        texte = ' '.join(w['text'] for w in line)
+        plat = _flat(texte)
+        montants = [w for w in line
+                    if _AMOUNT.fullmatch(w['text'].replace('\u00a0', ' '))]
+        if 'ANCIEN SOLDE' in plat or 'SOLDE AU' in plat:
+            if montants and first is None:
+                first = _num(montants[-1]['text'])
+            dans_table = True
+            continue
+        if 'NOUVEAU SOLDE' in plat or 'SOLDE FINAL' in plat:
+            if montants:
+                last = _num(montants[-1]['text'])
+            dans_table = False
+            continue
+        if not dans_table or not montants:
+            continue
+        md = re.match(r'(\d{2})/(\d{2})/(\d{4})\s+(\S.*)$', texte)
+        if not md:
+            continue
+        # Le libelle s'arrete a la date de valeur, qui precede le montant.
+        libelle = re.sub(r'\s*\d{2}/\d{2}/\d{4}.*$', '', md.group(4)).strip()
+        rows.append((f'{md.group(3)}-{md.group(2)}-{md.group(1)}',
+                     libelle or md.group(4).strip(),
+                     _num(montants[-1]['text']), float(montants[-1]['x1'])))
+    return rows, (first, last)
+
+
+def parse_releve_especes(text: str, account_map: Optional[dict] = None,
+                        words: Optional[list] = None) -> List[DetectedMovement]:
+    """Un releve = N mouvements de tresorerie. Retourne [] si ce n'en est pas un.
+
+    `words` : les mots du PDF, page par page (`page.extract_words()`). Quand
+    l'appelant les fournit, le sens debit/credit vient des coordonnees, seules
+    fiables sur le gabarit 2026 qui perd son en-tete a l'extraction. Sans eux,
+    on retombe sur l'en-tete du texte mis en page.
+    """
     up = _flat(text)
     if 'RELEVE COMPTE ESPECES' not in up and 'EXTRAIT DE VOTRE COMPTE' not in up:
         return []
     lines = text.split('\n')
     env = detect_envelope(text, account_map)
 
-    # En-tete debit/credit quand il survit a l'extraction.
-    col_d = col_c = None
-    for ln in lines:
-        a = _flat(ln)
-        if 'DEBIT' in a and 'CREDIT' in a:
-            au = ln.upper()
-            i_d = au.find('DÉBIT') if 'DÉBIT' in au else au.find('DEBIT')
-            i_c = au.find('CRÉDIT') if 'CRÉDIT' in au else au.find('CREDIT')
-            if i_d >= 0 and i_c >= 0:
-                col_d, col_c = i_d + 2.5, i_c + 3.0
-            break
+    if words:
+        rows, soldes = _rows_from_words(words)
+        seuil = _split_columns([r[3] for r in rows])
+        # A droite du seuil : credit. Les deux colonnes sont calees a droite,
+        # celle du credit etant la plus a droite des deux.
+        def sens_of(pos):
+            return 'credit' if seuil is not None and pos > seuil else 'debit'
+    else:
+        rows = _rows_from_text(lines)
+        soldes = _balances(lines)
+        col_d, col_c = _header_columns(lines)
 
-    # Toutes les lignes datees portant un montant, sens encore indetermine.
-    rows = []
-    for ln in lines:
-        md = re.match(r'\s*(\d{2}/\d{2}/\d{4})\s+(\S.*?)(?:\s{2,}|$)', ln)
-        if not md:
-            continue
-        a = _flat(ln)
-        if 'ANCIEN SOLDE' in a or 'NOUVEAU SOLDE' in a or 'SOLDE AU' in a:
-            continue
-        hits = [(mm, (mm.start() + mm.end()) / 2) for mm in _AMOUNT.finditer(ln)]
-        hits = [h for h in hits if not re.match(r'\d{2}/\d{2}/\d{4}', h[0].group(0))]
-        if not hits:
-            continue
-        mm, centre = hits[-1]
-        d, mo, y = md.group(1).split('/')
-        rows.append((f'{y}-{mo}-{d}', md.group(2).strip(), centre, _num(mm.group(1))))
+        def sens_of(pos):
+            if col_d is None or col_c is None:
+                return 'credit'
+            return 'credit' if abs(pos - col_c) < abs(pos - col_d) else 'debit'
 
     if not rows:
         return []
-
-    threshold = None
-    if col_d is None or col_c is None:
-        threshold = _split_columns(rows)
-
-    def sens_of(centre):
-        if col_d is not None and col_c is not None:
-            return 'credit' if abs(centre - col_c) < abs(centre - col_d) else 'debit'
-        if threshold is not None:
-            return 'credit' if centre > threshold else 'debit'
-        return 'credit'
-
-    senses = [sens_of(c) for _, _, c, _ in rows]
+    senses = [sens_of(r[3]) for r in rows]
 
     # Controle global : solde initial + credits - debits = solde final. S'il
     # echoue, on teste le sens inverse avant de renoncer — mieux vaut un sens
-    # verifie qu'une convention supposee.
-    first, last = _balances(lines)
+    # verifie qu'une convention supposee. L'inversion en bloc n'a de sens que
+    # sur un releve a colonne unique, ou aucune coordonnee ne tranche.
+    first, last = soldes
     check = None
     if first is not None and last is not None:
         def closes(sq):
             total = first + sum(v if s == 'credit' else -v
-                                for (_, _, _, v), s in zip(rows, sq))
+                                for (_, _, v, _), s in zip(rows, sq))
             return abs(total - last) <= 0.02
+        inverse = ['debit' if s == 'credit' else 'credit' for s in senses]
         if closes(senses):
             check = 'solde initial + crédits − débits = solde final'
-        elif closes(['debit' if s == 'credit' else 'credit' for s in senses]):
-            senses = ['debit' if s == 'credit' else 'credit' for s in senses]
+        elif closes(inverse):
+            senses = inverse
             check = 'sens rétabli par le contrôle des soldes'
 
     out = []
-    for (date, label, _, amount), sens in zip(rows, senses):
+    for (date, label, amount, _pos), sens in zip(rows, senses):
         ftype = _flux_type(label, sens)
         if not ftype:
             continue
@@ -382,7 +475,45 @@ def parse_releve_especes(text: str, account_map: Optional[dict] = None) -> List[
     return out
 
 
-def parse_movements(text: str, account_map: Optional[dict] = None) -> List[DetectedMovement]:
-    """Point d'entree : detecte la nature du document et dispatche."""
+def _header_columns(lines):
+    """Position des en-tetes Debit et Credit dans le texte mis en page."""
+    for ln in lines:
+        if 'DEBIT' in _flat(ln) and 'CREDIT' in _flat(ln):
+            au = ln.upper()
+            i_d = au.find('DÉBIT') if 'DÉBIT' in au else au.find('DEBIT')
+            i_c = au.find('CRÉDIT') if 'CRÉDIT' in au else au.find('CREDIT')
+            if i_d >= 0 and i_c >= 0:
+                return i_d + 2.5, i_c + 3.0
+            break
+    return None, None
+
+
+def _rows_from_text(lines):
+    """Repli sans coordonnees : lignes datees portant un montant."""
+    rows = []
+    for ln in lines:
+        md = re.match(r'\s*(\d{2}/\d{2}/\d{4})\s+(\S.*?)(?:\s{2,}|$)', ln)
+        if not md:
+            continue
+        a = _flat(ln)
+        if 'ANCIEN SOLDE' in a or 'NOUVEAU SOLDE' in a or 'SOLDE AU' in a:
+            continue
+        hits = [mm for mm in _AMOUNT.finditer(ln)
+                if not re.match(r'\d{2}/\d{2}/\d{4}', mm.group(0))]
+        if not hits:
+            continue
+        mm = hits[-1]
+        d, mo, y = md.group(1).split('/')
+        rows.append((f'{y}-{mo}-{d}', md.group(2).strip(), _num(mm.group(1)),
+                     (mm.start() + mm.end()) / 2))
+    return rows
+
+
+def parse_movements(text: str, account_map: Optional[dict] = None,
+                    words: Optional[list] = None) -> List[DetectedMovement]:
+    """Point d'entree : detecte la nature du document et dispatche.
+
+    `words` n'est utile qu'aux releves d'especes : voir parse_releve_especes.
+    """
     return (parse_avis_opere(text, account_map)
-            or parse_releve_especes(text, account_map))
+            or parse_releve_especes(text, account_map, words))

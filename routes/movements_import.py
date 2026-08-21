@@ -27,10 +27,15 @@ _EXTRACT = {'layout': True, 'x_tolerance': 1, 'y_tolerance': 2}
 
 
 def _text(file_bytes):
-    """Couche texte du PDF, mise en page conservee."""
+    """(texte mis en page, mots par page) du PDF.
+
+    Les mots portent leurs coordonnees : sur les releves d'especes, elles sont
+    le seul indice fiable de la colonne debit ou credit, la mise en page texte
+    ne conservant pas l'alignement a droite des montants.
+    """
     from io import BytesIO
     import pdfplumber
-    out = []
+    out, words = [], []
     with pdfplumber.open(BytesIO(file_bytes)) as pdf:
         for page in pdf.pages:
             try:
@@ -40,7 +45,11 @@ def _text(file_bytes):
                     out.append(page.extract_text() or '')
                 except Exception:
                     pass
-    return '\n'.join(out)
+            try:
+                words.append(page.extract_words(x_tolerance=1, y_tolerance=2))
+            except Exception:
+                words.append([])
+    return '\n'.join(out), words
 
 
 def _known_docs(conn):
@@ -107,11 +116,11 @@ def _read(files, owner, establishment=None):
             rejets.append({'file': f.filename, 'reason': 'fichier trop volumineux (5 Mo max)'})
             continue
         try:
-            text = _text(raw)
+            text, words = _text(raw)
         except Exception as e:
             rejets.append({'file': f.filename, 'reason': f'PDF illisible : {e}'})
             continue
-        mvs = parse_movements(text)
+        mvs = parse_movements(text, words=words)
         if not mvs:
             rejets.append({'file': f.filename,
                            'reason': 'ni avis d\'opéré ni relevé d\'espèces exploitable'})

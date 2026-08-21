@@ -17,7 +17,8 @@ os.environ['PRICE_PROVIDER'] = 'mock'
 from models import init_db, get_db  # noqa: E402
 from app import app  # noqa: E402
 from services.parsers.movements import (parse_avis_opere, parse_releve_especes,  # noqa: E402
-                                        parse_movements, _num, _flat)
+                                        parse_movements, _num, _flat,
+                                        _rows_from_words, _split_columns)
 
 # Gabarits reels reduits a l'essentiel, mise en page conservee.
 AVIS_ACHAT = """                                    OPERATION DE BOURSE
@@ -328,3 +329,115 @@ class TestImportEndpoint:
         r = self._post(client, 'preview', [('avis', AVIS_DEVISE)])
         # Aucune position : l'enveloppe lue ne correspond a rien de connu
         assert 'Compte-titres' in r.get_json()['summary']['unresolved_envelopes']
+
+
+# ─── Releve d'especes lu par les coordonnees ────────────────────────────────
+
+# Les deux colonnes de montants sont calees a DROITE : x1=479 pour le debit,
+# x1=546 pour le credit. Les libelles etant de longueurs differentes, leurs
+# bords GAUCHES ne s'alignent pas — c'est tout le piege que ce gabarit tend au
+# texte mis en page, qui place chaque jeton d'apres son bord gauche et melange
+# alors les deux colonnes.
+def _mot(texte, x1, top):
+    return {'text': texte, 'x0': x1 - 7.0 * len(texte), 'x1': x1, 'top': top}
+
+
+def _ligne(top, date, libelle, montant, x1):
+    mots = [_mot(date, 100.0, top)]
+    mots.append(_mot(libelle, 100.0 + 7.0 * (len(libelle) + 2), top))
+    mots.append(_mot(date, 420.0, top))          # date de valeur
+    mots.append(_mot(montant, x1, top + 0.4))    # decale : meme ligne quand meme
+    return mots
+
+
+DEBIT, CREDIT = 479.3, 546.0
+
+
+def _releve_words():
+    """Un releve complet : en-tete parasite, bornes de solde, quatre mouvements."""
+    mots = []
+    # L'en-tete porte lui aussi une date et un montant, dans une colonne a lui.
+    mots += _ligne(50.0, '28/02/2026', 'EUR periode', '0,00', 441.9)
+    mots += [_mot('SOLDE AU : 30/01/2026', 300.0, 100.0),
+             _mot('4.321,00', CREDIT, 100.4)]
+    mots += _ligne(120.0, '02/02/2026', 'VIR frais divers', '670,00', DEBIT)
+    mots += _ligne(140.0, '17/02/2026', 'VIR CC vers livret', '1.200,00', CREDIT)
+    mots += _ligne(160.0, '17/02/2026', 'VIR epargne vers livret', '2.400,00', CREDIT)
+    mots += _ligne(180.0, '27/02/2026', 'VIR livret vers CC', '1.470,00', DEBIT)
+    mots += [_mot('Nouveau solde en EUR :', 300.0, 250.0),
+             _mot('5.781,00', CREDIT, 250.4)]
+    # Hors bornes : ne doit pas etre lu.
+    mots += _ligne(400.0, '05/03/2026', 'VIR posterieur au solde', '999,00', DEBIT)
+    return [mots]
+
+
+TEXTE_RELEVE_2026 = 'Extrait de votre compte en EUR\nCompte epargne : LIVRET BOURSO+\n'
+
+
+class TestReleveParCoordonnees:
+
+    def test_colonnes_separees_par_les_coordonnees(self):
+        rows, _ = _rows_from_words(_releve_words())
+        seuil = _split_columns([r[3] for r in rows])
+        assert seuil is not None
+        assert DEBIT < seuil < CREDIT
+
+    def test_entete_et_hors_bornes_ecartes(self):
+        """Seules les lignes entre solde initial et solde final sont des mouvements.
+
+        L'en-tete du releve porte une date et un "0,00" dans une troisieme
+        colonne : le lire comme un mouvement creait un alignement de plus et
+        deplacait la frontiere debit/credit, inversant tous les sens de la page.
+        """
+        rows, _ = _rows_from_words(_releve_words())
+        assert len(rows) == 4
+        assert all('periode' not in r[1] and 'posterieur' not in r[1] for r in rows)
+
+    def test_soldes_lus_malgre_le_decalage_de_ligne(self):
+        """Le montant du solde final est decale de 0,4 pt : c'est la meme ligne."""
+        _, (premier, dernier) = _rows_from_words(_releve_words())
+        assert premier == 4321.00
+        assert dernier == 5781.00
+
+    def test_sens_verifie_par_les_soldes(self):
+        mvs = parse_releve_especes(TEXTE_RELEVE_2026, words=_releve_words())
+        assert [m.flux_type for m in mvs] == [
+            'Retrait', 'Versement', 'Versement', 'Retrait']
+        assert all(m.checks and not m.warnings for m in mvs)
+
+    def test_enveloppe_livret(self):
+        mvs = parse_releve_especes(TEXTE_RELEVE_2026, words=_releve_words())
+        assert {m.envelope for m in mvs} == {'Livret Bourso+'}
+
+    def test_annee_non_prise_pour_un_millier(self):
+        """"27/02/2026 1.470,00" ne doit pas se lire 26 1 470,00.
+
+        Le "026" de l'annee se collait au montant comme groupe de milliers.
+        """
+        mvs = parse_releve_especes(TEXTE_RELEVE_2026, words=_releve_words())
+        assert max(m.net_eur for m in mvs) == 2400.0
+
+    def test_virement_finançant_un_achat_reste_un_flux(self):
+        """"VIR Achat crypto" sort bien de l'especes : ce n'est pas un titre.
+
+        La regle qui ecarte les mouvements de titres, deja portes par un avis
+        d'opere, happait ce virement et perdait 500 EUR de retrait.
+        """
+        mots = [_mot('SOLDE AU : 01/01/2026', 300.0, 100.0),
+                _mot('1.000,00', CREDIT, 100.0)]
+        mots += _ligne(120.0, '30/01/2026', 'VIR Achat crypto', '500,00', DEBIT)
+        mots += [_mot('Nouveau solde en EUR :', 300.0, 200.0),
+                 _mot('500,00', CREDIT, 200.0)]
+        mvs = parse_releve_especes(TEXTE_RELEVE_2026, words=[mots])
+        assert [(m.flux_type, m.net_eur) for m in mvs] == [('Retrait', 500.0)]
+
+    def test_virement_mentionnant_une_ouverture_reste_un_flux(self):
+        """"VIR vers CC pour ouverture CA31" est un retrait, pas une ouverture."""
+        mots = [_mot('SOLDE AU : 01/02/2026', 300.0, 100.0),
+                _mot('10.000,00', CREDIT, 100.0)]
+        mots += _ligne(120.0, '18/02/2026', 'VIR vers CC pour ouverture CA31',
+                       '5.000,00', DEBIT)
+        mots += [_mot('Nouveau solde en EUR :', 300.0, 200.0),
+                 _mot('5.000,00', CREDIT, 200.0)]
+        mvs = parse_releve_especes(TEXTE_RELEVE_2026, words=[mots])
+        assert [(m.flux_type, m.net_eur) for m in mvs] == [('Retrait', 5000.0)]
