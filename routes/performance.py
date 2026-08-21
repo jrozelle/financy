@@ -31,12 +31,18 @@ performance_bp = Blueprint('performance', __name__)
 # l'annee donne un chiffre a trois chiffres qui n'informe sur rien.
 MIN_DAYS_ANNUALISE = 180
 
-# Categories sur lesquelles un rendement n'a pas de sens. Un compte courant ou
-# un livret ne "performe" pas : sa valeur bouge parce que de l'argent entre et
-# sort, et ces mouvements internes ne sont pas des flux externes. Un compte
-# courant affichait +324 % sur deux mois. Idem pour les objets de valeur,
-# reevalues a la main sans flux.
-NON_MEASURABLE_CATEGORIES = {'Cash & dépôts', 'Objets de valeur'}
+# Objets de valeur : reevalues a la main, sans flux, souvent par paliers. Un
+# tableau qu'on fait estimer n'a pas "performe" parce que son estimation a
+# change.
+NON_MEASURABLE_CATEGORIES = {'Objets de valeur'}
+
+# Enveloppes de transaction, a distinguer de l'epargne. Un livret produit des
+# interets : son rendement est faible mais reel, et se mesure. Un compte courant
+# non : son solde bouge au rythme des depenses et des virements, qui ne sont pas
+# des flux d'investissement — un compte courant affichait plusieurs centaines de
+# pourcents sur un trimestre. C'est l'enveloppe qui tranche, pas la categorie
+# comptable : les deux partagent "Cash & depots".
+NON_MEASURABLE_ENVELOPES = {'Compte courant'}
 
 # Variation au-dela de laquelle un mouvement non declare est plus probable
 # qu'une performance reelle. Une TWR ne vaut que ce que vaut la table `flux`.
@@ -286,10 +292,11 @@ def get_performance():
         if cumul is None:
             status = ('negative' if g_values and min(g_values.values()) <= 0
                       else 'insufficient')
-        elif set(g_cats) - NON_MEASURABLE_CATEGORIES:
-            status = 'ok'
-        else:
+        elif (gk[0] in NON_MEASURABLE_ENVELOPES
+              or not set(g_cats) - NON_MEASURABLE_CATEGORIES):
             status = 'non_measurable'
+        else:
+            status = 'ok'
         m = meta.get(members[0], {})
         # Le capital apporte n'a de sens que sur la periode mesuree : additionner
         # des versements anterieurs au premier arrete afficherait un apport que
@@ -352,4 +359,5 @@ def get_performance():
                      for e in out if e['status'] != 'ok'],
         'min_days_annualise': MIN_DAYS_ANNUALISE,
         'non_measurable_categories': sorted(NON_MEASURABLE_CATEGORIES),
+        'non_measurable_envelopes': sorted(NON_MEASURABLE_ENVELOPES),
     })
