@@ -413,3 +413,40 @@ class TestComposition:
         g = client.get('/api/performance').get_json()['groups'][0]
         assert g['flux_net'] == pytest.approx(1000.0)
         assert g['flux_count'] == 1
+
+
+class TestEpargne:
+    """Un livret a un rendement faible mais reel ; un compte courant n'en a pas.
+
+    Les deux partagent la categorie "Cash & depots" : c'est l'enveloppe qui
+    tranche, pas la categorie comptable.
+    """
+
+    def _cash(self, envelope, valeurs):
+        with get_db() as conn:
+            for d, v in valeurs:
+                conn.execute("""INSERT INTO positions (date, owner, category, envelope,
+                    establishment, value, debt, ownership_pct, debt_pct)
+                    VALUES (?,'Alice','Cash & dépôts',?,'X',?,0,1.0,1.0)""", (d, envelope, v))
+            conn.commit()
+
+    def test_livret_mesurable(self, client):
+        self._cash('Livret A', [('2026-01-01', 20000), ('2026-08-01', 20400)])
+        g = client.get('/api/performance').get_json()['groups'][0]
+        assert g['status'] == 'ok'
+        assert g['twr'] == pytest.approx(0.02)
+
+    def test_compte_courant_non_mesurable(self, client):
+        self._cash('Compte courant', [('2026-01-01', 3000), ('2026-08-01', 9000)])
+        g = client.get('/api/performance').get_json()['groups'][0]
+        assert g['status'] == 'non_measurable'
+
+    def test_objet_de_valeur_non_mesurable(self, client):
+        with get_db() as conn:
+            for d, v in (('2026-01-01', 22000), ('2026-08-01', 47000)):
+                conn.execute("""INSERT INTO positions (date, owner, category, envelope,
+                    establishment, value, debt, ownership_pct, debt_pct)
+                    VALUES (?,'Alice','Objets de valeur','Autre',NULL,?,0,1.0,1.0)""", (d, v))
+            conn.commit()
+        g = client.get('/api/performance').get_json()['groups'][0]
+        assert g['status'] == 'non_measurable'

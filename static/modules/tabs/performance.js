@@ -32,12 +32,13 @@ export async function loadPerformance() {
 
 // Les groupes sans rendement calculable restent affiches : les masquer ferait
 // diverger le total de cet onglet de celui de la synthese, sans explication.
-// La tresorerie est ecartee sans recours : un compte courant ou un livret n'a
-// pas de rendement, sa valeur bouge parce que l'argent entre et sort. L'afficher
-// meme grise n'apprend rien et noie les comptes qui, eux, performent. Le compte
-// des exclusions reste indique pour que le total reste explicable.
-const visible = () => (V.data?.groups || [])
-  .filter(g => g.status !== 'non_measurable');
+// Ne restent affiches que les comptes dont un rendement se mesure. Sont ecartes
+// les comptes courants et les objets de valeur (aucun rendement a mesurer), et
+// les capitaux propres negatifs (aucun rendement calculable sur une base
+// negative, quel que soit l'historique). Le decompte figure dans l'en-tete pour
+// que le total reste explicable.
+const HIDDEN = new Set(['non_measurable', 'negative']);
+const visible = () => (V.data?.groups || []).filter(g => !HIDDEN.has(g.status));
 const LABELS = { insufficient: 'historique insuffisant', negative: 'capital négatif',
                  non_measurable: 'trésorerie, aucun rendement' };
 const current = () => V.focus
@@ -64,7 +65,7 @@ export function renderPerformance() {
 function renderHeader(d) {
   const host = document.getElementById('perf-controls');
   if (!host) return;
-  const hidden = (d.groups || []).filter(g => g.status === 'non_measurable').length;
+  const hidden = (d.groups || []).filter(g => HIDDEN.has(g.status)).length;
   host.innerHTML = `
     <div class="seg" role="group" aria-label="Maille d'agrégation">
       <button type="button" class="seg-btn ${V.group === 'account' ? 'is-on' : ''}" data-group="account"
