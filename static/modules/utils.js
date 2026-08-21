@@ -52,6 +52,22 @@ export function kpiDelta(variation, deltaKey, pctKey = null, { invert = false, l
   return `<div class="${cls}">${labelStr}${arrow} ${fmtDelta(delta)}${pctStr}</div>`;
 }
 
+// `flux.amount` est toujours stocke en valeur absolue : c'est le TYPE qui porte
+// le sens, comme dans le calcul du TRI et celui de la TWR. L'afficher tel quel
+// donnait un retrait a +241 885 EUR, et un total qui additionnait les sorties
+// aux entrees au lieu de les retrancher. Vu du compte : un versement et un
+// coupon entrent, un retrait et des frais sortent. Un type inconnu garde le
+// signe stocke, faute de mieux.
+const FLUX_SENS = { 'Versement': 1, 'Dividende/Intérêt': 1, 'Retrait': -1, 'Frais': -1 };
+
+/** Montant signe d'un flux, du point de vue du compte. */
+export const fluxSigned = f =>
+  (FLUX_SENS[f.type] ?? (Math.sign(f.amount || 0) || 1)) * Math.abs(f.amount || 0);
+
+/** Montant avec son signe explicite : le "+" d'une entree se lit mieux. */
+export const fmtSigned = (v, dec = 0) =>
+  `${v > 0 ? '+' : v < 0 ? '−' : ''}${fmt(Math.abs(v), dec)}`;
+
 export const today = () => new Date().toISOString().slice(0, 10);
 
 export function parseLocaleNumber(value, fallback = NaN) {
