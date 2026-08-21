@@ -2,8 +2,46 @@ import { api } from '../api.js';
 import { S, perfChart, setPerfChart } from '../state.js';
 import { fmt, esc, fmtDate, getColors, chartBorderColor, destroyChart } from '../utils.js';
 
-// Etat local : donnees, groupe isole, maille, affichage du non mesurable.
-const V = { data: null, focus: null, group: 'account' };
+// Etat local : donnees, groupe isole, maille, tri de la liste.
+// Le tri par defaut est celui que produit l'API — valeur decroissante — pour
+// qu'ouvrir l'onglet et cliquer un en-tete ne donnent pas deux ordres sans
+// rapport. Il survit au rechargement des donnees : reordonner puis changer de
+// maille ne doit pas ramener a l'ordre initial.
+const V = { data: null, focus: null, group: 'account',
+            sort: { col: 'value', dir: 'desc' } };
+
+// Cles de tri. Le nom concatene l'enveloppe et le libelle de compte, dans
+// l'ordre ou la ligne les affiche.
+const SORTS = {
+  name: g => `${g.envelope || g.label || ''} ${g.account_label || ''}`.trim(),
+  twr: g => g.twr,
+  value: g => g.value,
+};
+// Sens du premier clic : decroissant sur un chiffre — on cherche le plus
+// grand —, croissant sur un texte.
+const SORT_DIR0 = { name: 'asc', twr: 'desc', value: 'desc' };
+
+function sortRows(rows) {
+  const { col, dir } = V.sort;
+  const cle = SORTS[col] || SORTS.value;
+  const sens = dir === 'asc' ? 1 : -1;
+  return rows.slice().sort((a, b) => {
+    const x = cle(a), y = cle(b);
+    // Une valeur absente reste en bas dans les deux sens : un groupe dont le
+    // rendement n'est pas mesurable n'a pas a prendre la tete de la liste.
+    if (x == null && y == null) return 0;
+    if (x == null) return 1;
+    if (y == null) return -1;
+    return typeof x === 'string' ? sens * x.localeCompare(y, 'fr') : sens * (x - y);
+  });
+}
+
+function setSort(col) {
+  V.sort = V.sort.col === col
+    ? { col, dir: V.sort.dir === 'asc' ? 'desc' : 'asc' }
+    : { col, dir: SORT_DIR0[col] || 'desc' };
+  renderPerformance();
+}
 
 /** Nombre brut. `fmt` de utils.js ajoute toujours l'euro : inutilisable pour un %. */
 const n = (v, dec = 0) => v == null ? '—'
@@ -37,10 +75,11 @@ export async function loadPerformance() {
 // les capitaux propres negatifs (aucun rendement calculable sur une base
 // negative, quel que soit l'historique). Le decompte figure dans l'en-tete pour
 // que le total reste explicable.
-const HIDDEN = new Set(['non_measurable', 'negative']);
+const HIDDEN = new Set(['non_measurable', 'negative', 'closed']);
 const visible = () => (V.data?.groups || []).filter(g => !HIDDEN.has(g.status));
 const LABELS = { insufficient: 'historique insuffisant', negative: 'capital négatif',
-                 non_measurable: 'trésorerie, aucun rendement' };
+                 non_measurable: 'trésorerie, aucun rendement',
+                 closed: 'compte clos' };
 const current = () => V.focus
   ? visible().find(g => g.key === V.focus) || V.data.global
   : V.data.global;
@@ -76,7 +115,9 @@ function renderHeader(d) {
     ${V.focus ? `<button type="button" class="btn btn-sm" id="perf-reset">↩ Tout afficher</button>` : ''}
     <span class="perf-meta">${d.dates.length} arrêtés · ${fmtDate(d.first_date)} → ${fmtDate(d.date)}${
       d.excluded?.length ? ` · <span title="${esc(d.excluded.map(e =>
-        `${e.label} — ${LABELS[e.status] || e.status}`).join(' · '))}">${
+        `${e.label} — ${LABELS[e.status] || e.status}${
+          e.status === 'closed' ? ` (dernière valeur le ${fmtDate(e.last_date)})` : ''}`
+        ).join(' · '))}">${
         d.excluded.length} compte${d.excluded.length > 1 ? 's' : ''} hors calcul</span>` : ''}</span>`;
   host.querySelectorAll('[data-group]').forEach(b => b.addEventListener('click', () => {
     if (V.group === b.dataset.group) return;
@@ -124,7 +165,7 @@ function renderKpi(d) {
 function renderList(d) {
   const host = document.getElementById('perf-list');
   if (!host) return;
-  const rows = visible();
+  const rows = sortRows(visible());
   const span = Math.max(0.02, ...rows.map(g => Math.abs(g.twr || 0)));
   const total = rows.filter(g => g.status === 'ok').length;
   const line = g => {
@@ -174,11 +215,23 @@ function renderList(d) {
       </div>`;
   };
   const g = d.global;
+  // En-tetes triables. La colonne de barres n'en est pas une : elle donne a
+  // voir la TWR, que son propre en-tete trie deja.
+  const th = (col, texte, cls = '') => {
+    const actif = V.sort.col === col;
+    const sens = actif ? V.sort.dir : null;
+    return `<span class="perf-th ${cls}${actif ? ' is-sorted' : ''}" data-sort="${col}"
+        role="button" tabindex="0" aria-sort="${
+          actif ? (sens === 'asc' ? 'ascending' : 'descending') : 'none'}"
+        title="Trier par ${esc(texte.toLowerCase())}${
+          actif ? (sens === 'asc' ? ', décroissant' : ', croissant') : ''}"
+      >${texte}<i class="perf-caret">${actif ? (sens === 'asc' ? '▲' : '▼') : ''}</i></span>`;
+  };
   host.innerHTML = `
     <div class="perf-head">
-      <span>${V.group === 'account' ? 'Compte' : 'Enveloppe'}</span>
+      ${th('name', V.group === 'account' ? 'Compte' : 'Enveloppe')}
       <span class="perf-axis"><i>−</i><i>0</i><i>+</i></span>
-      <span class="ta-r">TWR</span><span class="ta-r">Valeur</span>
+      ${th('twr', 'TWR', 'ta-r')}${th('value', 'Valeur', 'ta-r')}
     </div>
     ${rows.map(line).join('')}
     ${g && !V.focus && total > 1 ? `<div class="perf-item is-total">
@@ -190,7 +243,15 @@ function renderList(d) {
       <div class="perf-val">${fmt(g.value)}</div>
     </div>` : ''}
     <p class="perf-note">TWR annualisée à partir de ${d.min_days_annualise} jours d'historique —
-    en dessous, la durée est indiquée à la place. Cliquez une ligne pour l'isoler.</p>`;
+    en dessous, la durée est indiquée à la place. Cliquez une ligne pour l'isoler,
+    un en-tête pour trier.</p>`;
+  host.querySelectorAll('.perf-th[data-sort]').forEach(el => {
+    const trier = () => setSort(el.dataset.sort);
+    el.addEventListener('click', trier);
+    el.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); trier(); }
+    });
+  });
   host.querySelectorAll('.perf-item[data-key]').forEach(el => {
     const pick = () => {
       V.focus = V.focus === el.dataset.key ? null : el.dataset.key;

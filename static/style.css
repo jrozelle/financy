@@ -3171,6 +3171,16 @@ kbd {
 .perf-head { font-size: .68rem; letter-spacing: .06em; text-transform: uppercase;
   color: var(--text-muted); border-bottom: 1px solid var(--border); padding-bottom: .45rem; }
 .perf-head .ta-r { text-align: right; }
+/* En-tetes triables : la fleche occupe une largeur fixe pour que le libelle ne
+   se decale pas d'une colonne a l'autre quand le tri change. */
+.perf-head .perf-th { display: flex; align-items: center; gap: .3rem;
+  cursor: pointer; user-select: none; color: inherit; }
+.perf-head .perf-th.ta-r { justify-content: flex-end; }
+.perf-head .perf-th:hover, .perf-head .perf-th.is-sorted { color: var(--text); }
+.perf-head .perf-th:focus-visible { outline: 2px solid var(--primary);
+  outline-offset: 2px; border-radius: 3px; }
+.perf-caret { font-style: normal; font-size: .58rem; line-height: 1;
+  min-width: .5rem; opacity: .85; }
 .perf-axis { display: flex; justify-content: space-between; font-style: normal; opacity: .5; }
 .perf-axis i { font-style: normal; }
 
