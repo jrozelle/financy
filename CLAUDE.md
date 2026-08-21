@@ -34,6 +34,16 @@
   exacte : deux documents ne datent pas le meme mouvement pareil — prelevement
   en debut de mois sur le compte courant, investissement une dizaine de jours
   plus tard chez l'assureur.
+- **Un arbitrage de valorisation ne se fait jamais en silence.** Quand le modele
+  prefere la valeur enregistree au cours du jour (divergence, devise etrangere,
+  titre non cote), il le signale : `holding_price_warning()` dans `models.py`,
+  remonte par `/api/performance` et affiche dans le panneau depliable. Ce choix
+  muet a masque des mois durant deux titres du Nasdaq cotes en dollars et
+  declares EUR — la valorisation n'etait juste que parce que l'ecart depassait
+  le seuil de divergence.
+- Aucune conversion de devise dans `models.py` : un cours libelle hors euro ne
+  doit donc JAMAIS servir a valoriser une ligne. La devise vient du provider
+  (`fetch_currency`), pas du defaut du schema.
 - Ne comptent comme flux EXTERNES ni les dividendes ni les frais : les premiers
   sont produits par les actifs detenus, les seconds preleves a l'interieur du
   contrat. Tous deux appartiennent au rendement, pas aux apports.

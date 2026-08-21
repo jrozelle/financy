@@ -83,6 +83,10 @@ const visible = () => (V.data?.groups || []).filter(g => !HIDDEN.has(g.status));
 const LABELS = { insufficient: 'historique insuffisant', negative: 'capital négatif',
                  non_measurable: 'aucun rendement à mesurer',
                  closed: 'compte clos' };
+/** [libelle du compte, alerte] pour tous les groupes qui en portent. */
+const alertes = d => (d?.groups || []).flatMap(
+  g => (g.price_warnings || []).map(a => [g.label, a]));
+
 const current = () => V.focus
   ? visible().find(g => g.key === V.focus) || V.data.global
   : V.data.global;
@@ -117,9 +121,11 @@ function renderHeader(d) {
     </div>
     ${V.focus ? `<button type="button" class="btn btn-sm" id="perf-reset">↩ Tout afficher</button>` : ''}
     <span class="perf-meta">${d.dates.length} arrêtés · ${fmtDate(d.first_date)} → ${fmtDate(d.date)}${
-      d.excluded?.length ? ` · <button type="button" class="perf-excl-toggle" id="perf-excl"
-        aria-expanded="${V.showExcluded}">${d.excluded.length} compte${
-        d.excluded.length > 1 ? 's' : ''} hors calcul ${V.showExcluded ? '▴' : '▾'}</button>` : ''}</span>`;
+      d.excluded?.length || alertes(d).length ? ` · <button type="button"
+        class="perf-excl-toggle" id="perf-excl" aria-expanded="${V.showExcluded}">${
+        d.excluded.length} hors calcul${
+        alertes(d).length ? ` · ${alertes(d).length} cours à vérifier` : ''} ${
+        V.showExcluded ? '▴' : '▾'}</button>` : ''}</span>`;
   host.querySelectorAll('[data-group]').forEach(b => b.addEventListener('click', () => {
     if (V.group === b.dataset.group) return;
     V.group = b.dataset.group;
@@ -189,6 +195,8 @@ function renderList(d) {
     const st = STATUS_BADGE[g.status];
     const flags = [
       st ? `<span class="badge badge-blk" title="${esc(st[1])} Hors du total.">${st[0]}</span>` : '',
+      g.price_warnings?.length
+        ? `<span class="badge badge-30">cours à vérifier</span>` : '',
       g.suspect_periods?.length ? `<span class="badge badge-30"
         title="${esc(g.suspect_periods.map(x =>
           `${fmtDate(x.from)} → ${fmtDate(x.to)} : ${pct(x.change)} inexpliqué (${
@@ -246,6 +254,15 @@ function renderList(d) {
         <span class="perf-num-sub">${
           g.annualisable ? pct(g.twr_annualise) + ' /an' : `sur ${duree(g.days)}`}</span></div>
       <div class="perf-val">${fmt(g.value)}</div>
+    </div>` : ''}
+    ${V.showExcluded && alertes(d).length ? `<div class="perf-excluded">
+      <div class="perf-excluded-head">Valorisations à vérifier — le modèle a préféré la
+        valeur enregistrée au cours du jour</div>
+      ${alertes(d).map(([lbl, a]) => `<div class="perf-excluded-row">
+        <span>${esc(a.name || a.isin)}</span>
+        <span class="perf-excl-why">${esc(a.reason)}</span>
+        <span class="num">${esc(lbl)}</span>
+      </div>`).join('')}
     </div>` : ''}
     ${V.showExcluded && d.excluded?.length ? `<div class="perf-excluded">
       <div class="perf-excluded-head">Hors calcul — ${d.excluded.length} compte${

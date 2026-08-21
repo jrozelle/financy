@@ -688,11 +688,49 @@ def _parse_holding_date(value):
         return None
 
 
+def holding_price_warning(h):
+    """Incoherence entre le cours et la valeur enregistree, ou None.
+
+    Le modele arbitre en silence entre `quantity x last_price` et le
+    `market_value` enregistre : au-dela de HOLDING_PRICE_DIVERGENCE_THRESHOLD,
+    il retient le second. Cet arbitrage doit se voir. Il a masque pendant des
+    mois deux titres americains dont le cours arrivait en dollars et dont la
+    devise etait declaree EUR : l'ecart valait exactement le taux de change, et
+    la valorisation n'etait juste que parce que ce taux depassait le seuil. A
+    1,14 au lieu de 1,1545, le dollar serait passe pour de l'euro.
+    """
+    if h.get('is_priceable') is False:
+        return None
+    q = h.get('quantity') or 0
+    manual = h.get('market_value')
+    price = h.get('last_price')
+    devise = (h.get('currency') or 'EUR').upper()
+    if devise != 'EUR' and price is not None:
+        return {'isin': h.get('isin'), 'name': h.get('name'), 'kind': 'devise',
+                'currency': devise, 'gap': None,
+                'reason': f'cours en {devise}, non converti en euros'}
+    if not q or manual is None or price is None:
+        return None
+    unite = manual / q
+    if unite <= 0:
+        return None
+    gap = abs(price - unite) / unite
+    if gap <= HOLDING_PRICE_DIVERGENCE_THRESHOLD:
+        return None
+    return {'isin': h.get('isin'), 'name': h.get('name'), 'kind': 'divergence',
+            'currency': devise, 'gap': round(gap, 4),
+            'reason': (f'cours {price:.2f} contre {unite:.2f} enregistré '
+                       f'({gap * 100:.1f} % d\'écart) : valeur enregistrée retenue')}
+
+
 def _holding_effective_value(h):
     """Valorisation effective d'une ligne.
 
     Regle de priorite :
     - Fonds euros / non cote : market_value manuel.
+    - Cours dans une devise autre que l'euro : manuel. Rien ne convertit dans ce
+      modele, et additionner des dollars a des euros surevalue la position du
+      taux de change.
     - Si market_value a une date plus recente que le dernier cours : manuel.
     - Sinon, dernier cours automatique si disponible.
     - Fallback : market_value.
@@ -705,6 +743,9 @@ def _holding_effective_value(h):
     manual_value = h.get('market_value')
     if not is_priceable:
         return manual_value or 0
+    # Un cours etranger non converti surevaluerait la ligne du taux de change.
+    if (h.get('currency') or 'EUR').upper() != 'EUR' and manual_value is not None:
+        return manual_value
 
     manual_date = _parse_holding_date(h.get('as_of_date') or h.get('position_date'))
     price_date = _parse_holding_date(h.get('last_price_date'))

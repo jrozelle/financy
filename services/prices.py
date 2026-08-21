@@ -60,6 +60,14 @@ class PriceProvider(ABC):
         period : '1d', '7d', '30d', '90d', '1y', '5y'."""
         ...
 
+    def fetch_currency(self, ticker):
+        """Devise dans laquelle le cours est libelle, ou None si inconnue.
+
+        Sans elle, un titre americain cote en dollars etait enregistre avec la
+        devise par defaut EUR, et sa valorisation surevaluee du taux de change.
+        """
+        return None
+
 
 # ─── Yahoo Finance (prod) ────────────────────────────────────────────────────
 
@@ -146,6 +154,17 @@ class YahooProvider(PriceProvider):
             return (price, date)
         except Exception as e:
             logger.warning('fetch_last_price(%s) failed: %s', ticker, e)
+            return None
+
+    def fetch_currency(self, ticker):
+        try:
+            import yfinance as yf
+            info = yf.Ticker(ticker).fast_info
+            cur = getattr(info, 'currency', None) or (
+                info.get('currency') if hasattr(info, 'get') else None)
+            return str(cur).upper() if cur else None
+        except Exception as e:
+            logger.debug('fetch_currency(%s) failed: %s', ticker, e)
             return None
 
     def fetch_history(self, ticker, period='30d'):
@@ -261,7 +280,8 @@ def refresh_securities(conn, provider=None, only_stale=False, stale_hours=20):
 
     stats = {'refreshed': 0, 'skipped': 0, 'errors': 0, 'resolved_tickers': 0}
     rows = conn.execute(
-        'SELECT isin, name, ticker, last_price_date FROM securities WHERE is_priceable=1'
+        'SELECT isin, name, ticker, currency, last_price_date '
+        'FROM securities WHERE is_priceable=1'
     ).fetchall()
 
     if only_stale:
@@ -319,6 +339,20 @@ def refresh_securities(conn, provider=None, only_stale=False, stale_hours=20):
             else:
                 stats['skipped'] += 1
                 continue
+
+        # Devise du cours. On ne la demande que pour un ticker sans suffixe de
+        # place, signature d'une cotation americaine, et dont la devise est
+        # restee au defaut EUR du schema : c'est le cas ou l'erreur est probable,
+        # et cela evite un appel par titre a chaque rafraichissement. Sans ce
+        # controle, deux titres du Nasdaq etaient valorises en dollars pris pour
+        # des euros, surevalues du taux de change.
+        if '.' not in (ticker or '') and (row['currency'] or 'EUR').upper() == 'EUR':
+            devise = provider.fetch_currency(ticker)
+            if devise and devise != 'EUR':
+                conn.execute('UPDATE securities SET currency=?, '
+                             'updated_at=CURRENT_TIMESTAMP WHERE isin=?', (devise, isin))
+                stats.setdefault('currencies_fixed', []).append(
+                    {'isin': isin, 'ticker': ticker, 'currency': devise})
 
         result = provider.fetch_last_price(ticker)
         if not result:
