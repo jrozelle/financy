@@ -688,80 +688,81 @@ def _parse_holding_date(value):
         return None
 
 
-def holding_price_warning(h):
-    """Incoherence entre le cours et la valeur enregistree, ou None.
+def _holding_decision(h):
+    """(valorisation, alerte) — l'arbitrage et sa justification au meme endroit.
 
-    Le modele arbitre en silence entre `quantity x last_price` et le
-    `market_value` enregistre : au-dela de HOLDING_PRICE_DIVERGENCE_THRESHOLD,
-    il retient le second. Cet arbitrage doit se voir. Il a masque pendant des
-    mois deux titres americains dont le cours arrivait en dollars et dont la
-    devise etait declaree EUR : l'ecart valait exactement le taux de change, et
-    la valorisation n'etait juste que parce que ce taux depassait le seuil. A
-    1,14 au lieu de 1,1545, le dollar serait passe pour de l'euro.
+    Le modele choisit entre `quantity x last_price` et le `market_value`
+    enregistre. Ce choix doit etre RESTITUABLE : une alerte calculee a part
+    finit par affirmer autre chose que ce que la valorisation a fait. Les deux
+    sortent donc de la meme fonction.
+
+    L'arbitrage muet a masque pendant des mois deux titres du Nasdaq dont le
+    cours arrivait en dollars et dont la devise etait restee au defaut EUR du
+    schema : l'ecart valait exactement le taux de change, et la valorisation
+    n'etait juste que parce que ce taux depassait le seuil de divergence. A 1,14
+    au lieu de 1,1545, le dollar serait passe pour de l'euro.
     """
-    if h.get('is_priceable') is False:
-        return None
-    q = h.get('quantity') or 0
-    manual = h.get('market_value')
-    price = h.get('last_price')
-    devise = (h.get('currency') or 'EUR').upper()
-    if devise != 'EUR' and price is not None:
-        return {'isin': h.get('isin'), 'name': h.get('name'), 'kind': 'devise',
-                'currency': devise, 'gap': None,
-                'reason': f'cours en {devise}, non converti en euros'}
-    if not q or manual is None or price is None:
-        return None
-    unite = manual / q
-    if unite <= 0:
-        return None
-    gap = abs(price - unite) / unite
-    if gap <= HOLDING_PRICE_DIVERGENCE_THRESHOLD:
-        return None
-    return {'isin': h.get('isin'), 'name': h.get('name'), 'kind': 'divergence',
-            'currency': devise, 'gap': round(gap, 4),
-            'reason': (f'cours {price:.2f} contre {unite:.2f} enregistré '
-                       f'({gap * 100:.1f} % d\'écart) : valeur enregistrée retenue')}
+    def alerte(kind, reason, gap=None):
+        return {'isin': h.get('isin'), 'name': h.get('name'), 'kind': kind,
+                'currency': (h.get('currency') or 'EUR').upper(),
+                'gap': round(gap, 4) if gap is not None else None,
+                'reason': reason}
 
-
-def _holding_effective_value(h):
-    """Valorisation effective d'une ligne.
-
-    Regle de priorite :
-    - Fonds euros / non cote : market_value manuel.
-    - Cours dans une devise autre que l'euro : manuel. Rien ne convertit dans ce
-      modele, et additionner des dollars a des euros surevalue la position du
-      taux de change.
-    - Si market_value a une date plus recente que le dernier cours : manuel.
-    - Sinon, dernier cours automatique si disponible.
-    - Fallback : market_value.
-    """
     is_priceable = h.get('is_priceable')
     if is_priceable is None:
         is_priceable = True
-    last_price = h.get('last_price')
-    quantity   = h.get('quantity') or 0
-    manual_value = h.get('market_value')
+    price = h.get('last_price')
+    q = h.get('quantity') or 0
+    manual = h.get('market_value')
     if not is_priceable:
-        return manual_value or 0
-    # Un cours etranger non converti surevaluerait la ligne du taux de change.
-    if (h.get('currency') or 'EUR').upper() != 'EUR' and manual_value is not None:
-        return manual_value
+        return manual or 0, None
+
+    # Aucune conversion de devise dans ce modele : un cours libelle hors euro
+    # ne peut pas valoriser une ligne sans surevaluer du taux de change.
+    devise = (h.get('currency') or 'EUR').upper()
+    if devise != 'EUR' and manual is not None:
+        return manual, alerte('devise', f'cours en {devise}, non converti : '
+                                        'valeur enregistrée retenue')
 
     manual_date = _parse_holding_date(h.get('as_of_date') or h.get('position_date'))
     price_date = _parse_holding_date(h.get('last_price_date'))
-    if manual_value is not None and manual_date and (not price_date or manual_date > price_date):
-        return manual_value
-    if (
-        manual_value is not None and last_price is not None and quantity
-        and h.get('data_source') != 'mock'
-        and manual_date and price_date and manual_date >= price_date
-    ):
-        manual_unit = manual_value / quantity
-        if manual_unit > 0 and abs(last_price - manual_unit) / manual_unit > HOLDING_PRICE_DIVERGENCE_THRESHOLD:
-            return manual_value
-    if last_price is not None:
-        return quantity * last_price
-    return manual_value or 0
+    unite = (manual / q) if (manual is not None and q) else None
+    gap = (abs(price - unite) / unite) if (unite and unite > 0 and price is not None) else None
+
+    if manual is not None and manual_date and (not price_date or manual_date > price_date):
+        return manual, None          # saisie plus recente que le cours : normal
+
+    if (manual is not None and price is not None and q
+            and h.get('data_source') != 'mock'
+            and manual_date and price_date and manual_date >= price_date
+            and gap is not None and gap > HOLDING_PRICE_DIVERGENCE_THRESHOLD):
+        return manual, alerte(
+            'divergence',
+            f'cours {price:.2f} contre {unite:.2f} enregistré '
+            f'({gap * 100:.1f} % d\'écart) : valeur enregistrée retenue', gap)
+
+    if price is not None:
+        # Le cours l'emporte. Un ecart important reste digne d'etre signale :
+        # il dit que la valeur enregistree a vieilli, pas que le cours est faux.
+        if gap is not None and gap > HOLDING_PRICE_DIVERGENCE_THRESHOLD:
+            quand = f" du {h.get('as_of_date')}" if h.get('as_of_date') else ''
+            return q * price, alerte(
+                'cours_retenu',
+                f'cours du jour retenu ({price:.2f}) : la valeur enregistrée'
+                f'{quand} en diffère de {gap * 100:.1f} %', gap)
+        return q * price, None
+
+    return manual or 0, None
+
+
+def holding_price_warning(h):
+    """Alerte de valorisation d'une ligne, ou None. Voir _holding_decision."""
+    return _holding_decision(h)[1]
+
+
+def _holding_effective_value(h):
+    """Valorisation effective d'une ligne. Voir _holding_decision."""
+    return _holding_decision(h)[0]
 
 
 def compute_position(pos, entity_map=None, ref=None, holdings_map=None):

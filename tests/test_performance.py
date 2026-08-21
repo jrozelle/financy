@@ -626,14 +626,56 @@ class TestAlerteValorisation:
                                    'is_priceable': True})
         assert a and a['kind'] == 'devise' and 'USD' in a['reason']
 
-    def test_divergence_signalee(self):
-        """Meme devise declaree EUR, l'ecart de 15,5 % doit se voir."""
+    def test_divergence_valeur_saisie_retenue(self):
+        """Saisie aussi recente que le cours : c'est elle qui l'emporte."""
         a = holding_price_warning({'isin': 'US0000000001', 'name': 'ADOBE',
                                    'quantity': 10, 'market_value': 1893.67,
                                    'last_price': 225.11, 'currency': 'EUR',
-                                   'is_priceable': True})
+                                   'is_priceable': True, 'as_of_date': '2026-08-12',
+                                   'last_price_date': '2026-08-12'})
         assert a and a['kind'] == 'divergence'
         assert a['gap'] == pytest.approx(0.1545, abs=0.001)
+        assert 'valeur enregistrée retenue' in a['reason']
+
+    def test_cours_retenu_signale_aussi(self):
+        """Cours plus recent que la saisie : c'est lui qui l'emporte.
+
+        L'alerte doit alors dire que la valeur enregistree a vieilli, et non
+        pretendre qu'elle a ete retenue — c'est le cas du bitcoin, dont la
+        saisie datait de six semaines.
+        """
+        a = holding_price_warning({'isin': 'CRYPTO_BTC', 'name': 'Bitcoin',
+                                   'quantity': 0.05493065, 'market_value': 3027.6,
+                                   'last_price': 57816.6, 'currency': 'EUR',
+                                   'is_priceable': True, 'as_of_date': '2026-07-02',
+                                   'last_price_date': '2026-08-21'})
+        assert a and a['kind'] == 'cours_retenu'
+        assert 'cours du jour retenu' in a['reason']
+
+    def test_l_alerte_ne_contredit_jamais_la_valorisation(self):
+        """Invariant : les deux sortent de la meme decision.
+
+        Une alerte calculee a part finit par affirmer autre chose que ce que la
+        valorisation a fait — c'est arrive des la premiere version.
+        """
+        from models import _holding_decision
+        cas = [
+            {'quantity': 10, 'market_value': 1893.67, 'last_price': 225.11,
+             'currency': 'EUR', 'is_priceable': True,
+             'as_of_date': '2026-08-12', 'last_price_date': '2026-08-12'},
+            {'quantity': 0.055, 'market_value': 3027.6, 'last_price': 57816.6,
+             'currency': 'EUR', 'is_priceable': True,
+             'as_of_date': '2026-07-02', 'last_price_date': '2026-08-21'},
+            {'quantity': 10, 'market_value': 1893.67, 'last_price': 225.11,
+             'currency': 'USD', 'is_priceable': True},
+        ]
+        for h in cas:
+            valeur, a = _holding_decision(h)
+            if not a:
+                continue
+            saisie = abs(valeur - h['market_value']) < 0.01
+            dit_saisie = 'enregistrée retenue' in a['reason']
+            assert saisie == dit_saisie, f"{a['kind']} : {a['reason']} vs {valeur}"
 
     def test_ecart_normal_silencieux(self):
         a = holding_price_warning({'isin': 'X', 'quantity': 10, 'market_value': 1000,
