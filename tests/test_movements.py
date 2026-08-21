@@ -19,7 +19,8 @@ from app import app  # noqa: E402
 from services.parsers.movements import (parse_avis_opere, parse_releve_especes,  # noqa: E402
                                         parse_movements, _num, _flat,
                                         _rows_from_words, _split_columns,
-                                        _montants, detect_envelope, entete)
+                                        _montants, detect_envelope, entete,
+                                        parse_situation_generali)
 
 # Gabarits reels reduits a l'essentiel, mise en page conservee.
 AVIS_ACHAT = """                                    OPERATION DE BOURSE
@@ -511,3 +512,86 @@ class TestEnveloppeDansLEntete:
                   '02/07/2024 VIR Virement interne depuis Compte p 1 000,00\n'
                   '31/07/2024 NOUVEAU SOLDE 1 000,00\n')
         assert [m.envelope for m in parse_releve_especes(releve)] == ['Compte-titres']
+
+
+# ─── Situation annuelle d'assurance-vie (Generali / Bourso Vie) ─────────────
+
+SITUATION_GENERALI = """\
+Contrat N° : 12345678
+MONSIEUR DUPONT CAMILLE
+EPARGNE ATTEINTE DE VOTRE CONTRAT AU 31/12/2025                    1 234,00 €
+                 OPERATIONS REALISEES DU 01/01/2025 AU 31/12/2025
+       Opérations / Supports Montant net A la date du Valeur de la part Nombre de parts
+Versement initial de 300,00 € du 13/05/2025 (Frais : 0,00%)
+ETF MONDE ACC                        300,00 € 24/05/2025   50,26 €        5,9695
+Versement libre programmé de 75,00 € du 10/06/2025 (Frais : 0,00%)
+ETF MONDE ACC                         75,00 € 13/06/2025   59,03 €        1,2704
+Frais de gestion de 2,97 € du 24/06/2025 (Frais : 0,18723%)
+ETF MONDE ACC                         -2,97 € 24/06/2025   54,71 €       -0,0543
+Distribution de dividendes de 23,75 € du 09/12/2025 (Frais : 0,00%)
+ETF MONDE ACC                         23,75 € 09/12/2025   60,40 €        0,3933
+Arbitrage de 100,00 € du 15/12/2025 (Frais : 0,00%)
+ETF MONDE ACC                        100,00 € 15/12/2025   59,44 €        1,6823
+"""
+
+
+class TestSituationGenerali:
+
+    OWNERS = ['Camille', 'Dominique']
+
+    def test_types_de_flux(self):
+        mvs = parse_situation_generali(SITUATION_GENERALI, self.OWNERS)
+        assert [(m.flux_type, m.net_eur) for m in mvs] == [
+            ('Versement', 300.0), ('Versement', 75.0),
+            ('Frais', 2.97), ('Dividende/Intérêt', 23.75)]
+
+    def test_arbitrage_ecarte(self):
+        """Un arbitrage deplace l'epargne au sein du contrat.
+
+        Le compter comme un versement gonflerait l'apport et effacerait d'autant
+        le rendement.
+        """
+        mvs = parse_situation_generali(SITUATION_GENERALI, self.OWNERS)
+        assert all('Arbitrage' not in (m.label or '') for m in mvs)
+
+    def test_date_de_valeur_retenue(self):
+        """C'est l'investissement qui fait bouger l'epargne, pas l'ordre."""
+        mvs = parse_situation_generali(SITUATION_GENERALI, self.OWNERS)
+        assert mvs[0].date == '2025-05-24'      # ordre le 13/05, investi le 24
+
+    def test_chaque_ligne_verifiee(self):
+        """parts x valeur de la part = montant net, a l'arrondi de la part pres.
+
+        Une tolerance absolue rejetait les gros versements : 2 200 EUR sur
+        42 parts laissent 0,13 EUR de jeu, 75 EUR sur 1,27 en laissent 0,02.
+        """
+        mvs = parse_situation_generali(SITUATION_GENERALI, self.OWNERS)
+        assert all(m.checks and not m.warnings for m in mvs)
+
+    def test_titulaire_lu_dans_le_document(self):
+        mvs = parse_situation_generali(SITUATION_GENERALI, self.OWNERS)
+        assert {m.owner for m in mvs} == {'Camille'}
+
+    def test_titulaire_inconnu_du_referentiel_non_invente(self):
+        mvs = parse_situation_generali(SITUATION_GENERALI, ['Dominique'])
+        assert all(m.owner is None for m in mvs)
+        assert all('titulaire non identifie' in ' '.join(m.warnings) for m in mvs)
+
+    def test_titulaire_ambigu_non_tranche(self):
+        """Deux noms connus dans le document : aucun ne peut etre retenu."""
+        mvs = parse_situation_generali(
+            SITUATION_GENERALI.replace('MONSIEUR DUPONT CAMILLE',
+                                       'MONSIEUR DUPONT CAMILLE ET DOMINIQUE'),
+            self.OWNERS)
+        assert all(m.owner is None for m in mvs)
+
+    def test_enveloppe_assurance_vie(self):
+        mvs = parse_situation_generali(SITUATION_GENERALI, self.OWNERS)
+        assert {m.envelope for m in mvs} == {'Assurance-vie'}
+
+    def test_autre_document_ignore(self):
+        assert parse_situation_generali('Relevé de compte espèces', self.OWNERS) == []
+
+    def test_dispatche_par_parse_movements(self):
+        mvs = parse_movements(SITUATION_GENERALI, owners=self.OWNERS)
+        assert len(mvs) == 4 and mvs[0].kind == 'flux'

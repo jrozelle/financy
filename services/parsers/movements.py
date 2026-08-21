@@ -149,6 +149,9 @@ class DetectedMovement:
     date: str                      # AAAA-MM-JJ, date d'execution
     envelope: Optional[str] = None
     establishment: str = DEFAULT_ESTABLISHMENT
+    # Titulaire, quand le document le nomme et qu'il figure au referentiel.
+    # None laisse l'appelant decider : un avis d'opere ne nomme personne.
+    owner: Optional[str] = None
     # transaction
     isin: Optional[str] = None
     name: Optional[str] = None
@@ -575,11 +578,114 @@ def _rows_from_text(lines):
     return rows
 
 
+# ─── Situation annuelle d'assurance-vie (Generali / Bourso Vie) ─────────────
+
+# "Versement libre programme de 75,00 EUR du 10/01/2025 (Frais : 0,00%)" puis,
+# ligne suivante, le support avec le montant net, la date de valeur, la valeur
+# de la part et le nombre de parts.
+_GEN_OP = re.compile(
+    r'^\s*(Versement[^\d]*?|Frais de gestion|Distribution de dividendes|'
+    r'Rachat[^\d]*?|Arbitrage[^\d]*?)\s*de\s*'
+    r'(-?\d{1,3}(?:[ \u202f\u00a0]\d{3})*,\d{2})\s*€?\s*du\s*(\d{2}/\d{2}/\d{4})',
+    re.I)
+_GEN_SUPPORT = re.compile(
+    r'^\s*(\S.*?)\s+(-?\d{1,3}(?:[ \u202f\u00a0]\d{3})*,\d{2})\s*€?\s*'
+    r'(\d{2}/\d{2}/\d{4})\s+(-?\d{1,3}(?:[ \u202f\u00a0]\d{3})*,\d{2})\s*€?\s+'
+    r'(-?[\d ,.]+?)\s*$')
+
+# Nature de l'operation -> type de flux Financy.
+_GEN_TYPES = (
+    ('VERSEMENT', 'Versement'),
+    ('FRAIS', 'Frais'),
+    ('DISTRIBUTION DE DIVIDENDES', 'Dividende/Intérêt'),
+    ('RACHAT', 'Retrait'),
+)
+
+
+def _gen_type(nature: str) -> Optional[str]:
+    plat = _ascii(nature)
+    for marque, kind in _GEN_TYPES:
+        if marque in plat:
+            return kind
+    return None          # arbitrage : mouvement interne, pas un flux externe
+
+
+def _gen_owner(text: str, owners) -> Optional[str]:
+    """Titulaire nomme par le document, s'il figure au referentiel.
+
+    Le nom n'est jamais devine : on cherche ceux que l'utilisateur a deja
+    saisis. Deux contrats d'enfants se distinguent ainsi sans que l'appelant
+    ait a importer un fichier a la fois — et surtout sans risquer d'attribuer
+    l'un a l'autre, une erreur qu'aucun controle arithmetique ne rattraperait.
+    """
+    plat = _flat(text)
+    trouves = [o for o in (owners or []) if o and _ascii(o) in plat]
+    return trouves[0] if len(trouves) == 1 else None
+
+
+def parse_situation_generali(text: str, owners=None) -> List[DetectedMovement]:
+    """Situation annuelle d'assurance-vie : N mouvements. [] si autre document.
+
+    Chaque ligne porte sa propre verification : montant net / valeur de la part
+    = nombre de parts. Un chiffre mal lu casse l'identite et le mouvement est
+    ecarte au lieu d'entrer en base.
+    """
+    plat = _flat(text)
+    if 'EPARGNE ATTEINTE DE VOTRE CONTRAT' not in plat:
+        return []
+    owner = _gen_owner(text, owners)
+    out, courant = [], None
+    for ln in text.split('\n'):
+        m = _GEN_OP.match(ln)
+        if m:
+            courant = (re.sub(r'\s+', ' ', m.group(1)).strip(), m.group(3))
+            continue
+        if not courant:
+            continue
+        d = _GEN_SUPPORT.match(ln)
+        if not d:
+            continue
+        nature, _date_ordre = courant
+        courant = None
+        ftype = _gen_type(nature)
+        if not ftype:
+            continue
+        net, vl = _num(d.group(2)), _num(d.group(4))
+        parts = _num(d.group(5)) if ',' in d.group(5) else None
+        if parts is None:
+            try:
+                parts = float(d.group(5).replace(' ', '').replace(',', '.'))
+            except ValueError:
+                parts = None
+        jour, mois, an = d.group(3).split('/')
+        mv = DetectedMovement(
+            kind='flux', date=f'{an}-{mois}-{jour}', envelope='Assurance-vie',
+            owner=owner, flux_type=ftype, label=f'{nature} — {d.group(1).strip()}',
+            net_eur=abs(net), raw=ln.strip()[:200])
+        # Identite de la ligne : nombre de parts x valeur de la part = montant
+        # net. La tolerance suit l'arrondi de la valeur de part, affichee au
+        # centime : l'ecart admissible croit donc avec le nombre de parts, et
+        # une tolerance absolue rejetait a tort les gros versements — 2 200 EUR
+        # sur 42,5754 parts laissent 0,13 EUR de jeu, 75 EUR sur 1,27 en
+        # laissent 0,02.
+        if parts and vl and abs(abs(parts) * vl - abs(net)) <= abs(parts) * 0.005 + 0.01:
+            mv.checks.append('nombre de parts x valeur de la part = montant net')
+        else:
+            mv.warnings.append('nombre de parts incoherent avec le montant')
+        if owner is None:
+            mv.warnings.append('titulaire non identifie dans le document')
+        out.append(mv)
+    return out
+
+
 def parse_movements(text: str, account_map: Optional[dict] = None,
-                    words: Optional[list] = None) -> List[DetectedMovement]:
+                    words: Optional[list] = None,
+                    owners=None) -> List[DetectedMovement]:
     """Point d'entree : detecte la nature du document et dispatche.
 
     `words` n'est utile qu'aux releves d'especes : voir parse_releve_especes.
+    `owners` sert aux documents qui nomment leur titulaire.
     """
     return (parse_avis_opere(text, account_map)
+            or parse_situation_generali(text, owners)
             or parse_releve_especes(text, account_map, words))

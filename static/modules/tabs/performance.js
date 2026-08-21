@@ -77,8 +77,11 @@ export async function loadPerformance() {
 // que le total reste explicable.
 const HIDDEN = new Set(['non_measurable', 'negative', 'closed']);
 const visible = () => (V.data?.groups || []).filter(g => !HIDDEN.has(g.status));
+// Motif de repli. Le motif precis vient de l'API, ou vit la regle : un libelle
+// unique pour toutes les exclusions affichait "trésorerie, aucun rendement" en
+// face d'une résidence principale.
 const LABELS = { insufficient: 'historique insuffisant', negative: 'capital négatif',
-                 non_measurable: 'trésorerie, aucun rendement',
+                 non_measurable: 'aucun rendement à mesurer',
                  closed: 'compte clos' };
 const current = () => V.focus
   ? visible().find(g => g.key === V.focus) || V.data.global
@@ -248,7 +251,7 @@ function renderList(d) {
         d.excluded.length > 1 ? 's' : ''}, présents dans la synthèse mais sans rendement mesurable</div>
       ${d.excluded.map(e => `<div class="perf-excluded-row">
         <span>${esc(e.label)}</span>
-        <span class="perf-excl-why">${esc(LABELS[e.status] || e.status)}${
+        <span class="perf-excl-why">${esc(e.reason || LABELS[e.status] || e.status)}${
           e.status === 'closed' && e.last_date
             ? ` · dernière valeur le ${fmtDate(e.last_date)}` : ''}</span>
         <span class="num">${fmt(e.value)}</span>

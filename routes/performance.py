@@ -31,12 +31,17 @@ performance_bp = Blueprint('performance', __name__)
 # l'annee donne un chiffre a trois chiffres qui n'informe sur rien.
 MIN_DAYS_ANNUALISE = 180
 
+# Chaque exclusion porte son motif : un libelle unique pour toutes affichait
+# "tresorerie, aucun rendement" en face d'une residence principale.
+#
 # Objets de valeur : reevalues a la main, sans flux, souvent par paliers. Un
 # tableau qu'on fait estimer n'a pas "performe" parce que son estimation a
 # change.
-NON_MEASURABLE_CATEGORIES = {'Objets de valeur'}
+NON_MEASURABLE_CATEGORIES = {
+    'Objets de valeur': 'réévalué à la main, sans flux',
+}
 
-# Enveloppes dont le rendement ne se mesure pas.
+# Enveloppes dont le rendement ne se mesure pas, chacune avec son motif.
 #
 # "Compte courant" : enveloppe de transaction, a distinguer de l'epargne. Un
 # livret produit des interets, son rendement est faible mais reel et se mesure.
@@ -50,7 +55,10 @@ NON_MEASURABLE_CATEGORIES = {'Objets de valeur'}
 # reevaluations : le seul mouvement du capital net est l'amortissement du pret,
 # soit un remboursement de dette lu comme un rendement. La SCI, elle, reste
 # mesuree : des parts de SCPI sont un placement, et leur valeur suit un marche.
-NON_MEASURABLE_ENVELOPES = {'Compte courant', 'Immobilier'}
+NON_MEASURABLE_ENVELOPES = {
+    'Compte courant': 'trésorerie, pas un placement',
+    'Immobilier': "bien d'usage, valeur estimée à la main",
+}
 
 # Variation au-dela de laquelle un mouvement non declare est plus probable
 # qu'une performance reelle. Une TWR ne vaut que ce que vaut la table `flux`.
@@ -321,14 +329,18 @@ def get_performance():
         # Sa derniere valeur connue s'affichait comme si elle etait du jour : un
         # compte-titres ferme en mars figurait encore en aout avec son solde de
         # cloture. Il reste liste dans les exclusions, avec sa date.
+        reason = None
         if g_dates[-1] != dates[-1]:
             status = 'closed'
         elif cumul is None:
             status = ('negative' if g_values and min(g_values.values()) <= 0
                       else 'insufficient')
-        elif (gk[0] in NON_MEASURABLE_ENVELOPES
-              or not set(g_cats) - NON_MEASURABLE_CATEGORIES):
+        elif gk[0] in NON_MEASURABLE_ENVELOPES:
+            status, reason = 'non_measurable', NON_MEASURABLE_ENVELOPES[gk[0]]
+        elif not set(g_cats) - set(NON_MEASURABLE_CATEGORIES):
             status = 'non_measurable'
+            reason = next((NON_MEASURABLE_CATEGORIES[c] for c in g_cats
+                           if c in NON_MEASURABLE_CATEGORIES), None)
         else:
             status = 'ok'
         m = meta.get(members[0], {})
@@ -338,7 +350,7 @@ def get_performance():
         window = [(d, a) for d, a in g_flux
                   if serie and serie[0]['date'] < d <= serie[-1]['date']] if serie else []
         out.append({
-            'status': status,
+            'status': status, 'reason': reason,
             'key': '|'.join(str(x or '') for x in gk),
             'label': _label(gk, grouping),
             'envelope': gk[0],
@@ -391,7 +403,8 @@ def get_performance():
         'owner': owner, 'grouping': grouping, 'groupings': list(GROUPINGS),
         'groups': out, 'global': glob,
         'excluded': [{'label': e['label'], 'value': e['value'], 'status': e['status'],
-                      'dates_count': e['dates_count'], 'last_date': e['last_date']}
+                      'reason': e['reason'], 'dates_count': e['dates_count'],
+                      'last_date': e['last_date']}
                      for e in out if e['status'] != 'ok'],
         'min_days_annualise': MIN_DAYS_ANNUALISE,
         'non_measurable_categories': sorted(NON_MEASURABLE_CATEGORIES),

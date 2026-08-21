@@ -75,9 +75,22 @@ def _known_operations(conn):
 
 
 def _flux_signature(conn):
-    """Signature des flux existants, pour ne pas reinserer deux fois le meme."""
-    return {(r['date'], r['envelope'] or '', r['type'] or '', round(r['amount'] or 0, 2))
-            for r in conn.execute('SELECT date, envelope, type, amount FROM flux')}
+    """Signature des flux existants, pour ne pas reinserer deux fois le meme.
+
+    Le titulaire et l'etablissement en font partie : sans eux, deux contrats
+    d'enfants recevant le meme versement programme de 75 EUR le meme jour
+    partageaient une signature, et la moitie des flux etait ecartee comme
+    doublon.
+    """
+    return {_sig(r) for r in conn.execute(
+        'SELECT date, owner, envelope, establishment, type, amount FROM flux')}
+
+
+def _sig(r, kind_key='type', amount_key='amount'):
+    """Signature d'un flux. Accepte une ligne SQLite comme un dict d'import."""
+    return (r['date'], r['owner'] or '', r['envelope'] or '',
+            r['establishment'] or '', r[kind_key] or '',
+            round(r[amount_key] or 0, 2))
 
 
 # Un compte-titres ordinaire se nomme "CTO" chez l'un, "Compte-titres" chez
@@ -107,8 +120,14 @@ def _map_envelopes(items, known):
     return sorted(unresolved)
 
 
-def _read(files, owner, establishment=None):
-    """Parse les fichiers recus et renvoie (mouvements, rejets)."""
+def _read(files, owner, establishment=None, owners=None):
+    """Parse les fichiers recus et renvoie (mouvements, rejets).
+
+    `owner` est le titulaire choisi dans l'ecran d'import ; il ne s'applique
+    qu'aux documents qui ne nomment pas le leur. `owners` est le referentiel des
+    personnes connues, que le parser consulte pour reconnaitre un titulaire sans
+    jamais l'inventer.
+    """
     items, rejets = [], []
     for f in files:
         raw = f.read()
@@ -120,10 +139,10 @@ def _read(files, owner, establishment=None):
         except Exception as e:
             rejets.append({'file': f.filename, 'reason': f'PDF illisible : {e}'})
             continue
-        mvs = parse_movements(text, words=words)
+        mvs = parse_movements(text, words=words, owners=owners)
         if not mvs:
             rejets.append({'file': f.filename,
-                           'reason': 'ni avis d\'opéré ni relevé d\'espèces exploitable'})
+                           'reason': 'aucun mouvement exploitable dans ce document'})
             continue
         # Sans enveloppe, un mouvement ne se rattache a aucun compte : mieux
         # vaut refuser le document que le ranger au hasard.
@@ -137,7 +156,11 @@ def _read(files, owner, establishment=None):
             d = m.to_dict()
             d['file'] = f.filename
             d['digest'] = digest
-            d['owner'] = owner
+            # Le titulaire lu dans le document prime sur celui de l'ecran : un
+            # lot peut melanger les contrats de plusieurs personnes, et deux
+            # contrats d'enfants attribues a la meme personne ne se rattraperaient
+            # par aucun controle arithmetique.
+            d['owner'] = m.owner or owner
             if establishment:
                 d['establishment'] = establishment
             items.append(d)
@@ -161,6 +184,8 @@ def import_movements():
             'WHERE establishment IS NOT NULL AND establishment <> ?', ('',))})
         known_envs = sorted({r['envelope'] for r in conn.execute(
             'SELECT DISTINCT envelope FROM positions WHERE envelope IS NOT NULL')})
+        known_owners = sorted({r['owner'] for r in conn.execute(
+            'SELECT DISTINCT owner FROM positions WHERE owner IS NOT NULL')})
     files = request.files.getlist('files') or request.files.getlist('file')
     if not files:
         return jsonify({'error': 'Aucun fichier reçu'}), 400
@@ -168,7 +193,7 @@ def import_movements():
         return jsonify({'error': f'{MAX_FILES} fichiers au maximum par lot'}), 400
 
     items, rejets = _read(files, owner, request.form.get('establishment')
-                          or request.args.get('establishment'))
+                          or request.args.get('establishment'), known_owners)
     unresolved_envs = _map_envelopes(items, known_envs)
     with get_db() as conn:
         known = _known_docs(conn)
@@ -193,8 +218,7 @@ def import_movements():
             seen_ops.add(op)
     seen_fx = set()
     for i in fx:
-        sig = (i['date'], i['envelope'] or '', i['flux_type'] or '',
-               round(i['net_eur'] or 0, 2))
+        sig = _sig(i, kind_key='flux_type', amount_key='net_eur')
         i['duplicate'] = sig in signatures or sig in seen_fx
         i['duplicate_reason'] = 'flux déjà enregistré' if i['duplicate'] else None
         if not i['duplicate']:
@@ -210,6 +234,8 @@ def import_movements():
         'rejected': rejets,
         'known_establishments': known_etabs,
         'unresolved_envelopes': unresolved_envs,
+        # Titulaires reconnus dans les documents, quand ils s'y nomment.
+        'detected_owners': sorted({i['owner'] for i in items if i.get('owner')}),
     }
     if step != 'commit':
         return jsonify({'step': 'preview', 'summary': summary,
@@ -231,7 +257,7 @@ def import_movements():
                 (date, owner, envelope, establishment, isin, side, quantity, price,
                  currency, fx_rate, gross, fees, net_eur, place, source_doc, notes)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
-                (i['date'], owner, i['envelope'], i['establishment'], i['isin'],
+                (i['date'], i['owner'] or owner, i['envelope'], i['establishment'], i['isin'],
                  i['side'], i['quantity'], i['price'], i['currency'], i['fx_rate'],
                  i['gross'], i['fees'], i['net_eur'], i['place'], i['source_doc'],
                  f"[import] {i['file']}"))
@@ -242,7 +268,7 @@ def import_movements():
             cur.execute('''INSERT INTO flux
                 (date, owner, envelope, establishment, type, amount, notes)
                 VALUES (?,?,?,?,?,?,?)''',
-                (i['date'], owner, i['envelope'], i['establishment'],
+                (i['date'], i['owner'] or owner, i['envelope'], i['establishment'],
                  i['flux_type'], i['net_eur'], f"[import] {i['label'] or ''}".strip()))
             inserted['flux'] += 1
         conn.commit()

@@ -482,8 +482,27 @@ class TestEpargne:
                     VALUES (?,'Alice','Immobilier','Immobilier',NULL,610000,?,0.5,0.5)""",
                     (d, dette))
             conn.commit()
-        g = client.get('/api/performance').get_json()['groups'][0]
+        d = client.get('/api/performance').get_json()
+        g = d['groups'][0]
         assert g['status'] == 'non_measurable'
+        # Le motif est propre a l'enveloppe : un libelle unique affichait
+        # "tresorerie, aucun rendement" en face d'une residence principale.
+        assert 'usage' in g['reason']
+        assert d['excluded'][0]['reason'] == g['reason']
+
+    def test_motif_propre_a_chaque_exclusion(self, client):
+        self._cash('Compte courant', [('2026-01-01', 3000), ('2026-08-01', 9000)])
+        with get_db() as conn:
+            for d in ('2026-01-01', '2026-08-01'):
+                conn.execute("""INSERT INTO positions (date, owner, category, envelope,
+                    establishment, value, debt, ownership_pct, debt_pct)
+                    VALUES (?,'Alice','Objets de valeur','Autre',NULL,22000,0,1.0,1.0)""", (d,))
+            conn.commit()
+        par = {g['envelope']: g['reason'] for g in
+               client.get('/api/performance').get_json()['groups']}
+        assert 'trésorerie' in par['Compte courant']
+        assert 'main' in par['Autre']
+        assert par['Compte courant'] != par['Autre']
 
     def test_sci_reste_mesurable(self, client):
         """Des parts de SCPI sont un placement : leur valeur suit un marche."""
