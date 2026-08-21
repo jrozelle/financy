@@ -110,7 +110,10 @@ def _key(row, grouping):
 
 
 def _label(key, grouping):
-    if grouping == 'envelope':
+    # C'est la forme de la cle qui decide, pas la maille : a la maille
+    # enveloppe, un compte clos garde sa cle complete pour former son propre
+    # groupe, et doit donc etre nomme comme un compte.
+    if len(key) == 1:
         return key[0]
     env, etab, owner, name = key
     tete = f'{env} — {name}' if name else env
@@ -255,8 +258,16 @@ def get_performance():
     # {cle de compte: {date: valeur}}
     acct_values = {a: {d: by_date[d][a] for d in dates if a in by_date[d]} for a in accounts}
 
+    # Un compte qui n'est plus valorise au dernier arrete n'est plus detenu. Il
+    # forme son propre groupe dans les DEUX mailles : fondu dans son enveloppe,
+    # sa cloture se lit comme un effondrement du compte reste ouvert — un CTO
+    # ferme a 11 487 EUR faisait ressortir l'enveloppe CTO a -7,45 % alors que
+    # le compte survivant gagnait 11,81 %. Les deux mailles ne doivent diverger
+    # que lorsque l'enveloppe agrege des contrats ouverts sans rapport.
+    closed = {a for a in accounts if max(acct_values[a]) != dates[-1]}
+
     def group_key(acct):
-        return (acct[0],) if grouping == 'envelope' else acct
+        return (acct[0],) if grouping == 'envelope' and acct not in closed else acct
 
     groups = {}
     for a in accounts:
@@ -331,9 +342,9 @@ def get_performance():
             'key': '|'.join(str(x or '') for x in gk),
             'label': _label(gk, grouping),
             'envelope': gk[0],
-            'establishment': None if grouping == 'envelope' else m.get('establishment'),
-            'owner': None if grouping == 'envelope' else m.get('owner'),
-            'account_label': None if grouping == 'envelope' else m.get('account_label'),
+            'establishment': m.get('establishment') if len(gk) > 1 else None,
+            'owner': m.get('owner') if len(gk) > 1 else None,
+            'account_label': m.get('account_label') if len(gk) > 1 else None,
             'serie': serie, 'twr': cumul, 'days': days,
             'twr_annualise': annualise(cumul, days),
             'annualisable': bool(days) and days >= MIN_DAYS_ANNUALISE,

@@ -543,13 +543,30 @@ class TestComptesHomonymes:
         d = client.get('/api/performance').get_json()
         assert any(g['label'] == 'CTO — Ancien CTO · Ma Banque · Alice' for g in d['groups'])
 
-    def test_maille_enveloppe_les_regroupe(self, client):
-        """A la maille enveloppe, les deux comptes se retrouvent — et la
-        disparition de l'un est neutralisee comme un retrait."""
+    def test_maille_enveloppe_isole_le_compte_clos(self, client):
+        """Un compte clos garde son propre groupe, meme a la maille enveloppe.
+
+        Fondu dans son enveloppe, sa cloture se lit comme un effondrement du
+        compte reste ouvert : l'enveloppe ressortait a -7,45 % quand le
+        survivant gagnait +11,81 %.
+        """
         self._deux_cto()
         d = client.get('/api/performance?group=envelope').get_json()
-        assert len(d['groups']) == 1
-        g = d['groups'][0]
-        assert g['accounts'] == 2
-        # Sans neutralisation : 11 500 -> 2 000 se lirait comme -83 %
-        assert g['twr'] > -0.2
+        par = {g['account_label']: g for g in d['groups']}
+        assert set(par) == {'Ancien CTO', None}
+        assert par['Ancien CTO']['status'] == 'closed'
+        assert par[None]['status'] == 'ok'
+        assert par[None]['accounts'] == 1
+
+    def test_les_deux_mailles_concordent(self, client):
+        """Les deux mailles ne doivent diverger que sur des contrats ouverts.
+
+        C'est l'invariant qui rend la bascule utile : un ecart signale un
+        agregat douteux, pas un artefact de calcul.
+        """
+        self._deux_cto()
+        cpt = client.get('/api/performance?group=account').get_json()
+        env = client.get('/api/performance?group=envelope').get_json()
+        vivant = lambda d: next(g for g in d['groups'] if g['status'] == 'ok')
+        assert vivant(env)['twr'] == pytest.approx(vivant(cpt)['twr'])
+        assert env['global']['twr'] == pytest.approx(cpt['global']['twr'])
