@@ -276,19 +276,29 @@ function renderChart(d) {
   const hue = g => colors[Math.max(0, d.groups.findIndex(x => x.key === g.key)) % colors.length];
   const series = (V.focus ? shown.filter(g => g.key === V.focus) : shown)
     .filter(g => g.serie?.length > 1);
+  const labels = [...new Set(series.flatMap(g => g.serie.map(p => p.date)))].sort();
+  // Chaque serie est alignee sur la liste complete des arretes, un trou valant
+  // null. Les series n'ont pas toutes la meme longueur — un compte ouvert en
+  // cours de periode en a moins — et le mode d'interaction `index` de Chart.js
+  // regroupe les points par POSITION dans le tableau, pas par date : la crypto,
+  // apparue plus tard, voyait sa valeur du 13/05 s'afficher sous le titre
+  // 07/06. `spanGaps` garde le trait continu par-dessus les trous.
+  const aligned = serie => {
+    const par = new Map(serie.map(p => [p.date, p.index]));
+    return labels.map(l => (par.has(l) ? par.get(l) : null));
+  };
   const datasets = series.map(g => ({
     label: g.label, borderColor: hue(g), backgroundColor: hue(g),
-    data: g.serie.map(p => ({ x: p.date, y: p.index })),
+    data: aligned(g.serie), spanGaps: true,
     borderWidth: 2, pointRadius: 2.5, pointHoverRadius: 6, tension: 0,
   }));
   if (!V.focus && d.global && series.length > 1) {
     datasets.push({
-      label: 'Ensemble', data: d.global.serie.map(p => ({ x: p.date, y: p.index })),
+      label: 'Ensemble', data: aligned(d.global.serie), spanGaps: true,
       borderColor: border, backgroundColor: border,
       borderWidth: 2, borderDash: [5, 3], pointRadius: 0, tension: 0,
     });
   }
-  const labels = [...new Set(series.flatMap(g => g.serie.map(p => p.date)))].sort();
   const toggle = lbl => {
     const hit = d.groups.find(g => g.label === lbl);
     if (!hit) return;
@@ -297,15 +307,15 @@ function renderChart(d) {
   };
   setPerfChart(new Chart(el.getContext('2d'), {
     type: 'line',
-    data: { datasets },
+    data: { labels, datasets },
     options: {
-      responsive: true, maintainAspectRatio: false, parsing: false,
+      responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       onClick(ev, els) {
         if (els.length) toggle(this.data.datasets[els[0].datasetIndex].label);
       },
       scales: {
-        x: { type: 'category', labels, grid: { display: false },
+        x: { type: 'category', grid: { display: false },
              ticks: { autoSkip: true, maxRotation: 0,
                       callback(v) { return fmtDate(this.getLabelForValue(v)); } } },
         y: { title: { display: true, text: 'base 100 au premier arrêté' },
@@ -316,8 +326,14 @@ function renderChart(d) {
                   labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 24, padding: 12 },
                   onClick: (ev, item) => toggle(item.text) },
         tooltip: {
+          // Onze lignes empilees se lisent mal : les ordonner du plus haut au
+          // plus bas fait correspondre l'ordre de lecture a l'ordre des
+          // courbes a l'ecran.
+          itemSort: (a, b) => b.parsed.y - a.parsed.y,
+          boxWidth: 8, boxHeight: 8, boxPadding: 3,
+          padding: 8, bodySpacing: 2, titleMarginBottom: 6, caretPadding: 8,
           callbacks: {
-            title: items => fmtDate(items[0].label),
+            title: items => fmtDate(labels[items[0].dataIndex]),
             label: it => `${it.dataset.label} : ${pct(it.parsed.y / 100 - 1)}`,
           },
         },
