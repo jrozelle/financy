@@ -595,3 +595,81 @@ class TestSituationGenerali:
     def test_dispatche_par_parse_movements(self):
         mvs = parse_movements(SITUATION_GENERALI, owners=self.OWNERS)
         assert len(mvs) == 4 and mvs[0].kind == 'flux'
+
+
+class TestFluxProvisoires:
+    """Un versement programme peut etre saisi avant que le releve l'atteste.
+
+    Le releve annuel doit alors le CORRIGER, pas le doubler : les deux sources
+    ne datent pas le meme versement pareil — prelevement en debut de mois sur le
+    compte courant, investissement une dizaine de jours plus tard chez
+    l'assureur.
+    """
+    H = {'X-CSRF-Token': 'test'}
+
+    def _seed_flux(self, date, notes, montant=75.0):
+        with get_db() as conn:
+            conn.execute("""INSERT INTO positions (date, owner, category, envelope,
+                establishment, value, debt, ownership_pct, debt_pct)
+                VALUES ('2025-01-01','Camille','Actions','Assurance-vie','BoursoBank',
+                        1,0,1.0,1.0)""")
+            conn.execute("""INSERT INTO flux (date, owner, envelope, establishment,
+                type, amount, notes) VALUES (?,'Camille','Assurance-vie','BoursoBank',
+                'Versement',?,?)""", (date, montant, notes))
+            conn.commit()
+
+    def _post(self, client, step='preview'):
+        return client.post(
+            f'/api/import/movements?step={step}',
+            data={'owner': 'Camille',
+                  'files': [(_pdf(SITUATION_GENERALI), 'situation.pdf')]},
+            headers=self.H, content_type='multipart/form-data')
+
+    def test_provisoire_corrige_et_non_double(self, client):
+        # Saisi le 10/06, la situation l'atteste au 13/06 : trois jours d'ecart.
+        self._seed_flux('2025-06-10', '[provisoire] versement programmé')
+        d = self._post(client, 'commit').get_json()
+        assert d['inserted']['corrections'] == 1
+        with get_db() as conn:
+            lignes = conn.execute("SELECT date, notes FROM flux WHERE amount=75.0").fetchall()
+        assert len(lignes) == 1, 'un seul enregistrement, pas deux'
+        assert lignes[0]['date'] == '2025-06-13', 'redate par le document'
+        assert '[provisoire]' not in lignes[0]['notes']
+
+    def test_flux_atteste_reste_un_doublon(self, client):
+        """Sans mention provisoire, le meme flux a trois jours pres est un doublon.
+
+        Il n'est ni insere ni modifie : deux documents peuvent decrire le meme
+        mouvement, mais rien ne dit lequel fait foi.
+        """
+        self._seed_flux('2025-06-10', 'saisi a la main')
+        d = self._post(client, 'commit').get_json()
+        assert d['inserted']['flux'] == 3      # les trois autres operations
+        assert d['inserted']['corrections'] == 0
+        with get_db() as conn:
+            row = conn.execute("SELECT date FROM flux WHERE amount=75.0").fetchone()
+        assert row['date'] == '2025-06-10', 'date d origine conservee'
+
+    def test_hors_tolerance_reste_un_flux_distinct(self, client):
+        """A plus de quinze jours, c'est un autre versement."""
+        self._seed_flux('2025-05-01', '[provisoire] versement programmé')
+        d = self._post(client, 'commit').get_json()
+        assert d['inserted']['corrections'] == 0
+        with get_db() as conn:
+            n = conn.execute('SELECT COUNT(*) FROM flux WHERE amount=75.0').fetchone()[0]
+        assert n == 2
+
+    def test_montant_different_non_rapproche(self, client):
+        self._seed_flux('2025-06-10', '[provisoire] versement programmé', montant=80.0)
+        d = self._post(client, 'commit').get_json()
+        assert d['inserted']['corrections'] == 0
+
+    def test_apercu_annonce_la_correction(self, client):
+        self._seed_flux('2025-06-10', '[provisoire] versement programmé')
+        d = self._post(client, 'preview').get_json()
+        assert d['summary']['corrections'] == 1
+        vise = [f for f in d['flux'] if f.get('corrects')]
+        assert len(vise) == 1 and 'provisoire' in vise[0]['correction_reason']
+        with get_db() as conn:
+            assert conn.execute("SELECT date FROM flux WHERE amount=75.0"
+                                ).fetchone()[0] == '2025-06-10', 'apercu n ecrit rien'
