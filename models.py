@@ -551,6 +551,90 @@ def _migration_008(conn):
         pass
 
 
+def _migration_009(conn):
+    """Registre des transactions : le mouvement de titres, piece par piece.
+
+    Ce que `holdings` ne peut pas porter. Une holding decrit un ETAT (quantite
+    et cout a une date) ; elle ne garde aucune trace d'une vente. Quand une
+    ligne est soldee, elle disparait et sa plus-value avec. Les plus-values
+    REALISEES sont donc structurellement hors d'atteinte sans registre.
+
+    Deliberement SANS cle etrangere vers `positions` : une transaction n'est pas
+    rattachee a un arrete. Elle survit a la suppression d'un snapshot, ce qui
+    evite au passage la question des cascades inertes (`PRAGMA foreign_keys`
+    n'est pas positionne dans `get_db`, cf. dette documentee). La seule
+    reference est `isin`, souple, vers `securities`.
+
+    `source_doc` porte le chemin de la piece justificative et sert de cle
+    naturelle : l'import est ainsi idempotent sans dedoublonnage applicatif.
+    Une saisie manuelle sans piece reste possible (plusieurs NULL autorises par
+    SQLite sur un index unique).
+    """
+    conn.executescript('''
+        CREATE TABLE IF NOT EXISTS transactions (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            date          TEXT    NOT NULL,              -- date d'execution
+            owner         TEXT    NOT NULL,
+            envelope      TEXT,
+            establishment TEXT,
+            isin          TEXT    NOT NULL REFERENCES securities(isin),
+            side          TEXT    NOT NULL CHECK (side IN ('ACHAT','VENTE')),
+            quantity      REAL    NOT NULL CHECK (quantity > 0),
+            price         REAL,                          -- cours en devise de negociation
+            currency      TEXT    DEFAULT 'EUR',
+            fx_rate       REAL,                          -- cours de change si devise <> EUR
+            gross         REAL,                          -- montant brut en devise
+            fees          REAL    DEFAULT 0,             -- courtage + taxes, en EUR
+            net_eur       REAL    NOT NULL,              -- montant reellement regle
+            place         TEXT,
+            source_doc    TEXT,                          -- piece justificative
+            notes         TEXT,
+            created_at    TEXT    DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_tx_date  ON transactions(date);
+        CREATE INDEX IF NOT EXISTS idx_tx_isin  ON transactions(isin);
+        CREATE INDEX IF NOT EXISTS idx_tx_owner ON transactions(owner, envelope);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_tx_source ON transactions(source_doc);
+    ''')
+
+
+def _migration_010(conn):
+    """Ajout de `flux.establishment`.
+
+    Sans cette colonne, un flux ne peut etre rattache qu'a (personne, enveloppe)
+    — insuffisant des qu'une enveloppe existe chez plusieurs etablissements. Une
+    assurance-vie repartie sur quatre contrats obligeait a repartir les
+    versements au prorata de la valeur, ce qui biaise le rendement de chaque
+    contrat.
+
+    Backfill sans risque : on ne renseigne l'etablissement que lorsque le couple
+    (personne, enveloppe) n'en connait QU'UN SEUL dans `positions`. Toute
+    ambiguite est laissee a NULL plutot que devinee.
+    """
+    try:
+        conn.execute('ALTER TABLE flux ADD COLUMN establishment TEXT DEFAULT NULL')
+    except Exception:
+        pass
+    try:
+        conn.execute('''
+            UPDATE flux SET establishment = (
+                SELECT MIN(p.establishment) FROM positions p
+                WHERE p.owner = flux.owner
+                  AND IFNULL(p.envelope, '') = IFNULL(flux.envelope, '')
+                  AND p.establishment IS NOT NULL AND p.establishment <> ''
+                HAVING COUNT(DISTINCT p.establishment) = 1
+            )
+            WHERE establishment IS NULL
+        ''')
+    except Exception:
+        pass
+    try:
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_flux_account '
+                     'ON flux(owner, envelope, establishment)')
+    except Exception:
+        pass
+
+
 MIGRATIONS = [
     (1, _migration_001),
     (2, _migration_002),
@@ -560,6 +644,8 @@ MIGRATIONS = [
     (6, _migration_006),
     (7, _migration_007),
     (8, _migration_008),
+    (9, _migration_009),
+    (10, _migration_010),
 ]
 
 
@@ -743,6 +829,21 @@ def snapshot_holdings_to_date(conn, snapshot_date):
     except sqlite3.OperationalError:
         # Tables non encore migrées
         return 0
+
+
+def freeze_holdings_prices(holdings_map):
+    """Neutralise le cours du jour pour valoriser un arrete historique.
+
+    Sans cela, `_holding_effective_value` prefere `securities.last_price` des
+    qu'il est plus recent que la ligne : chaque arrete passe se retrouve
+    revalorise aux prix d'aujourd'hui. Correct pour le portefeuille courant,
+    faux pour une serie historique. Le dernier arrete, lui, garde le cours du
+    jour pour rester aligne sur les KPI live.
+    """
+    for holdings in holdings_map.values():
+        for h in holdings:
+            h['last_price'] = None
+    return holdings_map
 
 
 def get_holdings_map(conn, position_ids=None):

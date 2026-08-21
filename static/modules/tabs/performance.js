@@ -1,0 +1,258 @@
+import { api } from '../api.js';
+import { S, perfChart, setPerfChart } from '../state.js';
+import { fmt, esc, fmtDate, getColors, chartBorderColor, destroyChart } from '../utils.js';
+
+// Etat local : donnees, groupe isole, maille, affichage du non mesurable.
+const V = { data: null, focus: null, group: 'account', showAll: false };
+
+/** Nombre brut. `fmt` de utils.js ajoute toujours l'euro : inutilisable pour un %. */
+const n = (v, dec = 0) => v == null ? '—'
+  : new Intl.NumberFormat('fr-FR', { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(v);
+
+const pct = (v, dec = 2) => v == null ? '—'
+  : `${v >= 0 ? '+' : '−'}${n(Math.abs(v) * 100, dec)} %`;
+
+const sign = v => v == null ? '' : (v >= 0 ? 'positive' : 'negative');
+
+function duree(days) {
+  if (days == null) return '—';
+  if (days < 62) return `${days} j`;
+  const m = Math.round(days / 30.44);
+  return m < 24 ? `${m} mois` : `${n(days / 365.25, 1)} ans`;
+}
+
+export async function loadPerformance() {
+  const owner = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : null;
+  const qs = new URLSearchParams({ group: V.group });
+  if (owner) qs.set('owner', owner);
+  V.data = await api('GET', `/api/performance?${qs}`);
+  V.focus = null;
+  renderPerformance();
+}
+
+// Les groupes sans rendement calculable restent affiches : les masquer ferait
+// diverger le total de cet onglet de celui de la synthese, sans explication.
+const visible = () => (V.data?.groups || [])
+  .filter(g => V.showAll || g.status !== 'non_measurable');
+const LABELS = { insufficient: 'historique insuffisant', negative: 'valeur négative',
+                 non_measurable: 'trésorerie' };
+const current = () => V.focus
+  ? visible().find(g => g.key === V.focus) || V.data.global
+  : V.data.global;
+
+export function renderPerformance() {
+  const d = V.data;
+  const body = document.getElementById('perf-body');
+  const empty = document.getElementById('perf-empty');
+  if (!d || d.insufficient || !d.groups?.length) {
+    body?.classList.add('hidden');
+    empty?.classList.remove('hidden');
+    return;
+  }
+  body?.classList.remove('hidden');
+  empty?.classList.add('hidden');
+  renderHeader(d);
+  renderKpi(d);
+  renderList(d);
+  renderChart(d);
+}
+
+function renderHeader(d) {
+  const host = document.getElementById('perf-controls');
+  if (!host) return;
+  const hidden = (d.groups || []).filter(g => !g.measurable).length;
+  host.innerHTML = `
+    <div class="seg" role="group" aria-label="Maille d'agrégation">
+      <button type="button" class="seg-btn ${V.group === 'account' ? 'is-on' : ''}" data-group="account"
+        title="Un compte = une enveloppe chez un établissement, pour une personne. Maille correcte : chaque contrat a son propre rendement.">Par compte</button>
+      <button type="button" class="seg-btn ${V.group === 'envelope' ? 'is-on' : ''}" data-group="envelope"
+        title="Fusionne tous les contrats d'une même enveloppe, toutes personnes et tous établissements confondus. Un écart avec la vue par compte signale que l'enveloppe agrège des contrats sans rapport.">Par enveloppe</button>
+    </div>
+    ${hidden ? `<label class="checkbox-inline">
+      <input type="checkbox" id="perf-show-all" ${V.showAll ? 'checked' : ''}>
+      Inclure ${hidden} compte${hidden > 1 ? 's' : ''} sans rendement mesurable</label>` : ''}
+    ${V.focus ? `<button type="button" class="btn btn-sm" id="perf-reset">↩ Tout afficher</button>` : ''}
+    <span class="perf-meta">${d.dates.length} arrêtés · ${fmtDate(d.first_date)} → ${fmtDate(d.date)}${
+      d.excluded?.length ? ` · <span title="${esc(d.excluded.map(e =>
+        `${e.label} — ${LABELS[e.status] || e.status}`).join(' · '))}">${
+        d.excluded.length} compte${d.excluded.length > 1 ? 's' : ''} hors calcul</span>` : ''}</span>`;
+  host.querySelectorAll('[data-group]').forEach(b => b.addEventListener('click', () => {
+    if (V.group === b.dataset.group) return;
+    V.group = b.dataset.group;
+    loadPerformance();
+  }));
+  document.getElementById('perf-show-all')?.addEventListener('change', ev => {
+    V.showAll = ev.target.checked;
+    if (!V.showAll && V.focus && !visible().some(g => g.key === V.focus)) V.focus = null;
+    renderPerformance();
+  });
+  document.getElementById('perf-reset')?.addEventListener('click', () => {
+    V.focus = null; renderPerformance();
+  });
+}
+
+function renderKpi(d) {
+  const host = document.getElementById('perf-kpi');
+  if (!host) return;
+  const g = current();
+  if (!g) { host.innerHTML = ''; return; }
+  // Meme gabarit que la synthese (.kpi-card + lisere colore) : deux onglets qui
+  // presentent des indicateurs doivent se ressembler.
+  const tiles = [
+    ['', 'Valeur suivie', fmt(g.value), esc(g.label || 'Ensemble mesurable')],
+    ['kpi-gross', 'TWR cumulée', pct(g.twr), duree(g.days), sign(g.twr)],
+    ['kpi-mobilizable', 'TWR annualisée',
+      g.annualisable ? pct(g.twr_annualise) : '—',
+      g.annualisable ? 'pondérée par le temps'
+        : `moins de ${d.min_days_annualise} j d'historique`,
+      g.annualisable ? sign(g.twr_annualise) : ''],
+    ['kpi-debt', 'Capital net apporté', fmt(g.flux_net),
+      `${g.flux_count} flux externe${g.flux_count > 1 ? 's' : ''}`],
+  ];
+  host.innerHTML = tiles.map(([variant, k, v, s, cl = '']) => `
+    <div class="kpi-card ${variant}">
+      <div class="kpi-label">${esc(k)}</div>
+      <div class="kpi-value ${cl}">${v}</div>
+      <div class="kpi-sub">${s}</div>
+    </div>`).join('');
+}
+
+/** Liste en grille plutot qu'un tableau : sept colonnes de chiffres se lisent
+ *  mal, et la barre donne l'ordre de grandeur avant la lecture du nombre. */
+function renderList(d) {
+  const host = document.getElementById('perf-list');
+  if (!host) return;
+  const rows = visible();
+  const span = Math.max(0.02, ...rows.map(g => Math.abs(g.twr || 0)));
+  const total = rows.filter(g => g.status === 'ok').length;
+  const line = g => {
+    const w = g.twr == null ? 0 : Math.abs(g.twr) / span * 50;
+    const neg = (g.twr || 0) < 0;
+    const sub = [g.establishment, g.owner].filter(Boolean).join(' · ')
+      || (g.categories || []).join(', ');
+    const flags = [
+      g.status === 'insufficient' ? `<span class="badge badge-blk"
+        title="Il faut deux valorisations pour mesurer un rendement. Ce compte est hors du total.">historique insuffisant</span>` : '',
+      g.status === 'negative' ? `<span class="badge badge-blk"
+        title="Valeur nulle ou négative sur la période : un rendement n'a pas de sens sur une dette nette ou un apport en compte courant. Hors du total.">valeur négative</span>` : '',
+      g.suspect_periods?.length ? `<span class="badge badge-30"
+        title="${esc(g.suspect_periods.map(x =>
+          `${fmtDate(x.from)} → ${fmtDate(x.to)} : ${pct(x.change)} inexpliqué (${
+            x.delta >= 0 ? '+' : '−'}${n(Math.abs(x.delta))} € de variation, ${
+            x.flux ? n(x.flux) + ' € de flux déclaré' : 'aucun flux déclaré'})`).join(' · '))}">écart inexpliqué</span>` : '',
+      g.measurable ? '' : `<span class="badge badge-blk"
+        title="Un compte de trésorerie n'a pas de rendement : sa valeur bouge parce que l'argent entre et sort">non mesurable</span>`,
+    ].join(' ');
+    return `
+      <div class="perf-item${V.focus === g.key ? ' is-focus' : ''}" data-key="${esc(g.key)}"
+           tabindex="0" role="button" aria-pressed="${V.focus === g.key}">
+        <div class="perf-name">
+          <span class="perf-title">${esc(g.envelope || g.label)}</span>
+          ${sub ? `<span class="perf-sub">${esc(sub)}</span>` : ''}
+        </div>
+        <div class="perf-bar" aria-hidden="true">
+          <span class="perf-bar-fill ${neg ? 'neg' : 'pos'}"
+                style="width:${w.toFixed(1)}%;${neg ? 'right' : 'left'}:50%"></span>
+        </div>
+        <div class="perf-num ${sign(g.twr)}">${pct(g.twr)}
+          <span class="perf-num-sub">${
+            g.annualisable ? pct(g.twr_annualise) + ' /an'
+            : g.days != null ? duree(g.days)
+            : `${g.dates_count} arrêté${g.dates_count > 1 ? 's' : ''}`}</span>
+        </div>
+        <div class="perf-val">${fmt(g.value)}
+          <span class="perf-num-sub">${flags || (g.flux_count ? `${g.flux_count} flux` : '')}</span>
+        </div>
+      </div>`;
+  };
+  const g = d.global;
+  host.innerHTML = `
+    <div class="perf-head">
+      <span>${V.group === 'account' ? 'Compte' : 'Enveloppe'}</span>
+      <span class="perf-axis"><i>−</i><i>0</i><i>+</i></span>
+      <span class="ta-r">TWR</span><span class="ta-r">Valeur</span>
+    </div>
+    ${rows.map(line).join('')}
+    ${g && !V.focus && total > 1 ? `<div class="perf-item is-total">
+      <div class="perf-name"><span class="perf-title">Ensemble mesurable</span>
+        <span class="perf-sub">${(g.groups || []).length} ${V.group === 'account' ? 'compte' : 'enveloppe'}${(g.groups || []).length > 1 ? 's' : ''}</span></div>
+      <div class="perf-bar"></div>
+      <div class="perf-num ${sign(g.twr)}">${pct(g.twr)}
+        <span class="perf-num-sub">${g.annualisable ? pct(g.twr_annualise) + ' /an' : duree(g.days)}</span></div>
+      <div class="perf-val">${fmt(g.value)}</div>
+    </div>` : ''}
+    <p class="perf-note">TWR annualisée à partir de ${d.min_days_annualise} jours d'historique —
+    en dessous, la durée est indiquée à la place. Cliquez une ligne pour l'isoler.</p>`;
+  host.querySelectorAll('.perf-item[data-key]').forEach(el => {
+    const pick = () => {
+      V.focus = V.focus === el.dataset.key ? null : el.dataset.key;
+      renderPerformance();
+    };
+    el.addEventListener('click', pick);
+    el.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); pick(); }
+    });
+  });
+}
+
+function renderChart(d) {
+  const el = document.getElementById('perf-chart');
+  if (!el || typeof Chart === 'undefined') return;
+  destroyChart(perfChart);
+  const colors = getColors();
+  const border = chartBorderColor();
+  const shown = visible();
+  // La couleur suit le groupe, jamais son rang : isoler une ligne ne doit pas
+  // repeindre les autres.
+  const hue = g => colors[Math.max(0, d.groups.findIndex(x => x.key === g.key)) % colors.length];
+  const series = (V.focus ? shown.filter(g => g.key === V.focus) : shown)
+    .filter(g => g.serie?.length > 1);
+  const datasets = series.map(g => ({
+    label: g.label, borderColor: hue(g), backgroundColor: hue(g),
+    data: g.serie.map(p => ({ x: p.date, y: p.index })),
+    borderWidth: 2, pointRadius: 2.5, pointHoverRadius: 6, tension: 0,
+  }));
+  if (!V.focus && d.global && series.length > 1) {
+    datasets.push({
+      label: 'Ensemble', data: d.global.serie.map(p => ({ x: p.date, y: p.index })),
+      borderColor: border, backgroundColor: border,
+      borderWidth: 2, borderDash: [5, 3], pointRadius: 0, tension: 0,
+    });
+  }
+  const labels = [...new Set(series.flatMap(g => g.serie.map(p => p.date)))].sort();
+  const toggle = lbl => {
+    const hit = d.groups.find(g => g.label === lbl);
+    if (!hit) return;
+    V.focus = V.focus === hit.key ? null : hit.key;
+    renderPerformance();
+  };
+  setPerfChart(new Chart(el.getContext('2d'), {
+    type: 'line',
+    data: { datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false, parsing: false,
+      interaction: { mode: 'index', intersect: false },
+      onClick(ev, els) {
+        if (els.length) toggle(this.data.datasets[els[0].datasetIndex].label);
+      },
+      scales: {
+        x: { type: 'category', labels, grid: { display: false },
+             ticks: { autoSkip: true, maxRotation: 0,
+                      callback(v) { return fmtDate(this.getLabelForValue(v)); } } },
+        y: { title: { display: true, text: 'base 100 au premier arrêté' },
+             grid: { color: border } },
+      },
+      plugins: {
+        legend: { position: 'bottom',
+                  labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 24, padding: 12 },
+                  onClick: (ev, item) => toggle(item.text) },
+        tooltip: {
+          callbacks: {
+            title: items => fmtDate(items[0].label),
+            label: it => `${it.dataset.label} : ${pct(it.parsed.y / 100 - 1)}`,
+          },
+        },
+      },
+    },
+  }));
+}

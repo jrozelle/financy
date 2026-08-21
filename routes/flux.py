@@ -39,11 +39,14 @@ def add_flux():
         return jsonify({'error': 'Montant invalide'}), 400
     if not validate_string(d.get('notes'), 2000):
         return jsonify({'error': 'Notes trop longues (2000 car. max)'}), 400
+    if not validate_string(d.get('establishment'), 120):
+        return jsonify({'error': 'Établissement trop long (120 car. max)'}), 400
     with get_db() as conn:
         cur = conn.execute(
-            'INSERT INTO flux (date, owner, envelope, type, amount, notes, category) VALUES (?,?,?,?,?,?,?)',
-            (d['date'], d['owner'], d.get('envelope'), d.get('type'),
-             parse_number(d['amount']), d.get('notes'), d.get('category'))
+            'INSERT INTO flux (date, owner, envelope, establishment, type, amount, notes, category) '
+            'VALUES (?,?,?,?,?,?,?,?)',
+            (d['date'], d['owner'], d.get('envelope'), d.get('establishment') or None,
+             d.get('type'), parse_number(d['amount']), d.get('notes'), d.get('category'))
         )
         row = conn.execute('SELECT * FROM flux WHERE id=?', (cur.lastrowid,)).fetchone()
     return jsonify(dict(row)), 201
@@ -62,9 +65,10 @@ def update_flux(fid):
         return jsonify({'error': 'Notes trop longues (2000 car. max)'}), 400
     with get_db() as conn:
         conn.execute(
-            'UPDATE flux SET date=?, owner=?, envelope=?, type=?, amount=?, notes=?, category=? WHERE id=?',
-            (d['date'], d['owner'], d.get('envelope'), d.get('type'),
-             parse_number(d['amount']), d.get('notes'), d.get('category'), fid)
+            'UPDATE flux SET date=?, owner=?, envelope=?, establishment=?, type=?, amount=?, '
+            'notes=?, category=? WHERE id=?',
+            (d['date'], d['owner'], d.get('envelope'), d.get('establishment') or None,
+             d.get('type'), parse_number(d['amount']), d.get('notes'), d.get('category'), fid)
         )
         row = conn.execute('SELECT * FROM flux WHERE id=?', (fid,)).fetchone()
     return jsonify(dict(row))

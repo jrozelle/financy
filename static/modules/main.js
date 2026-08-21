@@ -16,11 +16,12 @@ import { openHoldingsModal, wireHoldingsEvents, confirmCloseHoldings } from './t
 import { wireIsinPopoverEvents } from './isin-popover.js';
 import { loadAdvisor, wireAdvisorEvents } from './tabs/advisor.js';
 import { loadActifs, wireActifsEvents } from './tabs/actifs.js';
-import { loadFlux, renderFlux, openFluxModal, saveFlux, persistFluxFilters, clearFluxFilters } from './tabs/flux.js';
+import { loadFlux, renderFlux, openFluxModal, saveFlux, persistFluxFilters, clearFluxFilters, wireFluxImport } from './tabs/flux.js';
 import { loadEntities, renderEntities, openEntityModal, saveEntity, updateEntInfo } from './tabs/entities.js';
 import { importXlsx, importJson, exportJson, resetDb, initDemoToggle, createBackup, updateDemoBadge } from './tabs/import-export.js';
 import { loadReferential, saveReferential, initTemplateSelect } from './tabs/referentiel.js';
 import { loadTimeline, wireSimulation, triggerAutoSnapshot, triggerPricesRefresh, loadSchedulerStatus } from './tabs/tools.js';
+import { loadPerformance } from './tabs/performance.js';
 import { wireGlobalSearch } from './search.js';
 import { wireSettingsEvents } from './settings.js';
 import { initColumnPicker, reapplyColumns } from './column-picker.js';
@@ -125,7 +126,7 @@ function _onGlobalOwnerChange(e) {
 }
 
 const VALID_TABS = new Set([
-  'synthese', 'positions', 'actifs', 'flux', 'entites', 'conseil',
+  'synthese', 'positions', 'actifs', 'flux', 'entites', 'performance', 'conseil',
   'referentiel', 'tools', 'import',
 ]);
 
@@ -401,6 +402,7 @@ export async function switchTab(tab, { pushHistory = true } = {}) {
     if (tab === 'entites')     await loadEntities();
     if (tab === 'referentiel') await loadReferential();
     if (tab === 'actifs')      await loadActifs();
+    if (tab === 'performance') await loadPerformance();
     if (tab === 'conseil')     await loadAdvisor();
     if (tab === 'tools')       { await loadTimeline(); loadSchedulerStatus(); }
   } finally {
@@ -701,6 +703,7 @@ function wireEvents() {
 
   // Holdings + popover ISIN + advisor + actifs
   wireHoldingsEvents();
+  wireFluxImport();
   wireIsinPopoverEvents();
   wireAdvisorEvents();
   wireActifsEvents();

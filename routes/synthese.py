@@ -2,7 +2,7 @@ import json
 from flask import Blueprint, jsonify, request
 from datetime import datetime
 from models import (get_db, compute_position, get_entity_map, get_holdings_map,
-                    load_referential)
+                    load_referential, freeze_holdings_prices)
 from auth import login_required, csrf_protect
 
 synthese_bp = Blueprint('synthese', __name__)
@@ -28,13 +28,8 @@ def _macro_bucket(category):
 
 
 def _freeze_holdings(holdings_map):
-    """Neutralise le cours du jour (last_price) pour valoriser un snapshot
-    historique a la market_value ENREGISTREE de ses holdings (valeur du jour du
-    snapshot), et non au cours actuel. Le snapshot le plus recent garde son
-    last_price (cours du jour) pour rester aligne sur le KPI live."""
-    for holdings in holdings_map.values():
-        for h in holdings:
-            h['last_price'] = None
+    """Alias historique de models.freeze_holdings_prices (voir ce helper)."""
+    return freeze_holdings_prices(holdings_map)
 
 
 @synthese_bp.route('/api/synthese')
@@ -357,17 +352,26 @@ def get_historique():
 
 # ─── TRI (XIRR) ──────────────────────────────────────────────────────────────
 
-def _xirr(cashflows):
+# Duree minimale pour annualiser. En dessous, extrapoler quelques semaines a
+# l'annee donne un chiffre a trois chiffres qui n'informe sur rien : un compte
+# ouvert depuis 7 semaines et en hausse de 12 % afficherait +245 % par an.
+MIN_DAYS_ANNUALISE = 180
+
+
+def _xirr(cashflows, min_days=MIN_DAYS_ANNUALISE):
     """
     Calcule le XIRR (taux de rendement interne annualisé).
     cashflows : liste de (date_str 'YYYY-MM-DD', montant)
-    Retourne le taux annuel en % ou None si non convergent.
+    Retourne le taux annuel en % ou None si non convergent, ou si la periode
+    couverte est plus courte que `min_days` (annualisation non significative).
     Utilise Newton-Raphson avec plusieurs estimations initiales,
     puis bisection en fallback.
     """
     if len(cashflows) < 2:
         return None
     dates = [datetime.strptime(d, '%Y-%m-%d') for d, _ in cashflows]
+    if (max(dates) - min(dates)).days < min_days:
+        return None
     amounts = [a for _, a in cashflows]
     if all(a >= 0 for a in amounts) or all(a <= 0 for a in amounts):
         return None  # pas de signe mixte → pas de TRI
@@ -424,6 +428,25 @@ def _xirr(cashflows):
             lo = mid
             npv_lo = npv_mid
     return None
+
+
+def _period_return(cashflows):
+    """Rendement brut sur la periode, pour les cas non annualisables.
+
+    Retourne {days, invested, final, return} ou None. `invested` somme les
+    sorties de tresorerie de l'investisseur (montants negatifs), `final` les
+    entrees (valeur finale + retraits).
+    """
+    if len(cashflows) < 2:
+        return None
+    dates = [datetime.strptime(d, '%Y-%m-%d') for d, _ in cashflows]
+    days = (max(dates) - min(dates)).days
+    invested = -sum(a for _, a in cashflows if a < 0)
+    final = sum(a for _, a in cashflows if a > 0)
+    if invested <= 0:
+        return None
+    return {'days': days, 'invested': round(invested, 2),
+            'final': round(final, 2), 'return': round(final / invested - 1, 6)}
 
 
 def _flux_to_cashflow(f):
@@ -508,6 +531,7 @@ def get_tri():
     all_envs = set(initial_by_env.keys()) | set(current_by_env.keys())
 
     result = {}
+    short_periods = {}
     for env in all_envs:
         init_val = initial_by_env.get(env, 0)
         final_val = current_by_env.get(env, 0)
@@ -521,6 +545,12 @@ def get_tri():
         tri = _xirr(cashflows)
         if tri is not None:
             result[env] = tri
+        else:
+            # Periode trop courte pour annualiser : on remonte le rendement brut
+            # sur la periode, que le front affichera tel quel.
+            short = _period_return(cashflows)
+            if short:
+                short_periods[env] = short
 
     # TRI global
     all_cashflows = []
@@ -534,6 +564,9 @@ def get_tri():
         result['_global'] = tri_global
 
     resp = {'date': last_date, 'first_date': first_date, 'tri': result}
+    if short_periods:
+        resp['short_periods'] = short_periods
+    resp['min_days_annualise'] = MIN_DAYS_ANNUALISE
     if excluded_count > 0:
         resp['excluded_flux'] = excluded_count
     return jsonify(resp)
