@@ -306,7 +306,13 @@ def get_performance():
         serie, cumul, days, gaps, suspects = _chain(g_dates, g_values, g_flux + comp)
 
         g_cats = sorted({c for a in members for c in (cats.get(a) or set()) if c})
-        if cumul is None:
+        # Un compte qui n'est plus valorise au dernier arrete n'est plus detenu.
+        # Sa derniere valeur connue s'affichait comme si elle etait du jour : un
+        # compte-titres ferme en mars figurait encore en aout avec son solde de
+        # cloture. Il reste liste dans les exclusions, avec sa date.
+        if g_dates[-1] != dates[-1]:
+            status = 'closed'
+        elif cumul is None:
             status = ('negative' if g_values and min(g_values.values()) <= 0
                       else 'insufficient')
         elif (gk[0] in NON_MEASURABLE_ENVELOPES
@@ -334,6 +340,7 @@ def get_performance():
             'categories': g_cats, 'measurable': status == 'ok',
             'suspect_periods': suspects,
             'value': g_values[g_dates[-1]], 'dates_count': len(g_dates),
+            'last_date': g_dates[-1],
             'gaps': gaps, 'accounts': len(members),
             'flux_count': len(window),
             'flux_net': round(sum(a for _, a in window), 2),
@@ -373,7 +380,7 @@ def get_performance():
         'owner': owner, 'grouping': grouping, 'groupings': list(GROUPINGS),
         'groups': out, 'global': glob,
         'excluded': [{'label': e['label'], 'value': e['value'], 'status': e['status'],
-                      'dates_count': e['dates_count']}
+                      'dates_count': e['dates_count'], 'last_date': e['last_date']}
                      for e in out if e['status'] != 'ok'],
         'min_days_annualise': MIN_DAYS_ANNUALISE,
         'non_measurable_categories': sorted(NON_MEASURABLE_CATEGORIES),

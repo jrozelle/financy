@@ -441,6 +441,32 @@ class TestEpargne:
         g = client.get('/api/performance').get_json()['groups'][0]
         assert g['status'] == 'non_measurable'
 
+    def test_compte_clos_ecarte(self, client):
+        """Un compte absent du dernier arrete n'est plus detenu.
+
+        Sa derniere valorisation s'affichait comme si elle etait du jour : un
+        compte-titres ferme en fevrier figurait encore en aout avec son solde
+        de cloture.
+        """
+        _seed([('2026-01-01', 10000), ('2026-02-01', 11000)], envelope='CTO')
+        # Un autre compte, lui, va jusqu'au dernier arrete.
+        self._cash('Livret A', [('2026-01-01', 5000), ('2026-02-01', 5000),
+                                ('2026-08-01', 5100)])
+        d = client.get('/api/performance').get_json()
+        clos = next(g for g in d['groups'] if g['envelope'] == 'CTO')
+        assert clos['status'] == 'closed'
+        assert clos['last_date'] == '2026-02-01'
+        assert clos['key'] in [e['label'] for e in d['excluded']] or any(
+            e['status'] == 'closed' for e in d['excluded'])
+        # Sa valeur perimee ne doit pas entrer dans l'ensemble.
+        assert d['global']['value'] == pytest.approx(5100)
+
+    def test_compte_encore_valorise_reste_ouvert(self, client):
+        self._cash('Livret A', [('2026-01-01', 20000), ('2026-08-01', 20400)])
+        g = client.get('/api/performance').get_json()['groups'][0]
+        assert g['status'] == 'ok'
+        assert g['last_date'] == '2026-08-01'
+
     def test_immobilier_non_mesurable(self, client):
         """Un bien d'usage n'est pas un placement.
 
