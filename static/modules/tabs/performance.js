@@ -210,7 +210,7 @@ function renderList(d) {
         <div class="perf-num ${sign(g.twr)}">${pct(g.twr)}
           <span class="perf-num-sub">${
             g.annualisable ? pct(g.twr_annualise) + ' /an'
-            : g.days != null ? duree(g.days)
+            : g.days != null ? `sur ${duree(g.days)}`
             : `${g.dates_count} arrêté${g.dates_count > 1 ? 's' : ''}`}</span>
         </div>
         <div class="perf-val">${fmt(g.value)}
@@ -243,7 +243,8 @@ function renderList(d) {
         <span class="perf-sub">${(g.groups || []).length} ${V.group === 'account' ? 'compte' : 'enveloppe'}${(g.groups || []).length > 1 ? 's' : ''}</span></div>
       <div class="perf-bar"></div>
       <div class="perf-num ${sign(g.twr)}">${pct(g.twr)}
-        <span class="perf-num-sub">${g.annualisable ? pct(g.twr_annualise) + ' /an' : duree(g.days)}</span></div>
+        <span class="perf-num-sub">${
+          g.annualisable ? pct(g.twr_annualise) + ' /an' : `sur ${duree(g.days)}`}</span></div>
       <div class="perf-val">${fmt(g.value)}</div>
     </div>` : ''}
     ${V.showExcluded && d.excluded?.length ? `<div class="perf-excluded">
@@ -257,9 +258,11 @@ function renderList(d) {
         <span class="num">${fmt(e.value)}</span>
       </div>`).join('')}
     </div>` : ''}
-    <p class="perf-note">TWR annualisée à partir de ${d.min_days_annualise} jours d'historique —
-    en dessous, la durée est indiquée à la place. Cliquez une ligne pour l'isoler,
-    un en-tête pour trier.</p>`;
+    <p class="perf-note">Les pourcentages sont des rendements <strong>cumulés sur la
+    période</strong> ; « /an » signale un équivalent annualisé, affiché à partir de
+    ${d.min_days_annualise} jours d'historique seulement — extrapoler quelques semaines
+    à l'année ne renseigne sur rien. Cliquez une ligne pour l'isoler, un en-tête pour
+    trier.</p>`;
   host.querySelectorAll('.perf-th[data-sort]').forEach(el => {
     const trier = () => setSort(el.dataset.sort);
     el.addEventListener('click', trier);
