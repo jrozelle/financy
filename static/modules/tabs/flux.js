@@ -1,5 +1,6 @@
 import { S } from '../state.js';
-import { fmt, fmtDate, esc, sortArr, updateSortIndicators, today, parseLocaleNumber } from '../utils.js';
+import { fmt, fmtDate, esc, sortArr, updateSortIndicators, today, parseLocaleNumber,
+         fluxSigned as signed, fmtSigned as eurSigned } from '../utils.js';
 import { api } from '../api.js';
 import { confirmDialog, toast, closeModal } from '../dialogs.js';
 import { saveFilters, loadFilters, clearFilterKey, applyIfValid } from '../filter-persist.js';
@@ -105,7 +106,7 @@ export function renderFlux() {
         title="Sans établissement, ce flux est réparti au prorata entre les comptes de l'enveloppe : le rendement de chacun en est faussé">à préciser</span>`}</td>
       <td>${esc(f.category || '—')}</td>
       <td>${esc(f.type || '—')}</td>
-      <td class="num ${f.amount >= 0 ? 'pos' : 'neg'}">${f.amount >= 0 ? '+' : ''}${fmt(f.amount)}</td>
+      <td class="num ${signed(f) >= 0 ? 'pos' : 'neg'}">${eurSigned(signed(f))}</td>
       <td>${esc(f.notes || '—')}</td>
       <td style="white-space:nowrap">
         <button class="btn-icon edit" data-id="${f.id}" data-action="edit-flux">Éditer</button>
@@ -113,13 +114,13 @@ export function renderFlux() {
       </td>
     </tr>`).join('');
 
-  const total = flux.reduce((s, f) => s + (f.amount || 0), 0);
+  const total = flux.reduce((s, f) => s + signed(f), 0);
   const byType  = {};
   const byOwner = {};
   for (const f of flux) {
     const t = f.type || 'Autre';
-    byType[t]   = (byType[t]   || 0) + (f.amount || 0);
-    byOwner[f.owner] = (byOwner[f.owner] || 0) + (f.amount || 0);
+    byType[t]   = (byType[t]   || 0) + signed(f);
+    byOwner[f.owner] = (byOwner[f.owner] || 0) + signed(f);
   }
   const ownersActive = Object.keys(byOwner);
   if (tfoot) {
@@ -127,16 +128,18 @@ export function renderFlux() {
       <tr>
         <td colspan="6" style="font-size:11px;color:var(--text-muted)">
           ${Object.entries(byType).map(([t, v]) =>
-            `${esc(t)} : <strong class="${v >= 0 ? 'pos' : 'neg'}">${v >= 0 ? '+' : ''}${fmt(v)}</strong>`
+            `${esc(t)} : <strong class="${v >= 0 ? 'pos' : 'neg'}">${eurSigned(v)}</strong>`
           ).join(' &nbsp;·&nbsp; ')}
         </td>
-        <td class="num ${total >= 0 ? 'pos' : 'neg'}" style="font-weight:700">${total >= 0 ? '+' : ''}${fmt(total)}</td>
+        <td class="num ${total >= 0 ? 'pos' : 'neg'}" style="font-weight:700"
+            title="Solde net des flux affichés : versements et coupons moins retraits et frais.">${
+          eurSigned(total)}</td>
         <td colspan="2"></td>
       </tr>
       ${ownersActive.length > 1 ? `<tr>
         <td colspan="6" style="font-size:11px;color:var(--text-muted)">
           ${ownersActive.map(o =>
-            `${esc(o)} : <strong class="${byOwner[o] >= 0 ? 'pos' : 'neg'}">${byOwner[o] >= 0 ? '+' : ''}${fmt(byOwner[o])}</strong>`
+            `${esc(o)} : <strong class="${byOwner[o] >= 0 ? 'pos' : 'neg'}">${eurSigned(byOwner[o])}</strong>`
           ).join(' &nbsp;·&nbsp; ')}
         </td>
         <td colspan="3"></td>
@@ -209,7 +212,7 @@ export async function saveFlux(e) {
 
 export async function deleteFlux(id) {
   const f = S.flux.find(x => x.id === id);
-  const label = f ? `${f.type || 'Flux'} — ${fmt(f.amount)} (${f.owner})` : `Flux #${id}`;
+  const label = f ? `${f.type || 'Flux'} — ${eurSigned(signed(f))} (${f.owner})` : `Flux #${id}`;
   if (!await confirmDialog('Supprimer ce flux ?', `<strong>${esc(label)}</strong><br>Cette action est irréversible.`)) return;
   await api('DELETE', `/api/flux/${id}`);
   toast('Flux supprimé');

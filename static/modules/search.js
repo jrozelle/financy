@@ -1,5 +1,5 @@
 import { S } from './state.js';
-import { fmt, fmtDate, esc } from './utils.js';
+import { fmt, fmtDate, esc, fluxSigned, fmtSigned } from './utils.js';
 
 let _debounce = null;
 
@@ -146,7 +146,7 @@ function renderResults(query, panel, switchTabFn) {
           ${highlight(f.notes || f.envelope || f.type, q)}
           <span style="color:var(--text-muted);font-size:11px;margin-left:.25rem">${esc(f.owner)} · ${fmtDate(f.date)}</span>
         </div>
-        <div class="search-item-amount">${fmt(f.amount)}</div>
+        <div class="search-item-amount">${fmtSigned(fluxSigned(f))}</div>
       </div>
     `).join('');
   }
