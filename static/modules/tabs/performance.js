@@ -105,8 +105,11 @@ function renderKpi(d) {
       g.annualisable ? 'équivalent par an'
         : `moins de ${d.min_days_annualise} j d'historique`,
       g.annualisable ? sign(g.twr_annualise) : ''],
-    ['kpi-debt', 'Apports nets de la période', fmt(g.flux_net),
-      `${g.flux_count} versement${g.flux_count > 1 ? 's' : ''} et retrait${g.flux_count > 1 ? 's' : ''}, hors dividendes`],
+    // La periode est nommee sur la tuile elle-meme : "de la periode" sans dire
+    // laquelle obligeait a aller la chercher a l'autre bout de l'ecran.
+    ['kpi-debt', 'Apports nets', fmt(g.flux_net),
+      `du ${fmtDate(d.first_date)} au ${fmtDate(d.date)} — `
+      + `${g.flux_count} mouvement${g.flux_count > 1 ? 's' : ''}, hors dividendes`],
   ];
   host.innerHTML = tiles.map(([variant, k, v, s, cl = '']) => `
     <div class="kpi-card ${variant}">
