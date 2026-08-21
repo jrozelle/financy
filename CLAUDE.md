@@ -1,11 +1,20 @@
 # Consignes permanentes Financy
 
 ## Workflow
-- Branche de dev active : `claude/asset-import-tracking-8psft`
+- Branche de travail : `main`. La branche `claude/asset-import-tracking-8psft`
+  est abandonnée à `d045e86` — ne pas y revenir sans raison explicite.
 - 1 commit par phase fonctionnelle, message clair en français
 - Ne push jamais sans feu vert explicite de l'utilisateur
 - Ne crée jamais de PR sans demande explicite
 - Après chaque phase : rappeler la checklist de test local et attendre le feedback
+- Déploiement prod : `git pull` sur `/volume1/docker/tools/financy/app` puis
+  `docker compose up -d --build financy` depuis `/volume1/docker` (le conteneur
+  appartient au projet compose de ce répertoire, pas de `app/`). `static/` et
+  `templates/` étant montés en lecture seule, un changement front ne demande
+  qu'un `git pull`.
+- Toute mutation de la base prod est précédée d'une copie datée
+  `data/patrimoine.db.bak-AAAAMMJJ-HHMM-<motif>`, et d'une simulation affichant
+  les lignes visées avant écriture.
 
 ## Interface
 - **Jamais d'attribut `title` natif pour une information necessaire.** Il ne
