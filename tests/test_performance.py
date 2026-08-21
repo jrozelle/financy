@@ -269,14 +269,19 @@ class TestGrouping:
         # Le contrat ouvert au dernier arrete n'a pas de rendement mesurable
         assert 'CA31' not in by or by['CA31']['twr'] is None
 
-    def test_maille_enveloppe_absorbe_l_ouverture(self, client):
+    def test_maille_enveloppe_neutralise_l_ouverture(self, client):
+        """L'arrivee d'un contrat dans un agregat n'est pas un rendement.
+
+        10 000 -> 111 000 sans flux declare : sans traitement, l'enveloppe
+        afficherait +1000 %. L'ouverture du second contrat est un apport de
+        capital dans le perimetre, pas une performance.
+        """
         self._two_contracts()
         d = client.get('/api/performance?group=envelope').get_json()
-        # 10 000 -> 111 000 sans flux : l'agregat voit un rendement enorme,
-        # c'est l'artefact que la maille compte evite.
         g = d['groups'][0]
-        assert g['twr'] > 5.0
-        assert g['suspect_periods']
+        # Seul le contrat A a produit du rendement : +10 %
+        assert g['twr'] == pytest.approx(0.10, abs=0.01)
+        assert g['accounts'] == 2
 
     def test_maille_inconnue_refusee(self, client):
         assert client.get('/api/performance?group=nawak').status_code == 400
@@ -339,3 +344,72 @@ class TestStatuts:
         assert g['status'] == 'negative'
         assert g['dates_count'] == 3          # l'historique est bien la
         assert g['twr'] is None
+
+
+class TestComposition:
+    """Un agregat ne doit pas compter l'arrivee d'un compte comme du rendement.
+
+    Constate en prod : l'ensemble affichait +37,24 % quand la moyenne ponderee
+    des comptes donnait +6,68 %. Tout l'ecart venait d'une assurance-vie de
+    100 000 EUR entrant dans le perimetre entre deux arretes.
+    """
+
+    def _deux_comptes(self):
+        """A present aux trois arretes, B a partir du deuxieme.
+
+        B doit avoir deux valorisations pour etre mesurable : sinon il est ecarte
+        et l'agregat ne teste rien.
+        """
+        with get_db() as conn:
+            lignes = [
+                ('2026-01-01', 'PEA', 10000), ('2026-04-01', 'PEA', 10500),
+                ('2026-08-01', 'PEA', 11000),
+                ('2026-04-01', 'CTO', 100000), ('2026-08-01', 'CTO', 100000),
+            ]
+            for d, env, v in lignes:
+                conn.execute("""INSERT INTO positions (date, owner, category, envelope,
+                    establishment, value, debt, ownership_pct, debt_pct)
+                    VALUES (?,'Alice','Actions',?,'X',?,0,1.0,1.0)""", (d, env, v))
+            conn.commit()
+
+    def test_ensemble_ignore_l_arrivee_d_un_compte(self, client):
+        self._deux_comptes()
+        d = client.get('/api/performance').get_json()
+        g = d['global']
+        assert g['accounts'] == 2
+        # Sans neutralisation : le total passe de 10 000 a 110 500 entre les deux
+        # premiers arretes, soit +1005 % attribues au rendement.
+        # Avec : seul le PEA progresse (+5 % puis +4,76 %), le CTO stagne.
+        assert g['twr'] == pytest.approx(0.0476, abs=0.01)
+        assert 0 < g['twr'] < 0.10
+
+    def test_ensemble_ignore_la_disparition_d_un_compte(self, client):
+        with get_db() as conn:
+            for d, env, v in (('2026-01-01', 'PEA', 10000), ('2026-08-01', 'PEA', 11000),
+                              ('2026-01-01', 'CTO', 50000)):
+                conn.execute("""INSERT INTO positions (date, owner, category, envelope,
+                    establishment, value, debt, ownership_pct, debt_pct)
+                    VALUES (?,'Alice','Actions',?,'X',?,0,1.0,1.0)""", (d, env, v))
+            conn.commit()
+        g = client.get('/api/performance').get_json()['global']
+        # Le CTO sort du perimetre : ce n'est pas une perte de 83 %
+        assert g['twr'] == pytest.approx(0.10, abs=0.01)
+
+    def test_compte_seul_inchange(self, client):
+        """A la maille compte, un groupe n'a qu'un membre : rien a neutraliser."""
+        _seed([('2026-01-01', 10000), ('2026-08-01', 11000)])
+        g = client.get('/api/performance').get_json()['groups'][0]
+        assert g['twr'] == pytest.approx(0.10)
+        assert g['accounts'] == 1
+
+    def test_apports_limites_a_la_periode(self, client):
+        """Un versement anterieur au premier arrete n'est pas un apport de la periode.
+
+        Le calcul l'ignore ; l'afficher dans le KPI donnerait un capital apporte
+        que le rendement ne reflete pas.
+        """
+        _seed([('2026-03-01', 10000), ('2026-09-01', 12000)],
+              [('2025-06-01', 'Versement', 5000), ('2026-05-01', 'Versement', 1000)])
+        g = client.get('/api/performance').get_json()['groups'][0]
+        assert g['flux_net'] == pytest.approx(1000.0)
+        assert g['flux_count'] == 1

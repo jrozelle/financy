@@ -71,7 +71,7 @@ def _flux_signature(conn):
             for r in conn.execute('SELECT date, envelope, type, amount FROM flux')}
 
 
-def _read(files, owner):
+def _read(files, owner, establishment=None):
     """Parse les fichiers recus et renvoie (mouvements, rejets)."""
     items, rejets = [], []
     for f in files:
@@ -95,6 +95,8 @@ def _read(files, owner):
             d['file'] = f.filename
             d['digest'] = digest
             d['owner'] = owner
+            if establishment:
+                d['establishment'] = establishment
             items.append(d)
     return items, rejets
 
@@ -108,13 +110,20 @@ def import_movements():
     owner = request.form.get('owner') or request.args.get('owner')
     if not owner:
         return jsonify({'error': 'Personne requise'}), 400
+    # Les etablissements deja employes dans les positions : les proposer evite
+    # les variantes d'orthographe, qui creeraient des comptes fantomes.
+    with get_db() as conn:
+        known_etabs = sorted({r['establishment'] for r in conn.execute(
+            'SELECT DISTINCT establishment FROM positions '
+            'WHERE establishment IS NOT NULL AND establishment <> ?', ('',))})
     files = request.files.getlist('files') or request.files.getlist('file')
     if not files:
         return jsonify({'error': 'Aucun fichier reçu'}), 400
     if len(files) > MAX_FILES:
         return jsonify({'error': f'{MAX_FILES} fichiers au maximum par lot'}), 400
 
-    items, rejets = _read(files, owner)
+    items, rejets = _read(files, owner, request.form.get('establishment')
+                          or request.args.get('establishment'))
     with get_db() as conn:
         known = _known_docs(conn)
         known_ops = _known_operations(conn)
@@ -153,6 +162,7 @@ def import_movements():
         'warnings': sum(1 for i in items if i.get('warnings')),
         'unknown_isins': sorted({i['isin'] for i in tx if i.get('unknown_isin')}),
         'rejected': rejets,
+        'known_establishments': known_etabs,
     }
     if step != 'commit':
         return jsonify({'step': 'preview', 'summary': summary,

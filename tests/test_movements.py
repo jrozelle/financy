@@ -277,6 +277,32 @@ class TestImportEndpoint:
                 "SELECT COUNT(*) FROM securities WHERE isin='FR0000000001'"
             ).fetchone()[0] == 1
 
+    def test_etablissement_impose(self, client):
+        """L'appelant impose l'etablissement, pour coller a l'orthographe des positions.
+
+        Un import ecrivant "BoursoBank" quand les positions disent "Boursorama"
+        cree un compte distinct : les versements ne se rattachent plus, et le
+        rendement de l'enveloppe absorbe les apports. Vu en prod : un PEA affiche
+        a +44,86 % au lieu de +11,56 %.
+        """
+        r = client.post('/api/import/movements?step=commit',
+                        data={'owner': 'Alice', 'establishment': 'Ma Banque',
+                              'files': [(_pdf(AVIS_ACHAT), 'a.pdf')]},
+                        headers=self.H, content_type='multipart/form-data')
+        assert r.status_code == 200
+        with get_db() as conn:
+            assert conn.execute(
+                'SELECT establishment FROM transactions').fetchone()[0] == 'Ma Banque'
+
+    def test_etablissements_connus_proposes(self, client):
+        with get_db() as conn:
+            conn.execute("""INSERT INTO positions (date, owner, category, envelope,
+                establishment, value, debt, ownership_pct, debt_pct)
+                VALUES ('2026-01-01','Alice','Actions','PEA','Ma Banque',1,0,1.0,1.0)""")
+            conn.commit()
+        r = self._post(client, 'preview', [('avis', AVIS_ACHAT)])
+        assert 'Ma Banque' in r.get_json()['summary']['known_establishments']
+
     def test_document_rejete_signale(self, client):
         r = self._post(client, 'preview', [('facture', 'Facture EDF 42,00 EUR')])
         assert r.get_json()['summary']['rejected'][0]['file'] == 'facture.pdf'

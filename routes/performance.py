@@ -128,6 +128,36 @@ def _values_by_group(conn, dates, grouping, owner=None):
     return by_date, cats, meta
 
 
+def _composition_flux(dates, members):
+    """Flux synthetiques traduisant les changements de composition d'un agregat.
+
+    Un agregat (une enveloppe, l'ensemble du patrimoine) additionne plusieurs
+    comptes. Quand un compte APPARAIT entre deux arretes, le total augmente sans
+    qu'aucun versement ne soit declare : le rendement absorbe l'arrivee du
+    capital. C'est ainsi qu'une assurance-vie de 100 000 EUR entrant dans le
+    perimetre affichait +35 % de performance sur quinze jours.
+
+    On traite donc l'apparition d'un compte comme un apport et sa disparition
+    comme un retrait, dates a la fin de la sous-periode : poids nul dans le
+    denominateur de Dietz, ce qui neutralise l'effet sans fabriquer de rendement.
+
+    `members` : {cle de compte: {date: valeur}}. Retourne [(date, montant signe)].
+    """
+    out = []
+    for k in range(len(dates) - 1):
+        d0, d1 = dates[k], dates[k + 1]
+        delta = 0.0
+        for vals in members.values():
+            at0, at1 = d0 in vals, d1 in vals
+            if at1 and not at0:
+                delta += vals[d1]
+            elif at0 and not at1:
+                delta -= vals[d0]
+        if abs(delta) > 0.005:
+            out.append((d1, delta))
+    return out
+
+
 def _chain(dates, values, flux):
     """Chaine les rendements Dietz modifiee.
 
@@ -189,111 +219,129 @@ def get_performance():
         if len(dates) < 2:
             return jsonify({'dates': dates, 'groups': [], 'global': None,
                             'grouping': grouping, 'insufficient': True})
-        by_date, cats, meta = _values_by_group(conn, dates, grouping, owner)
+        # Toujours calcule a la maille compte : c'est le grain le plus fin, et
+        # les changements de composition d'un agregat ne sont visibles qu'a ce
+        # niveau.
+        by_date, cats, meta = _values_by_group(conn, dates, 'account', owner)
         flux = [dict(r) for r in conn.execute('SELECT * FROM flux ORDER BY date')]
     if owner:
         flux = [f for f in flux if f['owner'] == owner]
 
-    # Rattachement des flux. Depuis `flux.establishment` (migration 010), un
-    # flux se rattache exactement a son compte. Les flux anterieurs, ou ceux
-    # saisis sans etablissement, restent ambigus : on les repartit au prorata de
-    # la valeur entre les comptes de la meme (enveloppe, personne), et on compte
-    # combien pour pouvoir le signaler.
-    keys = sorted({k for v in by_date.values() for k in v},
-                  key=lambda k: tuple(str(x or '') for x in k))
+    accounts = sorted({k for v in by_date.values() for k in v},
+                      key=lambda k: tuple(str(x or '') for x in k))
+    # {cle de compte: {date: valeur}}
+    acct_values = {a: {d: by_date[d][a] for d in dates if a in by_date[d]} for a in accounts}
+
+    def group_key(acct):
+        return (acct[0],) if grouping == 'envelope' else acct
+
+    groups = {}
+    for a in accounts:
+        groups.setdefault(group_key(a), []).append(a)
+
     out = []
-    for k in keys:
-        k_dates = [d for d in dates if k in by_date[d]]
-        k_values = {d: by_date[d][k] for d in k_dates}
+    for gk, members in groups.items():
+        mvals = {a: acct_values[a] for a in members}
+        g_dates = sorted({d for v in mvals.values() for d in v})
+        g_values = {d: sum(v[d] for v in mvals.values() if d in v) for d in g_dates}
+
+        # Flux reels : rattachement exact par etablissement quand il est connu.
         approx = 0
-        if grouping == 'envelope':
-            k_flux = [(f['date'], _flux_signed(f)) for f in flux
-                      if (f.get('envelope') or 'Autre') == k[0]]
-        else:
-            env, etab, own = k
-            siblings = [x for x in keys if x[0] == env and x[2] == own]
-            k_flux = []
-            for f in flux:
-                if (f.get('envelope') or 'Autre') != env or f.get('owner') != own:
-                    continue
-                amt = _flux_signed(f)
-                if not amt:
-                    continue
-                f_etab = f.get('establishment') or None
-                if f_etab:
-                    if f_etab == etab:
-                        k_flux.append((f['date'], amt))
-                    continue
-                if len(siblings) == 1:
-                    k_flux.append((f['date'], amt))
-                    continue
-                # Etablissement inconnu et plusieurs comptes candidats.
-                d_ref = max([d for d in dates if d <= f['date'] and by_date[d]],
-                            default=k_dates[0] if k_dates else dates[0])
-                tot = sum(by_date[d_ref].get(x, 0.0) for x in siblings) or 0.0
-                share = (by_date[d_ref].get(k, 0.0) / tot) if tot else 0.0
-                if share:
-                    k_flux.append((f['date'], amt * share))
-                    approx += 1
-        k_flux = [(d, a) for d, a in k_flux if a]
-        serie, cumul, days, gaps, suspects = _chain(k_dates, k_values, k_flux)
-        k_cats = sorted(c for c in cats.get(k, set()) if c)
-        m = meta.get(k, {})
-        # Un groupe sans rendement calculable — un compte ouvert au dernier
-        # arrete, par exemple — n'est PAS retire de la reponse : l'omettre en
-        # silence fait diverger cet onglet de la synthese sans explication.
-        # Il est rendu avec son statut, et l'interface l'affiche comme tel.
+        g_flux = []
+        for f in flux:
+            amt = _flux_signed(f)
+            if not amt:
+                continue
+            f_env = f.get('envelope') or 'Autre'
+            f_own = f.get('owner')
+            f_etab = f.get('establishment') or None
+            cand = [a for a in members if a[0] == f_env
+                    and (grouping == 'envelope' or a[2] == f_own)]
+            if not cand:
+                continue
+            if grouping == 'envelope':
+                g_flux.append((f['date'], amt))
+                continue
+            # maille compte : un flux appartient a un etablissement precis
+            siblings = [a for a in accounts if a[0] == f_env and a[2] == f_own]
+            if f_etab:
+                if any(a[1] == f_etab for a in cand):
+                    g_flux.append((f['date'], amt))
+                continue
+            if len(siblings) == 1:
+                g_flux.append((f['date'], amt))
+                continue
+            d_ref = max([d for d in dates if d <= f['date'] and by_date[d]],
+                        default=g_dates[0])
+            tot = sum(by_date[d_ref].get(x, 0.0) for x in siblings) or 0.0
+            share = sum(by_date[d_ref].get(a, 0.0) for a in cand) / tot if tot else 0.0
+            if share:
+                g_flux.append((f['date'], amt * share))
+                approx += 1
+
+        comp = _composition_flux(g_dates, mvals) if len(members) > 1 else []
+        serie, cumul, days, gaps, suspects = _chain(g_dates, g_values, g_flux + comp)
+
+        g_cats = sorted({c for a in members for c in (cats.get(a) or set()) if c})
         if cumul is None:
-            # Deux causes distinctes, qu'il serait faux de confondre : un compte
-            # trop recent (une seule valorisation) et un poste a valeur nulle ou
-            # negative (dette nette, apport en compte courant), sur lequel aucun
-            # rendement n'existe meme avec dix ans d'historique.
-            status = ('negative' if k_values and min(k_values.values()) <= 0
+            status = ('negative' if g_values and min(g_values.values()) <= 0
                       else 'insufficient')
-        elif set(k_cats) - NON_MEASURABLE_CATEGORIES:
+        elif set(g_cats) - NON_MEASURABLE_CATEGORIES:
             status = 'ok'
         else:
             status = 'non_measurable'
+        m = meta.get(members[0], {})
+        # Le capital apporte n'a de sens que sur la periode mesuree : additionner
+        # des versements anterieurs au premier arrete afficherait un apport que
+        # le calcul, lui, ignore.
+        window = [(d, a) for d, a in g_flux
+                  if serie and serie[0]['date'] < d <= serie[-1]['date']] if serie else []
         out.append({
             'status': status,
-            'key': '|'.join(str(x or '') for x in k),
-            'label': _label(k, grouping),
-            'envelope': m.get('envelope'), 'establishment': m.get('establishment'),
-            'owner': m.get('owner'),
+            'key': '|'.join(str(x or '') for x in gk),
+            'label': _label(gk, grouping),
+            'envelope': gk[0],
+            'establishment': None if grouping == 'envelope' else m.get('establishment'),
+            'owner': None if grouping == 'envelope' else m.get('owner'),
             'serie': serie, 'twr': cumul, 'days': days,
             'twr_annualise': annualise(cumul, days),
             'annualisable': bool(days) and days >= MIN_DAYS_ANNUALISE,
-            'categories': k_cats,
-            'measurable': status == 'ok',
+            'categories': g_cats, 'measurable': status == 'ok',
             'suspect_periods': suspects,
-            'value': k_values[k_dates[-1]], 'dates_count': len(k_dates),
-            'gaps': gaps, 'flux_count': len(k_flux), 'flux_approx': approx,
-            'flux_net': round(sum(a for _, a in k_flux), 2),
+            'value': g_values[g_dates[-1]], 'dates_count': len(g_dates),
+            'gaps': gaps, 'accounts': len(members),
+            'flux_count': len(window),
+            'flux_net': round(sum(a for _, a in window), 2),
+            'flux_approx': approx,
         })
     out.sort(key=lambda e: (e['status'] != 'ok', -e['value']))
 
-    # L'ensemble agrege les seuls groupes mesurables : y melanger les comptes
-    # courants ferait passer leurs mouvements de tresorerie pour du rendement.
-    keep = {e['key'] for e in out if e['status'] == 'ok'}
-    keep_keys = [k for k in keys if '|'.join(str(x or '') for x in k) in keep]
-    g_tot = {d: sum(by_date[d].get(k, 0.0) for k in keep_keys) for d in dates}
-    g_tot = {d: v for d, v in g_tot.items() if v}
-    envs_keep = {(e['envelope'], e['owner']) for e in out if e['status'] == 'ok'}
-    g_flux = [(f['date'], _flux_signed(f)) for f in flux
-              if ((f.get('envelope') or 'Autre'), f.get('owner')) in envs_keep]
-    g_flux = [(d, a) for d, a in g_flux if a]
-    g_dates = sorted(g_tot)
-    g_serie, g_cumul, g_days, g_gaps, g_susp = _chain(g_dates, g_tot, g_flux)
+    # Ensemble : memes regles, sur les seuls comptes mesurables.
+    keep = [a for gk, members in groups.items() for a in members
+            if next(e for e in out if e['key'] == '|'.join(str(x or '') for x in gk))['status'] == 'ok']
     glob = None
-    if g_cumul is not None:
-        glob = {'label': 'Ensemble mesurable', 'serie': g_serie, 'twr': g_cumul,
-                'days': g_days, 'twr_annualise': annualise(g_cumul, g_days),
-                'annualisable': g_days >= MIN_DAYS_ANNUALISE,
-                'value': g_tot[g_dates[-1]], 'dates_count': len(g_dates),
-                'gaps': g_gaps, 'suspect_periods': g_susp,
-                'flux_count': len(g_flux),
-                'flux_net': round(sum(a for _, a in g_flux), 2),
-                'groups': sorted(keep)}
+    if keep:
+        mvals = {a: acct_values[a] for a in keep}
+        g_dates = sorted({d for v in mvals.values() for d in v})
+        g_values = {d: sum(v[d] for v in mvals.values() if d in v) for d in g_dates}
+        pairs = {(a[0], a[2]) for a in keep}
+        g_flux = [(f['date'], _flux_signed(f)) for f in flux
+                  if ((f.get('envelope') or 'Autre'), f.get('owner')) in pairs
+                  and _flux_signed(f)]
+        comp = _composition_flux(g_dates, mvals)
+        serie, cumul, days, gaps, suspects = _chain(g_dates, g_values, g_flux + comp)
+        if cumul is not None:
+            window = [(d, a) for d, a in g_flux
+                      if serie[0]['date'] < d <= serie[-1]['date']]
+            glob = {'label': 'Ensemble mesurable', 'serie': serie, 'twr': cumul,
+                    'days': days, 'twr_annualise': annualise(cumul, days),
+                    'annualisable': days >= MIN_DAYS_ANNUALISE,
+                    'value': g_values[g_dates[-1]], 'dates_count': len(g_dates),
+                    'gaps': gaps, 'suspect_periods': suspects,
+                    'flux_count': len(window),
+                    'flux_net': round(sum(a for _, a in window), 2),
+                    'accounts': len(keep),
+                    'groups': sorted(e['key'] for e in out if e['status'] == 'ok')}
 
     return jsonify({
         'dates': dates, 'first_date': dates[0], 'date': dates[-1],
