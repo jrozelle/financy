@@ -441,6 +441,36 @@ class TestEpargne:
         g = client.get('/api/performance').get_json()['groups'][0]
         assert g['status'] == 'non_measurable'
 
+    def test_immobilier_non_mesurable(self, client):
+        """Un bien d'usage n'est pas un placement.
+
+        Sa valeur est une estimation saisie a la main : entre deux
+        reevaluations elle ne bouge pas, et le seul mouvement du capital net
+        est l'amortissement du pret — un remboursement de dette qui se lisait
+        comme un rendement.
+        """
+        with get_db() as conn:
+            for d, dette in (('2026-01-01', 184000), ('2026-08-01', 183000)):
+                conn.execute("""INSERT INTO positions (date, owner, category, envelope,
+                    establishment, value, debt, ownership_pct, debt_pct)
+                    VALUES (?,'Alice','Immobilier','Immobilier',NULL,610000,?,0.5,0.5)""",
+                    (d, dette))
+            conn.commit()
+        g = client.get('/api/performance').get_json()['groups'][0]
+        assert g['status'] == 'non_measurable'
+
+    def test_sci_reste_mesurable(self, client):
+        """Des parts de SCPI sont un placement : leur valeur suit un marche."""
+        with get_db() as conn:
+            for d, v in (('2026-01-01', 100000), ('2026-08-01', 104000)):
+                conn.execute("""INSERT INTO positions (date, owner, category, envelope,
+                    establishment, value, debt, ownership_pct, debt_pct)
+                    VALUES (?,'Alice','SCPI','SCI',NULL,?,0,1.0,1.0)""", (d, v))
+            conn.commit()
+        g = client.get('/api/performance').get_json()['groups'][0]
+        assert g['status'] == 'ok'
+        assert g['twr'] == pytest.approx(0.04)
+
     def test_objet_de_valeur_non_mesurable(self, client):
         with get_db() as conn:
             for d, v in (('2026-01-01', 22000), ('2026-08-01', 47000)):

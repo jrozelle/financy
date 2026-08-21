@@ -36,13 +36,21 @@ MIN_DAYS_ANNUALISE = 180
 # change.
 NON_MEASURABLE_CATEGORIES = {'Objets de valeur'}
 
-# Enveloppes de transaction, a distinguer de l'epargne. Un livret produit des
-# interets : son rendement est faible mais reel, et se mesure. Un compte courant
-# non : son solde bouge au rythme des depenses et des virements, qui ne sont pas
-# des flux d'investissement — un compte courant affichait plusieurs centaines de
-# pourcents sur un trimestre. C'est l'enveloppe qui tranche, pas la categorie
-# comptable : les deux partagent "Cash & depots".
-NON_MEASURABLE_ENVELOPES = {'Compte courant'}
+# Enveloppes dont le rendement ne se mesure pas.
+#
+# "Compte courant" : enveloppe de transaction, a distinguer de l'epargne. Un
+# livret produit des interets, son rendement est faible mais reel et se mesure.
+# Un compte courant non : son solde bouge au rythme des depenses et des
+# virements, qui ne sont pas des flux d'investissement — un compte courant
+# affichait plusieurs centaines de pourcents sur un trimestre. C'est l'enveloppe
+# qui tranche, pas la categorie comptable : les deux partagent "Cash & depots".
+#
+# "Immobilier" : des biens d'usage — residence principale et secondaire. Leur
+# valeur est une estimation saisie a la main, qui ne bouge pas entre deux
+# reevaluations : le seul mouvement du capital net est l'amortissement du pret,
+# soit un remboursement de dette lu comme un rendement. La SCI, elle, reste
+# mesuree : des parts de SCPI sont un placement, et leur valeur suit un marche.
+NON_MEASURABLE_ENVELOPES = {'Compte courant', 'Immobilier'}
 
 # Variation au-dela de laquelle un mouvement non declare est plus probable
 # qu'une performance reelle. Une TWR ne vaut que ce que vaut la table `flux`.
