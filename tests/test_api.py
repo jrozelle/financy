@@ -604,7 +604,26 @@ class TestSynthese:
         assert by_env['Livret A']['delta'] == -5000
         assert by_env['Crypto']['status'] == 'new'
         assert by_env['Crypto']['delta'] == 5000
-        assert d['totals']['delta'] == 12000
+
+    def test_snapshot_diff_separe_les_titulaires(self, client):
+        """Une meme enveloppe chez un meme etablissement, deux personnes.
+
+        Sans la personne dans la maille, l'assurance-vie BoursoBank additionnait
+        celle de l'utilisateur et celles de ses enfants : 91 000 EUR affiches la
+        ou les autres ecrans en montraient 82 317.
+        """
+        for d, v_a, v_e in (('2026-05-01', 80000, 5000), ('2026-06-01', 82000, 5300)):
+            _make_position(client, date=d, owner='Alice', category='Actions',
+                           envelope='Assurance-vie', establishment='BoursoBank', value=v_a)
+            _make_position(client, date=d, owner='Enfant', category='Actions',
+                           envelope='Assurance-vie', establishment='BoursoBank', value=v_e)
+        d = client.get('/api/snapshot-diff?date=2026-06-01').get_json()
+        av = {m['owner']: m for m in d['movements'] if m['envelope'] == 'Assurance-vie'}
+        assert set(av) == {'Alice', 'Enfant'}, 'un mouvement par titulaire'
+        assert av['Alice']['net_after'] == 82000
+        assert av['Enfant']['net_after'] == 5300
+        assert av['Alice']['delta'] == 2000 and av['Enfant']['delta'] == 300
+        assert d['totals']['delta'] == 2300
 
     def test_delete_snapshot(self, client):
         _make_position(client, date='2026-05-01', owner='Alice', value=1000)

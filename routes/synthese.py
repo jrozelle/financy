@@ -231,13 +231,18 @@ def get_synthese():
 @synthese_bp.route('/api/snapshot-diff')
 @login_required
 def get_snapshot_diff():
-    """Compare deux snapshots agreges PAR ENVELOPPE + ETABLISSEMENT.
+    """Compare deux snapshots agreges PAR ENVELOPPE + ETABLISSEMENT + PERSONNE.
 
     Par defaut : la date fournie (ou la derniere) vs le snapshot precedent.
     Valorisation alignee sur la synthese : cours du jour pour le snapshot le plus
     recent, valeur figee (stockee) pour l'historique -> la variation inclut donc
     l'effet marche, et le total = la variation nette affichee en KPI. Retourne les
-    mouvements par enveloppe+etablissement tries par |Δ net|, nouvelles/cloturees.
+    mouvements par compte tries par |Δ net|, nouvelles/cloturees.
+
+    La personne fait partie de la maille : sans elle, une meme enveloppe chez un
+    meme etablissement fusionnait des contrats sans rapport — l'assurance-vie
+    BoursoBank additionnait celle de l'utilisateur et celles de ses deux enfants,
+    et affichait 91 000 EUR la ou les autres ecrans en montraient 82 317.
     """
     to_date = request.args.get('date')
     owner = request.args.get('owner')
@@ -274,7 +279,9 @@ def get_snapshot_diff():
         for p in positions:
             env = p.get('envelope') or 'Autre'
             est = p.get('establishment') or ''
-            e = agg.setdefault((env, est), {'net': 0.0, 'envelope': env, 'establishment': est})
+            own = p.get('owner') or ''
+            e = agg.setdefault((env, est, own), {'net': 0.0, 'envelope': env,
+                                                'establishment': est, 'owner': own})
             e['net'] += p.get('net_attributed', 0) or 0
         return agg
 
@@ -289,6 +296,7 @@ def get_snapshot_diff():
             'label':         rep['envelope'],
             'envelope':      rep['envelope'],
             'establishment': rep['establishment'],
+            'owner':         rep['owner'],
             'net_before':    round(net_before, 2),
             'net_after':     round(net_after, 2),
             'delta':         round(net_after - net_before, 2),
