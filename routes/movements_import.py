@@ -125,6 +125,13 @@ def _read(files, owner, establishment=None):
             rejets.append({'file': f.filename,
                            'reason': 'ni avis d\'opéré ni relevé d\'espèces exploitable'})
             continue
+        # Sans enveloppe, un mouvement ne se rattache a aucun compte : mieux
+        # vaut refuser le document que le ranger au hasard.
+        if any(m.envelope is None for m in mvs):
+            rejets.append({'file': f.filename,
+                           'reason': 'compte non identifié dans le document '
+                                     '(relevé de compte courant ?)'})
+            continue
         digest = hashlib.sha256(raw).hexdigest()[:16]
         for m in mvs:
             d = m.to_dict()

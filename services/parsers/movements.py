@@ -34,6 +34,9 @@ from typing import List, Optional
 # releve de livret peut mentionner le PEA ailleurs dans la page.
 _ENVELOPE_MARKERS = (
     ('LIVRET BOURSO', 'Livret Bourso+'),
+    # "Compte a vue ORD" : l'intitule du compte-titres ordinaire. Le marqueur
+    # saute le "a" accentue, que l'extraction rend parfois en "(cid:224)".
+    ('VUE ORD', 'Compte-titres'),
     ('LIVRET A', 'Livret A'),
     ('LIVRET DE DEVELOPPEMENT', 'LDDS'),
     ('LDDS', 'LDDS'),
@@ -42,7 +45,14 @@ _ENVELOPE_MARKERS = (
     ('P.E.A', 'PEA'),
     ('PEA', 'PEA'),
 )
+# Enveloppe supposee quand le document ne nomme pas son compte. Elle depend du
+# gabarit : le releve "RELEVE COMPTE ESPECES" est celui d'un compte especes
+# adosse a un portefeuille — sans marqueur, c'est le compte-titres ordinaire,
+# le PEA etant toujours nomme. Le gabarit "Extrait de votre compte", lui, est
+# celui d'un compte bancaire : son intitule est le nom de la banque, et le
+# supposer compte-titres faisait entrer ses virements dans le rendement du CTO.
 DEFAULT_ENVELOPE = 'Compte-titres'
+DEFAULT_ENVELOPE_BANCAIRE = 'Compte courant'
 
 # Etablissement propose par defaut. Ce n'est qu'une suggestion : il DOIT
 # correspondre a l'orthographe employee dans `positions`, sinon les flux
@@ -51,8 +61,33 @@ DEFAULT_ENVELOPE = 'Compte-titres'
 DEFAULT_ESTABLISHMENT = 'BoursoBank'
 
 
-def detect_envelope(text: str, account_map: Optional[dict] = None) -> Optional[str]:
-    """Enveloppe du document : correspondance explicite, sinon marqueur textuel."""
+# Bornes de l'en-tete d'un releve : au-dela commence le tableau des
+# mouvements, ou les libelles de virement nomment les comptes d'en face
+# ("VIR Virement interne depuis Livret Bourso+"). Chercher le marqueur
+# d'enveloppe dans tout le document rangeait donc les mouvements d'un compte
+# courant dans le livret qu'ils alimentaient.
+_ENTETE_FIN = ('ANCIEN SOLDE', 'SOLDE AU', 'MOUVEMENTS EN')
+
+
+def entete(text: str) -> str:
+    """Partie du releve qui precede le tableau des mouvements."""
+    lignes = text.split('\n')
+    for i, ln in enumerate(lignes):
+        plat = _flat(ln)
+        if any(b in plat for b in _ENTETE_FIN):
+            return '\n'.join(lignes[:i + 1])
+    return text
+
+
+def detect_envelope(text: str, account_map: Optional[dict] = None,
+                    default: Optional[str] = DEFAULT_ENVELOPE) -> Optional[str]:
+    """Enveloppe du document : correspondance explicite, sinon marqueur textuel.
+
+    `default` a la valeur None quand deviner est plus dangereux que renoncer :
+    le releve d'un compte courant BoursoBank ne porte aucun marqueur — son
+    intitule de compte est le nom de la banque — et retombait donc sur le
+    compte-titres, ou ses virements auraient fausse le rendement du CTO.
+    """
     if account_map:
         for account, envelope in account_map.items():
             if account and str(account) in text:
@@ -61,7 +96,7 @@ def detect_envelope(text: str, account_map: Optional[dict] = None) -> Optional[s
     for marker, envelope in _ENVELOPE_MARKERS:
         if marker in flat:
             return envelope
-    return DEFAULT_ENVELOPE
+    return default
 
 # La garde arriere evite de coller la date de valeur au montant : sur le
 # gabarit 2026, ou la date de valeur precede immediatement le montant,
@@ -70,6 +105,8 @@ def detect_envelope(text: str, account_map: Optional[dict] = None) -> Optional[s
 _AMOUNT = re.compile(r'(?<![\d/.,])(\d{1,3}(?:[ \u202f\u00a0.]\d{3})*,\d{2})')
 # Le cours de change porte 6 a 8 decimales : la regex des montants, qui en
 # impose exactement deux, le tronquerait a 1,13 et faussait la contrevaleur.
+# Groupe de milliers isole, pour recoller les jetons qu'une espace a separes.
+_GROUPE_MONTANT = re.compile(r'\d{1,3}')
 _FX = re.compile(r'\b(\d{1,2},\d{4,})\b')
 _NUM = re.compile(r'\d{1,3}(?:[   ]\d{3})*(?:,\d+)?')
 _ISIN = re.compile(r'\b([A-Z]{2}[A-Z0-9]{9}[0-9])\b')
@@ -318,6 +355,10 @@ COLUMN_GAP_PT = 20
 COLUMN_TOL_PT = 3
 # Ecart d'ordonnee en deca duquel deux mots appartiennent a la meme ligne.
 LINE_TOL_PT = 2.5
+# Ecart d'abscisse en deca duquel deux jetons numeriques n'en font qu'un : le
+# separateur de milliers est une espace, et `extract_words` coupe donc
+# "1 000,00" en "1" et "000,00". Mesure : 1,7 pt entre les deux.
+WORD_GAP_PT = 3.0
 
 
 def _split_columns(rights):
@@ -336,6 +377,29 @@ def _split_columns(rights):
     gaps = [(uniq[k + 1] - uniq[k], uniq[k]) for k in range(len(uniq) - 1)]
     width, at = max(gaps)
     return at + width / 2 if width >= COLUMN_GAP_PT else None
+
+
+def _montants(line):
+    """Montants d'une ligne, chacun avec le bord droit de sa colonne.
+
+    Recolle les jetons qu'une espace de milliers a separes : sans cela
+    "1 000,00" se lisait 0,00 et "2 562,00" se lisait 562,00 — des montants
+    tronques, mais plausibles, qui entraient en base sans rien signaler.
+    Le raccord n'est retenu que si la chaine reconstituee est un montant
+    valide : c'est la forme, et non l'espacement, qui tranche.
+    """
+    out = []
+    for i, mot in enumerate(line):
+        if not _AMOUNT.fullmatch(mot['text'].replace('\u00a0', ' ')):
+            continue
+        deb = i
+        while (deb > 0 and _GROUPE_MONTANT.fullmatch(line[deb - 1]['text'])
+               and float(line[deb]['x0']) - float(line[deb - 1]['x1']) <= WORD_GAP_PT):
+            deb -= 1
+        texte = ' '.join(w['text'] for w in line[deb:i + 1])
+        if _AMOUNT.fullmatch(texte):
+            out.append((_num(texte), float(mot['x1'])))
+    return out
 
 
 def _lines_from_words(pages):
@@ -379,16 +443,15 @@ def _rows_from_words(pages):
     for line in _lines_from_words(pages):
         texte = ' '.join(w['text'] for w in line)
         plat = _flat(texte)
-        montants = [w for w in line
-                    if _AMOUNT.fullmatch(w['text'].replace('\u00a0', ' '))]
+        montants = _montants(line)
         if 'ANCIEN SOLDE' in plat or 'SOLDE AU' in plat:
             if montants and first is None:
-                first = _num(montants[-1]['text'])
+                first = montants[-1][0]
             dans_table = True
             continue
         if 'NOUVEAU SOLDE' in plat or 'SOLDE FINAL' in plat:
             if montants:
-                last = _num(montants[-1]['text'])
+                last = montants[-1][0]
             dans_table = False
             continue
         if not dans_table or not montants:
@@ -400,7 +463,7 @@ def _rows_from_words(pages):
         libelle = re.sub(r'\s*\d{2}/\d{2}/\d{4}.*$', '', md.group(4)).strip()
         rows.append((f'{md.group(3)}-{md.group(2)}-{md.group(1)}',
                      libelle or md.group(4).strip(),
-                     _num(montants[-1]['text']), float(montants[-1]['x1'])))
+                     montants[-1][0], montants[-1][1]))
     return rows, (first, last)
 
 
@@ -414,10 +477,13 @@ def parse_releve_especes(text: str, account_map: Optional[dict] = None,
     on retombe sur l'en-tete du texte mis en page.
     """
     up = _flat(text)
-    if 'RELEVE COMPTE ESPECES' not in up and 'EXTRAIT DE VOTRE COMPTE' not in up:
+    titres = 'RELEVE COMPTE ESPECES' in up
+    if not titres and 'EXTRAIT DE VOTRE COMPTE' not in up:
         return []
     lines = text.split('\n')
-    env = detect_envelope(text, account_map)
+    env = detect_envelope(entete(text), account_map,
+                          default=DEFAULT_ENVELOPE if titres
+                          else DEFAULT_ENVELOPE_BANCAIRE)
 
     if words:
         rows, soldes = _rows_from_words(words)

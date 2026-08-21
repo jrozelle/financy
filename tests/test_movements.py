@@ -18,7 +18,8 @@ from models import init_db, get_db  # noqa: E402
 from app import app  # noqa: E402
 from services.parsers.movements import (parse_avis_opere, parse_releve_especes,  # noqa: E402
                                         parse_movements, _num, _flat,
-                                        _rows_from_words, _split_columns)
+                                        _rows_from_words, _split_columns,
+                                        _montants, detect_envelope, entete)
 
 # Gabarits reels reduits a l'essentiel, mise en page conservee.
 AVIS_ACHAT = """                                    OPERATION DE BOURSE
@@ -441,3 +442,72 @@ class TestReleveParCoordonnees:
                  _mot('5.000,00', CREDIT, 200.0)]
         mvs = parse_releve_especes(TEXTE_RELEVE_2026, words=[mots])
         assert [(m.flux_type, m.net_eur) for m in mvs] == [('Retrait', 5000.0)]
+
+
+class TestMontantsRecolles:
+    """Le separateur de milliers est une espace : extract_words coupe le montant."""
+
+    def test_millier_recolle(self):
+        line = [{'text': '1', 'x0': 553.8, 'x1': 557.3, 'top': 10.0},
+                {'text': '000,00', 'x0': 559.0, 'x1': 578.3, 'top': 10.0}]
+        assert _montants(line) == [(1000.0, 578.3)]
+
+    def test_million_recolle(self):
+        line = [{'text': '2', 'x0': 540.0, 'x1': 543.5, 'top': 10.0},
+                {'text': '562,00', 'x0': 545.2, 'x1': 578.3, 'top': 10.0}]
+        assert _montants(line) == [(2562.0, 578.3)]
+
+    def test_jeton_eloigne_non_recolle(self):
+        """Une quantite separee du montant par la colonne suivante reste dehors."""
+        line = [{'text': '409', 'x0': 380.0, 'x1': 396.0, 'top': 10.0},
+                {'text': '130,19', 'x0': 493.8, 'x1': 513.1, 'top': 10.0}]
+        assert _montants(line) == [(130.19, 513.1)]
+
+    def test_montant_deja_complet_inchange(self):
+        """Le gabarit 2026 groupe par des points : le jeton arrive entier."""
+        line = [{'text': '100.000,00', 'x0': 438.6, 'x1': 479.3, 'top': 10.0}]
+        assert _montants(line) == [(100000.0, 479.3)]
+
+
+class TestEnveloppeDansLEntete:
+
+    RELEVE = ('Extrait de votre compte en EUR\n'
+              'BOURSOBANK\n'
+              'MOUVEMENTS EN EUR\n'
+              'SOLDE AU : 01/02/2026 1.000,00\n'
+              '03/02/2026 VIR Virement interne depuis Livret Bourso+ 03/02/2026 500,00\n'
+              'Nouveau solde en EUR : 1.500,00\n')
+
+    def test_marqueur_cherche_dans_l_entete_seulement(self):
+        """Un libelle de virement nomme le compte d'en face, pas celui du releve.
+
+        Chercher "Livret Bourso+" dans tout le document rangeait les mouvements
+        d'un compte courant dans le livret qu'ils alimentaient.
+        """
+        assert detect_envelope(entete(self.RELEVE), default=None) is None
+        assert detect_envelope(self.RELEVE, default=None) == 'Livret Bourso+'
+
+    def test_entete_s_arrete_au_tableau(self):
+        assert 'VIR Virement' not in entete(self.RELEVE)
+        assert 'BOURSOBANK' in entete(self.RELEVE)
+
+    def test_compte_courant_ne_devient_pas_compte_titres(self):
+        """Le releve d'un compte courant n'a pas d'intitule d'enveloppe.
+
+        Le ranger dans le compte-titres par defaut faisait entrer ses virements
+        dans le rendement du CTO.
+        """
+        mvs = parse_releve_especes(self.RELEVE)
+        assert [m.envelope for m in mvs] == ['Compte courant']
+
+    def test_compte_titres_reconnu_par_son_intitule(self):
+        releve = self.RELEVE.replace('BOURSOBANK', 'Compte (cid:224) vue ORD')
+        assert [m.envelope for m in parse_releve_especes(releve)] == ['Compte-titres']
+
+    def test_ancien_gabarit_sans_intitule_reste_compte_titres(self):
+        """"RELEVE COMPTE ESPECES" est celui d'un compte adosse a un portefeuille."""
+        releve = ('RELEVE  COMPTE  ESPECES : JUILLET 2024\n'
+                  '30/06/2024 ANCIEN SOLDE 0,00\n'
+                  '02/07/2024 VIR Virement interne depuis Compte p 1 000,00\n'
+                  '31/07/2024 NOUVEAU SOLDE 1 000,00\n')
+        assert [m.envelope for m in parse_releve_especes(releve)] == ['Compte-titres']
