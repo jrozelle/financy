@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, request
 from models import get_db, validate_isin
 from services.prices import (get_provider, refresh_securities, refresh_history,
+                             refresh_fx_rates,
                              freshness_status)
 from services.scheduler import status as scheduler_status, is_enabled as scheduler_is_enabled
 from auth import login_required, csrf_protect
@@ -37,6 +38,12 @@ def refresh():
         provider = get_provider()
         with get_db() as conn:
             stats = refresh_securities(conn, provider=provider, only_stale=only_stale)
+            # Les cours de change suivent les cours des titres : sans eux, un
+            # titre cote hors euro n'est pas valorisable. Une requete par
+            # devise detenue, dans le meme cycle — rien en tache de fond.
+            fx = refresh_fx_rates(conn, provider=provider)
+            if fx:
+                stats['fx_rates'] = {d: round(v[0], 6) for d, v in fx.items()}
         stats['provider'] = provider.name
         logger.info('Prices refresh: %s', stats)
         return jsonify(stats)

@@ -619,12 +619,38 @@ class TestAlerteValorisation:
     ce taux depassait le seuil de divergence.
     """
 
-    def test_devise_etrangere_signalee(self):
+    def test_devise_sans_taux_signalee(self):
+        """Sans taux de change, le cours etranger ne valorise rien."""
         a = holding_price_warning({'isin': 'US0000000001', 'name': 'ADOBE',
                                    'quantity': 10, 'market_value': 2241.23,
                                    'last_price': 258.75, 'currency': 'USD',
                                    'is_priceable': True})
         assert a and a['kind'] == 'devise' and 'USD' in a['reason']
+
+    def test_devise_convertie_donne_un_cours_frais(self):
+        """Avec le taux, le dollar se convertit et le cours du jour s'applique.
+
+        258,75 USD / 1,1545 = 224,12 EUR, soit exactement la valeur enregistree
+        d'Adobe : c'est ce qui prouve que l'ecart de 15,45 % etait bien le
+        change, et rien d'autre.
+        """
+        from models import _holding_decision
+        h = {'isin': 'US0000000001', 'name': 'ADOBE', 'quantity': 10,
+             'market_value': 2241.23, 'last_price': 258.75, 'currency': 'USD',
+             'is_priceable': True, 'fx_rate': 1.1545,
+             'as_of_date': '2026-08-12', 'last_price_date': '2026-08-21'}
+        valeur, a = _holding_decision(h)
+        assert valeur == pytest.approx(2241.2, abs=1)
+        assert a is None, "converti, l ecart disparait : plus rien a signaler"
+
+    def test_taux_absurde_ne_valorise_pas(self):
+        from models import _holding_decision
+        valeur, a = _holding_decision(
+            {'isin': 'X', 'quantity': 10, 'market_value': 2241.23,
+             'last_price': 258.75, 'currency': 'USD', 'is_priceable': True,
+             'fx_rate': 0})
+        assert valeur == pytest.approx(2241.23)
+        assert a['kind'] == 'devise'
 
     def test_divergence_valeur_saisie_retenue(self):
         """Saisie aussi recente que le cours : c'est elle qui l'emporte."""

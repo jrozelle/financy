@@ -635,6 +635,27 @@ def _migration_010(conn):
         pass
 
 
+def _migration_011(conn):
+    """Table des cours de change.
+
+    Aucune conversion n'existait dans le modele : un titre cote hors euro etait
+    valorise en additionnant sa devise a des euros, surevaluant la position du
+    taux de change. Les cours sont dates, comme ceux des titres, pour qu'un
+    arrete historique puisse etre valorise au taux de sa date.
+    """
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS fx_rates (
+                pair TEXT NOT NULL,          -- 'EURUSD' : combien de USD pour 1 EUR
+                date TEXT NOT NULL,
+                rate REAL NOT NULL,
+                PRIMARY KEY (pair, date)
+            )
+        """)
+    except Exception:
+        pass
+
+
 MIGRATIONS = [
     (1, _migration_001),
     (2, _migration_002),
@@ -646,6 +667,7 @@ MIGRATIONS = [
     (8, _migration_008),
     (9, _migration_009),
     (10, _migration_010),
+    (11, _migration_011),
 ]
 
 
@@ -717,12 +739,19 @@ def _holding_decision(h):
     if not is_priceable:
         return manual or 0, None
 
-    # Aucune conversion de devise dans ce modele : un cours libelle hors euro
-    # ne peut pas valoriser une ligne sans surevaluer du taux de change.
+    # Un cours hors euro se convertit. A defaut de taux, il ne valorise rien :
+    # additionner des dollars a des euros surevaluerait la ligne du change.
     devise = (h.get('currency') or 'EUR').upper()
-    if devise != 'EUR' and manual is not None:
-        return manual, alerte('devise', f'cours en {devise}, non converti : '
-                                        'valeur enregistrée retenue')
+    if devise != 'EUR':
+        taux = h.get('fx_rate')
+        if not taux or taux <= 0:
+            if manual is not None:
+                return manual, alerte(
+                    'devise', f'cours en {devise} et taux de change inconnu : '
+                              'valeur enregistrée retenue')
+            return 0, alerte('devise', f'cours en {devise}, taux inconnu')
+        # `pair` vaut EURxxx : le taux dit combien de xxx pour un euro.
+        price = price / taux if price is not None else None
 
     manual_date = _parse_holding_date(h.get('as_of_date') or h.get('position_date'))
     price_date = _parse_holding_date(h.get('last_price_date'))
@@ -900,7 +929,10 @@ def get_holdings_map(conn, position_ids=None):
                    h.market_value, h.as_of_date,
                    p.date AS position_date,
                    s.name, s.ticker, s.currency, s.asset_class,
-                   s.is_priceable, s.last_price, s.last_price_date, s.data_source
+                   s.is_priceable, s.last_price, s.last_price_date, s.data_source,
+                   (SELECT f.rate FROM fx_rates f
+                     WHERE f.pair = 'EUR' || s.currency
+                     ORDER BY f.date DESC LIMIT 1) AS fx_rate
             FROM holdings h
             JOIN positions p ON p.id = h.position_id
             LEFT JOIN securities s ON s.isin = h.isin
