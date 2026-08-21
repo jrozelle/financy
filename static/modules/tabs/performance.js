@@ -3,7 +3,7 @@ import { S, perfChart, setPerfChart } from '../state.js';
 import { fmt, esc, fmtDate, getColors, chartBorderColor, destroyChart } from '../utils.js';
 
 // Etat local : donnees, groupe isole, maille, affichage du non mesurable.
-const V = { data: null, focus: null, group: 'account', showAll: false };
+const V = { data: null, focus: null, group: 'account' };
 
 /** Nombre brut. `fmt` de utils.js ajoute toujours l'euro : inutilisable pour un %. */
 const n = (v, dec = 0) => v == null ? '—'
@@ -32,10 +32,14 @@ export async function loadPerformance() {
 
 // Les groupes sans rendement calculable restent affiches : les masquer ferait
 // diverger le total de cet onglet de celui de la synthese, sans explication.
+// La tresorerie est ecartee sans recours : un compte courant ou un livret n'a
+// pas de rendement, sa valeur bouge parce que l'argent entre et sort. L'afficher
+// meme grise n'apprend rien et noie les comptes qui, eux, performent. Le compte
+// des exclusions reste indique pour que le total reste explicable.
 const visible = () => (V.data?.groups || [])
-  .filter(g => V.showAll || g.status !== 'non_measurable');
-const LABELS = { insufficient: 'historique insuffisant', negative: 'valeur négative',
-                 non_measurable: 'trésorerie' };
+  .filter(g => g.status !== 'non_measurable');
+const LABELS = { insufficient: 'historique insuffisant', negative: 'capital négatif',
+                 non_measurable: 'trésorerie, aucun rendement' };
 const current = () => V.focus
   ? visible().find(g => g.key === V.focus) || V.data.global
   : V.data.global;
@@ -60,7 +64,7 @@ export function renderPerformance() {
 function renderHeader(d) {
   const host = document.getElementById('perf-controls');
   if (!host) return;
-  const hidden = (d.groups || []).filter(g => !g.measurable).length;
+  const hidden = (d.groups || []).filter(g => g.status === 'non_measurable').length;
   host.innerHTML = `
     <div class="seg" role="group" aria-label="Maille d'agrégation">
       <button type="button" class="seg-btn ${V.group === 'account' ? 'is-on' : ''}" data-group="account"
@@ -68,9 +72,6 @@ function renderHeader(d) {
       <button type="button" class="seg-btn ${V.group === 'envelope' ? 'is-on' : ''}" data-group="envelope"
         title="Fusionne tous les contrats d'une même enveloppe, toutes personnes et tous établissements confondus. Un écart avec la vue par compte signale que l'enveloppe agrège des contrats sans rapport.">Par enveloppe</button>
     </div>
-    ${hidden ? `<label class="checkbox-inline">
-      <input type="checkbox" id="perf-show-all" ${V.showAll ? 'checked' : ''}>
-      Inclure ${hidden} compte${hidden > 1 ? 's' : ''} sans rendement mesurable</label>` : ''}
     ${V.focus ? `<button type="button" class="btn btn-sm" id="perf-reset">↩ Tout afficher</button>` : ''}
     <span class="perf-meta">${d.dates.length} arrêtés · ${fmtDate(d.first_date)} → ${fmtDate(d.date)}${
       d.excluded?.length ? ` · <span title="${esc(d.excluded.map(e =>
@@ -81,11 +82,6 @@ function renderHeader(d) {
     V.group = b.dataset.group;
     loadPerformance();
   }));
-  document.getElementById('perf-show-all')?.addEventListener('change', ev => {
-    V.showAll = ev.target.checked;
-    if (!V.showAll && V.focus && !visible().some(g => g.key === V.focus)) V.focus = null;
-    renderPerformance();
-  });
   document.getElementById('perf-reset')?.addEventListener('click', () => {
     V.focus = null; renderPerformance();
   });
@@ -130,18 +126,23 @@ function renderList(d) {
     const neg = (g.twr || 0) < 0;
     const sub = [g.establishment, g.owner].filter(Boolean).join(' · ')
       || (g.categories || []).join(', ');
+    // Un seul badge de statut par ligne : "valeur negative" et "non mesurable"
+    // cote a cote se contredisaient. Et une TWR negative est un resultat normal,
+    // pas une anomalie : rien ne la signale.
+    const STATUS_BADGE = {
+      insufficient: ['historique insuffisant',
+        'Il faut deux valorisations successives pour mesurer un rendement.'],
+      negative: ['capital négatif',
+        "Valeur nulle ou négative sur la période : un rendement n'a pas de sens sur une dette nette ou un apport en compte courant."],
+    };
+    const st = STATUS_BADGE[g.status];
     const flags = [
-      g.status === 'insufficient' ? `<span class="badge badge-blk"
-        title="Il faut deux valorisations pour mesurer un rendement. Ce compte est hors du total.">historique insuffisant</span>` : '',
-      g.status === 'negative' ? `<span class="badge badge-blk"
-        title="Valeur nulle ou négative sur la période : un rendement n'a pas de sens sur une dette nette ou un apport en compte courant. Hors du total.">valeur négative</span>` : '',
+      st ? `<span class="badge badge-blk" title="${esc(st[1])} Hors du total.">${st[0]}</span>` : '',
       g.suspect_periods?.length ? `<span class="badge badge-30"
         title="${esc(g.suspect_periods.map(x =>
           `${fmtDate(x.from)} → ${fmtDate(x.to)} : ${pct(x.change)} inexpliqué (${
             x.delta >= 0 ? '+' : '−'}${n(Math.abs(x.delta))} € de variation, ${
             x.flux ? n(x.flux) + ' € de flux déclaré' : 'aucun flux déclaré'})`).join(' · '))}">écart inexpliqué</span>` : '',
-      g.measurable ? '' : `<span class="badge badge-blk"
-        title="Un compte de trésorerie n'a pas de rendement : sa valeur bouge parce que l'argent entre et sort">non mesurable</span>`,
     ].join(' ');
     return `
       <div class="perf-item${V.focus === g.key ? ' is-focus' : ''}" data-key="${esc(g.key)}"
