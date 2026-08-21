@@ -3143,3 +3143,93 @@ kbd {
     max-height: calc(100dvh - var(--navbar-fixed-offset)) !important;
   }
 }
+
+/* ── Onglet Performance ───────────────────────────────────────────────── */
+#perf-controls { display: flex; align-items: center; gap: .9rem; flex-wrap: wrap; margin: .25rem 0 1rem; }
+.perf-meta { margin-left: auto; font-size: .78rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.perf-meta span { border-bottom: 1px dotted var(--border); cursor: help; }
+#perf-kpi .kpi-sub { font-size: .74rem; color: var(--text-muted); margin-top: .2rem; }
+#perf-kpi .kpi-value.positive { color: var(--success); }
+#perf-kpi .kpi-value.negative { color: var(--danger); }
+.checkbox-inline { display: inline-flex; align-items: center; gap: .4rem; font-size: .82rem; cursor: pointer; color: var(--text-muted); }
+
+/* Selecteur de maille */
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.seg-btn { border: 0; background: var(--card-bg); color: var(--text-muted); font: inherit;
+  font-size: .82rem; padding: .38rem .8rem; cursor: pointer; }
+.seg-btn + .seg-btn { border-left: 1px solid var(--border); }
+.seg-btn:hover { background: var(--card-hover); }
+.seg-btn.is-on { background: var(--primary); color: #fff; }
+
+/* Liste : grille a 4 colonnes, alignement garanti sans table */
+.perf-head, .perf-item {
+  display: grid;
+  grid-template-columns: minmax(11rem, 2fr) minmax(6rem, 1.6fr) 8.5rem 9rem;
+  align-items: center; gap: 1rem;
+  padding: .55rem .9rem;
+}
+.perf-head { font-size: .68rem; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-muted); border-bottom: 1px solid var(--border); padding-bottom: .45rem; }
+.perf-head .ta-r { text-align: right; }
+.perf-axis { display: flex; justify-content: space-between; font-style: normal; opacity: .5; }
+.perf-axis i { font-style: normal; }
+
+.perf-item { border-bottom: 1px solid var(--border); cursor: pointer; border-radius: 6px; }
+.perf-item:last-of-type { border-bottom: 0; }
+.perf-item:hover { background: var(--card-hover); }
+.perf-item:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.perf-item.is-focus { background: var(--card-hover); box-shadow: inset 3px 0 0 var(--primary); }
+.perf-item.is-total { cursor: default; border-top: 2px solid var(--border); border-bottom: 0;
+  margin-top: .3rem; font-weight: 600; }
+.perf-item.is-total:hover { background: transparent; }
+
+.perf-name { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
+.perf-title { font-size: .92rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.perf-sub { font-size: .72rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Barre divergente : le zero est au milieu, la longueur donne l'ordre de grandeur */
+.perf-bar { position: relative; height: 8px; background: var(--card-hover); border-radius: 4px; }
+.perf-bar::before { content: ''; position: absolute; left: 50%; top: -3px; bottom: -3px;
+  width: 1px; background: var(--border); }
+.perf-bar-fill { position: absolute; top: 0; height: 8px; border-radius: 3px; }
+.perf-bar-fill.pos { background: var(--success, #16a34a); }
+.perf-bar-fill.neg { background: var(--danger, #dc2626); }
+
+.perf-num, .perf-val { text-align: right; font-variant-numeric: tabular-nums; font-size: .95rem; font-weight: 600; }
+.perf-num-sub { display: block; font-size: .72rem; font-weight: 400; color: var(--text-muted); margin-top: .1rem; }
+.perf-note { font-size: .74rem; color: var(--text-muted); margin: .9rem .9rem 0; line-height: 1.5; }
+
+@media (max-width: 760px) {
+  .perf-head { display: none; }
+  .perf-item { grid-template-columns: 1fr auto; gap: .35rem .8rem; padding: .7rem .6rem; }
+  .perf-bar { grid-column: 1 / -1; order: 3; }
+  .perf-val { order: 2; }
+}
+
+/* ── Zone de depot d'import ───────────────────────────────────────────────── */
+.dropzone {
+  display: flex; flex-direction: column; align-items: center; gap: .2rem;
+  padding: 1.1rem 1rem; margin-bottom: .9rem; cursor: pointer;
+  border: 1.5px dashed var(--border); border-radius: var(--radius);
+  background: var(--card-bg); text-align: center; transition: border-color .15s, background .15s;
+}
+.dropzone:hover, .dropzone:focus-visible { border-color: var(--primary); background: var(--card-hover); }
+.dropzone.is-over { border-color: var(--primary); background: var(--card-hover); border-style: solid; }
+.dropzone.is-busy { opacity: .6; pointer-events: none; }
+.dropzone-main { font-size: .9rem; font-weight: 600; }
+.dropzone-sub { font-size: .74rem; color: var(--text-muted); }
+
+.import-report { border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--card-bg); padding: .9rem 1rem; margin-bottom: .9rem; }
+.import-report h3 { font-size: .92rem; margin: 0 0 .5rem; }
+.import-tally { display: flex; flex-wrap: wrap; gap: .4rem .9rem; font-size: .82rem; margin-bottom: .6rem; }
+.import-tally b { font-variant-numeric: tabular-nums; }
+.import-lines { max-height: 15rem; overflow: auto; font-size: .76rem;
+  border-top: 1px solid var(--border); padding-top: .5rem; }
+.import-line { display: grid; grid-template-columns: 5.5rem 4.5rem 1fr 7rem;
+  gap: .6rem; padding: .18rem 0; align-items: baseline; }
+.import-line.is-dup { opacity: .55; }
+.import-line .num { text-align: right; font-variant-numeric: tabular-nums; }
+.import-actions { display: flex; gap: .5rem; align-items: center; margin-top: .7rem; flex-wrap: wrap; }
+.import-owner { margin-left: auto; display: inline-flex; align-items: center; gap: .4rem;
+  font-size: .78rem; color: var(--text-muted); }

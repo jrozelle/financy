@@ -19,6 +19,7 @@
       <button class="tab-btn" data-tab="actifs">Actifs</button>
       <button class="tab-btn" data-tab="flux">Flux</button>
       <button class="tab-btn" data-tab="entites">Entités</button>
+      <button class="tab-btn" data-tab="performance">Performance</button>
       <button class="tab-btn" data-tab="conseil">Conseil</button>
     </div>
     <div class="nav-owner-filter">
@@ -238,6 +239,13 @@
           <h1>Flux externes</h1>
           <button class="btn btn-primary" id="btn-add-flux">+ Ajouter</button>
         </div>
+        <div id="flux-drop" class="dropzone" tabindex="0" role="button"
+             aria-label="Importer des avis d'opérés ou des relevés d'espèces">
+          <input type="file" id="flux-drop-input" accept="application/pdf" multiple hidden>
+          <span class="dropzone-main">Déposez ici vos avis d'opérés ou relevés d'espèces</span>
+          <span class="dropzone-sub">PDF BoursoBank · plusieurs fichiers acceptés · rien n'est écrit avant votre validation</span>
+        </div>
+        <div id="flux-import-report" class="hidden"></div>
         <div class="filters-bar" id="flux-filters">
           <select id="flux-filter-owner" class="filter-select hidden" aria-hidden="true" tabindex="-1"><option value="">Toutes les personnes</option></select>
           <select id="flux-filter-type"  class="filter-select"><option value="">Tous les types</option></select>
@@ -253,6 +261,7 @@
               <th data-sort="date">Date</th>
               <th data-sort="owner">Propriétaire</th>
               <th data-sort="envelope">Enveloppe</th>
+              <th data-sort="establishment">Établissement</th>
               <th data-sort="category">Catégorie</th>
               <th data-sort="type">Type</th>
               <th class="num" data-sort="amount">Montant</th>
@@ -440,6 +449,25 @@
     </div>
 
     <!-- ── CONSEIL PATRIMONIAL ─────────────────────────────────────────── -->
+    <div id="tab-performance" class="tab-content hidden">
+      <div id="perf-empty" class="empty-state hidden">
+        <p>Deux arrêtés au minimum sont nécessaires pour mesurer une performance.</p>
+        <p class="muted">Ajoutez des snapshots de positions, et des flux pour distinguer
+        les versements du rendement.</p>
+      </div>
+      <div id="perf-body">
+        <div class="kpi-grid" id="perf-kpi"></div>
+        <div id="perf-controls"></div>
+        <div class="card">
+          <h2>Rentabilité pondérée par le temps</h2>
+          <p class="card-sub">Base 100 au premier arrêté. Les versements et retraits sont neutralisés :
+          la courbe montre le rendement des placements, pas l'effet du calendrier d'apport.</p>
+          <div class="chart-container" style="height:320px"><canvas id="perf-chart"></canvas></div>
+        </div>
+        <div class="card" id="perf-list"></div>
+      </div>
+    </div>
+
     <div id="tab-conseil" class="tab-content hidden">
       <div class="page-header"><h1>Conseil patrimonial</h1></div>
       <div class="advisor-disclaimer">
@@ -1101,6 +1129,13 @@
           <div class="form-group">
             <label>Type</label>
             <select id="flux-type"></select>
+          </div>
+          <div class="form-group">
+            <label>Établissement</label>
+            <input type="text" id="flux-establishment" list="flux-etab-list"
+                   placeholder="ex : BoursoBank"
+                   title="Indispensable si l'enveloppe existe chez plusieurs établissements : sans lui, le flux est réparti au prorata et fausse le rendement de chaque compte.">
+            <datalist id="flux-etab-list"></datalist>
           </div>
           <div class="form-group">
             <label>Catégorie</label>
