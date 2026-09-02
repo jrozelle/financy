@@ -160,6 +160,48 @@ def _by_isin(lines):
     return {l.isin: l for l in lines}
 
 
+
+# Vue PEA avec la colonne de boutons "A" / "V" (Acheter / Vendre) : chaque
+# libelle se colle sur sa propre ligne, AVANT le nom du support.
+PEA_BOUTONS_AV = """    Valeur    Quantite    Px. Revient    Cours    Montant    +/- Latentes    +/- %    Notification
+A
+V
+    
+ISHARES MSCI WORLD SWAP PEA UCITS ETF EUR (ACC)
+IE0002XZSHO1
+    
+4 190
+    
+6,02 €
+    
+6,95 €
+0,17 %
+    
+29 120,50 €
+    
+3 898,80 €
+    
+15,46 %
+    
+A
+V
+    
+AMUNDI NASDAQ-100 DAILY (2X) LEVERAGED UCITS ETF ACC
+FR0010342592
+    
+82
+    
+9,22 €
+    
+9,29 €
+- 0,30 %
+    
+761,45 €
+    
+5,54 €
+    
+0,73 %"""
+
 class TestDetection:
     def test_all_sources_detected(self):
         for txt in (ANAE, PEA, BOURSOVIE, LUCYA):
@@ -333,3 +375,24 @@ class TestFullImport:
         by_cat = {p['category']: p for p in pea}
         assert set(by_cat) == {'Actions'}
         assert abs(by_cat['Actions']['value'] - (21638.40 + 5962.58)) < 0.5
+
+class TestBoutonsAchatVente:
+    """Regression : la colonne de boutons fabriquait deux faux fonds euros par
+    support. "A" et "V", promus en nom de support, ouvraient un bloc sans
+    aucune donnee, et 5 lignes collees en rendaient 15."""
+
+    def test_pas_de_ligne_parasite(self):
+        lines = parse_boursorama_paste(PEA_BOUTONS_AV)
+        assert len(lines) == 2
+        assert {l.isin for l in lines} == {'IE0002XZSHO1', 'FR0010342592'}
+
+    def test_valeurs_intactes(self):
+        d = _by_isin(parse_boursorama_paste(PEA_BOUTONS_AV))
+        a = d['IE0002XZSHO1']
+        assert a.quantity == 4190.0
+        assert a.unit_price == 6.95
+        assert a.market_value == 29120.50
+        assert a.cost_basis == 25223.80      # Px.Revient 6,02 x 4190
+        b = d['FR0010342592']
+        assert b.quantity == 82.0
+        assert b.market_value == 761.45
