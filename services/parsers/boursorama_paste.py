@@ -101,6 +101,12 @@ def _is_name_line(line: str, next_line: str = '') -> bool:
         return False
     if _is_header(s):
         return False
+    # Colonne de boutons : le tableau Boursorama expose "A" / "V" (Acheter /
+    # Vendre) et chaque libelle est colle sur sa propre ligne. Promu en nom, il
+    # ouvrait un bloc et fabriquait un faux fonds euros par bouton, soit deux
+    # lignes parasites par support. Aucun support ne se nomme sur un caractere.
+    if len(re.sub(r'[^0-9A-Za-z]', '', s)) < 2:
+        return False
     if _is_code_line(s):
         return ISIN_RE.search(s) is None and line_has_isin(next_line) is not None
     return True
@@ -165,6 +171,11 @@ def _build(name: str, rest: List[str]) -> Optional[DetectedLine]:
     no_isin = isin is None
     asset_class = None
     if no_isin:
+        # Sans ISIN ET sans montant, le bloc ne porte aucune donnee : c'est un
+        # artefact de collage, pas un support. On ne fabrique pas un fonds euros
+        # a partir de rien — il faudrait ensuite l'expliquer a l'utilisateur.
+        if montant is None:
+            return None
         qty = 1.0
         cours = None
         if _CASH_RE.search(name):
