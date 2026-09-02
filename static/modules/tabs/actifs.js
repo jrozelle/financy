@@ -5,6 +5,7 @@ import { openIsinPopover } from '../isin-popover.js';
 import { triggerPricesRefresh } from './tools.js';
 import { saveFilters, loadFilters } from '../filter-persist.js';
 import { reapplyColumns } from '../column-picker.js';
+import { loadReconcile } from './reconcile.js';
 
 let _classChart = null;
 let _envelopeChart = null;
@@ -82,6 +83,10 @@ export async function loadActifs() {
     _data = await api('GET', url, null, { silent: true });
   } catch { return; }
   _render();
+  // Le rapprochement avec le journal des operations vit au-dessus du tableau :
+  // il repond a « ces quantites sont-elles a jour ? », question que les chiffres
+  // affiches ne posent jamais d'eux-memes.
+  loadReconcile();
 }
 
 function _render() {
