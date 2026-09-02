@@ -543,3 +543,72 @@ def update_security(isin):
         )
         row = conn.execute('SELECT * FROM securities WHERE isin=?', (isin,)).fetchone()
     return jsonify(dict(row))
+
+
+# ─── Rapprochement photo / journal des operations ────────────────────────────
+
+@holdings_bp.route('/api/holdings/reconcile', methods=['GET'])
+@login_required
+def reconcile():
+    """Ecarts entre les quantites d'un arrete et le journal des transactions.
+
+    Lecture seule. `date` par defaut : l'arrete le plus recent.
+    """
+    from services.reconcile import reconcile_snapshot
+
+    date = request.args.get('date')
+    with get_db() as conn:
+        if not date:
+            row = conn.execute(
+                'SELECT MAX(date) AS d FROM positions'
+            ).fetchone()
+            date = row['d'] if row else None
+            if not date:
+                return jsonify({'date': None, 'ecarts': [], 'absents': [],
+                                'ignores': {}, 'verifiees': 0})
+        elif not validate_date(date):
+            return jsonify({'error': 'Date invalide (format AAAA-MM-JJ attendu)'}), 400
+        rapport = reconcile_snapshot(conn, date)
+    return jsonify(rapport)
+
+
+@holdings_bp.route('/api/holdings/reconcile/apply', methods=['POST'])
+@login_required
+@csrf_protect
+def reconcile_apply():
+    """Applique les ecarts des lignes designees par `holding_ids`.
+
+    Le client transmet des identifiants de ligne, jamais des montants : chaque
+    delta est recalcule cote serveur au moment de l'ecriture. Une ligne sans
+    ecart est ignoree et listee dans `ignorees`, pas traitee en erreur — l'ecart
+    a pu etre resolu entre-temps par une saisie manuelle.
+    """
+    from services.reconcile import apply_ecart
+
+    d = request.json or {}
+    date = d.get('date')
+    ids = d.get('holding_ids')
+    if not validate_date(date):
+        return jsonify({'error': 'Date invalide (format AAAA-MM-JJ attendu)'}), 400
+    if not isinstance(ids, list) or not ids:
+        return jsonify({'error': 'holding_ids attendu (liste non vide)'}), 400
+    if not all(isinstance(i, int) for i in ids):
+        return jsonify({'error': 'holding_ids doit ne contenir que des entiers'}), 400
+
+    appliquees, ignorees = [], []
+    with get_db() as conn:
+        conn.execute('BEGIN IMMEDIATE')
+        for hid in ids:
+            detail = apply_ecart(conn, date, hid)
+            if detail is None:
+                ignorees.append(hid)
+            else:
+                appliquees.append(detail)
+        # positions.value suit la somme des market_value de ses holdings.
+        for pid in {a['position_id'] for a in appliquees}:
+            sync_position_value(conn, pid)
+        if appliquees:
+            snapshot_holdings_to_date(conn, date)
+
+    return jsonify({'ok': True, 'date': date,
+                    'appliquees': appliquees, 'ignorees': ignorees})
