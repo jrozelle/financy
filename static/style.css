@@ -3264,3 +3264,87 @@ kbd {
 .import-actions { display: flex; gap: .5rem; align-items: center; margin-top: .7rem; flex-wrap: wrap; }
 .import-owner { margin-left: auto; display: inline-flex; align-items: center; gap: .4rem;
   font-size: .78rem; color: var(--text-muted); }
+
+/* ── Rapprochement quantites / journal des operations ─────────────────── */
+/* Les couleurs passent par les variables de theme : le panneau doit rester
+   lisible en clair comme en sombre sans regle dediee. */
+.rec-panel {
+  background: var(--card); border: 1px solid var(--warning);
+  border-radius: var(--radius); margin-bottom: 1rem; overflow: hidden;
+}
+.rec-head {
+  display: flex; align-items: center; gap: .6rem; width: 100%;
+  padding: .7rem .9rem; background: none; border: 0; cursor: pointer;
+  font: inherit; color: var(--text); text-align: left;
+}
+.rec-head:hover { background: var(--card-hover); }
+.rec-head:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.rec-badge {
+  flex: 0 0 auto; min-width: 1.5rem; padding: .1rem .4rem; border-radius: 999px;
+  background: var(--warning); color: #fff; font-size: .8rem; font-weight: 600;
+  text-align: center;
+}
+.rec-title { flex: 1 1 auto; font-weight: 500; }
+.rec-impact { flex: 0 0 auto; color: var(--warning); font-size: .84rem; font-weight: 600; }
+.rec-chevron { flex: 0 0 auto; color: var(--text-muted); }
+.rec-body { border-top: 1px solid var(--border); padding: .2rem .9rem .7rem; }
+
+.rec-row {
+  display: flex; gap: .6rem; align-items: flex-start;
+  padding: .65rem 0; border-bottom: 1px solid var(--border);
+}
+.rec-row:last-of-type { border-bottom: 0; }
+.rec-row-absent { padding-left: 1.9rem; }
+.rec-check { margin-top: .2rem; flex: 0 0 auto; }
+.rec-row-main { display: flex; flex-direction: column; gap: .12rem; min-width: 0; }
+.rec-name { font-weight: 500; }
+.rec-ctx { color: var(--text-muted); font-size: .78rem; }
+.rec-delta { font-size: .86rem; font-variant-numeric: tabular-nums; }
+.rec-diff { color: var(--warning); font-weight: 600; }
+.rec-asof { color: var(--text-muted); font-size: .78rem; margin-left: .4rem; }
+.rec-ops { display: flex; flex-direction: column; gap: .05rem; margin-top: .2rem; }
+.rec-op {
+  color: var(--text-muted); font-size: .78rem; font-variant-numeric: tabular-nums;
+  padding-left: .8rem; border-left: 2px solid var(--border);
+}
+.rec-hint { color: var(--text-muted); font-size: .78rem; font-style: italic; margin-top: .2rem; }
+
+.rec-actions {
+  display: flex; align-items: center; justify-content: flex-end; gap: .8rem;
+  padding-top: .7rem; border-top: 1px solid var(--border);
+}
+.rec-footer {
+  display: flex; align-items: center; justify-content: space-between; gap: .8rem;
+  flex-wrap: wrap; margin-top: .6rem; padding-top: .5rem;
+  border-top: 1px solid var(--border); color: var(--text-muted); font-size: .78rem;
+}
+.rec-meta { color: var(--text-muted); font-size: .78rem; }
+.rec-ok {
+  display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+  margin-bottom: 1rem; padding: .5rem .8rem; border-radius: var(--radius);
+  background: var(--success-light); color: var(--success); font-size: .84rem;
+}
+.rec-ok .rec-meta { color: inherit; opacity: .85; }
+
+.rec-journal-toggle {
+  background: none; border: 0; padding: 0; font: inherit; font-size: .78rem;
+  color: var(--primary); cursor: pointer; text-decoration: underline;
+}
+.rec-journal-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.rec-journal {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: .7rem .9rem; margin-bottom: 1rem;
+  overflow-x: auto;
+}
+.rec-journal-head {
+  color: var(--text-muted); font-size: .78rem; margin-bottom: .5rem;
+}
+.rec-journal-table { font-size: .82rem; }
+.rec-buy  { color: var(--success); }
+.rec-sell { color: var(--danger); }
+
+@media (max-width: 640px) {
+  .rec-head { flex-wrap: wrap; }
+  .rec-impact { flex-basis: 100%; }
+  .rec-footer { flex-direction: column; align-items: flex-start; }
+}
