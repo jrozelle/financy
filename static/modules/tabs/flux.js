@@ -108,16 +108,18 @@ export function renderFlux() {
       : '';
   }
   tbody.innerHTML = flux.map(f => `
-    <tr>
-      <td>${fmtDate(f.date)}</td>
-      <td>${esc(f.owner)}</td>
-      <td>${esc(f.envelope || '—')}</td>
-      <td>${f.establishment ? esc(f.establishment) : '<span class="badge badge-blk">à préciser</span>'}</td>
-      <td>${esc(f.category || '—')}</td>
-      <td>${esc(f.type || '—')}</td>
-      <td class="num ${signed(f) >= 0 ? 'pos' : 'neg'}">${eurSigned(signed(f))}</td>
-      <td>${esc(f.notes || '—')}</td>
-      <td style="white-space:nowrap">
+    <tr class="fx-ligne">
+      <td class="fx-date">${fmtDate(f.date)}</td>
+      <td class="fx-qui">${esc(f.owner)}</td>
+      <td class="fx-env">${esc(f.envelope || '—')}</td>
+      <td class="fx-etab">${f.establishment ? esc(f.establishment) : '<span class="badge badge-blk">à préciser</span>'}</td>
+      <td class="fx-cat">${esc(f.category || '—')}</td>
+      <td class="fx-type">${esc(f.type || '—')}</td>
+      <td class="num fx-montant ${signed(f) >= 0 ? 'pos' : 'neg'}">${eurSigned(signed(f))}</td>
+      <td class="fx-contexte">${esc([f.owner, f.envelope, f.establishment, f.type].filter(Boolean).join(' · '))}${
+        f.establishment ? '' : ' <span class="badge badge-blk">à préciser</span>'}</td>
+      <td class="fx-notes">${esc(f.notes || '—')}</td>
+      <td class="fx-actions" style="white-space:nowrap">
         <button class="btn-icon edit" data-id="${f.id}" data-action="edit-flux">Éditer</button>
         <button class="btn-icon del"  data-id="${f.id}" data-action="del-flux">Supprimer</button>
       </td>

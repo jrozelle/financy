@@ -2266,9 +2266,7 @@ kbd {
 
   #tab-positions .data-table th:first-child,
   #tab-positions .data-table td:first-child,
-  #tab-positions .data-table .mobile-sticky-col,
-  #tab-flux .data-table th:first-child,
-  #tab-flux .data-table td:first-child {
+  #tab-positions .data-table .mobile-sticky-col {
     position: sticky;
     left: 0;
     z-index: 2;
@@ -2525,6 +2523,12 @@ kbd {
   background: var(--success-light); color: var(--success); font-size: .84rem;
 }
 .rec-ok .rec-meta { color: inherit; opacity: .85; }
+.rec-neutre {
+  display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+  margin-bottom: 1rem; padding: .5rem .8rem; border-radius: var(--radius);
+  background: var(--card); border: 1px solid var(--border); color: var(--text-muted); font-size: .84rem;
+}
+.rec-neutre .rec-meta { color: inherit; }
 
 .rec-journal-toggle {
   background: none; border: 0; padding: 0; font: inherit; font-size: .78rem;
@@ -3749,3 +3753,31 @@ td.arbo-part > * { vertical-align: middle; }
 .ent-suppr { font-size: 16px; line-height: 1; padding: .1rem .45rem; }
 #dd-amount.neg { color: var(--danger); }
 .form-aide { margin: .25rem 0 0; font-size: 11.5px; line-height: 1.4; color: var(--text-muted); }
+
+.fx-contexte { display: none; }
+@media (max-width: 640px) {
+  /* Une fiche par flux : la date et le montant en tete, le compte dessous.
+     En tableau, neuf colonnes laissaient le montant hors de l'ecran. */
+  #tab-flux .data-table thead { display: none; }
+  #tab-flux .data-table, #tab-flux .data-table tbody { display: block; min-width: 0; width: 100%; }
+  #tab-flux .card-table { overflow: visible; }
+  #flux-tbody tr.fx-ligne {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .15rem .75rem;
+    grid-template-areas: "date montant" "compte compte" "notes actions";
+    padding: .65rem .9rem; border-bottom: 1px solid var(--border);
+  }
+  #flux-tbody tr.fx-ligne td { display: block; padding: 0; border: 0; min-width: 0; max-width: none;
+    white-space: normal; overflow: visible; text-overflow: clip; }
+  #flux-tbody .fx-date { grid-area: date; font-weight: 600; }
+  #flux-tbody .fx-montant { grid-area: montant; font-weight: 600; }
+  /* Titulaire, enveloppe, etablissement, type : une ligne de contexte. */
+  #flux-tbody tr.fx-ligne .fx-qui, #flux-tbody tr.fx-ligne .fx-env, #flux-tbody tr.fx-ligne .fx-etab,
+  #flux-tbody tr.fx-ligne .fx-type, #flux-tbody tr.fx-ligne .fx-cat { display: none; }
+  #flux-tbody tr.fx-ligne .fx-contexte { display: block; }
+  #flux-tbody .fx-notes { grid-area: notes; font-size: 12px; color: var(--text-muted); overflow-wrap: anywhere; }
+  #flux-tbody .fx-actions { grid-area: actions; align-self: center; }
+  #flux-tbody .fx-contexte { grid-area: compte; font-size: 12px; color: var(--text-muted); }
+  #flux-tfoot, #flux-tfoot tr { display: block; }
+  #flux-tfoot td { display: inline-block; border: 0; padding: .5rem .9rem; }
+  #flux-tfoot td:empty { display: none; }
+}

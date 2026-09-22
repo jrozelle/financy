@@ -67,8 +67,14 @@ function render() {
   // Rien a signaler : on garde une ligne de confirmation discrete plutot que le
   // vide, sinon on ne sait pas si le controle a tourne.
   if (!total) {
+    // « Conformes », en vert, alors qu'aucune ligne n'avait pu etre comparee :
+    // l'absence d'ecart n'est une bonne nouvelle que si le controle a porte
+    // sur quelque chose.
+    const rien = !d.verifiees;
     host.innerHTML = `
-      <div class="rec-ok">Quantités conformes au journal des opérations
+      <div class="${rien ? 'rec-neutre' : 'rec-ok'}">${rien
+        ? 'Aucune ligne à comparer au journal des opérations'
+        : 'Quantités conformes au journal des opérations'}
         <span class="rec-meta">${d.verifiees} ligne${d.verifiees > 1 ? 's' : ''} vérifiée${
           d.verifiees > 1 ? 's' : ''}${_motifs(d.ignores)}</span>
         ${_journalToggle()}
