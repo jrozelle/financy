@@ -1,5 +1,6 @@
 import { S } from './state.js';
 import { initMask, toggleMask, isMasked, onMaskChange } from './mask.js';
+import { wireTodo } from './todo.js';
 import { fmtDate, treeFilter, treeExpandCollapse, treeToggleRow, esc } from './utils.js';
 import { api, buildSelects } from './api.js';
 import { closeModal, trapModalFocus, installModalScrollLock } from './dialogs.js';
@@ -31,6 +32,7 @@ import { initColumnPicker, reapplyColumns } from './column-picker.js';
 
 async function init() {
   initMask();
+  wireTodo(switchTab);   // la zone « À traiter » renvoie vers l'onglet concerne
   S.config = await api('GET', '/api/config');
   buildSelects();
   _buildGlobalOwnerFilter();

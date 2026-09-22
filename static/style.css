@@ -3399,3 +3399,57 @@ html.is-masked body::before {
 @media (max-width: 700px) {
   .subnav { padding-inline: .6rem; }
 }
+
+/* ── Zone « À traiter » ───────────────────────────────────────────────── */
+/* Repliee sur une ligne : les indicateurs sont ce qu'on vient voir. Replier
+   n'est pas cacher — la barre nomme le plus grave et denombre le reste. */
+.todo {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); margin-bottom: 1rem; overflow: hidden;
+}
+.todo--warn { border-color: var(--warning); }
+.todo-bar {
+  display: flex; align-items: center; gap: .6rem; width: 100%;
+  padding: .55rem .8rem; background: none; border: 0;
+  font: inherit; color: var(--text); text-align: left; cursor: pointer;
+}
+.todo-bar:hover { background: var(--card-hover); }
+.todo-bar:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.todo-bar[aria-expanded="true"] { border-bottom: 1px solid var(--border); }
+.todo-count {
+  flex: none; min-width: 1.2rem; height: 1.2rem; padding: 0 .35rem;
+  border-radius: 999px; background: var(--text-muted); color: #fff;
+  font-size: .72rem; font-weight: 600; display: grid; place-items: center;
+}
+.todo--warn .todo-count { background: var(--warning); }
+.todo-lead {
+  flex: 1 1 auto; min-width: 0; font-size: .87rem; font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.todo-amount {
+  flex: none; font-variant-numeric: tabular-nums; font-size: .8rem;
+  font-weight: 600; color: var(--warning);
+}
+.todo-more { flex: none; color: var(--text-muted); font-size: .78rem; }
+.todo-chev { flex: none; color: var(--text-muted); font-size: .7rem; }
+.todo-bar[aria-expanded="true"] .todo-chev { transform: rotate(180deg); }
+
+.todo-item {
+  display: grid; grid-template-columns: 3px 1fr auto; gap: 0 .7rem;
+  align-items: center; padding: .6rem .8rem .6rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.todo-item:last-child { border-bottom: 0; }
+.todo-sev { align-self: stretch; border-radius: 0 2px 2px 0; }
+.todo-sev--warn { background: var(--warning); }
+.todo-sev--info { background: var(--primary); }
+.todo-texte { min-width: 0; }
+.todo-texte b { display: block; font-weight: 500; font-size: .88rem; }
+.todo-texte p { margin: .1rem 0 0; color: var(--text-muted); font-size: .78rem; }
+.todo-action { white-space: nowrap; }
+
+@media (max-width: 640px) {
+  .todo-more { display: none; }
+  .todo-item { grid-template-columns: 3px 1fr; row-gap: .4rem; }
+  .todo-action { grid-column: 2; justify-self: start; }
+}

@@ -2,6 +2,7 @@ import { S, catChart, histChart, syntheseEnvChart, syntheseHistChart,
          setCatChart, setHistChart, setSyntheseEnvChart, setSyntheseHistChart } from '../state.js';
 import { fmt, fmtDate, esc, kpiDelta, liqBadge, getColors, doughnutConfig, chartBorderColor, chartFamilyColors, destroyChart, parseLocaleNumber, fmtAxis } from '../utils.js';
 import { api } from '../api.js';
+import { loadTodo } from '../todo.js';
 import { drilldownPositions } from '../drilldown.js';
 import { loadUserAlerts } from '../alerts.js';
 import { renderAllocationTargets } from '../targets.js';
@@ -476,21 +477,31 @@ function renderHistChart(filterOwner = 'Famille') {
 }
 
 function renderEntityWarnings(warnings) {
-  const bar = document.getElementById('entity-warnings-bar');
-  const entityHtml = warnings.map(w => {
-    const msg = w.type === 'debt'
-      ? `⚠ <strong>${esc(w.entity)}</strong> : total % dette = ${w.total_pct}% — double-comptage sur la dette`
-      : `⚠ <strong>${esc(w.entity)}</strong> : total % détention = ${w.total_pct}% — double-comptage probable`;
-    return `<div class="alert alert-error" style="margin-bottom:.5rem">${msg}</div>`;
-  }).join('');
-
-  const alertHtml = evalUserAlerts();
-  bar.innerHTML = entityHtml + alertHtml;
+  // Ces avertissements ne s'affichent plus dans leur propre bandeau : ils
+  // rejoignent la zone « À traiter », avec les signaux calcules en base. Un
+  // probleme se lit au meme endroit quelle que soit son origine.
+  const signaux = [
+    ...warnings.map(w => ({
+      cle: `entite-${w.entity}-${w.type}`,
+      severite: 'warn',
+      titre: w.type === 'debt'
+        ? `${w.entity} : total % dette = ${w.total_pct} %`
+        : `${w.entity} : total % détention = ${w.total_pct} %`,
+      detail: w.type === 'debt'
+        ? 'Double-comptage sur la dette'
+        : 'Double-comptage probable de la détention',
+      action: 'Ouvrir Entités',
+      onglet: 'entites',
+    })),
+    ...evalUserAlerts(),
+  ];
+  document.getElementById('entity-warnings-bar').innerHTML = '';
+  loadTodo(S.syntheseDate, signaux);
 }
 
 function evalUserAlerts() {
   const alerts = loadUserAlerts();
-  if (!alerts.length || !S.synthese) return '';
+  if (!alerts.length || !S.synthese) return [];
   const syn   = S.synthese;
   const owner = S.syntheseOwner;
   const isFamily = owner === 'Famille';
@@ -512,16 +523,20 @@ function evalUserAlerts() {
     } else if (a.metric === 'net')   actual = net;
     else if (a.metric === 'gross')   actual = gross;
 
-    if (actual === null) return '';
+    if (actual === null) return null;
     const triggered = a.op === '<' ? actual < a.threshold : actual > a.threshold;
-    if (!triggered) return '';
+    if (!triggered) return null;
 
     const fmtActual = a.metric.endsWith('pct') ? actual.toFixed(1) + ' %' : fmt(actual);
     const fmtThresh = a.metric.endsWith('pct') ? a.threshold + ' %' : fmt(a.threshold);
-    return `<div class="alert alert-warning" style="margin-bottom:.5rem">
-      ⚡ <strong>${esc(a.label || a.category || a.metric)}</strong> : ${fmtActual} ${a.op === '<' ? '&lt;' : '&gt;'} seuil ${fmtThresh}
-    </div>`;
-  }).join('');
+    return {
+      cle: `seuil-${a.metric}-${a.category || ''}`,
+      severite: 'info',
+      titre: `${a.label || a.category || a.metric} : ${fmtActual}`,
+      detail: `Seuil que vous avez défini : ${a.op === '<' ? 'moins de' : 'plus de'} ${fmtThresh}`,
+      action: null, onglet: null,
+    };
+  }).filter(Boolean);
 }
 
 function renderEntitiesSynthese() {

@@ -648,3 +648,28 @@ def save_wealth_target():
             (json.dumps(d),)
         )
     return jsonify({'ok': True})
+
+
+@synthese_bp.route('/api/todo')
+@login_required
+def todo():
+    """Signaux systeme a traiter pour un arrete. Lecture seule.
+
+    `date` par defaut : l'arrete le plus recent. Les avertissements d'entites et
+    les alertes de seuil de l'utilisateur ne sont PAS ici : le front les evalue
+    contre la synthese qu'il detient deja.
+    """
+    from models import validate_date
+    from services.todo import collect
+
+    date = request.args.get('date')
+    with get_db() as conn:
+        if not date:
+            row = conn.execute('SELECT MAX(date) AS d FROM positions').fetchone()
+            date = row['d'] if row else None
+            if not date:
+                return jsonify({'date': None, 'signaux': [], 'total': 0})
+        elif not validate_date(date):
+            return jsonify({'error': 'Date invalide (format AAAA-MM-JJ attendu)'}), 400
+        data = collect(conn, date)
+    return jsonify({'date': date, **data})
