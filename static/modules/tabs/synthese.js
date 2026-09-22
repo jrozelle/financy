@@ -313,6 +313,7 @@ function renderHistChart() {
 }
 
 let _legendeJeton = 0;
+let _legendeRequete = null;
 async function _legendeEvolution(owner, debut, fin) {
   const hote = document.getElementById('evolution-legende');
   if (!hote) return;
@@ -324,7 +325,15 @@ async function _legendeEvolution(owner, debut, fin) {
   try {
     const q = new URLSearchParams({ limit: '40' });
     if (owner) q.set('owner', owner);
-    const d = await api('GET', `/api/contribution?${q}`, null, { silent: true });
+    // La courbe se dessine deux fois au chargement — apres la synthese, puis
+    // apres l'historique, qui arrivent dans un ordre variable. La meme
+    // decomposition, demandee a quelques millisecondes d'intervalle, est
+    // partagee plutot que redemandee.
+    const cle = `${q}|${debut.date}|${fin.date}`;
+    if (!_legendeRequete || _legendeRequete.cle !== cle || Date.now() - _legendeRequete.t > 2000) {
+      _legendeRequete = { cle, t: Date.now(), p: api('GET', `/api/contribution?${q}`, null, { silent: true }) };
+    }
+    const d = await _legendeRequete.p;
     if (jeton !== _legendeJeton) return;
     // L'epargne et les marches expliquent la variation seulement s'ils couvrent
     // la meme periode : au-dela de 40 arretes, le serveur tronque, et les
