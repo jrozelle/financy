@@ -24,7 +24,10 @@ export async function loadContribution() {
     d = await api('GET', `/api/contribution?${q}`, null, { silent: true });
   } catch { carte.style.display = 'none'; return; }
 
-  const periodes = (d.periodes || []).filter(p => p.variation || p.apports);
+  // Une periode sans mouvement ni apport n'apporte rien au graphe : elle y
+  // occupe une colonne pour n'y montrer qu'un trait a zero.
+  const periodes = (d.periodes || [])
+    .filter(p => Math.abs(p.variation) > 100 || Math.abs(p.apports) > 100);
   // Moins de deux periodes ne fait pas une comparaison : on n'affiche rien
   // plutot qu'une barre solitaire qui n'apprend rien.
   if (periodes.length < 2) { carte.style.display = 'none'; return; }
@@ -67,11 +70,11 @@ function dessiner(periodes) {
            + `height="${Math.max(h, 1).toFixed(1)}" fill="${couleur}" rx="2"/>`;
     };
     const total = p.apports + p.performance;
-    const yVal = total >= 0 ? hautCumul - 7 : basCumul + 14;
+    const sommet = Math.min(hautCumul, zero);
+    const yVal = sommet - 7;
     // Un libelle par barre, en mois abrege : la date complete se chevauchait
     // des quatre periodes.
-    const mois = new Date(p.fin + 'T12:00:00')
-      .toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' });
+    const mois = p.libelle || '';
     return seg(p.performance, 'var(--chart-1)')
          + seg(p.apports, 'var(--chart-4)')
          + `<text x="${cx.toFixed(1)}" y="${(H + 15).toFixed(1)}" text-anchor="middle" `

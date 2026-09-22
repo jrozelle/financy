@@ -38,6 +38,41 @@ def _apports(conn, debut, fin, owner=None):
     return round(sum(_flux_signed(dict(r)) for r in conn.execute(q, p)), 2)
 
 
+def _trimestre(date):
+    """'2026-08-31' -> ('2026-T3', 'T3 26')"""
+    an, mois = int(date[:4]), int(date[5:7])
+    t = (mois - 1) // 3 + 1
+    return f'{an}-T{t}', f'T{t} {str(an)[2:]}'
+
+
+def _par_trimestre(periodes):
+    """Regroupe les periodes entre arretes en trimestres calendaires.
+
+    Les arretes sont irreguliers — deux en aout, aucun en septembre — donc les
+    barres d'un graphe par arrete ne sont pas comparables entre elles : une
+    colonne peut couvrir trois semaines et sa voisine trois mois. Le trimestre
+    est une unite de temps homogene, et c'est la maille a laquelle on juge un
+    patrimoine.
+    """
+    groupes = {}
+    for p in periodes:
+        cle, libelle = _trimestre(p['fin'])
+        g = groupes.setdefault(cle, {
+            'cle': cle, 'libelle': libelle, 'debut': p['debut'], 'fin': p['fin'],
+            'variation': 0.0, 'apports': 0.0, 'performance': 0.0,
+        })
+        # La periode la plus ancienne du trimestre en donne le debut, la plus
+        # recente la fin : les bornes doivent couvrir tout ce qu'on additionne.
+        g['debut'] = min(g['debut'], p['debut'])
+        g['fin'] = max(g['fin'], p['fin'])
+        for champ in ('variation', 'apports', 'performance'):
+            g[champ] += p[champ]
+    for g in groupes.values():
+        for champ in ('variation', 'apports', 'performance'):
+            g[champ] = round(g[champ], 2)
+    return [groupes[c] for c in sorted(groupes)]
+
+
 def decompose(conn, arretes, owner=None, limite=8):
     """Decompose la variation du net entre arretes consecutifs.
 
@@ -63,7 +98,7 @@ def decompose(conn, arretes, owner=None, limite=8):
             'performance': round(delta - apports, 2),
         })
 
-    periodes = periodes[-limite:]
+    periodes = _par_trimestre(periodes)[-limite:]
     return {
         'periodes':          periodes,
         'total_apports':     round(sum(p['apports'] for p in periodes), 2),

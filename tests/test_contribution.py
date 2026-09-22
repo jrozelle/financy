@@ -146,6 +146,48 @@ class TestDecomposition:
         assert r['total_apports'] + r['total_performance'] == r['total_variation']
 
 
+class TestGroupementTrimestriel:
+    """Les arretes sont irreguliers — deux en aout, aucun en septembre. Les
+    regrouper en trimestres calendaires rend les colonnes comparables."""
+
+    def test_deux_arretes_du_meme_trimestre_fusionnent(self):
+        with get_db() as conn:
+            _flux(conn, '2026-07-10', 'Versement', 1000)
+            _flux(conn, '2026-08-20', 'Versement', 500)
+            conn.commit()
+            r = decompose(conn, _arretes(
+                ('2026-06-30', 100000), ('2026-07-31', 102000), ('2026-08-31', 103000)))
+        assert len(r['periodes']) == 1               # juillet et aout, un seul T3
+        p = r['periodes'][0]
+        assert p['libelle'] == 'T3 26'
+        assert p['apports'] == 1500                  # les deux versements
+        assert p['variation'] == 3000                # 100 000 -> 103 000
+
+    def test_bornes_couvrent_tout_le_trimestre(self):
+        with get_db() as conn:
+            conn.commit()
+            r = decompose(conn, _arretes(
+                ('2026-06-30', 100000), ('2026-07-31', 101000), ('2026-08-31', 102000)))
+        p = r['periodes'][0]
+        assert p['debut'] == '2026-06-30'            # depart de la 1re periode
+        assert p['fin'] == '2026-08-31'              # arrivee de la derniere
+
+    def test_trimestres_distincts_restent_separes(self):
+        with get_db() as conn:
+            conn.commit()
+            r = decompose(conn, _arretes(
+                ('2026-02-28', 100000), ('2026-05-31', 103000), ('2026-08-31', 107000)))
+        assert [p['libelle'] for p in r['periodes']] == ['T2 26', 'T3 26']
+
+    def test_ordre_chronologique(self):
+        with get_db() as conn:
+            conn.commit()
+            r = decompose(conn, _arretes(
+                ('2025-11-30', 50000), ('2026-02-28', 52000), ('2026-05-31', 55000)))
+        libelles = [p['libelle'] for p in r['periodes']]
+        assert libelles == ['T1 26', 'T2 26']        # 2026 apres 2025, T1 avant T2
+
+
 class TestEndpoint:
     def _snapshot(self, conn, date, valeur, owner='Paul'):
         conn.execute('INSERT INTO positions (date, owner, category, envelope, value) '

@@ -370,19 +370,42 @@ export async function renderSyntheseHistory() {
   const history = await api('GET', url);
   const dates   = history.map(h => fmtDate(h.date));
 
-  const groups = new Set();
-  history.forEach(h => Object.keys(h.by_group || {}).forEach(k => groups.add(k)));
-  const groupList = [...groups].sort();
+  // Douze series empilees et une legende de douze entrees : on distingue les
+  // trois plus grosses, les autres forment un liseré illisible qui occupe la
+  // moitie de la legende. On garde les six premieres par poids et on regroupe
+  // le reste, qui reste ainsi compte sans encombrer.
+  const MAX_SERIES = 6;
+  const poids = {};
+  history.forEach(h => Object.entries(h.by_group || {}).forEach(([k, v]) => {
+    poids[k] = Math.max(poids[k] || 0, Math.abs(v || 0));
+  }));
+  const classees = Object.keys(poids).sort((a, b) => poids[b] - poids[a]);
+  const gardees = classees.slice(0, MAX_SERIES);
+  const fondues = classees.slice(MAX_SERIES);
 
+  const serie = g => history.map(h => ({ x: _ts(h.date), y: Math.round(h.by_group?.[g] || 0) }));
   const colors = getColors();
-  const datasets = groupList.map((g, i) => ({
+  const datasets = gardees.map((g, i) => ({
     label: g,
-    data:  history.map(h => ({ x: _ts(h.date), y: Math.round(h.by_group?.[g] || 0) })),
+    data:  serie(g),
     backgroundColor: colors[i % colors.length] + 'cc',
     borderColor:     colors[i % colors.length],
     borderWidth: 1.5, tension: .25, pointRadius: 2,
     fill: true,
   }));
+  if (fondues.length) {
+    datasets.push({
+      label: `${fondues.length} autres`,
+      data: history.map(h => ({
+        x: _ts(h.date),
+        y: Math.round(fondues.reduce((t, g) => t + (h.by_group?.[g] || 0), 0)),
+      })),
+      backgroundColor: getComputedStyle(document.documentElement)
+        .getPropertyValue('--text-muted').trim() + '55',
+      borderColor: 'var(--text-muted)',
+      borderWidth: 1.5, tension: .25, pointRadius: 2, fill: true,
+    });
+  }
 
   destroyChart(syntheseHistChart);
   setSyntheseHistChart(new Chart(
