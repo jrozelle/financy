@@ -4070,3 +4070,74 @@ body { padding-top: 0 !important; }
   font-variant-numeric: tabular-nums;
 }
 .kpi-sub:empty { display: none; }
+
+/* ── Fenêtre de réglages ──────────────────────────────────────────────── */
+/* Onglets à gauche, contenu à droite : la forme attendue d'un écran de
+   configuration, et qui évite quatre lignes de navigation permanente pour des
+   écrans ouverts quelques fois par an. */
+.reglages-content {
+  display: grid; grid-template-columns: 190px 1fr;
+  max-width: 980px; width: min(96vw, 980px);
+  height: min(84vh, 760px); padding: 0; overflow: hidden;
+}
+.reglages-nav {
+  background: var(--bg); border-right: 1px solid var(--border);
+  padding: 1rem .6rem; display: flex; flex-direction: column; gap: 2px;
+  overflow-y: auto;
+}
+.reglages-nav h2 {
+  margin: 0 0 .8rem; padding: 0 .5rem; font-size: 1rem; font-weight: 600;
+}
+.reglages-onglet {
+  width: 100%; text-align: left; background: none; border: 0; border-radius: 7px;
+  padding: .45rem .5rem; font: inherit; font-size: .84rem;
+  color: var(--text-muted); cursor: pointer;
+}
+.reglages-onglet:hover { background: var(--card); color: var(--text); }
+.reglages-onglet[aria-selected="true"] {
+  background: var(--card); color: var(--text); font-weight: 500;
+  box-shadow: 0 1px 2px rgba(16,20,30,.07);
+}
+.reglages-onglet:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+
+.reglages-corps { position: relative; overflow-y: auto; padding: 1.25rem 1.5rem; min-width: 0; }
+.reglages-corps .modal-close { position: absolute; top: .7rem; right: .9rem; }
+.reglages-panneau > h3 {
+  margin: 1.4rem 0 .5rem; font-size: .68rem; font-weight: 600;
+  letter-spacing: .09em; text-transform: uppercase; color: var(--text-muted);
+}
+.reglages-panneau > h3:first-child { margin-top: 0; }
+
+/* Chaque réglage : ce qu'il fait à gauche, le contrôle à droite. Un libellé
+   seul obligeait à cliquer pour savoir ce qu'on changeait. */
+.pref-ligne {
+  display: flex; align-items: center; justify-content: space-between; gap: 1.5rem;
+  padding: .7rem 0; border-bottom: 1px solid var(--border);
+}
+.pref-ligne:last-child { border-bottom: 0; }
+.pref-ligne b { display: block; font-weight: 500; font-size: .87rem; }
+.pref-ligne p { margin: .1rem 0 0; color: var(--text-muted); font-size: .76rem; }
+.pref-ligne > div:last-child { flex: none; }
+/* Les boutons repris du menu retrouvent une apparence de contrôle. */
+.pref-ligne .settings-item {
+  width: auto; border: 1px solid var(--border); border-radius: 8px;
+  padding: .3rem .7rem; font-size: .78rem; background: var(--card);
+  color: var(--text-muted); white-space: nowrap;
+}
+.pref-ligne .settings-item:hover { border-color: var(--primary); color: var(--primary); }
+
+/* Les écrans déplacés perdent leur marge de page : ils sont dans une fenêtre. */
+.reglages-corps .tab-content { padding: 0; }
+.reglages-corps .page-header { margin-top: 0; }
+
+.fin-rail-reglages { margin-top: .3rem; }
+
+@media (max-width: 700px) {
+  .reglages-content { grid-template-columns: 1fr; height: min(90vh, 700px); }
+  .reglages-nav {
+    flex-direction: row; overflow-x: auto; border-right: 0;
+    border-bottom: 1px solid var(--border); padding: .5rem;
+  }
+  .reglages-nav h2 { display: none; }
+  .reglages-onglet { width: auto; white-space: nowrap; }
+}

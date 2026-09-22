@@ -1,6 +1,7 @@
 import { S } from './state.js';
 import { initMask, toggleMask, isMasked, onMaskChange } from './mask.js';
 import { wireTodo } from './todo.js';
+import { wireReglages, estUnReglage, ouvrir as ouvrirReglages } from './reglages.js';
 import { fmtDate, treeFilter, treeExpandCollapse, treeToggleRow, esc } from './utils.js';
 import { api, buildSelects } from './api.js';
 import { closeModal, trapModalFocus, installModalScrollLock } from './dialogs.js';
@@ -33,6 +34,7 @@ import { initColumnPicker, reapplyColumns } from './column-picker.js';
 async function init() {
   initMask();
   wireTodo(switchTab);   // la zone « À traiter » renvoie vers l'onglet concerne
+  wireReglages(switchTab);
   S.config = await api('GET', '/api/config');
   buildSelects();
   _buildGlobalOwnerFilter();
@@ -383,7 +385,6 @@ const GROUPES = [
   { id: 'patrimoine', label: 'Patrimoine', tabs: ['positions', 'actifs', 'entites'] },
   { id: 'suivi',      label: 'Suivi',      tabs: ['performance', 'flux'] },
   { id: 'conseil',    label: 'Conseil',    tabs: ['conseil'] },
-  { id: 'reglages',   label: 'Réglages',   tabs: ['referentiel', 'import', 'tools'] },
 ];
 
 const LABELS_ONGLET = {
@@ -446,6 +447,15 @@ function majTitrePage(tab) {
 }
 
 export async function switchTab(tab, { pushHistory = true } = {}) {
+  // Referentiel, Import et Outils sont desormais des onglets de la fenetre de
+  // reglages : y « naviguer » revient a l'ouvrir. Si elle est deja ouverte,
+  // l'appel vient d'elle et on poursuit le chargement normalement.
+  const fenetre = document.getElementById('reglages-modal');
+  const fenetreFermee = fenetre?.classList.contains('hidden') !== false;
+  if (estUnReglage(tab) && fenetreFermee) {
+    ouvrirReglages(tab);
+    return;
+  }
   S.currentTab = tab;
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));

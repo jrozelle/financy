@@ -33,11 +33,13 @@
     <button type="button" class="tab-btn fin-rail-item" data-tab="conseil"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>Conseil</button>
 
     <div class="fin-rail-foot">
-      <div class="fin-rail-group">Réglages</div>
-      <div id="rail-reglages"></div>
-      <button type="button" class="tab-btn fin-rail-sub" data-tab="referentiel">Référentiel</button>
-      <button type="button" class="tab-btn fin-rail-sub" data-tab="import">Import / Export</button>
-      <button type="button" class="tab-btn fin-rail-sub" data-tab="tools">Outils</button>
+      <button type="button" class="fin-rail-item fin-rail-reglages" id="ouvrir-reglages">
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>
+        </svg>Réglages
+      </button>
+      <div id="rail-reglages" hidden></div>
     </div>
   </nav>
 
@@ -1296,6 +1298,62 @@
   </div>
 
   <div id="toast" role="status" aria-live="polite"></div>
+
+
+  <!-- Fenetre de reglages. Un seul point d'entree dans le rail, et les ecrans
+       de configuration deviennent des onglets : Referentiel, Import et Outils
+       n'ont pas a occuper quatre lignes de navigation permanente pour des
+       ecrans qu'on ouvre quelques fois par an. -->
+  <div id="reglages-modal" class="modal hidden" role="dialog" aria-modal="true"
+       aria-labelledby="reglages-titre">
+    <div class="modal-overlay" data-fermer-reglages></div>
+    <div class="modal-content reglages-content">
+      <div class="reglages-nav">
+        <h2 id="reglages-titre">Réglages</h2>
+        <button type="button" class="reglages-onglet" data-reglage="preferences" aria-selected="true">Préférences</button>
+        <button type="button" class="reglages-onglet" data-reglage="referentiel" aria-selected="false">Référentiel</button>
+        <button type="button" class="reglages-onglet" data-reglage="import" aria-selected="false">Import / Export</button>
+        <button type="button" class="reglages-onglet" data-reglage="tools" aria-selected="false">Outils</button>
+      </div>
+      <div class="reglages-corps">
+        <button class="modal-close" data-fermer-reglages aria-label="Fermer">&#10005;</button>
+        <div id="reglages-preferences" class="reglages-panneau">
+          <h3>Affichage</h3>
+          <div class="pref-ligne">
+            <div><b>Thème</b><p>Clair, sombre, ou celui du système</p></div>
+            <div id="pref-theme"></div>
+          </div>
+          <div class="pref-ligne">
+            <div><b>Densité</b><p>Espacement des cartes et des tableaux</p></div>
+            <div id="pref-densite"></div>
+          </div>
+          <div class="pref-ligne">
+            <div><b>Masquer les montants</b><p>Pour montrer l'écran sans révéler le patrimoine</p></div>
+            <div id="pref-masque"></div>
+          </div>
+          <h3>Colonnes</h3>
+          <div class="pref-ligne">
+            <div><b>Positions</b><p>Colonnes affichées dans le tableau des positions</p></div>
+            <div id="pref-col-positions"></div>
+          </div>
+          <div class="pref-ligne">
+            <div><b>Actifs</b><p>Colonnes affichées dans le tableau des actifs</p></div>
+            <div id="pref-col-actifs"></div>
+          </div>
+          <h3>Application</h3>
+          <div class="pref-ligne">
+            <div><b>Clés API</b><p>Nécessaires à l'analyse de l'onglet Conseil</p></div>
+            <div id="pref-api"></div>
+          </div>
+          <div class="pref-ligne">
+            <div><b>Raccourcis clavier</b><p>La liste des raccourcis disponibles</p></div>
+            <div id="pref-raccourcis"></div>
+          </div>
+        </div>
+        <div id="reglages-accueil" class="reglages-panneau hidden"></div>
+      </div>
+    </div>
+  </div>
 
   <script type="module" src="/static/modules/main.js"></script>
 </body>
