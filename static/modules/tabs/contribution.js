@@ -19,8 +19,9 @@ export async function loadContribution() {
   const owner = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : '';
   let d;
   try {
-    d = await api('GET', `/api/contribution${owner ? `?owner=${encodeURIComponent(owner)}` : ''}`,
-                  null, { silent: true });
+    const q = new URLSearchParams({ limit: '6' });
+    if (owner) q.set('owner', owner);
+    d = await api('GET', `/api/contribution?${q}`, null, { silent: true });
   } catch { carte.style.display = 'none'; return; }
 
   const periodes = (d.periodes || []).filter(p => p.variation || p.apports);
@@ -40,8 +41,9 @@ function dessiner(periodes) {
   // `preserveAspectRatio="none"` : cet etirement deforme le texte autant que
   // les formes, ce qui rendait les libelles illisibles une fois la carte
   // etiree sur toute la largeur.
-  const L = 60 * periodes.length + 40;   // largeur intrinseque
-  const H = 140, BAS = 26, MARGE = 20;
+  // 78 px par periode : en deca, le libelle de valeur deborde sur ses voisins.
+  const L = 78 * periodes.length + 30;
+  const H = 150, BAS = 30, MARGE = 26;
 
   const haut = Math.max(...periodes.map(p => Math.max(0, p.apports) + Math.max(0, p.performance)), 0);
   const bas  = Math.min(...periodes.map(p => Math.min(0, p.apports) + Math.min(0, p.performance)), 0);
@@ -49,11 +51,11 @@ function dessiner(periodes) {
   const zero = MARGE + (H - MARGE) * (haut / etendue);
   const ech = v => (Math.abs(v) / etendue) * (H - MARGE);
 
-  const pas = (L - 40) / periodes.length;
-  const barre = Math.min(pas * 0.56, 34);
+  const pas = (L - 30) / periodes.length;
+  const barre = Math.min(pas * 0.5, 40);
 
   const parts = periodes.map((p, i) => {
-    const cx = 20 + pas * (i + 0.5);
+    const cx = 15 + pas * (i + 0.5);
     const x = cx - barre / 2;
     let hautCumul = zero, basCumul = zero;
     const seg = (valeur, couleur) => {
@@ -65,7 +67,7 @@ function dessiner(periodes) {
            + `height="${Math.max(h, 1).toFixed(1)}" fill="${couleur}" rx="2"/>`;
     };
     const total = p.apports + p.performance;
-    const yVal = total >= 0 ? hautCumul - 5 : basCumul + 11;
+    const yVal = total >= 0 ? hautCumul - 7 : basCumul + 14;
     // Un libelle par barre, en mois abrege : la date complete se chevauchait
     // des quatre periodes.
     const mois = new Date(p.fin + 'T12:00:00')
@@ -75,7 +77,7 @@ function dessiner(periodes) {
          + `<text x="${cx.toFixed(1)}" y="${(H + 15).toFixed(1)}" text-anchor="middle" `
          + `class="contrib-axe">${mois}</text>`
          + `<text x="${cx.toFixed(1)}" y="${yVal.toFixed(1)}" text-anchor="middle" `
-         + `class="contrib-val">${(total >= 0 ? '+' : '−') + Math.round(Math.abs(total) / 1000)}k</text>`;
+         + `class="contrib-val">${_millier(total)}</text>`;
   }).join('');
 
   hote.innerHTML = `
@@ -84,6 +86,15 @@ function dessiner(periodes) {
       <line x1="10" y1="${zero.toFixed(1)}" x2="${L - 10}" y2="${zero.toFixed(1)}" class="contrib-zero"/>
       ${parts}
     </svg>`;
+}
+
+/** Arrondi lisible : « +12 k » au-dessus de mille, la valeur exacte en deca —
+ *  « +0 k » sur une periode a 400 EUR laisse croire a un mouvement nul. */
+function _millier(v) {
+  const signe = v >= 0 ? '+' : '−';
+  const a = Math.abs(v);
+  return a >= 1000 ? `${signe}${Math.round(a / 1000)} k`
+                   : `${signe}${Math.round(a)}`;
 }
 
 function legende(d) {
