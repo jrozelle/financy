@@ -111,10 +111,6 @@ _FX = re.compile(r'\b(\d{1,2},\d{4,})\b')
 _NUM = re.compile(r'\d{1,3}(?:[   ]\d{3})*(?:,\d+)?')
 _ISIN = re.compile(r'\b([A-Z]{2}[A-Z0-9]{9}[0-9])\b')
 
-MOIS = {'JANVIER': 1, 'FEVRIER': 2, 'MARS': 3, 'AVRIL': 4, 'MAI': 5, 'JUIN': 6,
-        'JUILLET': 7, 'AOUT': 8, 'SEPTEMBRE': 9, 'OCTOBRE': 10,
-        'NOVEMBRE': 11, 'DECEMBRE': 12}
-
 
 def _num(s: str) -> Optional[float]:
     if s is None:
@@ -353,9 +349,6 @@ def _balances(lines):
 # Mesure sur les releves BoursoBank : debit cale a droite sur x=479, credit sur
 # x=546, soit 66 points. Un ecart sous ce seuil signale une colonne unique.
 COLUMN_GAP_PT = 20
-# Tolerance d'alignement a droite d'une meme colonne : les glyphes varient de
-# moins d'un point d'un montant a l'autre.
-COLUMN_TOL_PT = 3
 # Ecart d'ordonnee en deca duquel deux mots appartiennent a la meme ligne.
 LINE_TOL_PT = 2.5
 # Ecart d'abscisse en deca duquel deux jetons numeriques n'en font qu'un : le

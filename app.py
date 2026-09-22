@@ -152,9 +152,6 @@ def ensure_csrf_token():
 
 # ─── Index ────────────────────────────────────────────────────────────────────
 
-TAB_ROUTES = ['synthese', 'positions', 'actifs', 'flux', 'entites', 'conseil',
-              'referentiel', 'tools', 'import']
-
 
 @app.route('/')
 @app.route('/<tab>')

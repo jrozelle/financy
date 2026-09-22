@@ -238,13 +238,8 @@ DEFAULT_TEMPLATE_NAME = 'Famille (4 personnes)'
 DEFAULT_REFERENTIAL = {**REFERENTIAL_TEMPLATES[DEFAULT_TEMPLATE_NAME], 'liquidity_order': LIQUIDITY_ORDER}
 
 # Aliases pour la rétrocompatibilité (tests, compute_position fallback)
-OWNERS = DEFAULT_REFERENTIAL['owners']
-CATEGORIES = DEFAULT_REFERENTIAL['categories']
 ENVELOPE_META = DEFAULT_REFERENTIAL['envelope_meta']
 CATEGORY_MOBILIZABLE = DEFAULT_REFERENTIAL['category_mobilizable']
-FLUX_TYPES = DEFAULT_REFERENTIAL['flux_types']
-ENTITY_TYPES = DEFAULT_REFERENTIAL['entity_types']
-VALUATION_MODES = DEFAULT_REFERENTIAL['valuation_modes']
 
 # ─── Référentiel dynamique ───────────────────────────────────────────────────
 

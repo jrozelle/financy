@@ -3,7 +3,6 @@ Fonctions de duplication de snapshots.
 
 UN SEUL helper `duplicate_position` pour copier une position + ses holdings.
 Utilise par :
-- ensure_today_snapshot (auto-snapshot)
 - auto_snapshot route (routes/tools.py)
 - snapshot_update route (routes/positions.py)
 """
@@ -83,32 +82,6 @@ def duplicate_snapshot(conn, source_date, target_date):
         f'SELECT COUNT(*) AS c FROM holdings WHERE position_id IN ({",".join("?" * len(ids))})', ids
     ).fetchone()['c']
     return {'positions_copied': len(ids), 'holdings_copied': holdings}
-
-
-def ensure_today_snapshot(conn):
-    """Duplique le dernier snapshot vers aujourd'hui si necessaire.
-
-    Retourne (created: bool, target_date: str).
-    """
-    today = datetime.now().strftime('%Y-%m-%d')
-
-    existing = conn.execute(
-        'SELECT COUNT(*) as cnt FROM positions WHERE date=?', (today,)
-    ).fetchone()
-    if existing['cnt'] > 0:
-        return False, today
-
-    last = conn.execute(
-        'SELECT DISTINCT date FROM positions ORDER BY date DESC LIMIT 1'
-    ).fetchone()
-    if not last or last['date'] == today:
-        return False, today
-
-    stats = duplicate_snapshot(conn, last['date'], today)
-    logger.info('Auto-snapshot: %d positions + %d holdings from %s to %s',
-                stats['positions_copied'], stats['holdings_copied'],
-                last['date'], today)
-    return True, today
 
 
 # ── Mise a jour d'un arrete ──────────────────────────────────────────────────
