@@ -1,5 +1,5 @@
 import { S } from '../state.js';
-import { fmt, fmtDate, esc, sortArr, updateSortIndicators, today, getColors, chartBorderColor, destroyChart, parseLocaleNumber } from '../utils.js';
+import { fmt, fmtDate, esc, sortArr, updateSortIndicators, today, getColors, chartBorderColor, destroyChart, parseLocaleNumber, fmtAxis } from '../utils.js';
 import { api, refreshEntitySelect } from '../api.js';
 import { confirmDialog, toast, closeModal } from '../dialogs.js';
 import { switchTab } from '../main.js';
@@ -250,7 +250,7 @@ function renderEntityTimeline(snaps) {
       scales: {
         y: {
           ticks: {
-            callback: v => new Intl.NumberFormat('fr-FR', { notation: 'compact' }).format(v) + ' €',
+            callback: fmtAxis,
             font: { size: 11 },
           },
           grid: { color: border },

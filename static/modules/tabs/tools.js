@@ -1,5 +1,5 @@
 import { S } from '../state.js';
-import { fmt, fmtDate, esc, getColors, chartBorderColor, destroyChart, parseLocaleNumber } from '../utils.js';
+import { fmt, fmtDate, esc, getColors, chartBorderColor, destroyChart, parseLocaleNumber, fmtAxis } from '../utils.js';
 import { api } from '../api.js';
 import { toast } from '../dialogs.js';
 import { refreshDates } from '../main.js';
@@ -89,7 +89,7 @@ function renderTimelineChart(snapshots) {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: ctx => ` ${new Intl.NumberFormat('fr-FR').format(Math.round(ctx.parsed.y))}\u202f€`,
+            label: ctx => ` ${fmt(ctx.parsed.y)}`,
             afterBody: () => 'Cliquer pour voir la composition',
           },
         },
@@ -97,7 +97,7 @@ function renderTimelineChart(snapshots) {
       scales: {
         y: {
           ticks: {
-            callback: v => new Intl.NumberFormat('fr-FR', { notation: 'compact' }).format(v) + ' €',
+            callback: fmtAxis,
             font: { size: 11 },
           },
           grid: { color: border },
@@ -196,7 +196,7 @@ function renderSimulChart(points) {
       scales: {
         y: {
           ticks: {
-            callback: v => new Intl.NumberFormat('fr-FR', { notation: 'compact' }).format(v) + ' €',
+            callback: fmtAxis,
             font: { size: 11 },
           },
           grid: { color: border },

@@ -16,6 +16,7 @@ import { S } from '../state.js';
 import { api } from '../api.js';
 import { fmt, fmtDate, esc } from '../utils.js';
 import { toast } from '../dialogs.js';
+import { isMasked, maskFormatted } from '../mask.js';
 
 const V = {
   data: null,
@@ -35,7 +36,8 @@ function _qty(n) {
   if (n == null) return '—';
   // Les parts d'OPCVM vont a 5 decimales, les ETF sont entiers : on n'affiche
   // des decimales que lorsqu'il y en a.
-  return Number.isInteger(n) ? String(n) : n.toFixed(5).replace(/0+$/, '').replace(/\.$/, '');
+  const brut = Number.isInteger(n) ? String(n) : n.toFixed(5).replace(/0+$/, '').replace(/\.$/, '');
+  return isMasked() ? maskFormatted(brut) : brut;
 }
 
 function _signe(n) {

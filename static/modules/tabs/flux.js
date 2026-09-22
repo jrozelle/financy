@@ -226,8 +226,7 @@ export async function deleteFlux(id) {
 let _staged = null;   // resultat du dernier apercu, en attente de validation
 
 const _fmtDate = d => d ? d.split('-').reverse().join('/') : '—';
-const _eur = v => v == null ? '—'
-  : new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v) + ' €';
+const _eur = v => v == null ? '—' : fmt(v, 2);
 
 export function wireFluxImport() {
   const zone = document.getElementById('flux-drop');

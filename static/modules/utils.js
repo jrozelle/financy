@@ -1,11 +1,31 @@
 import { S } from './state.js';
+import { isMasked, maskFormatted, maskAxis } from './mask.js';
+
+const _nf = (n, dec) => new Intl.NumberFormat('fr-FR', {
+  minimumFractionDigits: dec,
+  maximumFractionDigits: dec,
+}).format(n);
 
 export const fmt = (n, dec = 0) => {
   if (n == null) return '—';
-  return new Intl.NumberFormat('fr-FR', {
-    minimumFractionDigits: dec,
-    maximumFractionDigits: dec,
-  }).format(n) + '\u202f€';
+  const brut = _nf(n, dec);
+  return (isMasked() ? maskFormatted(brut) : brut) + '\u202f€';
+};
+
+/** Quantite de titres. Masquee comme un montant : le cours etant public, une
+ *  quantite visible suffit a retrouver la valorisation. */
+export const fmtQty = (n, dec = 0) => {
+  if (n == null) return '—';
+  const brut = _nf(n, dec);
+  return isMasked() ? maskFormatted(brut) : brut;
+};
+
+/** Libelle d'axe de graphe (notation compacte : "29 k€"). Cinq graphes le
+ *  reformataient chacun de leur cote ; un seul endroit desormais, donc un seul
+ *  endroit ou le masquage s'applique. */
+export const fmtAxis = v => {
+  if (isMasked()) return maskAxis();
+  return new Intl.NumberFormat('fr-FR', { notation: 'compact' }).format(v) + '\u202f€';
 };
 
 export const fmtDate = d => {
@@ -29,11 +49,9 @@ export const liqBadge = liq => {
 
 export const fmtDelta = (n, dec = 0) => {
   if (n == null || n === 0) return '';
-  const sign = n > 0 ? '+' : '';
-  return sign + new Intl.NumberFormat('fr-FR', {
-    minimumFractionDigits: dec,
-    maximumFractionDigits: dec,
-  }).format(n) + '\u202f\u20ac';
+  // Le signe passe devant la valeur absolue : masquee, "-" colle a "???" se lit
+  // mal, et fmt() gere deja le masquage.
+  return (n > 0 ? '+' : '−') + fmt(Math.abs(n), dec);
 };
 
 export function kpiDelta(variation, deltaKey, pctKey = null, { invert = false, label = null } = {}) {

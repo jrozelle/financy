@@ -1,5 +1,5 @@
 import { S } from './state.js';
-import { fmt, fmtDate, esc, liqText, getColors, chartBorderColor, destroyChart } from './utils.js';
+import { fmt, fmtDate, esc, liqText, getColors, chartBorderColor, destroyChart, fmtAxis } from './utils.js';
 import { api } from './api.js';
 import { closeModal, confirmDialog } from './dialogs.js';
 
@@ -249,7 +249,7 @@ export async function drilldownHistory({ subtitle, title, filters }) {
         maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: {
-          y: { ticks: { callback: v => new Intl.NumberFormat('fr-FR', { notation: 'compact' }).format(v) + ' €', font: { size: 11 } }, grid: { color: border } },
+          y: { ticks: { callback: fmtAxis, font: { size: 11 } }, grid: { color: border } },
           x: { ticks: { font: { size: 10 } }, grid: { display: false } },
         },
       },

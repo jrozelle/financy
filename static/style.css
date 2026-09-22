@@ -3348,3 +3348,32 @@ kbd {
   .rec-impact { flex-basis: 100%; }
   .rec-footer { flex-direction: column; align-items: flex-start; }
 }
+
+/* ── Mode discretion : montants masques ───────────────────────────────── */
+/* Les groupes masques passent en gris et en chasse fixe : ils se lisent comme
+   un caviardage, pas comme une valeur reelle ni comme un bug d'affichage. */
+html.is-masked {
+  --mask-ink: var(--text-muted);
+}
+html.is-masked .kpi-value,
+html.is-masked .num,
+html.is-masked td,
+html.is-masked .rec-delta {
+  font-variant-numeric: tabular-nums;
+}
+/* Bandeau discret mais permanent : sans lui, on oublie que le masque est actif
+   et on croit a des donnees corrompues. */
+html.is-masked body::before {
+  content: "Montants masqués · Ctrl+M";
+  position: fixed;
+  top: 0; left: 50%; transform: translateX(-50%);
+  z-index: 2147483000;
+  padding: .12rem .7rem;
+  border-radius: 0 0 var(--radius) var(--radius);
+  background: var(--warning); color: #fff;
+  font-size: .68rem; font-weight: 600; letter-spacing: .04em;
+  pointer-events: none;
+}
+@media print {
+  html.is-masked body::before { display: none; }
+}

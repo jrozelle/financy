@@ -1,5 +1,5 @@
 import { api } from './api.js';
-import { esc, fmt, fmtDate, destroyChart, getColors, chartBorderColor, parseLocaleNumber } from './utils.js';
+import { esc, fmt, fmtDate, destroyChart, getColors, chartBorderColor, parseLocaleNumber, fmtQty} from './utils.js';
 import { toast } from './dialogs.js';
 
 let _chart = null;
@@ -124,7 +124,7 @@ function _holdingHtml(h) {
       const pct = h.current_value ? ((p.market_value || 0) / h.current_value * 100).toFixed(1) : '—';
       return `<tr>
         <td style="font-size:12px">${esc(label)}</td>
-        <td class="num" style="font-size:12px">${new Intl.NumberFormat('fr-FR', {maximumFractionDigits:2}).format(p.quantity || 0)}</td>
+        <td class="num" style="font-size:12px">${fmtQty(p.quantity || 0, 2)}</td>
         <td class="num" style="font-size:12px">${fmt(p.market_value || 0)}</td>
         <td class="num" style="font-size:12px;color:var(--text-muted)">${pct}%</td>
       </tr>`;
@@ -146,7 +146,7 @@ function _holdingHtml(h) {
 
   return `
     <div class="isin-holding-card">
-      <div class="isin-holding-row"><span>Quantite cumulee</span><strong>${new Intl.NumberFormat('fr-FR', {maximumFractionDigits:4}).format(h.quantity)}</strong></div>
+      <div class="isin-holding-row"><span>Quantite cumulee</span><strong>${fmtQty(h.quantity, 4)}</strong></div>
       ${h.cost_basis != null && h.cost_basis > 0 ? `<div class="isin-holding-row"><span>Cout total</span><strong>${fmt(h.cost_basis)}</strong></div>` : ''}
       ${pru != null ? `<div class="isin-holding-row"><span>PRU</span><strong>${fmt(pru, 2)}</strong></div>` : ''}
       ${h.current_value != null ? `<div class="isin-holding-row"><span>Valorisation</span><strong>${fmt(h.current_value)}</strong></div>` : ''}
@@ -195,14 +195,14 @@ function _renderChart(data) {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: ctx => ` ${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 4 }).format(ctx.parsed.y)} ${data.currency || ''}`,
+            label: ctx => ` ${fmtQty(ctx.parsed.y, 4)} ${data.currency || ''}`,
           },
         },
       },
       scales: {
         y: {
           ticks: {
-            callback: v => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(v),
+            callback: v => fmtQty(v, 2),
             font: { size: 11 },
           },
           grid: { color: border },

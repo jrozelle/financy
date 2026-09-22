@@ -1,6 +1,6 @@
 import { S } from '../state.js';
 import { api } from '../api.js';
-import { esc, fmt, fmtDate, destroyChart, getColors, chartBorderColor, sortArr } from '../utils.js';
+import { esc, fmt, fmtDate, destroyChart, getColors, chartBorderColor, sortArr, fmtQty} from '../utils.js';
 import { openIsinPopover } from '../isin-popover.js';
 import { triggerPricesRefresh } from './tools.js';
 import { saveFilters, loadFilters } from '../filter-persist.js';
@@ -143,7 +143,7 @@ function _renderTable(lines) {
       <td>${esc(l.name || '—')}</td>
       <td>${esc((l.establishments || []).join(', ') || '—')}</td>
       <td>${esc(l.asset_class || '—')}</td>
-      <td class="num">${new Intl.NumberFormat('fr-FR').format(l.quantity)}</td>
+      <td class="num">${fmtQty(l.quantity)}</td>
       <td class="num">${l.avg_cost != null ? fmt(l.avg_cost) : '—'}</td>
       <td class="num">${l.last_price != null ? fmt(l.last_price) : '—'}</td>
       <td class="num">${fmt(l.market_value)}</td>
@@ -169,7 +169,7 @@ function _renderTable(lines) {
         <dl class="actif-card-metrics">
           <div><dt>Valo</dt><dd>${fmt(l.market_value)}</dd></div>
           <div><dt>PRU</dt><dd>${l.avg_cost != null ? fmt(l.avg_cost) : '—'}</dd></div>
-          <div><dt>Qté</dt><dd>${new Intl.NumberFormat('fr-FR').format(l.quantity)}</dd></div>
+          <div><dt>Qté</dt><dd>${fmtQty(l.quantity)}</dd></div>
           <div><dt>+/-</dt><dd class="${pnlCls}">${pnlStr}</dd></div>
           <div><dt>Poids</dt><dd>${l.weight_pct.toFixed(1)}%</dd></div>
           <div><dt>Cours</dt><dd>${l.last_price != null ? fmt(l.last_price) : '—'}</dd></div>

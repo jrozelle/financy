@@ -43,7 +43,9 @@ function setSort(col) {
   renderPerformance();
 }
 
-/** Nombre brut. `fmt` de utils.js ajoute toujours l'euro : inutilisable pour un %. */
+/** Nombre brut. `fmt` de utils.js ajoute toujours l'euro : inutilisable pour un %.
+ *  Non masque a dessein — sert aux compteurs (nombre d'arretes, de comptes), qui
+ *  ne revelent aucun montant. Les euros passent par `fmt`. */
 const n = (v, dec = 0) => v == null ? '—'
   : new Intl.NumberFormat('fr-FR', { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(v);
 
@@ -200,8 +202,8 @@ function renderList(d) {
       g.suspect_periods?.length ? `<span class="badge badge-30"
         title="${esc(g.suspect_periods.map(x =>
           `${fmtDate(x.from)} → ${fmtDate(x.to)} : ${pct(x.change)} inexpliqué (${
-            x.delta >= 0 ? '+' : '−'}${n(Math.abs(x.delta))} € de variation, ${
-            x.flux ? n(x.flux) + ' € de flux déclaré' : 'aucun flux déclaré'})`).join(' · '))}">écart inexpliqué</span>` : '',
+            x.delta >= 0 ? '+' : '−'}${fmt(Math.abs(x.delta))} de variation, ${
+            x.flux ? fmt(x.flux) + ' de flux déclaré' : 'aucun flux déclaré'})`).join(' · '))}">écart inexpliqué</span>` : '',
     ].join(' ');
     return `
       <div class="perf-item${V.focus === g.key ? ' is-focus' : ''}" data-key="${esc(g.key)}"

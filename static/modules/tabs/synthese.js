@@ -1,6 +1,6 @@
 import { S, catChart, histChart, syntheseEnvChart, syntheseHistChart,
          setCatChart, setHistChart, setSyntheseEnvChart, setSyntheseHistChart } from '../state.js';
-import { fmt, fmtDate, esc, kpiDelta, liqBadge, getColors, doughnutConfig, chartBorderColor, chartFamilyColors, destroyChart, parseLocaleNumber } from '../utils.js';
+import { fmt, fmtDate, esc, kpiDelta, liqBadge, getColors, doughnutConfig, chartBorderColor, chartFamilyColors, destroyChart, parseLocaleNumber, fmtAxis } from '../utils.js';
 import { api } from '../api.js';
 import { drilldownPositions } from '../drilldown.js';
 import { loadUserAlerts } from '../alerts.js';
@@ -242,7 +242,7 @@ function renderCatChart(byCat) {
             label: ctx => {
               const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
               const pct = ((ctx.parsed / total) * 100).toFixed(1);
-              return ` ${new Intl.NumberFormat('fr-FR').format(Math.round(ctx.parsed))}\u202f€  (${pct}%)`;
+              return ` ${fmt(ctx.parsed)}  (${pct}%)`;
             },
             afterLabel: () => 'Cliquer pour détailler',
           },
@@ -304,7 +304,7 @@ function renderEnvChart(posCache, owner) {
             label: ctx => {
               const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
               const pct = ((ctx.parsed / total) * 100).toFixed(1);
-              return ` ${new Intl.NumberFormat('fr-FR').format(Math.round(ctx.parsed))}\u202f€  (${pct}%)`;
+              return ` ${fmt(ctx.parsed)}  (${pct}%)`;
             },
             afterLabel: () => 'Cliquer pour détailler',
           },
@@ -368,14 +368,14 @@ export async function renderSyntheseHistory() {
           x: { type: 'linear', ticks: { font: { size: 11 }, maxRotation: 0, autoSkip: true, callback: _tsTick } },
           y: { stacked: true, ticks: {
             font: { size: 11 },
-            callback: v => new Intl.NumberFormat('fr-FR', { notation: 'compact' }).format(v) + '\u202f€'
+            callback: fmtAxis
           }},
         },
         plugins: {
           legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 8, boxWidth: 12 } },
           tooltip: { callbacks: {
             title: _tsTitle,
-            label: ctx => ` ${ctx.dataset.label} : ${new Intl.NumberFormat('fr-FR').format(ctx.parsed.y)}\u202f€`,
+            label: ctx => ` ${ctx.dataset.label} : ${fmt(ctx.parsed.y)}`,
             afterBody: () => 'Cliquer pour détailler',
           }},
         },
@@ -457,7 +457,7 @@ function renderHistChart(filterOwner = 'Famille') {
           callbacks: {
             title: _tsTitle,
             label: ctx =>
-              ` ${ctx.dataset.label} : ${new Intl.NumberFormat('fr-FR').format(Math.round(ctx.parsed.y))}\u202f€`,
+              ` ${ctx.dataset.label} : ${fmt(ctx.parsed.y)}`,
             afterBody: () => 'Cliquer pour voir la composition',
           },
         },
@@ -468,10 +468,7 @@ function renderHistChart(filterOwner = 'Famille') {
           ticks: { font: { size: 11 }, maxRotation: 0, autoSkip: true, callback: _tsTick },
         },
         y: {
-          ticks: {
-            callback: v =>
-              new Intl.NumberFormat('fr-FR', { notation: 'compact' }).format(v) + '\u202f€',
-          },
+          ticks: { callback: fmtAxis },
         },
       },
     },

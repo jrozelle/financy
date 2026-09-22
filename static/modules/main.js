@@ -1,4 +1,5 @@
 import { S } from './state.js';
+import { initMask, toggleMask, isMasked, onMaskChange } from './mask.js';
 import { fmtDate, treeFilter, treeExpandCollapse, treeToggleRow, esc } from './utils.js';
 import { api, buildSelects } from './api.js';
 import { closeModal, trapModalFocus, installModalScrollLock } from './dialogs.js';
@@ -29,6 +30,7 @@ import { initColumnPicker, reapplyColumns } from './column-picker.js';
 // ─── Init ─────────────────────────────────────────────────────────────────
 
 async function init() {
+  initMask();
   S.config = await api('GET', '/api/config');
   buildSelects();
   _buildGlobalOwnerFilter();
@@ -221,6 +223,8 @@ function _normalizeLegacyLayout() {
       ensureMenuButton('actifs-col-picker', 'Colonnes actifs'),
       section('Affichage'),
       ensureMenuButton('theme-toggle', 'Thème'),
+      ensureMenuButton('mask-toggle', 'Masquer les montants',
+                       { 'data-mask-toggle': '1', 'aria-pressed': String(isMasked()) }),
       ensureMenuButton('btn-keyboard-help', '? Raccourcis clavier'),
       section('Administration'),
       ensureMenuButton('btn-open-settings', '&#128273; Clés API'),
@@ -834,6 +838,29 @@ function initTheme() {
     const next = current === 'auto' ? 'light' : current === 'light' ? 'dark' : 'auto';
     localStorage.setItem('financy_theme', next);
     applyTheme(next);
+  });
+
+  document.getElementById('mask-toggle')?.addEventListener('click', toggleMask);
+
+  // Ctrl/Cmd + M : bascule sans ouvrir le menu, pour couper court quand
+  // quelqu'un arrive derriere l'ecran.
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'm') {
+      const cible = e.target;
+      const saisie = cible instanceof HTMLElement &&
+        (cible.tagName === 'INPUT' || cible.tagName === 'TEXTAREA' || cible.isContentEditable);
+      if (saisie) return;
+      e.preventDefault();
+      toggleMask();
+    }
+  });
+
+  // Les montants sont figes dans le HTML deja rendu et dans les graphes
+  // Chart.js : il faut redessiner l'onglet courant a chaque bascule.
+  onMaskChange(() => {
+    const btn = document.getElementById('mask-toggle');
+    if (btn) btn.textContent = isMasked() ? 'Afficher les montants' : 'Masquer les montants';
+    switchTab(S.currentTab || 'synthese', { pushHistory: false });
   });
 }
 
