@@ -61,12 +61,12 @@ export function renderEntities() {
       ? `<button class="btn-icon ent-histo" data-id="${e.id}" data-name="${esc(e.name)}" data-action="snap-hist">${snaps.length} valeur${snaps.length > 1 ? 's' : ''}<span>${fmtDate(lastSnap.date)}</span></button>`
       : '<span class="ent-note">—</span>';
     return `<tr>
-      <td><strong>${esc(e.name)}</strong>${nature ? `<div class="ent-note">${esc(nature)}</div>` : ''}${e.comment ? `<div class="ent-note">${esc(e.comment)}</div>` : ''}</td>
-      <td class="num">${fmt(e.gross_assets)}</td>
-      <td class="num ${e.debt > 0 ? 'neg' : ''}">${e.debt > 0 ? fmt(e.debt) : '—'}</td>
-      <td class="num ${e.net_assets < 0 ? 'neg' : 'pos'}">${fmt(e.net_assets)}</td>
+      <td class="ent-nom"><strong>${esc(e.name)}</strong>${nature ? `<div class="ent-note">${esc(nature)}</div>` : ''}${e.comment ? `<div class="ent-note">${esc(e.comment)}</div>` : ''}</td>
+      <td class="num ent-valeur" data-lib="Valeur">${fmt(e.gross_assets)}</td>
+      <td class="num ent-dette ${e.debt > 0 ? 'neg' : ''}" data-lib="Dette">${e.debt > 0 ? fmt(e.debt) : '—'}</td>
+      <td class="num ent-net ${e.net_assets < 0 ? 'neg' : 'pos'}">${fmt(e.net_assets)}</td>
       <td class="ent-detenteurs">${owners}${noLink}${repartition}</td>
-      <td>${snapCell}</td>
+      <td class="ent-c-histo">${snapCell}</td>
       <td class="ent-actions">
         <button class="btn-icon add" data-action="add-pos-entity" data-name="${esc(e.name)}">+ Position</button>
         <button class="btn-icon edit" data-id="${e.id}" data-action="edit-ent">Éditer</button>

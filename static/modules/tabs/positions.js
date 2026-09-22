@@ -182,11 +182,23 @@ function renderPositionsEmpty(msg) {
 }
 
 export function renderPosViewToggle() {
+  // En arbre, la barre du haut ne portait plus que ce bascule : une carte
+  // entiere pour deux boutons. Il rejoint la barre d'outils de l'arbre.
+  const isTree = S.positionsView === 'tree';
+  const place = toggle => {
+    const hote = isTree ? document.querySelector('#positions-tree-wrap .arbo-barre-outils')
+                        : document.querySelector('#tab-positions .header-actions');
+    if (hote && toggle.parentElement !== hote) {
+      isTree ? hote.appendChild(toggle) : hote.insertBefore(toggle, hote.firstChild);
+    }
+    document.querySelector('#tab-positions .positions-toolbar')?.classList.toggle('hidden', isTree);
+  };
   const existing = document.getElementById('pos-view-toggle');
   if (existing) {
     existing.querySelectorAll('.view-toggle-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.view === S.positionsView);
     });
+    place(existing);
     return;
   }
   const toggle = document.createElement('div');
@@ -202,8 +214,7 @@ export function renderPosViewToggle() {
     localStorage.setItem('financy_positionsView', S.positionsView);
     renderPositions();
   });
-  const headerActions = document.querySelector('#tab-positions .header-actions');
-  if (headerActions) headerActions.insertBefore(toggle, headerActions.firstChild);
+  place(toggle);
 }
 
 export function renderPositions() {

@@ -2268,9 +2268,7 @@ kbd {
   #tab-positions .data-table td:first-child,
   #tab-positions .data-table .mobile-sticky-col,
   #tab-flux .data-table th:first-child,
-  #tab-flux .data-table td:first-child,
-  #tab-entites .data-table th:first-child,
-  #tab-entites .data-table td:first-child {
+  #tab-flux .data-table td:first-child {
     position: sticky;
     left: 0;
     z-index: 2;
@@ -3602,6 +3600,11 @@ td.arbo-part > * { vertical-align: middle; }
   .page-head-tools #mask-btn span { display: none; }
   .page-head-tools #mask-btn { padding: 0 .5rem; }
   .page-head-tools #head-maj, .page-head-tools #head-ajouter { padding-inline: .6rem; }
+  .head-complement { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  /* Le bascule Tableau / Arborescence, dans la barre de l'arbre, a la taille
+     de ses voisins — les regles generales des onglets l'etirent a 42 px. */
+  #positions-tree-wrap #pos-view-toggle { display: inline-flex; padding: 2px; }
+  #positions-tree-wrap #pos-view-toggle .view-toggle-btn { width: auto !important; min-height: 30px; font-size: .76rem; padding: 0 .6rem; }
 }
 
 /* ── Courbe d'evolution (modules/courbe.js) ───────────────────────────── */
@@ -3709,3 +3712,36 @@ td.arbo-part > * { vertical-align: middle; }
 .ent-aide { max-width: 680px; }
 .ent-aide > summary { cursor: pointer; font-weight: 600; font-size: 14px; }
 .ent-aide > p { font-size: 13px; line-height: 1.7; margin-top: 10px; }
+@media (max-width: 640px) {
+  /* Une fiche par entite : le net en regard du nom, valeur et dette dessous,
+     puis les detenteurs et les actions. En tableau, sept colonnes pour 360 px
+     laissaient la dette, le net et les actions hors de l'ecran. */
+  #tab-entites .data-table thead { display: none; }
+  #tab-entites .data-table, #tab-entites .data-table tbody { display: block; min-width: 0; width: 100%; }
+  #tab-entites .card-table { overflow: visible; }
+  #entities-tbody tr {
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .25rem .75rem;
+    grid-template-areas: "nom nom net" "valeur valeur dette" "det det det" "histo actions actions";
+    padding: .75rem .9rem; border-bottom: 1px solid var(--border);
+  }
+  #entities-tbody td { display: block; padding: 0; border: 0; max-width: none; min-width: 0; }
+  #entities-tbody .ent-nom { grid-area: nom; }
+  #entities-tbody .ent-net { grid-area: net; font-weight: 600; }
+  #entities-tbody .ent-valeur { grid-area: valeur; text-align: left; }
+  #entities-tbody .ent-dette { grid-area: dette; }
+  #entities-tbody .ent-valeur, #entities-tbody .ent-dette { font-size: 12px; color: var(--text-muted); }
+  #entities-tbody .ent-dette.neg { color: var(--danger); }
+  #entities-tbody .ent-valeur::before, #entities-tbody .ent-dette::before { content: attr(data-lib) " "; }
+  #entities-tbody .ent-detenteurs { grid-area: det; }
+  #entities-tbody .ent-c-histo { grid-area: histo; }
+  #entities-tbody .ent-actions { grid-area: actions; align-self: center; text-align: right; }
+  #entities-tbody .empty-row { display: block; }
+}
+
+/* ── Import des releves (Flux) ────────────────────────────────────────── */
+.import-alerte {
+  margin: .6rem 0; padding: .55rem .75rem; border-radius: 8px; font-size: .8rem; line-height: 1.5;
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent);
+}
+.import-avert { display: block; font-size: .72rem; color: var(--warning); margin-top: 2px; }

@@ -254,7 +254,9 @@ function _majBoutonAjouter(tab) {
   const a = AJOUTS[tab];
   if (btn) {
     btn.classList.toggle('hidden', !a);
-    if (a) btn.textContent = a.libelle;
+    // « Ajouter » seul en mode etroit : le complement reste lu par les
+    // lecteurs d'ecran, et la barre du haut garde deux rangs.
+    if (a) btn.innerHTML = a.libelle.replace(/^Ajouter (.+)$/, 'Ajouter<span class="head-complement"> $1</span>');
   }
   if (maj) {
     maj.classList.toggle('hidden', !MISE_A_JOUR.has(tab));
