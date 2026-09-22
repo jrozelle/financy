@@ -189,17 +189,6 @@ function _normalizeLegacyLayout() {
       for (const [name, value] of Object.entries(attrs)) btn.setAttribute(name, value);
       return btn;
     };
-    const ensureTabButton = (tab, html) => {
-      let btn = menu.querySelector(`[data-tab="${tab}"]`);
-      if (!btn) {
-        btn = document.createElement('button');
-        btn.dataset.tab = tab;
-      }
-      btn.type = 'button';
-      btn.className = 'settings-item';
-      btn.innerHTML = html;
-      return btn;
-    };
     const section = label => {
       const el = document.createElement('div');
       el.className = 'settings-section-label';
@@ -228,9 +217,8 @@ function _normalizeLegacyLayout() {
       ensureMenuButton('btn-keyboard-help', '? Raccourcis clavier'),
       section('Administration'),
       ensureMenuButton('btn-open-settings', '&#128273; Clés API'),
-      ensureTabButton('referentiel', '&#9881; Référentiel'),
-      ensureTabButton('tools', '&#128295; Outils'),
-      ensureTabButton('import', '&#8645; Import / Export'),
+      // Referentiel, Outils et Import sont desormais dans la navigation, sous
+      // « Réglages » : un menu de reglages ne contient que ce qui se regle.
     ];
 
     if (logout) {
@@ -375,13 +363,63 @@ function _updateNavAddButton(tab) {
   btn.setAttribute('aria-label', btn.title);
 }
 
+
+// ─── Navigation par intention ─────────────────────────────────────────────
+// Dix onglets a plat ne disent pas ce qu'on vient faire, et le menu ⚙ servait
+// de rangement a trois d'entre eux — d'ou l'impression de fourre-tout. Les
+// onglets eux-memes ne changent pas : seul leur regroupement est nouveau.
+const GROUPES = [
+  { id: 'synthese',   label: 'Synthèse',   tabs: ['synthese'] },
+  { id: 'patrimoine', label: 'Patrimoine', tabs: ['positions', 'actifs', 'entites'] },
+  { id: 'suivi',      label: 'Suivi',      tabs: ['performance', 'flux'] },
+  { id: 'conseil',    label: 'Conseil',    tabs: ['conseil'] },
+  { id: 'reglages',   label: 'Réglages',   tabs: ['referentiel', 'import', 'tools'] },
+];
+
+const LABELS_ONGLET = {
+  synthese: 'Synthèse', positions: 'Positions', actifs: 'Actifs', entites: 'Entités',
+  performance: 'Performance', flux: 'Flux', conseil: 'Conseil',
+  referentiel: 'Référentiel', import: 'Import / Export', tools: 'Outils',
+};
+
+const groupeDe = tab => GROUPES.find(g => g.tabs.includes(tab)) || GROUPES[0];
+
+/** Sous-barre du groupe courant. Un groupe d'un seul onglet n'en affiche pas :
+ *  une barre a un element ne renseigne sur rien et vole une ligne. */
+function renderSubnav(tab) {
+  const barre = document.getElementById('subnav');
+  if (!barre) return;
+  const g = groupeDe(tab);
+  if (g.tabs.length < 2) {
+    barre.replaceChildren();
+    barre.classList.add('hidden');
+    return;
+  }
+  barre.classList.remove('hidden');
+  barre.replaceChildren(...g.tabs.map(t => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'subnav-btn' + (t === tab ? ' active' : '');
+    b.dataset.tab = t;
+    b.textContent = LABELS_ONGLET[t] || t;
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-selected', String(t === tab));
+    b.addEventListener('click', () => switchTab(t));
+    return b;
+  }));
+}
+
 export async function switchTab(tab, { pushHistory = true } = {}) {
   S.currentTab = tab;
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
   document.getElementById(`tab-${tab}`).classList.remove('hidden');
-  const mainBtn = document.querySelector(`.nav-tabs .tab-btn[data-tab="${tab}"]`);
+  // Le bouton de navbar porte soit l'onglet lui-meme, soit son groupe.
+  const g = groupeDe(tab);
+  const mainBtn = document.querySelector(`.nav-tabs [data-tab="${tab}"]`)
+               || document.querySelector(`.nav-tabs [data-group="${g.id}"]`);
   if (mainBtn) mainBtn.classList.add('active');
+  renderSubnav(tab);
 
   if (pushHistory && location.pathname !== `/${tab}`) {
     history.pushState({ tab }, '', `/${tab}`);
@@ -421,7 +459,15 @@ function wireEvents() {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       _closeNavDrawer();
-      switchTab(btn.dataset.tab);
+      // Un bouton de groupe ouvre son premier onglet, sauf si l'onglet courant
+      // appartient deja au groupe : on ne ramene pas l'utilisateur en arriere.
+      if (btn.dataset.group) {
+        const g = GROUPES.find(x => x.id === btn.dataset.group);
+        if (!g) return;
+        switchTab(g.tabs.includes(S.currentTab) ? S.currentTab : g.tabs[0]);
+      } else {
+        switchTab(btn.dataset.tab);
+      }
     });
   });
 
