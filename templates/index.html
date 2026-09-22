@@ -10,7 +10,43 @@
 </head>
 <body>
 
+  <!-- Rail de navigation. Construit a neuf plutot que derive de .navbar :
+       celle-ci est redefinie douze fois dans la feuille, et la surcharger
+       revenait a se battre contre douze regles invisibles. Les boutons portent
+       les memes data-tab / data-group, le JS existant les cable sans rien
+       savoir de ce changement. -->
+  <nav class="fin-rail" aria-label="Navigation principale">
+    <div class="fin-rail-brand"><span class="fin-rail-mark">F</span>Financy</div>
+
+    <button type="button" class="tab-btn fin-rail-item" data-tab="synthese">Synthèse</button>
+
+    <div class="fin-rail-group">Patrimoine</div>
+    <button type="button" class="tab-btn fin-rail-item" data-tab="positions">Positions</button>
+    <button type="button" class="tab-btn fin-rail-sub" data-tab="actifs">Actifs détenus</button>
+    <button type="button" class="tab-btn fin-rail-sub" data-tab="entites">Entités</button>
+
+    <div class="fin-rail-group">Suivi</div>
+    <button type="button" class="tab-btn fin-rail-item" data-tab="performance">Performance</button>
+    <button type="button" class="tab-btn fin-rail-sub" data-tab="flux">Flux et versements</button>
+
+    <button type="button" class="tab-btn fin-rail-item" data-tab="conseil">Conseil</button>
+
+    <div class="fin-rail-foot">
+      <div class="fin-rail-group">Réglages</div>
+      <button type="button" class="tab-btn fin-rail-sub" data-tab="referentiel">Référentiel</button>
+      <button type="button" class="tab-btn fin-rail-sub" data-tab="import">Import / Export</button>
+      <button type="button" class="tab-btn fin-rail-sub" data-tab="tools">Outils</button>
+    </div>
+  </nav>
+
   <nav class="navbar">
+    <!-- Titre de la page courante : la barre du haut ne portait plus que des
+         outils depuis que les onglets ont rejoint le rail, et commencait par
+         un grand vide. -->
+    <div class="fin-title">
+      <h1 id="page-title">Synthèse du patrimoine</h1>
+      <p id="page-sub"></p>
+    </div>
     <button class="navbar-toggle" id="navbar-toggle" aria-label="Menu" aria-expanded="false" aria-controls="nav-tabs">&#9776;</button>
     <div class="nav-brand">&#9670; Financy</div>
     <!-- Quatre destinations par intention, plus les reglages. Les onglets d'un

@@ -411,6 +411,27 @@ function renderSubnav(tab) {
   }));
 }
 
+
+/** Titre de la page courante, affiche dans la barre du haut.
+ *  Le sous-titre rappelle l'arrete consulte : sur une application patrimoniale,
+ *  « quelles donnees je regarde » est aussi important que « ou je suis ». */
+function majTitrePage(tab) {
+  const h = document.getElementById('page-title');
+  const p = document.getElementById('page-sub');
+  if (!h) return;
+  const TITRES = {
+    synthese: 'Synthèse du patrimoine', positions: 'Positions',
+    actifs: 'Actifs détenus', entites: 'Entités', performance: 'Performance',
+    flux: 'Flux et versements', conseil: 'Conseil patrimonial',
+    referentiel: 'Référentiel', import: 'Import / Export', tools: 'Outils',
+  };
+  h.textContent = TITRES[tab] || 'Financy';
+  if (!p) return;
+  const d = S.syntheseDate || S.positionsDate || S.dates?.[0];
+  const qui = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : 'Famille';
+  p.textContent = d ? `Arrêté du ${fmtDate(d)} · ${qui}` : '';
+}
+
 export async function switchTab(tab, { pushHistory = true } = {}) {
   S.currentTab = tab;
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
@@ -422,6 +443,7 @@ export async function switchTab(tab, { pushHistory = true } = {}) {
                || document.querySelector(`.nav-tabs [data-group="${g.id}"]`);
   if (mainBtn) mainBtn.classList.add('active');
   renderSubnav(tab);
+  majTitrePage(tab);
 
   if (pushHistory && location.pathname !== `/${tab}`) {
     history.pushState({ tab }, '', `/${tab}`);
