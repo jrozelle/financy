@@ -175,8 +175,6 @@
   --chart-7:  #4e8a8a;  --chart-8:  #7a8b3f;  --chart-9:  #57739c;
   --chart-10: #96628c;  --chart-11: #8d8f9a;
   --chart-border: #ffffff;
-  --chart-family: #111827;
-  --chart-family-bg: rgba(17,24,39,.06);
   color-scheme: light dark;
 }
 
@@ -210,8 +208,6 @@
   --chart-7:  #7ec9c0;  --chart-8:  #b4c27a;  --chart-9:  #8fa8ce;
   --chart-10: #c58fbb;  --chart-11: #9ba2af;
   --chart-border: #313244;
-  --chart-family: #cdd6f4;
-  --chart-family-bg: rgba(205,214,244,.08);
 }
 
 /* ── Reset ─────────────────────────────────────────────────────────────── */

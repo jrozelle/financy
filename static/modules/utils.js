@@ -244,10 +244,6 @@ function _ensureCache() {
   _colorCache = {
     palette: Array.from({ length: 11 }, (_, i) => s.getPropertyValue(`--chart-${i + 1}`).trim()),
     border:  s.getPropertyValue('--chart-border').trim() || '#fff',
-    family: {
-      line: s.getPropertyValue('--chart-family').trim() || '#111827',
-      bg:   s.getPropertyValue('--chart-family-bg').trim() || 'rgba(17,24,39,.06)',
-    },
   };
   _cachedTheme = theme;
 }
@@ -255,8 +251,6 @@ function _ensureCache() {
 export function getColors() { _ensureCache(); return _colorCache.palette; }
 
 export function chartBorderColor() { _ensureCache(); return _colorCache.border; }
-
-export function chartFamilyColors() { _ensureCache(); return _colorCache.family; }
 
 export const liqText = l => l ? `Liq. ${l}` : '';
 
