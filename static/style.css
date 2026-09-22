@@ -3529,26 +3529,10 @@ html.is-masked body::before {
   html.is-masked body::before { display: none; }
 }
 
-/* ── Sous-barre de navigation ─────────────────────────────────────────── */
+
 /* Les onglets d'un groupe. Affichee uniquement quand le groupe en compte
    plusieurs : une barre a un seul element vole une ligne sans rien apprendre. */
-.subnav {
-  display: flex; gap: .25rem; align-items: center;
-  padding: .3rem 1rem; background: var(--card);
-  border-bottom: 1px solid var(--border); overflow-x: auto;
-  scrollbar-width: none;
-}
-.subnav::-webkit-scrollbar { display: none; }
-.subnav-btn {
-  flex: 0 0 auto; background: none; border: 0; border-radius: 6px;
-  padding: .3rem .6rem; font: inherit; font-size: .84rem;
-  color: var(--text-muted); cursor: pointer;
-}
-.subnav-btn:hover { color: var(--text); background: var(--bg); }
-.subnav-btn.active { color: var(--primary); background: var(--primary-light); font-weight: 500; }
-.subnav-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
 @media (max-width: 700px) {
-  .subnav { padding-inline: .6rem; }
 }
 
 /* ── Zone « À traiter » ───────────────────────────────────────────────── */
@@ -3676,7 +3660,6 @@ body { padding-left: var(--rail-w); }
 .navbar { left: var(--rail-w) !important; }
 /* Les onglets vivent dans le rail : la barre du haut ne garde que les outils. */
 .navbar .nav-tabs, .navbar .nav-brand, .navbar .navbar-toggle { display: none !important; }
-.subnav { display: none !important; }
 
 @media (max-width: 780px) {
   /* Sous 900 px le rail passe en barre horizontale : garder une colonne de

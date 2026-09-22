@@ -393,32 +393,6 @@ const LABELS_ONGLET = {
   referentiel: 'Référentiel', import: 'Import / Export', tools: 'Outils',
 };
 
-const groupeDe = tab => GROUPES.find(g => g.tabs.includes(tab)) || GROUPES[0];
-
-/** Sous-barre du groupe courant. Un groupe d'un seul onglet n'en affiche pas :
- *  une barre a un element ne renseigne sur rien et vole une ligne. */
-function renderSubnav(tab) {
-  const barre = document.getElementById('subnav');
-  if (!barre) return;
-  const g = groupeDe(tab);
-  if (g.tabs.length < 2) {
-    barre.replaceChildren();
-    barre.classList.add('hidden');
-    return;
-  }
-  barre.classList.remove('hidden');
-  barre.replaceChildren(...g.tabs.map(t => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'subnav-btn' + (t === tab ? ' active' : '');
-    b.dataset.tab = t;
-    b.textContent = LABELS_ONGLET[t] || t;
-    b.setAttribute('role', 'tab');
-    b.setAttribute('aria-selected', String(t === tab));
-    b.addEventListener('click', () => switchTab(t));
-    return b;
-  }));
-}
 
 
 /** Titre de la page courante, affiche dans la barre du haut.
@@ -471,12 +445,8 @@ export async function switchTab(tab, { pushHistory = true } = {}) {
   document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
   document.getElementById(`tab-${tab}`).classList.remove('hidden');
-  // Le bouton de navbar porte soit l'onglet lui-meme, soit son groupe.
-  const g = groupeDe(tab);
-  const mainBtn = document.querySelector(`.nav-tabs [data-tab="${tab}"]`)
-               || document.querySelector(`.nav-tabs [data-group="${g.id}"]`);
-  if (mainBtn) mainBtn.classList.add('active');
-  renderSubnav(tab);
+  // Le rail marque l'entree courante ; il porte les memes `data-tab`.
+  document.querySelector(`.fin-rail [data-tab="${tab}"]`)?.classList.add('active');
   majTitrePage(tab);
 
   if (pushHistory && location.pathname !== `/${tab}`) {
