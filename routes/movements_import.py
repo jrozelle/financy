@@ -196,6 +196,11 @@ def _read(files, owner, establishment=None, owners=None):
     return items, rejets
 
 
+def _date_fr(iso):
+    """AAAA-MM-JJ -> JJ/MM/AAAA, pour un texte affiche tel quel."""
+    return f'{iso[8:10]}/{iso[5:7]}/{iso[:4]}' if iso and len(iso) >= 10 else (iso or '')
+
+
 @movements_bp.route('/api/import/movements', methods=['POST'])
 @login_required
 @csrf_protect
@@ -255,9 +260,9 @@ def import_movements():
         i['corrects'] = match['id'] if match and match.get('provisoire') else None
         i['duplicate'] = bool(match) and not i['corrects']
         i['duplicate_reason'] = (
-            f"flux déjà enregistré le {match['date']}" if i['duplicate'] else None)
+            f"flux déjà enregistré le {_date_fr(match['date'])}" if i['duplicate'] else None)
         if i['corrects']:
-            i['correction_reason'] = f"corrige le flux provisoire du {match['date']}"
+            i['correction_reason'] = f"corrige le flux provisoire du {_date_fr(match['date'])}"
         if not i['duplicate']:
             vus.setdefault(sig, []).append(
                 {'id': None, 'date': i['date'], 'provisoire': False})

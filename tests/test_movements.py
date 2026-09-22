@@ -464,6 +464,25 @@ class TestMontantsRecolles:
                 {'text': '130,19', 'x0': 493.8, 'x1': 513.1, 'top': 10.0}]
         assert _montants(line) == [(130.19, 513.1)]
 
+    def test_groupe_de_milliers_espace_large_recolle(self):
+        """Une police a chasse fixe espace plus large que 3 pt. « 000,00 » ne peut
+        pas etre un montant a lui seul : c'est la fin d'un nombre coupe, qu'on
+        recolle meme au-dela de l'ecart ordinaire."""
+        line = [{'text': '1', 'x0': 550.0, 'x1': 554.2, 'top': 10.0},
+                {'text': '000,00', 'x0': 558.4, 'x1': 583.6, 'top': 10.0}]
+        assert _montants(line) == [(1000.0, 583.6)]
+
+    def test_groupe_orphelin_n_est_pas_lu_a_zero(self):
+        """Sans groupe a recoller, « 000,00 » est ecarte, pas lu 0,00 : un montant
+        faux mais plausible entrerait en base sans rien signaler."""
+        line = [{'text': 'Virement', 'x0': 300.0, 'x1': 340.0, 'top': 10.0},
+                {'text': '000,00', 'x0': 558.4, 'x1': 583.6, 'top': 10.0}]
+        assert _montants(line) == []
+
+    def test_zero_virgule_reste_un_montant(self):
+        line = [{'text': '0,50', 'x0': 560.0, 'x1': 578.3, 'top': 10.0}]
+        assert _montants(line) == [(0.5, 578.3)]
+
     def test_montant_deja_complet_inchange(self):
         """Le gabarit 2026 groupe par des points : le jeton arrive entier."""
         line = [{'text': '100.000,00', 'x0': 438.6, 'x1': 479.3, 'top': 10.0}]

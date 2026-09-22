@@ -275,7 +275,7 @@ function _defaultOwner() {
 }
 
 function _owner() {
-  return document.getElementById('flux-import-owner')?.value || _defaultOwner();
+  return document.getElementById('flux-import-owner')?.value || _staged?.owner || _defaultOwner();
 }
 
 /** Etablissement propose : celui que le parseur a devine s'il figure deja dans
@@ -285,11 +285,27 @@ function _defaultEtab(summary) {
   const known = summary?.known_establishments || [];
   const devine = _staged?.data?.transactions?.[0]?.establishment
               || _staged?.data?.flux?.[0]?.establishment;
-  return known.includes(devine) ? devine : (known[0] || '');
+  if (known.includes(devine)) return devine;
+  // « BoursoBank » dans le document, « Boursorama » dans les positions : meme
+  // racine, meme banque. Le premier connu par ordre alphabetique, lui, n'avait
+  // aucun rapport (« Biens personnels »).
+  const racine = x => (x || '').toLowerCase().normalize('NFD').replace(/[^a-z]/g, '').slice(0, 5);
+  return known.find(k => devine && racine(k) === racine(devine)) || '';
+}
+
+/** '' : l'etablissement lu dans chaque document. */
+function _etabsLus(d) {
+  return [...new Set([...d.transactions, ...d.flux].map(x => x.establishment).filter(Boolean))];
+}
+
+function _etabsDuDocumentConnus(d) {
+  const connus = new Set(d.summary?.known_establishments || []);
+  return [...d.transactions, ...d.flux].every(x => !x.establishment || connus.has(x.establishment));
 }
 
 function _etab() {
-  return document.getElementById('flux-import-etab')?.value || '';
+  const sel = document.getElementById('flux-import-etab');
+  return sel ? sel.value : (_staged?.etab ?? '');
 }
 
 async function _send(files, step, owner = null, etab = null) {
@@ -308,14 +324,28 @@ async function _send(files, step, owner = null, etab = null) {
   return data;
 }
 
-async function _preview(files) {
+/** L'apercu se calcule avec le titulaire et l'etablissement qui seront
+ *  ecrits : les doublons et les flux provisoires a corriger en dependent. Il
+ *  se relance donc a chaque changement de ces deux listes — sans quoi le
+ *  compte du bouton ne disait pas ce qui serait enregistre. */
+async function _preview(files, owner = _defaultOwner(), etab = '') {
   const pdfs = files.filter(f => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
   if (!pdfs.length) { toast('Déposez des fichiers PDF', 'error'); return; }
   const zone = document.getElementById('flux-drop');
   zone.classList.add('is-busy');
   try {
-    const d = await _send(pdfs, 'preview', _defaultOwner(), '');
-    _staged = { files: pdfs, data: d };
+    const d = await _send(pdfs, 'preview', owner, etab);
+    // Ce que dit le document se lit sur l'apercu sans etablissement impose ;
+    // un apercu relance le garde.
+    const doc = etab ? _staged?.doc : { connus: _etabsDuDocumentConnus(d), lus: _etabsLus(d) };
+    _staged = { files: pdfs, data: d, owner, etab, doc };
+    // Un etablissement lu dans un document mais absent des positions (une
+    // variante d'orthographe) creerait un compte fantome : on impose alors le
+    // plus probable des etablissements connus, et l'apercu le reflete.
+    if (!etab && !doc.connus) {
+      const devine = _defaultEtab(d.summary);
+      if (devine) return _preview(pdfs, owner, devine);
+    }
     _renderReport(d, pdfs.length);
   } catch (e) {
     toast(e.message, 'error');
@@ -338,21 +368,30 @@ function _renderReport(d, nfiles) {
     ...d.flux.map(f => ({
       dup: f.duplicate, reason: f.duplicate_reason, date: f.date,
       kind: f.flux_type, label: f.label || '', amount: f.net_eur, warn: f.warnings,
+      corrige: f.corrects ? f.correction_reason : null,
     })),
   ].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
-  const total = s.transactions + s.flux;
+  const total = s.transactions + s.flux + (s.corrections || 0);
+  const orphelines = s.unresolved_envelopes || [];
   host.className = 'import-report';
   host.innerHTML = `
     <h3>${nfiles} fichier${nfiles > 1 ? 's' : ''} lu${nfiles > 1 ? 's' : ''}</h3>
     <div class="import-tally">
       <span><b>${s.transactions}</b> opération${s.transactions > 1 ? 's' : ''} de titres</span>
       <span><b>${s.flux}</b> flux de trésorerie</span>
+      ${s.corrections ? `<span><b>${s.corrections}</b> flux provisoire${s.corrections > 1 ? 's' : ''} attesté${s.corrections > 1 ? 's' : ''}, redaté${s.corrections > 1 ? 's' : ''}</span>` : ''}
       ${s.duplicates ? `<span class="muted"><b>${s.duplicates}</b> déjà enregistré${s.duplicates > 1 ? 's' : ''}, ignoré${s.duplicates > 1 ? 's' : ''}</span>` : ''}
       ${s.warnings ? `<span class="negative"><b>${s.warnings}</b> à vérifier</span>` : ''}
       ${s.unknown_isins?.length ? `<span><b>${s.unknown_isins.length}</b> valeur${s.unknown_isins.length > 1 ? 's' : ''} à créer</span>` : ''}
       ${s.rejected?.length ? `<span class="negative"><b>${s.rejected.length}</b> non reconnu${s.rejected.length > 1 ? 's' : ''}</span>` : ''}
     </div>
+    ${!_staged.doc?.connus ? `<p class="import-alerte">Le document nomme ${_staged.doc.lus.map(e => `« ${esc(e)} »`).join(', ') || 'un établissement'},
+      absent de vos positions. ${_staged.etab ? `Rattaché à <b>${esc(_staged.etab)}</b> : changez-le ci-dessous s'il ne correspond pas.`
+        : 'Choisissez ci-dessous l’établissement de vos positions qui lui correspond.'}</p>` : ''}
+    ${orphelines.length ? `<p class="import-alerte">${orphelines.length > 1 ? 'Enveloppes' : 'Enveloppe'} sans compte correspondant dans vos positions :
+      <b>${orphelines.map(esc).join(', ')}</b>. Les flux seraient enregistrés sans compte à neutraliser, et le
+      rendement de ce compte ne les verrait pas. Créez le compte, ou vérifiez l'orthographe, avant d'enregistrer.</p>` : ''}
     ${s.rejected?.length ? `<div class="import-lines">${s.rejected.map(r =>
       `<div class="import-line"><span>—</span><span class="negative">rejeté</span>
        <span>${esc(r.file)} — ${esc(r.reason)}</span><span></span></div>`).join('')}</div>` : ''}
@@ -361,30 +400,36 @@ function _renderReport(d, nfiles) {
         <span>${_fmtDate(l.date)}</span>
         <span>${esc(l.kind || '')}</span>
         <span>${esc(l.label)}${l.dup ? ` <span class="badge badge-blk">${esc(l.reason || 'doublon')}</span>` : ''}${
-          l.warn?.length ? ` <span class="badge badge-30" title="${esc(l.warn.join(' · '))}">à vérifier</span>` : ''}</span>
+          l.corrige ? ` <span class="badge badge-j27">${esc(l.corrige)}</span>` : ''}${
+          l.warn?.length ? ` <span class="badge badge-30">à vérifier</span><span class="import-avert">${esc(l.warn.join(' · '))}</span>` : ''}</span>
         <span class="num">${_eur(l.amount)}</span>
       </div>`).join('')}</div>` : ''}
     <div class="import-actions">
-      <button class="btn btn-primary" id="flux-import-go" ${total ? '' : 'disabled'}>
+      <button class="btn btn-primary" id="flux-import-go" ${total && (_staged.doc?.connus || _staged.etab) ? '' : 'disabled'}>
         ${total ? `Enregistrer ${total} mouvement${total > 1 ? 's' : ''}` : 'Rien à enregistrer'}</button>
       <button class="btn" id="flux-import-cancel">Annuler</button>
       <label class="import-owner">Au nom de
         <select id="flux-import-owner" class="filter-select">
           ${_ownerChoices().map(o =>
-            `<option value="${esc(o)}"${o === _defaultOwner() ? ' selected' : ''}>${esc(o)}</option>`).join('')}
+            `<option value="${esc(o)}"${o === _staged.owner ? ' selected' : ''}>${esc(o)}</option>`).join('')}
         </select>
       </label>
       <label class="import-owner">Établissement
-        <select id="flux-import-etab" class="filter-select"
-          title="Doit correspondre à l'orthographe employée dans vos positions : une variante créerait un compte distinct, et les versements ne neutraliseraient plus le rendement.">
+        <select id="flux-import-etab" class="filter-select">
+          ${_staged.doc?.connus ? `<option value=""${_staged.etab ? '' : ' selected'}>Selon le document</option>`
+            : `<option value=""${_staged.etab ? '' : ' selected'} disabled>Choisir…</option>`}
           ${(s.known_establishments || []).map(e =>
-            `<option value="${esc(e)}"${e === _defaultEtab(s) ? ' selected' : ''}>${esc(e)}</option>`).join('')}
+            `<option value="${esc(e)}"${e === _staged.etab ? ' selected' : ''}>${esc(e)}</option>`).join('')}
         </select>
       </label>
     </div>`;
   host.classList.remove('hidden');
   document.getElementById('flux-import-cancel').addEventListener('click', _clear);
   document.getElementById('flux-import-go').addEventListener('click', _commit);
+  const relancer = () => _preview(_staged.files,
+    document.getElementById('flux-import-owner').value, document.getElementById('flux-import-etab').value);
+  document.getElementById('flux-import-owner').addEventListener('change', relancer);
+  document.getElementById('flux-import-etab').addEventListener('change', relancer);
 }
 
 function _clear() {
@@ -401,7 +446,8 @@ async function _commit() {
   try {
     const d = await _send(_staged.files, 'commit', _owner(), _etab());
     const i = d.inserted;
-    toast(`${i.flux} flux et ${i.transactions} opération${i.transactions > 1 ? 's' : ''} enregistré${i.transactions > 1 ? 's' : ''}`, 'success');
+    const corr = i.corrections ? `, ${i.corrections} flux provisoire${i.corrections > 1 ? 's' : ''} redaté${i.corrections > 1 ? 's' : ''}` : '';
+    toast(`${i.flux} flux et ${i.transactions} opération${i.transactions > 1 ? 's' : ''} enregistré${i.transactions > 1 ? 's' : ''}${corr}`, 'success');
     _clear();
     await loadFlux();
   } catch (e) {

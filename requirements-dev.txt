@@ -5,3 +5,4 @@
 -r requirements.txt
 pytest>=8.0
 fpdf2>=2.7,<3.0        # tests/test_pdf_parser.py fabrique ses PDF
+reportlab>=4.0,<6.0     # tests/test_movements.py fabrique ses releves

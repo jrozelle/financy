@@ -362,6 +362,11 @@ LINE_TOL_PT = 2.5
 # separateur de milliers est une espace, et `extract_words` coupe donc
 # "1 000,00" en "1" et "000,00". Mesure : 1,7 pt entre les deux.
 WORD_GAP_PT = 3.0
+# Un jeton qui commence par un zero suivi d'un chiffre (« 000,00 ») n'est pas un
+# montant a lui seul : c'est la fin d'un nombre coupe. On le recolle jusqu'a cet
+# ecart — une chasse fixe espace plus large que 3 pt —, et sinon on l'ecarte.
+WORD_GAP_GROUPE_PT = 6.0
+_FIN_DE_NOMBRE = re.compile(r'0\d')
 
 
 def _split_columns(rights):
@@ -396,10 +401,15 @@ def _montants(line):
         if not _AMOUNT.fullmatch(mot['text'].replace('\u00a0', ' ')):
             continue
         deb = i
-        while (deb > 0 and _GROUPE_MONTANT.fullmatch(line[deb - 1]['text'])
-               and float(line[deb]['x0']) - float(line[deb - 1]['x1']) <= WORD_GAP_PT):
+        while deb > 0 and _GROUPE_MONTANT.fullmatch(line[deb - 1]['text']):
+            ecart = float(line[deb]['x0']) - float(line[deb - 1]['x1'])
+            limite = WORD_GAP_GROUPE_PT if _FIN_DE_NOMBRE.match(line[deb]['text']) else WORD_GAP_PT
+            if ecart > limite:
+                break
             deb -= 1
         texte = ' '.join(w['text'] for w in line[deb:i + 1])
+        if deb == i and _FIN_DE_NOMBRE.match(texte):
+            continue
         if _AMOUNT.fullmatch(texte):
             out.append((_num(texte), float(mot['x1'])))
     return out
