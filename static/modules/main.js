@@ -34,7 +34,7 @@ import { initColumnPicker, reapplyColumns } from './column-picker.js';
 async function init() {
   initMask();
   wireTodo(switchTab);   // la zone « À traiter » renvoie vers l'onglet concerne
-  wireReglages(switchTab);
+  wireReglages(chargerEcranReglage);
   S.config = await api('GET', '/api/config');
   buildSelects();
   _buildGlobalOwnerFilter();
@@ -444,6 +444,17 @@ function majTitrePage(tab) {
   bouts.push(qui);
   if (nb > 1) bouts.push(`${nb} titulaires`);
   p.textContent = bouts.join(' · ');
+}
+
+
+/** Charge le contenu d'un ecran de reglages, sans rien changer a la navigation.
+ *  `switchTab` ferait bien plus : masquer les autres onglets — dont celui qu'on
+ *  voit derriere la fenetre —, changer le titre de page et deplacer la marque
+ *  du rail. Ouvrir une fenetre n'est pas naviguer. */
+export async function chargerEcranReglage(tab) {
+  if (tab === 'referentiel') await loadReferential();
+  if (tab === 'tools')       { await loadTimeline(); loadSchedulerStatus(); }
+  // « import » n'a pas de chargement : son ecran est entierement statique.
 }
 
 export async function switchTab(tab, { pushHistory = true } = {}) {

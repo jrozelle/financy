@@ -7,18 +7,21 @@
  * ces ecrans deviennent des onglets — le rail ne garde que ce qu'on consulte.
  *
  * Les ecrans existants ne sont pas reecrits : leurs noeuds sont DEPLACES dans
- * la fenetre. Identifiants et ecouteurs survivent, `switchTab` continue de les
- * charger comme avant, et l'onglet reste accessible par URL.
+ * la fenetre. Identifiants et ecouteurs survivent, tout le code qui les cible
+ * continue de fonctionner.
+ *
+ * Ouvrir un onglet ici ne NAVIGUE PAS : le chargeur injecte remplit l'ecran
+ * demande sans toucher a l'onglet courant. Passer par `switchTab` masquait
+ * l'ecran visible derriere la fenetre et lui volait son titre de page.
  */
-import { S } from './state.js';
 
 const ECRANS = ['referentiel', 'import', 'tools'];
 
 let _ouvert = false;
-let _charger = null;      // switchTab, injecte : reglages.js ne connait pas main.js
+let _charger = null;      // injecte : reglages.js ne connait pas main.js
 
-export function wireReglages(switchTab) {
-  _charger = switchTab;
+export function wireReglages(chargerEcran) {
+  _charger = chargerEcran;
   const modal = document.getElementById('reglages-modal');
   if (!modal) return;
 
@@ -69,7 +72,7 @@ export function ouvrir(quoi = 'preferences') {
   ECRANS.forEach(t => {
     document.getElementById(`tab-${t}`)?.classList.toggle('hidden', t !== quoi);
   });
-  if (!surPrefs) _charger?.(quoi, { pushHistory: false });
+  if (!surPrefs) _charger?.(quoi);
 
   modal.querySelector(`[data-reglage="${quoi}"]`)?.focus();
 }
@@ -77,9 +80,7 @@ export function ouvrir(quoi = 'preferences') {
 function fermer() {
   document.getElementById('reglages-modal')?.classList.add('hidden');
   _ouvert = false;
-  // L'ecran de fond reprend la main : sans cela, l'onglet reste marque comme
-  // courant alors que la fenetre est refermee.
-  if (S.currentTab && !ECRANS.includes(S.currentTab)) _charger?.(S.currentTab, { pushHistory: false });
+  // Rien a restaurer : l'ecran de fond n'a jamais ete quitte.
 }
 
 function deplacer(id, hote) {
