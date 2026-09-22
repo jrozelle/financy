@@ -4158,3 +4158,38 @@ body { padding-top: 0 !important; }
   .reglages-nav h2 { display: none; }
   .reglages-onglet { width: auto; white-space: nowrap; }
 }
+
+/* ── « Vos comptes » ──────────────────────────────────────────────────── */
+/* Valeur, apports, frais et rendement cote a cote : ces quatre chiffres
+   existaient separement et ne se lisaient jamais ensemble. */
+[data-carte="comptes"] { order: 9; grid-column: span 12; }
+[data-carte="entites"] { order: 10; }
+.comptes-wrap { overflow-x: auto; }
+.comptes { width: 100%; border-collapse: collapse; }
+.comptes th, .comptes td {
+  padding: calc(.5rem * var(--d)) .4rem; border-bottom: 1px solid var(--border);
+  text-align: right; font-size: .82rem;
+}
+.comptes th {
+  font-size: .62rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+.comptes th:first-child, .comptes td:first-child { text-align: left; min-width: 220px; }
+.comptes tbody tr:last-child td { border-bottom: 0; }
+.comptes tfoot td {
+  border-top: 1px solid var(--text-muted); border-bottom: 0;
+  font-weight: 600; padding-top: .55rem;
+}
+.compte-n { font-size: .84rem; }
+.taux {
+  display: inline-block; padding: .05rem .45rem; border-radius: 5px;
+  font-size: .74rem; font-weight: 500; font-variant-numeric: tabular-nums;
+}
+.taux--hausse { background: var(--success-light); color: var(--success); }
+.taux--baisse { background: var(--danger-light); color: var(--danger); }
+.taux--neutre { background: var(--bg); color: var(--text-muted); font-weight: 400; }
+.link-carte {
+  background: none; border: 0; padding: 0; font: inherit; font-size: .76rem;
+  color: var(--primary); font-weight: 500; cursor: pointer; white-space: nowrap;
+}
+.link-carte:hover { text-decoration: underline; }

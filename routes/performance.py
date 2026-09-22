@@ -335,6 +335,23 @@ def get_performance():
                 g_flux.append((f['date'], amt * share))
                 approx += 1
 
+        # Frais du groupe. Ils ne sont pas des flux EXTERNES — ils amputent le
+        # rendement au lieu d'en sortir — donc `_flux_signed` les rend a zero et
+        # ils n'apparaissaient nulle part. Or « ce que ce compte me coûte » est
+        # une des questions qu'on se pose devant un contrat.
+        g_fees = 0.0
+        for f in flux:
+            if (f.get('type') or '') != 'Frais':
+                continue
+            f_env = f.get('envelope') or 'Autre'
+            if not any(a[0] == f_env and (grouping == 'envelope' or a[2] == f.get('owner'))
+                       for a in members):
+                continue
+            f_etab = f.get('establishment') or None
+            if grouping != 'envelope' and f_etab and not any(a[1] == f_etab for a in members):
+                continue
+            g_fees += abs(f.get('amount') or 0)
+
         comp = _composition_flux(g_dates, mvals) if len(members) > 1 else []
         serie, cumul, days, gaps, suspects = _chain(g_dates, g_values, g_flux + comp)
 
@@ -386,6 +403,7 @@ def get_performance():
             'flux_count': len(window),
             'flux_net': round(sum(a for _, a in window), 2),
             'flux_approx': approx,
+            'fees': round(g_fees, 2),
         })
     out.sort(key=lambda e: (e['status'] != 'ok', -e['value']))
 
