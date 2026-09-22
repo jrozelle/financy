@@ -15,6 +15,9 @@ import { S } from '../state.js';
 import { api } from '../api.js';
 import { fmt, esc } from '../utils.js';
 
+/** Part minimale du patrimoine couverte pour que la carte ait un sens. */
+const COUVERTURE_MIN = 0.5;
+
 export async function loadFiscalite() {
   const carte = document.getElementById('fiscalite-card');
   if (!carte) return;
@@ -28,6 +31,14 @@ export async function loadFiscalite() {
   } catch { carte.style.display = 'none'; return; }
 
   if (!d || !d.brut) { carte.style.display = 'none'; return; }
+
+  // Sous ce seuil, l'estimation ne porte pas sur assez du patrimoine pour
+  // apprendre quoi que ce soit : mieux vaut ne rien montrer qu'un montant
+  // qu'on lirait comme un total. La carte reapparait d'elle-meme des que les
+  // versements ou les prix de revient sont saisis.
+  const couverture = (d.brut - (d.valeur_ecartee || 0)) / d.brut;
+  if (couverture < COUVERTURE_MIN) { carte.style.display = 'none'; return; }
+
   carte.style.display = '';
   carte.innerHTML = rendu(d);
   cabler(carte);

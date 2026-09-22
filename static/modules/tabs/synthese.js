@@ -131,10 +131,25 @@ export function renderSynthese() {
 
   // Sous-titres : un montant seul ne se situe pas. « 530 000 € » ne dit pas
   // ce qu'il contient ; « dont 280 000 € d'immobilier » le qualifie d'un mot.
+  // Ces deux valeurs suivent le titulaire choisi, comme le chiffre qu'elles
+  // qualifient. Les prendre au niveau famille faisait lire « dont 890 000 EUR
+  // d'immobilier » sous des actifs bruts de 950 000 EUR pour une seule
+  // personne — soit 94 %, alors que le montant etait celui des quatre.
   const macro = syn.totals_by_macro || {};
-  const immo = (macro['Patrimoine immobilier'] || {}).gross || 0;
-  const liq = syn.mobilizable_by_liquidity || {};
-  const court = (liq['J0–J1'] || 0);
+  const immoMacro = macro['Patrimoine immobilier'] || {};
+  const immo = isFamily ? (immoMacro.gross || 0)
+                        : (immoMacro.by_owner?.[owner]?.gross || 0);
+
+  const liqFiltered = isFamily
+    ? (mobilizable_by_liquidity || {})
+    : (() => {
+        const pos = S.synthese._positions_cache?.[owner];
+        if (!pos) return mobilizable_by_liquidity || {};
+        const byLiq = {};
+        for (const p of pos) byLiq[p.liquidity] = (byLiq[p.liquidity] || 0) + (p.mobilizable_value || 0);
+        return byLiq;
+      })();
+  const court = liqFiltered['J0–J1'] || 0;
   const sous = (id, txt) => {
     const el = document.getElementById(id);
     if (el) el.innerHTML = txt;
@@ -160,16 +175,6 @@ export function renderSynthese() {
           cat, { net: v.by_owner?.[owner] || 0, by_owner: v.by_owner }
         ]).filter(([, v]) => v.net > 0)
       );
-
-  const liqFiltered = isFamily
-    ? mobilizable_by_liquidity
-    : (() => {
-        const pos = S.synthese._positions_cache?.[owner];
-        if (!pos) return mobilizable_by_liquidity;
-        const byLiq = {};
-        for (const p of pos) byLiq[p.liquidity] = (byLiq[p.liquidity] || 0) + (p.mobilizable_value || 0);
-        return byLiq;
-      })();
 
   renderRepartition();
   loadContribution();

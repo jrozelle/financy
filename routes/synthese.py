@@ -99,10 +99,18 @@ def get_synthese():
     totals_by_envelope = {}
     for p in positions:
         env = p.get('envelope') or 'Sans enveloppe'
-        t = totals_by_envelope.setdefault(env, {'gross': 0.0, 'net': 0.0, 'debt': 0.0})
+        t = totals_by_envelope.setdefault(
+            env, {'gross': 0.0, 'net': 0.0, 'debt': 0.0, 'by_owner': {}})
         t['gross'] += p['gross_attributed'] or 0
         t['net']   += p['net_attributed'] or 0
         t['debt']  += p['debt_attributed'] or 0
+        # Le detail par titulaire manquait ici seul, si bien que la carte
+        # Repartition affichait les totaux de la famille sous un filtre
+        # nominatif : elle n'avait rien d'autre a lire.
+        ob = t['by_owner'].setdefault(p['owner'], {'gross': 0.0, 'net': 0.0, 'debt': 0.0})
+        ob['gross'] += p['gross_attributed'] or 0
+        ob['net']   += p['net_attributed'] or 0
+        ob['debt']  += p['debt_attributed'] or 0
 
     # Synthese en 3 poches patrimoniales, brut (gross_attributed) et net
     # (net_attributed = brut - dette attribuee), avec detail par owner.
@@ -113,9 +121,10 @@ def get_synthese():
         m['gross'] += p['gross_attributed']
         m['net']   += p['net_attributed']
         m['debt']  += p['debt_attributed']
-        ob = m['by_owner'].setdefault(p['owner'], {'gross': 0.0, 'net': 0.0})
+        ob = m['by_owner'].setdefault(p['owner'], {'gross': 0.0, 'net': 0.0, 'debt': 0.0})
         ob['gross'] += p['gross_attributed']
         ob['net']   += p['net_attributed']
+        ob['debt']  += p['debt_attributed']
 
     mobilizable_by_liquidity = {
         liq: sum(p['mobilizable_value'] for p in positions if p['liquidity'] == liq)

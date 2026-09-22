@@ -232,6 +232,11 @@ def _chain(dates, values, flux):
         weighted = sum(amt * ((span - (fd - t0).days) / span) for fd, amt in period)
         base = v0 + weighted
         if base <= 0:
+            # Des retraits ponderes qui depassent le capital de depart : la
+            # sous-periode n'a pas de base de calcul. Elle etait ecartee sans
+            # etre comptee, alors qu'une valeur nulle l'est ; un trou ne doit
+            # pas dependre de la raison pour laquelle il s'est forme.
+            gaps += 1
             continue
         if start is None:
             start = d0

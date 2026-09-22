@@ -372,7 +372,9 @@ function majTitrePage(tab) {
   const bouts = [];
   if (d) bouts.push(`Arrêté du ${fmtDate(d)}`);
   bouts.push(qui);
-  if (nb > 1) bouts.push(`${nb} titulaires`);
+  // Le nombre de titulaires qualifie une vue famille ; sous un filtre nominatif
+  // il annoncait « Paul · 4 titulaires », c'est-a-dire le contraire du filtre.
+  if (qui === 'Famille' && nb > 1) bouts.push(`${nb} titulaires`);
   p.textContent = bouts.join(' · ');
 }
 

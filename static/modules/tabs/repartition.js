@@ -22,6 +22,33 @@ const ANGLES = [
   { cle: 'owner',    libelle: 'Personne',  source: 'totals_by_owner' },
 ];
 
+/** Part d'un titulaire dans une ligne de repartition.
+ *
+ *  Chaque angle porte son detail par personne sous une forme differente —
+ *  heritage de quatre cartes ecrites separement : un nombre pour les
+ *  categories, un objet pour les poches et les enveloppes, rien du tout pour
+ *  l'angle « Personne », ou la ligne EST la personne. Cette fonction est le
+ *  seul endroit qui connaisse ces formes ; ailleurs on lit {gross, net, debt}.
+ */
+function partDe(cle, nom, t, owner, isFamille) {
+  const total = { gross: t.gross || 0, net: t.net || 0, debt: t.debt || 0 };
+  if (isFamille) return total;
+
+  if (cle === 'owner') {
+    // Une seule ligne subsiste : celle du titulaire choisi.
+    return nom === owner ? total : { gross: 0, net: 0, debt: 0 };
+  }
+  if (cle === 'category') {
+    // Seul angle a exposer le net et le brut separement, sans la dette.
+    const gross = t.by_owner_gross?.[owner] || 0;
+    const net = t.by_owner?.[owner] || 0;
+    return { gross, net, debt: gross - net };
+  }
+  const o = t.by_owner?.[owner];
+  return o ? { gross: o.gross || 0, net: o.net || 0, debt: o.debt || 0 }
+           : { gross: 0, net: 0, debt: 0 };
+}
+
 let _angle = 'macro';
 try { _angle = localStorage.getItem('financy_repartition') || 'macro'; } catch { /* session privee */ }
 
@@ -31,14 +58,11 @@ export function renderRepartition() {
 
   const angle = ANGLES.find(a => a.cle === _angle) || ANGLES[0];
   const source = S.synthese[angle.source] || {};
+  const owner = S.syntheseOwner;
+  const isFamille = !owner || owner === 'Famille';
 
   const lignes = Object.entries(source)
-    .map(([nom, t]) => ({
-      nom,
-      gross: t.gross || 0,
-      net: t.net || 0,
-      debt: t.debt || 0,
-    }))
+    .map(([nom, t]) => ({ nom, ...partDe(angle.cle, nom, t, owner, isFamille) }))
     .filter(l => l.gross || l.net)
     .sort((a, b) => b.gross - a.gross);
 
