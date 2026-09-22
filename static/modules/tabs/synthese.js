@@ -127,6 +127,25 @@ export function renderSynthese() {
   document.getElementById('kpi-mobilizable').innerHTML = fmt(kpi.mob) + varHtml('mob_delta')
     + sparkline(serie('mob'), { couleur: 'var(--primary)' });
 
+  // Sous-titres : un montant seul ne se situe pas. « 530 000 € » ne dit pas
+  // ce qu'il contient ; « dont 280 000 € d'immobilier » le qualifie d'un mot.
+  const macro = syn.totals_by_macro || {};
+  const immo = (macro['Patrimoine immobilier'] || {}).gross || 0;
+  const liq = syn.mobilizable_by_liquidity || {};
+  const court = (liq['J0–J1'] || 0);
+  const sous = (id, txt) => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = txt;
+  };
+  sous('kpi-gross-sub', immo ? `dont ${fmt(immo)} d'immobilier` : '');
+  sous('kpi-debt-sub', kpi.gross
+    ? `${(kpi.debt / kpi.gross * 100).toFixed(1)}\u202f% du brut`
+    : '');
+  sous('kpi-mob-sub', kpi.net
+    ? `${(kpi.mob / kpi.net * 100).toFixed(0)}\u202f% du net`
+      + (court ? ` · ${fmt(court)} sous 24\u202fh` : '')
+    : '');
+
   document.getElementById('kpi-net-label').textContent   = isFamily ? 'Patrimoine net famille' : `Patrimoine net — ${owner}`;
   document.getElementById('kpi-gross-label').textContent = isFamily ? 'Actifs bruts' : `Actifs bruts — ${owner}`;
   document.getElementById('kpi-debt-label').textContent  = isFamily ? 'Dettes' : `Dettes — ${owner}`;

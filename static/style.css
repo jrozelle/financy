@@ -1216,7 +1216,7 @@ input[type="file"] {
   .kpi-grid   { grid-template-columns: repeat(2, 1fr); }
   .charts-row { grid-template-columns: 1fr; }
 }
-@media (max-width: 900px) {
+@media (max-width: 780px) {
   .navbar { padding: 0 1rem; gap: 1rem; }
   .nav-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .alloc-row { grid-template-columns: 110px 1fr 50px 50px 50px; font-size: 12px; }
@@ -3678,7 +3678,7 @@ body { padding-left: var(--rail-w); }
 .navbar .nav-tabs, .navbar .nav-brand, .navbar .navbar-toggle { display: none !important; }
 .subnav { display: none !important; }
 
-@media (max-width: 900px) {
+@media (max-width: 780px) {
   /* Sous 900 px le rail passe en barre horizontale : garder une colonne de
      216 px mangerait la moitie de la largeur utile. */
   .fin-rail {
@@ -3725,7 +3725,7 @@ body { padding-left: var(--rail-w); }
   margin: 0; font-size: .74rem; color: var(--text-muted);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-@media (max-width: 900px) { .fin-title { display: none; } }
+@media (max-width: 780px) { .fin-title { display: none; } }
 
 /* ── Menu d'actions sur l'arrêté ──────────────────────────────────────── */
 /* Même apparence que l'engrenage — ce sont deux menus de même nature pour
@@ -3840,7 +3840,7 @@ body { padding-top: 0 !important; }
 #rail-reglages .settings-toggle svg { display: none; }
 #rail-reglages .settings-toggle:hover { background: var(--rail-hover); color: #b8c0d0; }
 #rail-reglages .settings-dropdown { right: auto; left: .3rem; bottom: calc(100% + 6px); top: auto; }
-@media (max-width: 900px) {
+@media (max-width: 780px) {
   #rail-recherche { display: none; }   /* la recherche reprend sa place ailleurs sur mobile */
 }
 
@@ -4051,3 +4051,10 @@ body { padding-top: 0 !important; }
   .kpi-grid > .kpi-card.kpi-debt,
   .kpi-grid > .kpi-card.kpi-mobilizable { grid-column: span 12; }
 }
+
+/* Sous-titre d'indicateur : un montant seul ne se situe pas. */
+.kpi-sub {
+  margin-top: .2rem; font-size: .72rem; color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.kpi-sub:empty { display: none; }
