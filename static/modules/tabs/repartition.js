@@ -99,7 +99,7 @@ function tableau(lignes, brut, net, dette) {
   const couleur = i => `var(--chart-${(i % 11) + 1})`;
 
   return `
-    <div class="rep-wrap">
+    <div class="rep-wrap" tabindex="0" role="region" aria-label="Répartition">
       <table class="rep">
         <thead>
           <tr>

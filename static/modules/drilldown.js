@@ -196,7 +196,7 @@ export async function drilldownHistory({ subtitle, title, filters }) {
 
   document.getElementById('dd-body').innerHTML = `
     ${history.length >= 2 ? '<div style="position:relative;height:200px;margin-bottom:1rem"><canvas id="dd-history-chart"></canvas></div>' : ''}
-    <div class="table-scroll">
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Historique">
       <table class="data-table">
         <thead><tr><th>Date</th><th class="num">Brut</th><th class="num">Net</th><th class="num">Δ</th></tr></thead>
         <tbody>${rows}</tbody>

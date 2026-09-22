@@ -63,7 +63,7 @@ function rendu(groupes, d, clotures = 0, hors = 0) {
       </div>
       <button type="button" class="link-carte" data-tab-switch="performance">Tout voir</button>
     </div>
-    <div class="comptes-wrap">
+    <div class="comptes-wrap" tabindex="0" role="region" aria-label="Vos comptes">
       <table class="comptes">
         <thead>
           <tr>

@@ -118,7 +118,7 @@ function showEntitySnapshots(entityName) {
     <p style="font-size:13px;color:var(--text-muted);margin-bottom:.75rem">
       Chaque modification de valeur crée une entrée datée. L'historique est utilisé pour reconstituer la valorisation aux dates passées.
     </p>
-    <div class="table-scroll">
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Valeurs enregistrées">
       <table class="data-table" id="snap-hist-table">
         <thead><tr>
           <th>Date</th>

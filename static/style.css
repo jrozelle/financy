@@ -3579,7 +3579,7 @@ td.arbo-part > * { vertical-align: middle; }
 
   /* Barre du haut : trois lignes de controles avant le premier chiffre. Le
      masquage garde son oeil, sans son mot. */
-  .page-head-tools #mask-btn span { display: none; }
+  .page-head-tools #mask-btn span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }   /* hors de la vue, pas du lecteur d'ecran */
   .page-head-tools #mask-btn { padding: 0 .5rem; }
   .page-head-tools #head-maj, .page-head-tools #head-ajouter { padding-inline: .6rem; }
   .head-complement { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -3759,3 +3759,7 @@ td.arbo-part > * { vertical-align: middle; }
   #flux-tfoot td { display: inline-block; border: 0; padding: .5rem .9rem; }
   #flux-tfoot td:empty { display: none; }
 }
+
+/* Une zone defilante recoit le focus clavier (sinon inatteignable sans
+   souris) : son contour le montre. */
+[role="region"][tabindex="0"]:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 6px; }
