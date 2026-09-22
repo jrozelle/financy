@@ -258,12 +258,12 @@ function renderList(d) {
   const th = (col, texte, cls = '') => {
     const actif = V.sort.col === col;
     const sens = actif ? V.sort.dir : null;
+    // `aria-sort` n'existe que sur un en-tete de tableau : ici, une liste. Le
+    // bouton dit donc son etat dans son nom, que le lecteur d'ecran annonce.
+    const etat = actif ? `, trié par ordre ${sens === 'asc' ? 'croissant' : 'décroissant'}` : '';
     return `<span class="perf-th ${cls}${actif ? ' is-sorted' : ''}" data-sort="${col}"
-        role="button" tabindex="0" aria-sort="${
-          actif ? (sens === 'asc' ? 'ascending' : 'descending') : 'none'}"
-        title="Trier par ${esc(texte.toLowerCase())}${
-          actif ? (sens === 'asc' ? ', décroissant' : ', croissant') : ''}"
-      >${texte}<i class="perf-caret">${actif ? (sens === 'asc' ? '▲' : '▼') : ''}</i></span>`;
+        role="button" tabindex="0" aria-label="Trier par ${esc(texte.toLowerCase())}${etat}"
+      >${texte}<i class="perf-caret" aria-hidden="true">${actif ? (sens === 'asc' ? '▲' : '▼') : ''}</i></span>`;
   };
   host.innerHTML = `
     <div class="perf-head">

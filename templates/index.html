@@ -183,7 +183,7 @@
       <div class="card" id="synthese-history-detail-card" data-carte="evolution">
         <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:.875rem">
           <h2 style="margin:0">Évolution par</h2>
-          <select id="synthese-history-group" class="filter-select" style="width:auto">
+          <select id="synthese-history-group" class="filter-select" style="width:auto" aria-label="Regrouper l'évolution par">
             <option value="category">Catégorie</option>
             <option value="envelope">Enveloppe</option>
           </select>
@@ -307,9 +307,9 @@
         <div id="flux-import-report" class="hidden"></div>
         <div class="filters-bar" id="flux-filters">
           <select id="flux-filter-owner" class="filter-select hidden" aria-hidden="true" tabindex="-1"><option value="">Toutes les personnes</option></select>
-          <select id="flux-filter-type"  class="filter-select"><option value="">Tous les types</option></select>
-          <select id="flux-filter-category" class="filter-select"><option value="">Toutes les catégories</option></select>
-          <select id="flux-filter-year"  class="filter-select"><option value="">Toutes les années</option></select>
+          <select id="flux-filter-type"  class="filter-select" aria-label="Type de flux"><option value="">Tous les types</option></select>
+          <select id="flux-filter-category" class="filter-select" aria-label="Catégorie"><option value="">Toutes les catégories</option></select>
+          <select id="flux-filter-year"  class="filter-select" aria-label="Année"><option value="">Toutes les années</option></select>
           <button class="btn btn-secondary btn-sm" id="btn-clear-flux-filters">Effacer filtres</button>
         </div>
       </div>
@@ -564,16 +564,16 @@
         <h2>Profil de la personne</h2>
         <div style="margin-bottom:.75rem">
           <label style="font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Personne</label>
-          <select id="advisor-owner-select" style="margin-left:.5rem"></select>
+          <select id="advisor-owner-select" style="margin-left:.5rem" aria-label="Titulaire du profil"></select>
         </div>
         <form id="advisor-profile-form">
           <div class="form-grid">
             <div class="form-group">
-              <label>Horizon (années)</label>
+              <label for="adv-horizon">Horizon (années)</label>
               <input type="text" inputmode="numeric" id="adv-horizon" min="0" max="100" step="1">
             </div>
             <div class="form-group">
-              <label>Tolérance au risque</label>
+              <label for="adv-risk">Tolérance au risque</label>
               <select id="adv-risk">
                 <option value="1">1 — Prudent</option>
                 <option value="2">2 — Modéré bas</option>
@@ -583,7 +583,7 @@
               </select>
             </div>
             <div class="form-group">
-              <label>Statut professionnel</label>
+              <label for="adv-employment">Statut professionnel</label>
               <select id="adv-employment">
                 <option value="">—</option>
                 <option value="salarie">Salarié</option>
@@ -594,11 +594,11 @@
               </select>
             </div>
             <div class="form-group">
-              <label>Âge de départ souhaité</label>
+              <label for="adv-pension-age">Âge de départ souhaité</label>
               <input type="text" inputmode="numeric" id="adv-pension-age" min="18" max="120" step="1" placeholder="ex: 65">
             </div>
             <div class="form-group">
-              <label>Enfants à charge</label>
+              <label for="adv-children">Enfants à charge</label>
               <input type="text" inputmode="numeric" id="adv-children" min="0" max="20" step="1" value="0">
             </div>
             <div class="form-group">
@@ -616,7 +616,7 @@
               </label>
             </div>
             <div class="form-group full-span">
-              <label>Notes / contexte</label>
+              <label for="adv-notes">Notes / contexte</label>
               <input type="text" id="adv-notes" maxlength="2000" placeholder="Ex: objectif transmission, concentration immobilière, etc.">
             </div>
           </div>
@@ -683,19 +683,19 @@
         </div>
         <div id="macro-content" class="form-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:.875rem;display:none">
           <div class="form-group">
-            <label>Régime de taux</label>
+            <label for="macro-rates">Régime de taux</label>
             <select id="macro-rates"><option value="bas">Bas</option><option value="neutre">Neutre</option><option value="haut">Haut</option></select>
           </div>
           <div class="form-group">
-            <label>Inflation</label>
+            <label for="macro-inflation">Inflation</label>
             <select id="macro-inflation"><option value="maitrisee">Maîtrisée</option><option value="persistante">Persistante</option></select>
           </div>
           <div class="form-group">
-            <label>Biais actions</label>
+            <label for="macro-bias">Biais actions</label>
             <select id="macro-bias"><option value="defensif">Défensif</option><option value="neutre">Neutre</option><option value="offensif">Offensif</option></select>
           </div>
           <div class="form-group full-span" style="grid-column:span 3">
-            <label>Synthèse</label>
+            <label for="macro-summary">Synthèse</label>
             <textarea id="macro-summary" rows="4" maxlength="4000" style="border:1px solid var(--border);border-radius:6px;padding:.5rem .75rem;font-size:13px;background:var(--card);color:var(--text);font-family:inherit;resize:vertical"></textarea>
           </div>
         </div>
@@ -714,7 +714,7 @@
         </p>
         <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.875rem;flex-wrap:wrap">
           <button type="button" class="btn btn-primary" id="btn-proposals-refresh">Générer les propositions</button>
-          <select id="proposals-filter" style="margin-left:auto">
+          <select id="proposals-filter" style="margin-left:auto" aria-label="Afficher les propositions">
             <option value="">Tous</option>
             <option value="pending" selected>En attente</option>
             <option value="applied">Appliquées</option>
@@ -756,19 +756,19 @@
         <form id="simulation-form">
           <div class="form-grid" style="margin-bottom:1rem">
             <div class="form-group">
-              <label>Capital initial (€)</label>
+              <label for="sim-initial">Capital initial (€)</label>
               <input type="text" inputmode="decimal" id="sim-initial" value="10000" min="0" step="100">
             </div>
             <div class="form-group">
-              <label>Versement mensuel (€)</label>
+              <label for="sim-monthly">Versement mensuel (€)</label>
               <input type="text" inputmode="decimal" id="sim-monthly" value="500" min="0" step="50">
             </div>
             <div class="form-group">
-              <label>Rendement annuel (%)</label>
+              <label for="sim-rate">Rendement annuel (%)</label>
               <input type="text" inputmode="decimal" id="sim-rate" value="5" min="-20" max="50" step="0.5">
             </div>
             <div class="form-group">
-              <label>Durée (années)</label>
+              <label for="sim-years">Durée (années)</label>
               <input type="text" inputmode="numeric" id="sim-years" value="10" min="1" max="50">
             </div>
           </div>
@@ -812,7 +812,7 @@
             Les données existantes ne sont pas effacées.
           </p>
           <div class="form-group">
-            <label>Fichier .xlsx</label>
+            <label for="import-file">Fichier .xlsx</label>
             <input type="file" id="import-file" accept=".xlsx">
           </div>
           <button class="btn btn-primary" id="btn-import" style="margin-top:.75rem">Importer</button>
@@ -826,7 +826,7 @@
             Les allocations cibles sont restaurées si incluses.
           </p>
           <div class="form-group">
-            <label>Fichier .json</label>
+            <label for="import-json-file">Fichier .json</label>
             <input type="file" id="import-json-file" accept=".json">
           </div>
           <button class="btn btn-primary" id="btn-import-json" style="margin-top:.75rem">Importer JSON</button>
@@ -982,54 +982,54 @@
       <form id="position-form">
         <div class="form-grid">
           <div class="form-group">
-            <label>Date *</label>
+            <label for="pos-date">Date *</label>
             <input type="date" id="pos-date" required placeholder="AAAA-MM-JJ" title="Format : AAAA-MM-JJ">
           </div>
           <div class="form-group">
-            <label>Propriétaire *</label>
+            <label for="pos-owner">Propriétaire *</label>
             <select id="pos-owner" required></select>
           </div>
           <div class="form-group">
-            <label>Catégorie *</label>
+            <label for="pos-category">Catégorie *</label>
             <select id="pos-category" required></select>
           </div>
           <div class="form-group">
-            <label>Enveloppe</label>
+            <label for="pos-envelope">Enveloppe</label>
             <select id="pos-envelope"></select>
           </div>
           <div class="form-group">
-            <label>Établissement</label>
+            <label for="pos-establishment">Établissement</label>
             <input type="text" id="pos-establishment" placeholder="ex : Boursorama">
           </div>
           <div class="form-group">
-            <label>Entité (SCI / indivision)</label>
+            <label for="pos-entity-select">Entité (SCI / indivision)</label>
             <select id="pos-entity-select"></select>
           </div>
           <div class="form-group"><!-- spacer --></div>
           <div class="form-group">
-            <label>Valeur brute (€)</label>
+            <label for="pos-value">Valeur brute (€)</label>
             <input type="text" inputmode="decimal" id="pos-value" step="0.01" min="0" value="0">
           </div>
           <div class="form-group">
-            <label>Dette restante (€)</label>
+            <label for="pos-debt">Dette restante (€)</label>
             <input type="text" inputmode="decimal" id="pos-debt" step="0.01" min="0" value="0">
           </div>
           <div id="pos-pct-fields" style="display:none">
           <div class="form-group">
-            <label>% propriété (0–100)</label>
+            <label for="pos-ownership">% propriété (0–100)</label>
             <input type="text" inputmode="decimal" id="pos-ownership" step="1" min="0" max="100" value="100">
           </div>
           <div class="form-group">
-            <label>% dette (0–100)</label>
+            <label for="pos-debt-pct">% dette (0–100)</label>
             <input type="text" inputmode="decimal" id="pos-debt-pct" step="1" min="0" max="100" value="100">
           </div>
           </div>
           <div class="form-group">
-            <label>Libelle (affiche dans l'arbre)</label>
+            <label for="pos-label">Libelle (affiche dans l'arbre)</label>
             <input type="text" id="pos-label" placeholder="ex: Holding Exemple, Perso...">
           </div>
           <div class="form-group">
-            <label>Notes</label>
+            <label for="pos-notes">Notes</label>
             <input type="text" id="pos-notes">
           </div>
           <div class="form-group full-span" id="pos-mob-override-row">
@@ -1107,17 +1107,17 @@
             <button type="button" class="btn btn-secondary btn-sm" id="isin-reset-btn" title="Effacer ticker + cours (force re-resolution)">Reset</button>
           </div>
           <div class="isin-ticker-row">
-            <label>Ticker</label>
+            <label for="isin-ticker-input">Ticker</label>
             <input type="text" id="isin-ticker-input" placeholder="(auto-resolu)" style="width:100px">
             <button type="button" class="btn-icon" id="isin-ticker-save">OK</button>
           </div>
           <div class="isin-ticker-row">
-            <label>Prix manuel</label>
+            <label for="isin-price-input">Prix manuel</label>
             <input type="text" inputmode="decimal" id="isin-price-input" placeholder="ex: 125.40" step="0.01" style="width:100px">
             <button type="button" class="btn-icon" id="isin-price-save">OK</button>
           </div>
           <div class="isin-ticker-row">
-            <label>Classe</label>
+            <label for="isin-asset-class">Classe</label>
             <select id="isin-asset-class" style="font-size:12px;width:110px">
               <option value="etf">ETF</option>
               <option value="opcvm">OPCVM</option>
@@ -1199,38 +1199,38 @@
       <form id="flux-form">
         <div class="form-grid">
           <div class="form-group">
-            <label>Date *</label>
+            <label for="flux-date">Date *</label>
             <input type="date" id="flux-date" required placeholder="AAAA-MM-JJ" title="Format : AAAA-MM-JJ">
           </div>
           <div class="form-group">
-            <label>Propriétaire *</label>
+            <label for="flux-owner">Propriétaire *</label>
             <select id="flux-owner" required></select>
           </div>
           <div class="form-group">
-            <label>Enveloppe</label>
+            <label for="flux-envelope">Enveloppe</label>
             <select id="flux-envelope"></select>
           </div>
           <div class="form-group">
-            <label>Type</label>
+            <label for="flux-type">Type</label>
             <select id="flux-type"></select>
           </div>
           <div class="form-group">
-            <label>Établissement</label>
+            <label for="flux-establishment">Établissement</label>
             <input type="text" id="flux-establishment" list="flux-etab-list"
                    placeholder="ex : BoursoBank"
                    title="Indispensable si l'enveloppe existe chez plusieurs établissements : sans lui, le flux est réparti au prorata et fausse le rendement de chaque compte.">
             <datalist id="flux-etab-list"></datalist>
           </div>
           <div class="form-group">
-            <label>Catégorie</label>
+            <label for="flux-category">Catégorie</label>
             <select id="flux-category"></select>
           </div>
           <div class="form-group full-span">
-            <label>Montant (€) * — positif = apport, négatif = sortie</label>
+            <label for="flux-amount">Montant (€) * — positif = apport, négatif = sortie</label>
             <input type="text" inputmode="decimal" id="flux-amount" step="0.01" required placeholder="ex : 5000 ou -1200">
           </div>
           <div class="form-group full-span">
-            <label>Notes</label>
+            <label for="flux-notes">Notes</label>
             <input type="text" id="flux-notes">
           </div>
         </div>
@@ -1253,30 +1253,30 @@
       <form id="entity-form">
         <div class="form-grid">
           <div class="form-group">
-            <label>Nom *</label>
+            <label for="ent-name">Nom *</label>
             <input type="text" id="ent-name" required placeholder="ex : SCI Famille Dupont">
           </div>
           <div class="form-group">
-            <label>Type</label>
+            <label for="ent-type">Type</label>
             <select id="ent-type"></select>
           </div>
           <div class="form-group">
-            <label>Mode de valorisation</label>
+            <label for="ent-valuation">Mode de valorisation</label>
             <select id="ent-valuation"></select>
           </div>
           <div class="form-group">
             <!-- spacer -->
           </div>
           <div class="form-group">
-            <label>Actif brut (€)</label>
+            <label for="ent-gross">Actif brut (€)</label>
             <input type="text" inputmode="decimal" id="ent-gross" step="0.01" min="0" value="0">
           </div>
           <div class="form-group">
-            <label>Dette (€)</label>
+            <label for="ent-debt">Dette (€)</label>
             <input type="text" inputmode="decimal" id="ent-debt" step="0.01" min="0" value="0">
           </div>
           <div class="form-group full-span">
-            <label>Commentaire</label>
+            <label for="ent-comment">Commentaire</label>
             <input type="text" id="ent-comment">
           </div>
         </div>

@@ -98,7 +98,7 @@ export async function renderAllocationTargets() {
   const switchEl = document.getElementById('alloc-mode-switch');
   if (switchEl) {
     switchEl.innerHTML = `<span style="display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;font-size:12px;vertical-align:middle">
-      ${['net', 'brut'].map(m => `<button type="button" data-alloc-mode="${m}" style="padding:.2rem .6rem;border:none;cursor:pointer;background:${m === _allocMode ? 'var(--primary)' : 'transparent'};color:${m === _allocMode ? '#fff' : 'var(--text)'}">${m === 'net' ? 'Net' : 'Brut'}</button>`).join('')}
+      ${['net', 'brut'].map(m => `<button type="button" data-alloc-mode="${m}" style="padding:.2rem .6rem;border:none;cursor:pointer;background:${m === _allocMode ? 'var(--primary)' : 'transparent'};color:${m === _allocMode ? 'var(--on-accent)' : 'var(--text)'}">${m === 'net' ? 'Net' : 'Brut'}</button>`).join('')}
     </span>`;
     _wireAllocMode(switchEl);
   }
