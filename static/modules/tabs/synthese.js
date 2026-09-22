@@ -4,6 +4,7 @@ import { fmt, fmtDate, esc, kpiDelta, liqBadge, getColors, doughnutConfig, chart
 import { api } from '../api.js';
 import { loadTodo } from '../todo.js';
 import { loadContribution } from './contribution.js';
+import { renderRepartition } from './repartition.js';
 import { drilldownPositions } from '../drilldown.js';
 import { loadUserAlerts } from '../alerts.js';
 import { renderAllocationTargets } from '../targets.js';
@@ -149,6 +150,7 @@ export function renderSynthese() {
         return byLiq;
       })();
 
+  renderRepartition();
   loadContribution();
   renderEntityWarnings(syn.entity_warnings || []);
   renderOwnersTable(totals_by_owner, family, Object.values(totals_by_owner).reduce((s,o)=>s+o.mobilizable,0));
@@ -183,7 +185,9 @@ function renderOwnersTable(byOwner, family, totalMob) {
     </tr>`;
   }).join('');
 
-  document.getElementById('owners-table').innerHTML = `
+  const hoteOwners = document.getElementById('owners-table');
+  if (!hoteOwners) return;   // fondu dans la carte Répartition
+  hoteOwners.innerHTML = `
     <table class="owners-table">
       <thead><tr>
         <th>Personne</th><th>Actifs</th><th>Dettes</th><th>Net</th><th>% du total</th><th>Mobilisable</th>
@@ -199,7 +203,7 @@ function renderOwnersTable(byOwner, family, totalMob) {
       </tr></tfoot>
     </table>`;
 
-  document.getElementById('owners-table').querySelectorAll('[data-dd-owner]').forEach(tr => {
+  hoteOwners.querySelectorAll('[data-dd-owner]').forEach(tr => {
     tr.addEventListener('click', () => {
       const owner = tr.dataset.ddOwner;
       api('GET', `/api/positions?date=${S.syntheseDate}`).then(positions => {
@@ -216,7 +220,9 @@ function renderCatChart(byCat) {
   const vals = cats.map(c => byCat[c].net);
 
   destroyChart(catChart);
-  const ctx = document.getElementById('category-chart').getContext('2d');
+  const cvCat = document.getElementById('category-chart');
+  if (!cvCat) return;        // fondu dans la carte Répartition
+  const ctx = cvCat.getContext('2d');
   setCatChart(new Chart(ctx, {
     type: 'doughnut',
     data: {
@@ -283,7 +289,9 @@ function renderEnvChart(posCache, owner) {
   const vals   = labels.map(k => byEnv[k]);
 
   destroyChart(syntheseEnvChart);
-  const ctx = document.getElementById('synthese-env-chart').getContext('2d');
+  const cvEnv = document.getElementById('synthese-env-chart');
+  if (!cvEnv) return;        // fondu dans la carte Répartition
+  const ctx = cvEnv.getContext('2d');
   const colors = getColors();
   setSyntheseEnvChart(new Chart(ctx, {
     type: 'doughnut',
@@ -647,6 +655,7 @@ function _macroBucket(category) {
 
 function renderMacroSynthesis(byMacro, posCache, owner, isFamily) {
   const el = document.getElementById('macro-synthese');
+  if (!el) return;           // fondu dans la carte Répartition
   if (!el) return;
   if (!byMacro) { el.innerHTML = ''; return; }
   const order = ['Patrimoine financier', 'Patrimoine immobilier', 'Patrimoine autre'];

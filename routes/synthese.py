@@ -84,11 +84,25 @@ def get_synthese():
             totals_by_category[cat] = {
                 'net':      sum(p['net_attributed'] for p in ops),
                 'gross':    sum(p['gross_attributed'] for p in ops),
+                # La dette manquait ici alors qu'elle existe pour les poches et
+                # les personnes : sans elle, impossible de lire le levier par
+                # categorie — c'est pourtant la ou il se joue (immobilier).
+                'debt':     sum(p['debt_attributed'] for p in ops),
                 'by_owner': {o: sum(p['net_attributed'] for p in ops if p['owner'] == o)
                              for o in owners},
                 'by_owner_gross': {o: sum(p['gross_attributed'] for p in ops if p['owner'] == o)
                                    for o in owners},
             }
+
+    # Par enveloppe : quatrieme angle de repartition, absent jusqu'ici alors que
+    # c'est la maille a laquelle on ouvre et ferme un contrat.
+    totals_by_envelope = {}
+    for p in positions:
+        env = p.get('envelope') or 'Sans enveloppe'
+        t = totals_by_envelope.setdefault(env, {'gross': 0.0, 'net': 0.0, 'debt': 0.0})
+        t['gross'] += p['gross_attributed'] or 0
+        t['net']   += p['net_attributed'] or 0
+        t['debt']  += p['debt_attributed'] or 0
 
     # Synthese en 3 poches patrimoniales, brut (gross_attributed) et net
     # (net_attributed = brut - dette attribuee), avec detail par owner.
@@ -219,6 +233,7 @@ def get_synthese():
         'family':                  family,
         'totals_by_owner':         totals_by_owner,
         'totals_by_category':      totals_by_category,
+        'totals_by_envelope':      totals_by_envelope,
         'totals_by_macro':         totals_by_macro,
         'mobilizable_by_liquidity': mobilizable_by_liquidity,
         'entity_warnings':         entity_warnings,
