@@ -1,5 +1,5 @@
 import { S } from '../state.js';
-import { fmt, fmtDate, esc, liqBadge, sortArr, updateSortIndicators, today, wireTreeAccordion, treeToggleRow, parseLocaleNumber } from '../utils.js';
+import { fmt, fmtDate, esc, liqBadge, sortArr, updateSortIndicators, today, wireTreeAccordion, treeToggleRow, parseLocaleNumber, fmtPct } from '../utils.js';
 import { api, refreshEntitySelect } from '../api.js';
 import { confirmDialog, promptDialog, toast, closeModal } from '../dialogs.js';
 import { loadSynthese, loadHistorique } from './synthese.js';
@@ -27,14 +27,18 @@ const POSITION_STICKY_COLUMNS = [
   'net_attributed',
   'mobilizable_value',
 ];
+// Les libelles parlent la langue de l'utilisateur, pas celle du modele :
+// « attribue » designait la part detenue (ownership_pct), ce que dit deja le
+// badge de pourcentage a cote du montant.
 const POSITION_TABLE_COLUMNS = [
-  { key: 'owner', label: 'Propriétaire' },
+  { key: 'owner', label: 'Titulaire' },
   { key: 'establishment', label: 'Établissement / Entité' },
   { key: 'envelope', label: 'Enveloppe' },
   { key: 'category', label: 'Catégorie' },
-  { key: 'gross_attributed', label: 'Actif attribué', num: true },
-  { key: 'debt_attributed', label: 'Dette attribuée', num: true },
-  { key: 'net_attributed', label: 'Net attribué', num: true },
+  { key: 'gross_attributed', label: 'Valeur', num: true },
+  { key: 'debt_attributed', label: 'Dette', num: true },
+  { key: 'net_attributed', label: 'Net', num: true },
+  { key: 'gain_attributed', label: 'Plus-value', num: true },
   { key: 'liquidity', label: 'Liquidité' },
   { key: 'mobilizable_value', label: 'Mobilisable', num: true },
   { key: 'actions', label: '' },
@@ -522,6 +526,7 @@ export function renderPositions() {
       <td data-pos-col="gross_attributed" class="num">${fmt(p.gross_attributed)}${pctBadge}</td>
       <td data-pos-col="debt_attributed" class="num ${p.debt_attributed > 0 ? 'neg' : ''}">${p.debt_attributed > 0 ? fmt(p.debt_attributed) : '—'}${debtBadge}</td>
       <td data-pos-col="net_attributed" class="num ${p.net_attributed < 0 ? 'neg' : ''}">${fmt(p.net_attributed)}</td>
+      <td data-pos-col="gain_attributed" class="num">${celluleGain(p)}</td>
       <td data-pos-col="liquidity">${liqBadge(p.liquidity)}</td>
       <td data-pos-col="mobilizable_value" class="num">${fmt(p.mobilizable_value)}${p.mobilizable_pct_override != null ? ` <span title="Mobilisabilité surchargée : ${Math.round(p.mobilizable_pct_override*100)} %" style="color:var(--warning);font-size:11px">⚠</span>` : ''}</td>
       <td data-pos-col="actions" style="white-space:nowrap">
@@ -536,6 +541,8 @@ export function renderPositions() {
   const totDebt  = positions.reduce((s, p) => s + (p.debt_attributed  || 0), 0);
   const totNet   = positions.reduce((s, p) => s + (p.net_attributed   || 0), 0);
   const totMob   = positions.reduce((s, p) => s + (p.mobilizable_value|| 0), 0);
+  const mesurees = positions.filter(p => p.gain_lignes);
+  const totGain  = mesurees.reduce((s, p) => s + (p.gain_attributed || 0), 0);
   document.getElementById('positions-tfoot').innerHTML = `
     <tr>
       <td data-pos-col="owner">TOTAL</td>
@@ -545,6 +552,7 @@ export function renderPositions() {
       <td data-pos-col="gross_attributed" class="num">${fmt(totGross)}</td>
       <td data-pos-col="debt_attributed" class="num neg">${totDebt > 0 ? fmt(totDebt) : '—'}</td>
       <td data-pos-col="net_attributed" class="num">${fmt(totNet)}</td>
+      <td data-pos-col="gain_attributed" class="num">${mesurees.length ? signe(totGain) : '—'}</td>
       <td data-pos-col="liquidity"></td>
       <td data-pos-col="mobilizable_value" class="num">${fmt(totMob)}</td>
       <td data-pos-col="actions"></td>
@@ -553,6 +561,21 @@ export function renderPositions() {
   reapplyColumns('positions', 'positions-thead');
   _applyPositionTableContext();
   document.getElementById('positions-tbody').addEventListener('click', onPosTableClick, { once: true });
+}
+
+const signe = v => `<span class="${v >= 0 ? 'pv-hausse' : 'pv-baisse'}">${v >= 0 ? '+' : '−'}${fmt(Math.abs(v))}</span>`;
+
+/** Plus-value d'une position a lignes de titres. Une ligne sans prix de
+ *  revient connu n'est pas comptee a zero : la cellule dit combien de lignes
+ *  le chiffre couvre, a l'ecran et non dans une infobulle. */
+function celluleGain(p) {
+  if (!p.has_holdings) return '<span class="pv-na">—</span>';
+  if (!p.gain_lignes) return '<span class="pv-na">PRU inconnu</span>';
+  const pct = p.gain_pct == null ? '' :
+    `<span class="pv-pct">${fmtPct(p.gain_pct * 100, 1, true)}</span>`;
+  const partiel = p.gain_lignes < p.holdings_count
+    ? `<span class="pv-partiel">${p.gain_lignes}/${p.holdings_count} lignes</span>` : '';
+  return `${signe(p.gain_attributed)}${pct}${partiel}`;
 }
 
 function onPosTableClick(e) {
@@ -818,7 +841,7 @@ export function updatePosInfo() {
   const overrideLabel = useOverride ? ' ⚠ surchargé' : '';
 
   document.getElementById('pos-computed-info').textContent =
-    `Net attribué : ${fmt(net)}  ·  Liquidité : ${envMeta.liquidity}  ·  Mobilisable : ${fmt(mob)} (${(mobPct * 100).toFixed(0)} %${overrideLabel})`;
+    `Net : ${fmt(net)}  ·  Liquidité : ${envMeta.liquidity}  ·  Mobilisable : ${fmt(mob)} (${fmtPct(mobPct * 100, 0)}${overrideLabel})`;
 }
 
 export async function savePosition(e) {

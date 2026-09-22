@@ -1,6 +1,6 @@
 import { S, _targetsCache, setTargetsCache } from './state.js';
 import { api } from './api.js';
-import { esc, fmt, parseLocaleNumber } from './utils.js';
+import { esc, fmt, parseLocaleNumber, fmtPct } from './utils.js';
 import { closeModal } from './dialogs.js';
 
 export async function loadTargets() {
@@ -124,7 +124,7 @@ export async function renderAllocationTargets() {
         <div class="cible-ligne">
           <span class="cible-n">${esc(r.cat)}</span>
           <span class="cible-v">
-            <span class="num">${r.actual.toFixed(1)}\u202f%</span>
+            <span class="num">${fmtPct(r.actual)}</span>
             ${ecart === null ? '<span class="cible-none">pas de cible</span>'
               : `<span class="cible-ecart cible-ecart--${classe}">${
                   ecart > 0 ? '+' : '−'}${Math.abs(ecart).toFixed(1)}\u202fpt</span>`}

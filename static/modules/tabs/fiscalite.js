@@ -13,7 +13,7 @@
  */
 import { S } from '../state.js';
 import { api } from '../api.js';
-import { fmt, esc } from '../utils.js';
+import { fmt, esc, fmtPct } from '../utils.js';
 
 /** Part minimale du patrimoine couverte pour que la carte ait un sens. */
 const COUVERTURE_MIN = 0.5;
@@ -75,7 +75,7 @@ function rendu(d) {
 
     <p class="fisc-portee">
       Calculé sur <strong>${fmt(couvert)}</strong> du patrimoine, soit
-      ${(part * 100).toFixed(0)} %.${nb ? ` ${nb} enveloppe${nb > 1 ? 's' : ''} sans assiette
+      ${fmtPct(part * 100, 0)}.${nb ? ` ${nb} enveloppe${nb > 1 ? 's' : ''} sans assiette
       sûre ${nb > 1 ? 'restent' : 'reste'} hors du calcul.` : ''}
       Les contrats sont supposés matures — PEA de plus de 5 ans, assurance-vie de
       plus de 8 ans —, c'est-à-dire au régime le plus favorable : l'impôt réel ne

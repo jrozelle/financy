@@ -1,6 +1,6 @@
 import { S } from '../state.js';
 import { api } from '../api.js';
-import { esc, fmt, destroyChart, getColors, chartBorderColor, parseLocaleNumber } from '../utils.js';
+import { esc, fmt, destroyChart, getColors, chartBorderColor, parseLocaleNumber, fmtPct } from '../utils.js';
 import { confirmDialog, toast } from '../dialogs.js';
 import { updateDemoBadge } from './import-export.js';
 
@@ -247,9 +247,9 @@ async function _loadAllocation(profile) {
     const cls = g.delta_eur > 0 ? 'pos' : g.delta_eur < 0 ? 'neg' : '';
     return `<tr>
       <td><strong>${esc(g.category)}</strong></td>
-      <td class="num">${(g.target_pct * 100).toFixed(1)}%</td>
-      <td class="num">${(g.actual_pct * 100).toFixed(1)}%</td>
-      <td class="num ${cls}">${g.delta_pct > 0 ? '+' : ''}${(g.delta_pct * 100).toFixed(1)}%</td>
+      <td class="num">${fmtPct(g.target_pct * 100)}</td>
+      <td class="num">${fmtPct(g.actual_pct * 100)}</td>
+      <td class="num ${cls}">${fmtPct(g.delta_pct * 100, 1, true)}</td>
       <td class="num ${cls}">${g.delta_eur > 0 ? '+' : ''}${fmt(g.delta_eur)}</td>
     </tr>`;
   }).join('');
@@ -282,7 +282,7 @@ function _renderAllocationChart(data) {
       maintainAspectRatio: false,
       plugins: {
         legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } },
-        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label} : ${ctx.parsed.y.toFixed(1)}%` } },
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label} : ${fmtPct(ctx.parsed.y)}` } },
       },
       scales: {
         y: { ticks: { callback: v => v + '%', font: { size: 11 } }, grid: { color: border }, beginAtZero: true },
@@ -474,12 +474,12 @@ async function _loadUsage() {
           <div style="height:100%;width:${pct}%;background:${barColor};transition:width .25s"></div>
         </div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:.25rem">
-          ${spent.toFixed(4)} $ / ${budget.toFixed(2)} $ (${pct.toFixed(0)} %)
+          ${spent.toFixed(4)} $ / ${budget.toFixed(2)} $ (${fmtPct(pct, 0)})
         </div>
       </div>`;
     if (pct >= 80 && pct < 100) {
       warning = `<div class="advisor-budget-warning" style="margin-top:.5rem;padding:.4rem .6rem;border-left:3px solid var(--warning);background:rgba(234,179,8,.1);font-size:12px;border-radius:4px">
-        Budget mensuel consommé à ${pct.toFixed(0)} %. Les prochains appels Claude
+        Budget mensuel consommé à ${fmtPct(pct, 0)}. Les prochains appels Claude
         passeront toujours, mais envisage d'augmenter <code>ADVISOR_BUDGET_USD</code>.
       </div>`;
     } else if (pct >= 100) {

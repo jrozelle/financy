@@ -12,7 +12,7 @@
  */
 import { S } from '../state.js';
 import { api } from '../api.js';
-import { fmt, esc } from '../utils.js';
+import { fmt, esc, fmtPct } from '../utils.js';
 import { estFinancier } from '../categories.js';
 
 export async function loadComptes() {
@@ -103,8 +103,7 @@ function ligne(g) {
       <td class="num">${g.flux_net ? fmt(g.flux_net) : '—'}</td>
       <td class="num">${g.fees ? fmt(g.fees) : '—'}</td>
       <td>${mesurable
-            ? `<span class="taux taux--${classe}">${taux >= 0 ? '+' : '−'}${
-                Math.abs(taux).toFixed(1)} %</span>`
+            ? `<span class="taux taux--${classe}">${fmtPct(taux, 1, true)}</span>`
             : `<span class="taux taux--neutre" title="">${esc(g.reason || 'hors calcul')}</span>`}</td>
     </tr>`;
 }

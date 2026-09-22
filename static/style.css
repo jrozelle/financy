@@ -3576,3 +3576,12 @@ a.settings-item { display: inline-flex; align-items: center; text-decoration: no
   .maj-resume { flex-basis: 100%; }
   .maj-pied .btn { flex: 1 1 0; justify-content: center; }
 }
+
+/* ── Plus-value dans Positions ────────────────────────────────────────── */
+.pv-hausse { color: var(--success); font-variant-numeric: tabular-nums; }
+.pv-baisse { color: var(--danger); font-variant-numeric: tabular-nums; }
+.pv-pct { display: block; font-size: .72rem; color: var(--text-muted); }
+.pv-na { color: var(--text-muted); font-size: .76rem; }
+/* Couverture partielle : dite sous le chiffre, pas dans une infobulle. */
+.pv-partiel { display: block; font-size: .68rem; color: var(--warning); }
+th[data-sort]:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }

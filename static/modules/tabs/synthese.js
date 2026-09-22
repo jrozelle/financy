@@ -1,5 +1,5 @@
 import { S, histChart, syntheseHistChart, setHistChart, setSyntheseHistChart } from '../state.js';
-import { fmt, fmtDate, esc, kpiDelta, getColors, chartFamilyColors, destroyChart, parseLocaleNumber, fmtAxis, sparkline } from '../utils.js';
+import { fmt, fmtDate, esc, kpiDelta, getColors, chartFamilyColors, destroyChart, parseLocaleNumber, fmtAxis, sparkline, fmtPct } from '../utils.js';
 import { api } from '../api.js';
 import { loadTodo } from '../todo.js';
 import { loadContribution } from './contribution.js';
@@ -148,10 +148,10 @@ export function renderSynthese() {
   };
   sous('kpi-gross-sub', immo ? `dont ${fmt(immo)} d'immobilier` : '');
   sous('kpi-debt-sub', kpi.gross
-    ? `${(kpi.debt / kpi.gross * 100).toFixed(1)}\u202f% du brut`
+    ? `${fmtPct(kpi.debt / kpi.gross * 100)} du brut`
     : '');
   sous('kpi-mob-sub', kpi.net
-    ? `${(kpi.mob / kpi.net * 100).toFixed(0)}\u202f% du net`
+    ? `${fmtPct(kpi.mob / kpi.net * 100, 0)} du net`
       + (court ? ` · ${fmt(court)} sous 24\u202fh` : '')
     : '');
 
@@ -410,7 +410,7 @@ function evalUserAlerts() {
     const triggered = a.op === '<' ? actual < a.threshold : actual > a.threshold;
     if (!triggered) return null;
 
-    const fmtActual = a.metric.endsWith('pct') ? actual.toFixed(1) + ' %' : fmt(actual);
+    const fmtActual = a.metric.endsWith('pct') ? fmtPct(actual) : fmt(actual);
     const fmtThresh = a.metric.endsWith('pct') ? a.threshold + ' %' : fmt(a.threshold);
     return {
       cle: `seuil-${a.metric}-${a.category || ''}`,
@@ -438,7 +438,7 @@ function renderEntitiesSynthese() {
     const familyNet  = linked.reduce((s, p) => s + (p.net_attributed || 0), 0);
     const familyGross= linked.reduce((s, p) => s + (p.gross_attributed || 0), 0);
     const familyDebt = linked.reduce((s, p) => s + (p.debt_attributed || 0), 0);
-    const familyPct  = e.gross_assets > 0 ? (familyGross / e.gross_assets * 100).toFixed(0) : '—';
+    const familyPct  = e.gross_assets > 0 ? fmtPct(familyGross / e.gross_assets * 100, 0) : '—';
 
     const ownerNet   = !isFamily
       ? linked.filter(p => p.owner === owner).reduce((s, p) => s + (p.net_attributed || 0), 0)
@@ -473,11 +473,11 @@ function renderEntitiesSynthese() {
           <td style="text-align:right;font-weight:600" class="${e.net_assets >= 0 ? 'pos' : 'neg'}">${fmt(e.net_assets)}</td>
           <td style="text-align:right">
             ${fmt(familyNet)}
-            <span style="font-size:11px;color:var(--text-muted);margin-left:4px">${familyPct !== '—' ? familyPct + '%' : ''}</span>
+            <span style="font-size:11px;color:var(--text-muted);margin-left:4px">${familyPct !== '—' ? familyPct : ''}</span>
           </td>
           ${!isFamily ? `<td style="text-align:right;font-weight:700;color:var(--primary)">
             ${fmt(ownerNet)}
-            ${ownerPct !== null ? `<span style="font-size:11px;color:var(--text-muted);margin-left:4px">${(ownerPct*100).toFixed(0)}%</span>` : ''}
+            ${ownerPct !== null ? `<span style="font-size:11px;color:var(--text-muted);margin-left:4px">${fmtPct(ownerPct * 100, 0)}</span>` : ''}
           </td>` : ''}
         </tr>`).join('')}
       </tbody>
@@ -661,7 +661,7 @@ function renderWealthTarget(currentNet) {
   hote.innerHTML = `
     <div class="g-track"><span class="g-fill" style="width:${pct.toFixed(1)}%"></span></div>
     <div class="g-foot">
-      <span>Objectif <b>${fmt(target)}</b> · ${pct.toFixed(1)}\u202f% atteint</span>
+      <span>Objectif <b>${fmt(target)}</b> · ${fmtPct(pct)} atteint</span>
       <span>${projection || `Reste <b>${fmt(Math.max(target - currentNet, 0))}</b>`}</span>
     </div>`;
 }

@@ -256,13 +256,14 @@
         <table class="data-table" id="positions-table">
           <thead id="positions-thead">
             <tr>
-              <th data-sort="owner" data-pos-col="owner">Propriétaire</th>
+              <th data-sort="owner" data-pos-col="owner">Titulaire</th>
               <th data-sort="establishment" data-pos-col="establishment">Établissement / Entité</th>
               <th data-sort="envelope" data-pos-col="envelope">Enveloppe</th>
               <th data-sort="category" data-pos-col="category">Catégorie</th>
-              <th class="num" data-sort="gross_attributed" data-pos-col="gross_attributed">Actif attribué</th>
-              <th class="num" data-sort="debt_attributed" data-pos-col="debt_attributed">Dette attribuée</th>
-              <th class="num" data-sort="net_attributed" data-pos-col="net_attributed">Net attribué</th>
+              <th class="num" data-sort="gross_attributed" data-pos-col="gross_attributed">Valeur</th>
+              <th class="num" data-sort="debt_attributed" data-pos-col="debt_attributed">Dette</th>
+              <th class="num" data-sort="net_attributed" data-pos-col="net_attributed">Net</th>
+              <th class="num" data-sort="gain_attributed" data-pos-col="gain_attributed">Plus-value</th>
               <th data-sort="liquidity" data-pos-col="liquidity">Liquidité</th>
               <th class="num" data-sort="mobilizable_value" data-pos-col="mobilizable_value">Mobilisable</th>
               <th data-pos-col="actions"></th>
@@ -360,7 +361,7 @@
           Crée ici une SCI ou indivision avec sa valeur globale et sa dette.<br>
           Ensuite dans <strong>Positions</strong>, sélectionne l'entité et renseigne
           le <strong>% de propriété</strong> de chaque personne.<br>
-          Le net attribué = <em>(Actif brut × % propriété) – (Dette × % dette)</em>.
+          Le net de chaque titulaire = <em>(Actif brut × % propriété) – (Dette × % dette)</em>.
         </p>
       </div>
     </div>

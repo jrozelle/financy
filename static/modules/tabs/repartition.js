@@ -13,7 +13,7 @@
  * camembert du brut cache ce qui revient vraiment au foyer.
  */
 import { S } from '../state.js';
-import { fmt, esc } from '../utils.js';
+import { fmt, esc, fmtPct } from '../utils.js';
 
 const ANGLES = [
   { cle: 'macro',    libelle: 'Poche',     source: 'totals_by_macro' },
@@ -129,10 +129,10 @@ function tableau(lignes, brut, net, dette) {
               </td>
               <td class="num">${fmt(l.gross)}</td>
               <td class="num">${fmt(l.net)}</td>
-              <td class="num">${pct(l.gross, brut).toFixed(1)} %</td>
-              <td class="num">${pct(l.net, net).toFixed(1)} %</td>
+              <td class="num">${fmtPct(pct(l.gross, brut))}</td>
+              <td class="num">${fmtPct(pct(l.net, net))}</td>
               <td>${levier > 0.05
-                    ? `<span class="tag tag-lev">${levier.toFixed(0)} %</span>`
+                    ? `<span class="tag tag-lev">${fmtPct(levier, 0)}</span>`
                     : '<span class="rep-none">—</span>'}</td>
             </tr>`;
           }).join('')}
@@ -145,7 +145,7 @@ function tableau(lignes, brut, net, dette) {
             <td class="num">100 %</td>
             <td class="num">100 %</td>
             <td>${dette > 0
-                  ? `<span class="tag tag-lev-tot">${((dette / brut) * 100).toFixed(1)} %</span>`
+                  ? `<span class="tag tag-lev-tot">${fmtPct((dette / brut) * 100)}</span>`
                   : '<span class="rep-none">—</span>'}</td>
           </tr>
         </tfoot>

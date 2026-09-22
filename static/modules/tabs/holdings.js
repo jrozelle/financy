@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { esc, fmt, parseLocaleNumber } from '../utils.js';
+import { esc, fmt, parseLocaleNumber, fmtPct } from '../utils.js';
 import { closeModal, confirmDialog, toast } from '../dialogs.js';
 import { loadPositions } from './positions.js';
 import { openIsinPopover } from '../isin-popover.js';
@@ -205,7 +205,7 @@ function _pnlCell(r) {
   const pnl = currentValue - cost;
   const pct = (pnl / cost) * 100;
   const cls = pnl >= 0 ? 'pos' : 'neg';
-  return `<span class="${cls}">${fmt(pnl)} (${pct.toFixed(1)}%)</span>`;
+  return `<span class="${cls}">${fmt(pnl)} (${fmtPct(pct)})</span>`;
 }
 
 function renderTotals() {
@@ -220,7 +220,7 @@ function renderTotals() {
       <td colspan="3">TOTAL</td>
       <td class="num">${fmt(totalCost)}</td>
       <td class="num">${fmt(totalMv)}</td>
-      <td class="num ${pnl >= 0 ? 'pos' : 'neg'}">${fmt(pnl)}${totalCost > 0 ? ` (${pct.toFixed(1)}%)` : ''}</td>
+      <td class="num ${pnl >= 0 ? 'pos' : 'neg'}">${fmt(pnl)}${totalCost > 0 ? ` (${fmtPct(pct)})` : ''}</td>
       <td></td>
     </tr>`;
 }

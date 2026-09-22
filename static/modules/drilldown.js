@@ -1,5 +1,5 @@
 import { S } from './state.js';
-import { fmt, fmtDate, esc, liqText, getColors, chartBorderColor, destroyChart, fmtAxis } from './utils.js';
+import { fmt, fmtDate, esc, liqText, getColors, chartBorderColor, destroyChart, fmtAxis, fmtPct } from './utils.js';
 import { api } from './api.js';
 import { closeModal, confirmDialog } from './dialogs.js';
 
@@ -72,7 +72,7 @@ export function drilldownPositions(positions, title, subtitle, { showOwner = fal
         const bar = total > 0
           ? `<div class="dd-bar-wrap"><div class="dd-bar" style="width:${Math.min(100, pct).toFixed(1)}%"></div></div>`
           : '';
-        const pctLabel = total > 0 ? pct.toFixed(1) + ' %' : '';
+        const pctLabel = total > 0 ? fmtPct(pct) : '';
         return `<div class="dd-row dd-row-clickable" data-pos-id="${p.id}"
                      data-category="${esc(p.category)}">
           <div class="dd-row-left">
@@ -132,7 +132,7 @@ export function drilldownMobilizable() {
               </div>
               <div class="dd-row-right">
                 <div class="dd-row-val">${fmt(v)}</div>
-                ${total > 0 ? `<div class="dd-row-pct">${pct.toFixed(1)} %</div>` : ''}
+                ${total > 0 ? `<div class="dd-row-pct">${fmtPct(pct)}</div>` : ''}
                 <div class="dd-row-action" title="Voir l'évolution">📈</div>
               </div>
             </div>`;

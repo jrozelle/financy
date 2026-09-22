@@ -106,7 +106,7 @@ export function kpiDelta(variation, deltaKey, pctKey = null, { invert = false, l
   let pctStr = '';
   if (pctKey && variation[pctKey] != null) {
     const pct = variation[pctKey];
-    pctStr = ` (${pct > 0 ? '+' : ''}${pct.toFixed(1)}\u202f%)`;
+    pctStr = ` (${fmtPct(pct, 1, true)})`;
   }
   const labelStr = label ? `<span class="kpi-delta-label">${label}</span> ` : '';
   return `<div class="${cls}">${labelStr}${arrow} ${fmtDelta(delta)}${pctStr}</div>`;
@@ -130,6 +130,22 @@ export const fmtSigned = (v, dec = 0) =>
 
 export const today = () => new Date().toISOString().slice(0, 10);
 
+const _pctFormats = {};
+/** Un pourcentage a la francaise : virgule decimale, espace fine insecable
+ *  avant le signe %. `toFixed` ecrivait « +13.9 % » dans toute l'application.
+ *  @param {number} v       deja en pourcent (13.9, pas 0.139)
+ *  @param {number} dec     decimales
+ *  @param {boolean} signe  prefixe + ou − (le moins typographique)
+ *  A reserver au TEXTE : une largeur CSS (`width:…%`) veut un point. */
+export function fmtPct(v, dec = 1, signe = false) {
+  if (v == null || Number.isNaN(v)) return '—';
+  const f = (_pctFormats[dec] ||= new Intl.NumberFormat('fr-FR',
+    { minimumFractionDigits: dec, maximumFractionDigits: dec }));
+  const s = f.format(Math.abs(v)) + '\u202f%';
+  if (!signe) return (v < 0 ? '−' : '') + s;
+  return (v > 0 ? '+' : v < 0 ? '−' : '') + s;
+}
+
 export function parseLocaleNumber(value, fallback = NaN) {
   if (value == null) return fallback;
   if (typeof value === 'number') return Number.isFinite(value) ? value : fallback;
@@ -149,9 +165,13 @@ export function parseLocaleNumber(value, fallback = NaN) {
 
 export function sortArr(arr, key, dir) {
   if (!key) return arr;
+  const vide = v => v === null || v === undefined || v === '';
   return [...arr].sort((a, b) => {
-    const va = a[key] ?? '';
-    const vb = b[key] ?? '';
+    const va = a[key], vb = b[key];
+    // Une valeur absente reste en bas dans les deux sens. Remplacee par '',
+    // elle faisait basculer toute la colonne en ordre alphabetique des qu'une
+    // ligne en manquait : « 4596 » se classait avant « 788 ».
+    if (vide(va) || vide(vb)) return vide(va) - vide(vb);
     if (typeof va === 'number' && typeof vb === 'number') return dir * (va - vb);
     return dir * String(va).localeCompare(String(vb), 'fr', { sensitivity: 'base' });
   });
@@ -160,19 +180,28 @@ export function sortArr(arr, key, dir) {
 export function wireSortableTable(theadId, stateKey, rerenderFn) {
   const thead = document.getElementById(theadId);
   if (!thead) return;
-  thead.querySelectorAll('th[data-sort]').forEach(th => {
-    th.addEventListener('click', () => {
-      const key = th.dataset.sort;
-      const st  = S.sort[stateKey];
-      if (st.key === key) {
-        st.dir = -st.dir;
-      } else {
-        st.key = key;
-        st.dir = 1;
-      }
-      rerenderFn();
-    });
+  // Delegation sur le thead : un en-tete reconstruit garde son comportement.
+  const trier = th => {
+    const key = th.dataset.sort;
+    const st  = S.sort[stateKey];
+    if (st.key === key) {
+      st.dir = -st.dir;
+    } else {
+      st.key = key;
+      st.dir = 1;
+    }
+    rerenderFn();
+  };
+  thead.addEventListener('click', e => {
+    const th = e.target.closest('th[data-sort]');
+    if (th) trier(th);
   });
+  // Au clavier aussi : Entree ou Espace sur un en-tete triable.
+  thead.addEventListener('keydown', e => {
+    const th = e.target.closest('th[data-sort]');
+    if (th && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); trier(th); }
+  });
+  updateSortIndicators(theadId, stateKey);
 }
 
 export function updateSortIndicators(theadId, stateKey) {
@@ -181,7 +210,11 @@ export function updateSortIndicators(theadId, stateKey) {
   const { key, dir } = S.sort[stateKey];
   thead.querySelectorAll('th[data-sort]').forEach(th => {
     th.classList.remove('sort-asc', 'sort-desc');
-    if (th.dataset.sort === key) th.classList.add(dir === 1 ? 'sort-asc' : 'sort-desc');
+    // Atteignable au clavier, et l'etat du tri annonce aux lecteurs d'ecran.
+    th.tabIndex = 0;
+    const actif = th.dataset.sort === key;
+    if (actif) th.classList.add(dir === 1 ? 'sort-asc' : 'sort-desc');
+    th.setAttribute('aria-sort', actif ? (dir === 1 ? 'ascending' : 'descending') : 'none');
   });
 }
 

@@ -711,10 +711,10 @@ function wireEvents() {
 
   // Column pickers
   initColumnPicker('positions', 'positions-col-picker', 'positions-thead', {
-    owner: 'Proprietaire', establishment: 'Etablissement', envelope: 'Enveloppe',
-    category: 'Categorie', gross_attributed: 'Actif attribue',
-    debt_attributed: 'Dette', net_attributed: 'Net attribue',
-    liquidity: 'Liquidite', mobilizable_value: 'Mobilisable',
+    owner: 'Titulaire', establishment: 'Établissement', envelope: 'Enveloppe',
+    category: 'Catégorie', gross_attributed: 'Valeur',
+    debt_attributed: 'Dette', net_attributed: 'Net', gain_attributed: 'Plus-value',
+    liquidity: 'Liquidité', mobilizable_value: 'Mobilisable',
   });
   initColumnPicker('actifs', 'actifs-col-picker', 'actifs-thead', {
     isin: 'ISIN', name: 'Nom', establishments: 'Etablissement',

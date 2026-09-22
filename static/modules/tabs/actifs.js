@@ -1,6 +1,6 @@
 import { S } from '../state.js';
 import { api } from '../api.js';
-import { esc, fmt, fmtDate, destroyChart, getColors, chartBorderColor, sortArr, fmtQty} from '../utils.js';
+import { esc, fmt, fmtDate, destroyChart, getColors, chartBorderColor, sortArr, fmtQty, fmtPct } from '../utils.js';
 import { openIsinPopover } from '../isin-popover.js';
 import { triggerPricesRefresh } from './tools.js';
 import { saveFilters, loadFilters } from '../filter-persist.js';
@@ -98,7 +98,7 @@ function _render() {
   document.getElementById('actifs-kpi-cost').textContent  = t.cost_basis ? fmt(t.cost_basis) : '—';
   const pnlEl = document.getElementById('actifs-kpi-pnl');
   if (t.pnl != null) {
-    pnlEl.textContent = (t.pnl >= 0 ? '+' : '') + fmt(t.pnl) + (t.pnl_pct != null ? ` (${t.pnl_pct.toFixed(2)}%)` : '');
+    pnlEl.textContent = (t.pnl >= 0 ? '+' : '') + fmt(t.pnl) + (t.pnl_pct != null ? ` (${fmtPct(t.pnl_pct, 2)})` : '');
     pnlEl.style.color = t.pnl >= 0 ? 'var(--success)' : 'var(--danger)';
   } else {
     pnlEl.textContent = '—'; pnlEl.style.color = '';
@@ -136,7 +136,7 @@ function _renderTable(lines) {
     const pnl = l.pnl;
     const pnlCls = pnl == null ? '' : pnl >= 0 ? 'pos' : 'neg';
     const pnlStr = pnl == null ? '—'
-      : `${pnl >= 0 ? '+' : ''}${fmt(pnl)}${l.pnl_pct != null ? ` (${l.pnl_pct.toFixed(1)}%)` : ''}`;
+      : `${pnl >= 0 ? '+' : ''}${fmt(pnl)}${l.pnl_pct != null ? ` (${fmtPct(l.pnl_pct)})` : ''}`;
     const fresh = _freshnessBadge(l);
     return `<tr>
       <td><button type="button" class="h-isin-btn" data-action="open-popover" data-isin="${esc(l.isin)}">${esc(l.isin)}</button></td>
@@ -148,7 +148,7 @@ function _renderTable(lines) {
       <td class="num">${l.last_price != null ? fmt(l.last_price) : '—'}</td>
       <td class="num">${fmt(l.market_value)}</td>
       <td class="num ${pnlCls}">${pnlStr}</td>
-      <td class="num">${l.weight_pct.toFixed(1)}%</td>
+      <td class="num">${fmtPct(l.weight_pct)}</td>
       <td>${esc((l.envelopes || []).join(', ') || '—')}</td>
       <td>${fresh}</td>
     </tr>`;
@@ -158,7 +158,7 @@ function _renderTable(lines) {
       const pnl = l.pnl;
       const pnlCls = pnl == null ? '' : pnl >= 0 ? 'pos' : 'neg';
       const pnlStr = pnl == null ? '—'
-        : `${pnl >= 0 ? '+' : ''}${fmt(pnl)}${l.pnl_pct != null ? ` (${l.pnl_pct.toFixed(1)}%)` : ''}`;
+        : `${pnl >= 0 ? '+' : ''}${fmt(pnl)}${l.pnl_pct != null ? ` (${fmtPct(l.pnl_pct)})` : ''}`;
       const fresh = _freshnessBadge(l);
       return `<article class="actif-card">
         <div class="actif-card-main">
@@ -171,7 +171,7 @@ function _renderTable(lines) {
           <div><dt>PRU</dt><dd>${l.avg_cost != null ? fmt(l.avg_cost) : '—'}</dd></div>
           <div><dt>Qté</dt><dd>${fmtQty(l.quantity)}</dd></div>
           <div><dt>+/-</dt><dd class="${pnlCls}">${pnlStr}</dd></div>
-          <div><dt>Poids</dt><dd>${l.weight_pct.toFixed(1)}%</dd></div>
+          <div><dt>Poids</dt><dd>${fmtPct(l.weight_pct)}</dd></div>
           <div><dt>Cours</dt><dd>${l.last_price != null ? fmt(l.last_price) : '—'}</dd></div>
         </dl>
         <div class="actif-card-freshness">${fresh}</div>

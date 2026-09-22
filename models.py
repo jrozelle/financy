@@ -855,7 +855,37 @@ def compute_position(pos, entity_map=None, ref=None, holdings_map=None):
     if holdings is not None:
         result['has_holdings']    = True
         result['holdings_count']  = len(holdings)
+        result.update(_plus_value(holdings, ownership_pct))
     return result
+
+
+def _plus_value(holdings, ownership_pct):
+    """Plus-value latente d'une position a lignes de titres.
+
+    Seules comptent les lignes dont le prix de revient est connu : un
+    `cost_basis` egal au centime pres a la valeur de marche n'est pas un prix
+    paye, c'est une case remplie par defaut — la moitie des lignes en base. Les
+    compter en ferait des lignes a gain nul, et le gain affiche serait faux sans
+    le dire. `gain_lignes` rend donc le nombre de lignes reellement mesurees,
+    a comparer a `holdings_count`.
+    """
+    cout = gain = 0.0
+    mesurees = 0
+    for h in holdings:
+        cb, mv = h.get('cost_basis'), h.get('market_value')
+        if not cb or (mv is not None and abs(cb - mv) < 0.01):
+            continue
+        cout += cb
+        gain += _holding_effective_value(h) - cb
+        mesurees += 1
+    if not mesurees:
+        return {'gain_lignes': 0}
+    return {
+        'gain_lignes':      mesurees,
+        'cost_attributed':  cout * ownership_pct,
+        'gain_attributed':  gain * ownership_pct,
+        'gain_pct':         gain / cout if cout else None,
+    }
 
 
 def snapshot_holdings_to_date(conn, snapshot_date):
