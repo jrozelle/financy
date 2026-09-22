@@ -710,12 +710,18 @@ function wireEvents() {
     ).observe(sentinelle);
   }
 
-  // ── Contrôles de l'en-tête ──────────────────────────────────────────
-  // Densite : segment visible plutot qu'entree de menu. Tout l'espacement
-  // derive d'une variable unique, donc rien ne se desaligne.
+  // ── Densité d'affichage ─────────────────────────────────────────────
+  // Compacte par defaut : sur un patrimoine, on vient lire des chiffres et les
+  // comparer, pas contempler des marges. Tout l'espacement derive d'une seule
+  // variable, donc rien ne se desaligne quand elle change.
+  //
+  // Le reglage a quitte l'en-tete pour la fenetre Reglages — on le touche une
+  // fois. La CLE de stockage change avec lui : l'ancienne avait ete ecrite au
+  // premier chargement de chaque navigateur, si bien qu'un nouveau defaut n'y
+  // serait jamais arrive.
   const DENSITES = [
-    { cle: 'confortable', valeur: '1',   libelle: 'Densité : confortable' },
     { cle: 'compacte',    valeur: '.78', libelle: 'Densité : compacte' },
+    { cle: 'confortable', valeur: '1',   libelle: 'Densité : confortable' },
   ];
   const appliquerDensite = cle => {
     const d = DENSITES.find(x => x.cle === cle) || DENSITES[0];
@@ -723,10 +729,10 @@ function wireEvents() {
     document.querySelectorAll('[data-den]').forEach(b => {
       b.setAttribute('aria-pressed', String(b.dataset.den === d.cle));
     });
-    try { localStorage.setItem('financy_density', d.cle); } catch { /* session privee */ }
+    try { localStorage.setItem('financy_densite', d.cle); } catch { /* session privee */ }
   };
-  let densite = 'confortable';
-  try { densite = localStorage.getItem('financy_density') || 'confortable'; } catch { /* idem */ }
+  let densite = 'compacte';
+  try { densite = localStorage.getItem('financy_densite') || 'compacte'; } catch { /* idem */ }
   appliquerDensite(densite);
   document.querySelectorAll('[data-den]').forEach(b => {
     b.addEventListener('click', () => appliquerDensite(b.dataset.den));
