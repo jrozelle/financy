@@ -195,14 +195,16 @@
       
 
       <div class="card" data-carte="mouvements">
-        <h2>Mouvements depuis le snapshot précédent</h2>
+        <h2>Ce qui a bougé</h2>
+          <p class="card-sub">Écarts de valorisation et apports depuis l’arrêté précédent</p>
         <div id="snapshot-diff"></div>
       </div>
 
       
 
       <div class="card" data-carte="historique">
-        <h2>Historique patrimoine net</h2>
+        <h2>Évolution du patrimoine net</h2>
+          <p class="card-sub">Tous les arrêtés enregistrés</p>
         <div class="chart-wrap-wide"><canvas id="history-chart"></canvas></div>
       </div>
 
@@ -231,12 +233,14 @@
 
       <div class="charts-row">
         <div class="card" data-carte="liquidite">
-          <h2>Mobilisable par liquidité</h2>
+          <h2>Si vous aviez besoin d’argent</h2>
+          <p class="card-sub">Délai réel pour mobiliser chaque euro</p>
           <div id="liquidity-bars"></div>
         </div>
         <div class="card" data-carte="cible">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.875rem;gap:.5rem">
-            <h2 style="margin:0">Allocation cible vs réelle</h2>
+            <h2 style="margin:0">Écart à la cible</h2>
+          <p class="card-sub">Comparaison de votre allocation réelle à celle que vous visez</p>
             <div style="display:flex;align-items:center;gap:.5rem">
               <span id="alloc-mode-switch"></span>
               <button class="btn btn-secondary btn-sm" id="btn-edit-targets">Modifier cibles</button>
@@ -247,7 +251,8 @@
       </div>
 
       <div class="card" id="entities-synthese-card" style="display:none" data-carte="entites">
-        <h2>Entités (SCI / Indivision)</h2>
+        <h2>Entités</h2>
+          <p class="card-sub">SCI et indivisions, quote-part de détention appliquée</p>
         <div id="entities-synthese"></div>
       </div>
     </div>

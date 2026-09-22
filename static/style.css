@@ -146,7 +146,7 @@
   --rail-group:    #616b80;
   --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  --radius:        8px;
+  --radius:        11px;
   --shadow:        0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
   --shadow-md:     0 4px 6px -1px rgba(0,0,0,.1), 0 2px 4px -2px rgba(0,0,0,.1);
   --chart-1:  #2f6f6a;  --chart-2:  #3f6ea8;  --chart-3:  #8a6bab;
@@ -3653,17 +3653,17 @@ html.is-masked body::before {
   display: grid; place-items: center; color: #fff; font-size: 12px; font-weight: 700;
 }
 .fin-rail-group {
-  padding: .95rem .55rem .3rem; font-size: .62rem; font-weight: 600;
-  letter-spacing: .1em; text-transform: uppercase; color: var(--rail-group);
+  padding: .82rem .5rem .25rem; font-size: .6rem; font-weight: 600;
+  letter-spacing: .11em; text-transform: uppercase; color: var(--rail-group);
 }
 /* Les entrees heritent de .tab-btn pour le cablage JS, mais toute son
    apparence est reprise ici. */
 .fin-rail .tab-btn {
   display: block; width: 100%; text-align: left; border: 0; border-radius: 7px;
   background: none; color: var(--rail-ink); cursor: pointer;
-  font: inherit; font-size: .84rem; font-weight: 450; padding: .42rem .55rem;
+  font: inherit; font-size: .82rem; font-weight: 450; padding: .44rem .5rem;
 }
-.fin-rail .fin-rail-sub { padding-left: 1.1rem; font-size: .8rem; color: #6f7891; }
+.fin-rail .fin-rail-sub { padding-left: 2.05rem; font-size: .78rem; color: #6b7486; }
 .fin-rail .tab-btn:hover { background: var(--rail-hover); color: #ced5e2; }
 .fin-rail .tab-btn.active {
   background: var(--rail-hover); color: var(--rail-ink-on); font-weight: 500;
@@ -3817,9 +3817,14 @@ body { padding-top: 0 !important; }
 #rail-recherche { padding: 0 .4rem .6rem; }
 #rail-recherche .global-search { width: 100%; }
 #rail-recherche .global-search-input {
-  width: 100%; background: var(--rail-hover); border-color: transparent;
-  color: #ced5e2; font-size: .78rem;
+  width: 100% !important;
+  background: var(--rail-hover) !important;
+  border-color: transparent !important;
+  color: #ced5e2 !important;
+  font-size: .76rem !important;
+  height: 30px !important; min-height: 30px !important;
 }
+#rail-recherche .global-search-icon { opacity: .55; }
 #rail-recherche .global-search-input::placeholder { color: #6f7891; }
 /* L'engrenage prend la forme d'une entree de rail et porte son libelle :
    une icone muette a cote d'un groupe nomme « Réglages » entretenait la
@@ -3832,7 +3837,7 @@ body { padding-top: 0 !important; }
   /* Meme gabarit que .fin-rail-sub : meme retrait, meme taille, meme couleur. */
   display: flex !important; align-items: center; justify-content: flex-start !important;
   width: 100% !important; height: auto !important; min-height: 0 !important;
-  margin: 0 !important; padding: .42rem .55rem .42rem 1.1rem !important;
+  margin: 0 !important; padding: .42rem .55rem .42rem 2.05rem !important;
   border-radius: 7px; border: 0; background: none;
   color: #6f7891; font: inherit; font-size: .8rem; cursor: pointer;
 }
@@ -3847,7 +3852,7 @@ body { padding-top: 0 !important; }
 /* Icônes des destinations : elles ancrent le regard et distinguent une
    navigation d'une simple liste de liens. Les sous-entrées n'en portent pas —
    leur retrait suffit à marquer la subordination. */
-.fin-rail-item { display: flex !important; align-items: center; gap: .55rem; }
+.fin-rail-item { display: flex !important; align-items: center; gap: .56rem; }
 .fin-rail-item svg {
   width: 16px; height: 16px; flex: none;
   stroke: currentColor; fill: none; stroke-width: 1.6;
@@ -4037,7 +4042,14 @@ body { padding-top: 0 !important; }
 /* Il identifiait la carte par une couleur qui ne voulait rien dire ; la
    hiérarchie passe désormais par la taille, et l'accent est réservé au héros. */
 #tab-synthese .kpi-card { border-left: 1px solid var(--border); box-shadow: none; }
-#tab-synthese .card { box-shadow: none; }
+#tab-synthese .card { box-shadow: none; margin-bottom: 0; padding: calc(1rem * var(--d)); }
+#tab-synthese .card h2 { font-size: .87rem; margin-bottom: 0; }
+/* Sous-titre de carte : dire ce que la carte montre, pas seulement de quoi
+   elle parle. « Délai pour mobiliser chaque euro » vaut mieux qu'un titre seul. */
+#tab-synthese .card-sub {
+  margin: .1rem 0 .8rem; color: var(--text-muted); font-size: .74rem;
+}
+#tab-synthese .card > h2:not(:last-child):not(:has(+ .card-sub)) { margin-bottom: .8rem; }
 
 @media (max-width: 1200px) {
   .kpi-hero { grid-column: span 12; }
