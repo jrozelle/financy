@@ -1,26 +1,38 @@
 /* ── Variables ─────────────────────────────────────────────────────────── */
 :root {
-  --primary:       #2563eb;
-  --primary-dark:  #1d4ed8;
-  --primary-light: #eff6ff;
-  --success:       #16a34a;
-  --success-light: #f0fdf4;
-  --danger:        #dc2626;
-  --danger-light:  #fef2f2;
-  --warning:       #d97706;
-  --text:          #111827;
-  --text-muted:    #6b7280;
-  --border:        #e5e7eb;
-  --bg:            #f3f4f6;
+  /* Accent sarcelle plutot que le bleu SaaS par defaut, neutres legerement
+     froids : une application patrimoniale se consulte longtemps, la couleur y
+     sert a hierarchiser, pas a signer. */
+  --primary:       #2f6f6a;
+  --primary-dark:  #245854;
+  --primary-light: #e4efed;
+  --success:       #17795e;
+  --success-light: #e2f2ec;
+  --danger:        #b3261e;
+  --danger-light:  #fbe9e7;
+  --warning:       #9a5b00;
+  --text:          #171b26;
+  --text-muted:    #79808f;
+  --border:        #e0e3ea;
+  --bg:            #f4f5f8;
   --card:          #ffffff;
-  --card-hover:    #fafafa;
+  --card-hover:    #f7f8fa;
+  /* Rail de navigation : sombre dans les deux themes, c'est une constante de
+     l'identite et non une variation de mode. */
+  --rail:          #171b26;
+  --rail-hover:    #232838;
+  --rail-ink:      #9aa3b5;
+  --rail-ink-on:   #ffffff;
+  --rail-group:    #616b80;
+  --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --radius:        8px;
   --shadow:        0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
   --shadow-md:     0 4px 6px -1px rgba(0,0,0,.1), 0 2px 4px -2px rgba(0,0,0,.1);
-  --chart-1:  #2563eb;  --chart-2:  #7c3aed;  --chart-3:  #db2777;
-  --chart-4:  #dc2626;  --chart-5:  #ea580c;  --chart-6:  #d97706;
-  --chart-7:  #65a30d;  --chart-8:  #16a34a;  --chart-9:  #0891b2;
-  --chart-10: #0284c7;  --chart-11: #4f46e5;
+  --chart-1:  #2f6f6a;  --chart-2:  #3f6ea8;  --chart-3:  #8a6bab;
+  --chart-4:  #b8823a;  --chart-5:  #5b7a4b;  --chart-6:  #a85a4a;
+  --chart-7:  #4e8a8a;  --chart-8:  #7a8b3f;  --chart-9:  #57739c;
+  --chart-10: #96628c;  --chart-11: #8d8f9a;
   --chart-border: #ffffff;
   --chart-family: #111827;
   --chart-family-bg: rgba(17,24,39,.06);
@@ -30,27 +42,32 @@
 
 /* ── Dark mode ────────────────────────────────────────────────────────── */
 [data-theme="dark"] {
-  --primary:       #60a5fa;
-  --primary-dark:  #93bbfd;
-  --primary-light: #1e293b;
-  --success:       #4ade80;
-  --success-light: #14532d;
-  --danger:        #f87171;
-  --danger-light:  #450a0a;
-  --warning:       #fbbf24;
-  --text:          #f1f5f9;
-  --text-muted:    #94a3b8;
-  --border:        #334155;
-  --bg:            #0f172a;
-  --card:          #1e293b;
-  --card-hover:    #263548;
+  --primary:       #5fb3a8;
+  --primary-dark:  #7fc7be;
+  --primary-light: #1c2f2e;
+  --success:       #4cb98d;
+  --success-light: #15302a;
+  --danger:        #e8796f;
+  --danger-light:  #331d1c;
+  --warning:       #dca858;
+  --text:          #e8ebf1;
+  --text-muted:    #818a99;
+  --border:        #2a3140;
+  --bg:            #0f1219;
+  --card:          #171b24;
+  --card-hover:    #1e232e;
+  --rail:          #0a0d13;
+  --rail-hover:    #1a1f2b;
+  --rail-ink:      #8b94a6;
+  --rail-ink-on:   #ffffff;
+  --rail-group:    #5a6478;
   --shadow:        0 1px 3px rgba(0,0,0,.3);
   --shadow-md:     0 4px 6px -1px rgba(0,0,0,.4);
   /* Catppuccin Mocha */
-  --chart-1:  #89b4fa;  --chart-2:  #cba6f7;  --chart-3:  #f5c2e7;
-  --chart-4:  #eba0ac;  --chart-5:  #fab387;  --chart-6:  #f9e2af;
-  --chart-7:  #a6e3a1;  --chart-8:  #94e2d5;  --chart-9:  #89dceb;
-  --chart-10: #74c7ec;  --chart-11: #b4befe;
+  --chart-1:  #5fb3a8;  --chart-2:  #7aa5d8;  --chart-3:  #b099cf;
+  --chart-4:  #d6a463;  --chart-5:  #8fb37a;  --chart-6:  #d68f80;
+  --chart-7:  #7ec9c0;  --chart-8:  #b4c27a;  --chart-9:  #8fa8ce;
+  --chart-10: #c58fbb;  --chart-11: #9ba2af;
   --chart-border: #313244;
   --chart-family: #cdd6f4;
   --chart-family-bg: rgba(205,214,244,.08);
@@ -64,7 +81,8 @@ html, body {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
   background: var(--bg);
   color: var(--text);
   font-size: 14px;
@@ -3463,4 +3481,20 @@ html.is-masked body::before {
 }
 @media (max-width: 640px) {
   .kpi-value .spark, .kpi-card .spark { height: 20px; }
+}
+
+/* ── Chiffres ─────────────────────────────────────────────────────────── */
+/* Dans une application patrimoniale, l'alignement des colonnes de montants
+   fait plus pour la lisibilite que n'importe quel choix de couleur. */
+.kpi-value, .num, td.num, th.num,
+.owners-table td:not(:first-child),
+.data-table td.num, .holdings-table td.num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+.kpi-value { letter-spacing: -.02em; font-weight: 500; }
+.kpi-label {
+  font-size: .66rem; font-weight: 600; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--text-muted);
 }
