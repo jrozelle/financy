@@ -11,10 +11,7 @@
  */
 import { S } from '../state.js';
 import { api } from '../api.js';
-import { fmt, fmtDate } from '../utils.js';
-
-const H = 150;          // hauteur utile du dessin
-const BASE = 22;        // place laissee sous l'axe pour les libelles
+import { fmt } from '../utils.js';
 
 export async function loadContribution() {
   const carte = document.getElementById('card-contribution');
@@ -39,19 +36,24 @@ function dessiner(periodes) {
   const hote = document.getElementById('contribution-chart');
   if (!hote) return;
 
-  // L'echelle couvre le plus grand empilement ET la plus grande baisse : une
-  // periode negative sortirait du cadre si on ne mesurait que les hausses.
+  // Coordonnees ABSOLUES dans un viewBox proportionne, et surtout PAS de
+  // `preserveAspectRatio="none"` : cet etirement deforme le texte autant que
+  // les formes, ce qui rendait les libelles illisibles une fois la carte
+  // etiree sur toute la largeur.
+  const L = 60 * periodes.length + 40;   // largeur intrinseque
+  const H = 140, BAS = 26, MARGE = 20;
+
   const haut = Math.max(...periodes.map(p => Math.max(0, p.apports) + Math.max(0, p.performance)), 0);
   const bas  = Math.min(...periodes.map(p => Math.min(0, p.apports) + Math.min(0, p.performance)), 0);
   const etendue = (haut - bas) || 1;
-  const zero = H * (haut / etendue);
-  const ech = v => (Math.abs(v) / etendue) * H;
+  const zero = MARGE + (H - MARGE) * (haut / etendue);
+  const ech = v => (Math.abs(v) / etendue) * (H - MARGE);
 
-  const largeur = 100 / periodes.length;
-  const barre = Math.min(largeur * 0.52, 9);
+  const pas = (L - 40) / periodes.length;
+  const barre = Math.min(pas * 0.56, 34);
 
   const parts = periodes.map((p, i) => {
-    const cx = largeur * (i + 0.5);
+    const cx = 20 + pas * (i + 0.5);
     const x = cx - barre / 2;
     let hautCumul = zero, basCumul = zero;
     const seg = (valeur, couleur) => {
@@ -59,23 +61,27 @@ function dessiner(periodes) {
       const h = ech(valeur);
       const y = valeur > 0 ? (hautCumul -= h) : basCumul;
       if (valeur < 0) basCumul += h;
-      return `<rect x="${x}%" y="${y.toFixed(1)}" width="${barre}%" height="${h.toFixed(1)}"
-                    fill="${couleur}" rx="1.5"/>`;
+      return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barre.toFixed(1)}" `
+           + `height="${Math.max(h, 1).toFixed(1)}" fill="${couleur}" rx="2"/>`;
     };
     const total = p.apports + p.performance;
+    const yVal = total >= 0 ? hautCumul - 5 : basCumul + 11;
+    // Un libelle par barre, en mois abrege : la date complete se chevauchait
+    // des quatre periodes.
+    const mois = new Date(p.fin + 'T12:00:00')
+      .toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' });
     return seg(p.performance, 'var(--chart-1)')
          + seg(p.apports, 'var(--chart-4)')
-         + `<text x="${cx}%" y="${H + 14}" text-anchor="middle" class="contrib-axe">
-              ${fmtDate(p.fin).slice(0, 5)}</text>`
-         + `<text x="${cx}%" y="${(total >= 0 ? hautCumul - 5 : basCumul + 12).toFixed(1)}"
-                  text-anchor="middle" class="contrib-val">${
-              (total >= 0 ? '+' : '−') + Math.round(Math.abs(total) / 1000)}k</text>`;
+         + `<text x="${cx.toFixed(1)}" y="${(H + 15).toFixed(1)}" text-anchor="middle" `
+         + `class="contrib-axe">${mois}</text>`
+         + `<text x="${cx.toFixed(1)}" y="${yVal.toFixed(1)}" text-anchor="middle" `
+         + `class="contrib-val">${(total >= 0 ? '+' : '−') + Math.round(Math.abs(total) / 1000)}k</text>`;
   }).join('');
 
   hote.innerHTML = `
-    <svg viewBox="0 0 100 ${H + BASE}" preserveAspectRatio="none" class="contrib-svg"
-         role="img" aria-label="Décomposition de la variation par période, apports et performance">
-      <line x1="0" y1="${zero.toFixed(1)}" x2="100" y2="${zero.toFixed(1)}" class="contrib-zero"/>
+    <svg class="contrib-svg" viewBox="0 0 ${L} ${H + BAS}"
+         role="img" aria-label="Décomposition de la variation par période : apports et performance">
+      <line x1="10" y1="${zero.toFixed(1)}" x2="${L - 10}" y2="${zero.toFixed(1)}" class="contrib-zero"/>
       ${parts}
     </svg>`;
 }

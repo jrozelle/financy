@@ -3823,11 +3823,14 @@ body { padding-top: 0 !important; }
    une icone muette a cote d'un groupe nomme « Réglages » entretenait la
    confusion entre les preferences et les ecrans d'administration. */
 #rail-reglages { margin: 0; padding: 0; }
-#rail-reglages .settings-menu { display: block; }
+/* Le conteneur d'origine centre son contenu ; dans le rail, l'entree doit
+   s'aligner a gauche comme ses voisines. */
+#rail-reglages .settings-menu { display: block; text-align: left; }
 #rail-reglages .settings-toggle {
   /* Meme gabarit que .fin-rail-sub : meme retrait, meme taille, meme couleur. */
-  display: flex; align-items: center; width: 100%;
-  margin: 0; padding: .42rem .55rem .42rem 1.1rem;
+  display: flex !important; align-items: center; justify-content: flex-start !important;
+  width: 100% !important; height: auto !important; min-height: 0 !important;
+  margin: 0 !important; padding: .42rem .55rem .42rem 1.1rem !important;
   border-radius: 7px; border: 0; background: none;
   color: #6f7891; font: inherit; font-size: .8rem; cursor: pointer;
 }
@@ -3904,10 +3907,12 @@ body { padding-top: 0 !important; }
 .page-head.is-stuck { border-bottom-color: var(--border); }
 
 /* ── « D'où vient la hausse » ─────────────────────────────────────────── */
-.contrib-svg { display: block; width: 100%; height: 172px; overflow: visible; }
+/* Hauteur libre et proportions conservees : un `preserveAspectRatio: none`
+   etirerait le texte autant que les barres. */
+.contrib-svg { display: block; width: 100%; max-width: 560px; height: auto; overflow: visible; }
 .contrib-zero { stroke: var(--border); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.contrib-axe  { font-size: 7px; fill: var(--text-muted); font-family: var(--mono); }
-.contrib-val  { font-size: 7px; fill: var(--text); font-family: var(--mono); font-weight: 500; }
+.contrib-axe  { font-size: 10px; fill: var(--text-muted); font-family: var(--mono); }
+.contrib-val  { font-size: 10px; fill: var(--text); font-family: var(--mono); font-weight: 500; }
 .stack-legend {
   display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;
   margin-top: .7rem; font-size: .78rem; color: var(--text-muted);
