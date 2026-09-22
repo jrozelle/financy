@@ -38,6 +38,7 @@ async function init() {
   wireReglages(chargerEcranReglage);
   S.config = await api('GET', '/api/config');
   buildSelects();
+  _lireContexte({ avecArrete: false });
   _buildGlobalOwnerFilter();
   wireEvents();
   wireDrilldownEvents();
@@ -48,12 +49,16 @@ async function init() {
     S.syntheseDate = cible;
     S.positionsDate = cible;
     await refreshDates();
+    _ecrireContexte();
     await loadHistorique();
     _lastLoadedTab = null;
     await switchTab(S.currentTab, { pushHistory: false });
   });
   await Promise.all([refreshDates(), loadEntities(), loadHistorique(), loadTargets(), loadUserAlertsAsync()]);
   await migrateLocalStorageToDB();
+  _lireContexte();
+  _refleterContexte();
+  _ecrireContexte();          // une valeur ignoree disparait aussi de l'adresse
   await switchTab(_tabFromUrl() || 'synthese', { pushHistory: false });
   initDemoToggle();
 }
@@ -123,6 +128,50 @@ function hideLoading(tabId) {
 
 // ─── Global owner filter ──────────────────────────────────────────────────
 
+// ── Contexte de lecture dans l'adresse ───────────────────────────────
+// Titulaire, arrete et periode se perdaient au rechargement. Ils vivent dans
+// l'adresse : un rechargement, un favori ou un lien partage les gardent, et
+// Precedent / Suivant restent coherents. Une valeur par defaut n'est pas
+// ecrite — /synthese seul montre la famille au DERNIER arrete, y compris
+// quand un nouvel arrete a ete cree depuis.
+function _contexteQuery() {
+  const q = new URLSearchParams();
+  if (S.syntheseOwner && S.syntheseOwner !== 'Famille') q.set('titulaire', S.syntheseOwner);
+  if (S.syntheseDate && S.dates?.length && S.syntheseDate !== S.dates[0]) q.set('arrete', S.syntheseDate);
+  if (S.periodeComparaison && S.periodeComparaison !== 'periode') q.set('periode', S.periodeComparaison);
+  const t = q.toString();
+  return t ? `?${t}` : '';
+}
+
+function _ecrireContexte() {
+  const url = location.pathname + _contexteQuery();
+  if (url !== location.pathname + location.search) history.replaceState(history.state, '', url);
+}
+
+/** Lit l'adresse. Une valeur qui ne correspond plus a rien — titulaire
+ *  retire du referentiel, arrete supprime — est ignoree, pas imposee. */
+function _lireContexte({ avecArrete = true } = {}) {
+  const q = new URLSearchParams(location.search);
+  const t = q.get('titulaire');
+  if (t && ['Famille', ...(S.config?.owners || [])].includes(t)) S.syntheseOwner = t;
+  else if (!t) S.syntheseOwner = 'Famille';
+  const p = q.get('periode');
+  S.periodeComparaison = p === 'an' ? 'an' : 'periode';
+  if (!avecArrete) return;
+  const a = q.get('arrete');
+  if (a && S.dates?.includes(a)) { S.syntheseDate = a; S.positionsDate = a; }
+  else if (!a && S.dates?.length) { S.syntheseDate = S.dates[0]; S.positionsDate = S.dates[0]; }
+}
+
+/** Remet les controles de l'en-tete dans l'etat de S. */
+function _refleterContexte() {
+  const sel = document.getElementById('global-owner-filter');
+  if (sel) sel.value = S.syntheseOwner || 'Famille';
+  renderDateSelects();
+  document.querySelectorAll('#seg-periode [data-periode]').forEach(b =>
+    b.setAttribute('aria-pressed', String(b.dataset.periode === S.periodeComparaison)));
+}
+
 function _buildGlobalOwnerFilter() {
   const sel = document.getElementById('global-owner-filter');
   if (!sel) return;
@@ -134,6 +183,7 @@ function _buildGlobalOwnerFilter() {
 
 function _onGlobalOwnerChange(e) {
   S.syntheseOwner = e.target.value;
+  _ecrireContexte();
   // Sync actifs filter
   const actifsSel = document.getElementById('actifs-owner-filter');
   if (actifsSel) actifsSel.value = S.syntheseOwner === 'Famille' ? '' : S.syntheseOwner;
@@ -269,7 +319,7 @@ export async function switchTab(tab, { pushHistory = true } = {}) {
   majTitrePage(tab);
 
   if (pushHistory && location.pathname !== `/${tab}`) {
-    history.pushState({ tab }, '', `/${tab}`);
+    history.pushState({ tab }, '', `/${tab}${_contexteQuery()}`);
   }
 
   updateDemoBadge();
@@ -326,6 +376,9 @@ function wireEvents() {
   // Browser back/forward
   window.addEventListener('popstate', e => {
     const tab = e.state?.tab || _tabFromUrl() || 'synthese';
+    _lireContexte();
+    _refleterContexte();
+    _lastLoadedTab = null;
     switchTab(tab, { pushHistory: false });
   });
 
@@ -333,6 +386,7 @@ function wireEvents() {
   document.getElementById('synthese-date-select').addEventListener('change', async e => {
     S.syntheseDate = e.target.value;
     S.positionsDate = e.target.value;
+    _ecrireContexte();
     const positionsSelect = document.getElementById('positions-date-select');
     if (positionsSelect) positionsSelect.value = e.target.value;
     if (S.currentTab === 'positions') {
@@ -349,6 +403,7 @@ function wireEvents() {
   document.getElementById('positions-date-select').addEventListener('change', async e => {
     S.positionsDate = e.target.value;
     S.syntheseDate = e.target.value;
+    _ecrireContexte();
     const syntheseSelect = document.getElementById('synthese-date-select');
     if (syntheseSelect) syntheseSelect.value = e.target.value;
     showLoading('tab-positions');
@@ -612,6 +667,7 @@ function wireEvents() {
       b.setAttribute('aria-pressed', String(p.cle === S.periodeComparaison));
       b.addEventListener('click', () => {
         S.periodeComparaison = p.cle;
+        _ecrireContexte();
         segPeriode.querySelectorAll('[data-periode]').forEach(o => {
           o.setAttribute('aria-pressed', String(o.dataset.periode === p.cle));
         });
