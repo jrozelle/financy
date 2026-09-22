@@ -23,9 +23,20 @@ export const fmtQty = (n, dec = 0) => {
 /** Libelle d'axe de graphe (notation compacte : "29 k€"). Cinq graphes le
  *  reformataient chacun de leur cote ; un seul endroit desormais, donc un seul
  *  endroit ou le masquage s'applique. */
-export const fmtAxis = v => {
+const _axeFormats = {};
+export const fmtAxis = (v, _i, ticks) => {
   if (isMasked()) return maskAxis();
-  return new Intl.NumberFormat('fr-FR', { notation: 'compact' }).format(v) + '\u202f€';
+  // Assez de decimales pour que deux graduations voisines ne se lisent pas
+  // pareil : de 1,00 a 1,04 M€ par pas de 20 k€, « 1 M€ » s'affichait trois
+  // fois. Chart.js passe la liste des graduations en troisieme argument.
+  let dec = 0;
+  if (ticks?.length > 1) {
+    const pas = Math.abs(ticks[1].value - ticks[0].value);
+    const unite = Math.abs(v) >= 1e9 ? 1e9 : Math.abs(v) >= 1e6 ? 1e6 : Math.abs(v) >= 1e3 ? 1e3 : 1;
+    if (pas > 0 && pas < unite) dec = Math.min(2, Math.ceil(-Math.log10(pas / unite) - 1e-9));
+  }
+  const f = (_axeFormats[dec] ||= new Intl.NumberFormat('fr-FR', { notation: 'compact', maximumFractionDigits: dec }));
+  return f.format(v) + '\u202f€';
 };
 
 
@@ -259,3 +270,29 @@ export function destroyChart(chart) {
 }
 
 
+
+// ─── Axe temporel Chart.js ─────────────────────────────────────────────────
+// Jamais d'echelle `category` pour une serie temporelle (CLAUDE.md) : des
+// arretes irreguliers y tombent a egale distance, et la pente ment. Sans
+// adaptateur de dates, l'axe est lineaire sur l'epoch.
+
+/** AAAA-MM-JJ -> epoch, a midi : une date ne glisse pas d'un jour selon le fuseau. */
+export const tsJour = d => new Date(d + 'T12:00:00').getTime();
+
+/** Echelle x bornee aux dates fournies. `jour` : libelle au jour pres (courtes
+ *  periodes), sinon au mois. */
+export function echelleTemps(dates, { jour = true, taille = 10, max = 6 } = {}) {
+  const ts = dates.map(tsJour);
+  return {
+    type: 'linear', min: Math.min(...ts), max: Math.max(...ts),
+    ticks: {
+      font: { size: taille }, maxRotation: 0, autoSkip: true, maxTicksLimit: max,
+      callback: v => new Date(v).toLocaleDateString('fr-FR',
+        jour ? { day: '2-digit', month: 'short' } : { month: 'short', year: '2-digit' }),
+    },
+    grid: { display: false },
+  };
+}
+
+/** Titre d'infobulle : la date du point survole. */
+export const titreDate = items => items.length ? new Date(items[0].parsed.x).toLocaleDateString('fr-FR') : '';

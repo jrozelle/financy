@@ -106,9 +106,12 @@ function _dessiner(hote) {
     return e;
   };
 
-  ticks.forEach(v => {
+  // Les graduations accompagnent la valeur, comme Chart.js : le format en
+  // deduit ses decimales, et deux libelles voisins ne se lisent pas pareil.
+  const graduees = ticks.map(value => ({ value }));
+  ticks.forEach((v, i) => {
     el('line', { class: 'courbe-grille', x1: MARGE_G, x2: L - MARGE_D, y1: Y(v), y2: Y(v) });
-    el('text', { class: 'courbe-axe', x: MARGE_G - 8, y: Y(v) + 3.5, 'text-anchor': 'end' }, formatY(v));
+    el('text', { class: 'courbe-axe', x: MARGE_G - 8, y: Y(v) + 3.5, 'text-anchor': 'end' }, formatY(v, i, graduees));
   });
   moisAffiches(t0, t1).forEach((t, i, arr) => {
     const dernier = i === arr.length - 1 && X(t) > L - 60;

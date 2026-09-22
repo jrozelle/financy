@@ -3,7 +3,8 @@ import logging
 import threading
 from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, request
-from models import get_db, validate_isin
+from models import (get_db, validate_isin, get_holdings_map, _holding_value_or_none,
+                    holding_price_warning)
 from services.prices import (get_provider, refresh_securities, refresh_history,
                              refresh_fx_rates,
                              freshness_status)
@@ -127,42 +128,33 @@ def history(isin):
         date_filter = 'AND p.date=?' if latest_date else ''
         date_params = [isin, latest_date] if latest_date else [isin]
 
-        hs = conn.execute(
-            f'''SELECT SUM(h.quantity) as qty, SUM(h.cost_basis) as cost, SUM(h.market_value) as mv
-               FROM holdings h JOIN positions p ON p.id = h.position_id
-               WHERE h.isin=? {date_filter}''', date_params
-        ).fetchone()
-
-        positions_detail = conn.execute(
-            f'''SELECT h.quantity, h.cost_basis, h.market_value,
-                      p.owner, p.envelope, p.establishment, p.category
-               FROM holdings h
-               JOIN positions p ON p.id = h.position_id
-               WHERE h.isin=? {date_filter}
-               ORDER BY h.market_value DESC''',
-            date_params
-        ).fetchall()
+        # Les lignes passent par le meme chemin que les positions : cours
+        # converti en euros par fx_rates, rien a defaut de taux, arbitrage
+        # signale. `quantite x cours` affichait en euros un cours en dollars.
+        ids = [r['id'] for r in conn.execute(
+            'SELECT id FROM positions WHERE date=?', (latest_date,))] if latest_date else []
+        pos_info = {r['id']: r for r in conn.execute(
+            f"SELECT id, owner, envelope, establishment, category FROM positions WHERE id IN ({','.join('?' * len(ids))})",
+            ids)} if ids else {}
+        lignes = [h for hs in get_holdings_map(conn, ids).values() for h in hs if h['isin'] == isin] if ids else []
 
     points = [{'date': r['date'], 'price': r['price']} for r in rows]
     last_price = points[-1]['price'] if points else sec['last_price']
     first_price = points[0]['price'] if points else None
     variation_pct = ((last_price - first_price) / first_price * 100) if (first_price and last_price) else None
 
-    qty = hs['qty'] if hs else None
-    cost = hs['cost'] if hs else None
-    mv_stored = hs['mv'] if hs else None
-
-    pnl = None
-    pnl_pct = None
-    current_value = None
-    if qty and qty > 0:
-        if last_price is not None and sec['is_priceable']:
-            current_value = qty * last_price
-        elif mv_stored is not None:
-            current_value = mv_stored
-        if current_value is not None and cost:
-            pnl = current_value - cost
-            pnl_pct = (pnl / cost * 100) if cost else None
+    qty = sum(h['quantity'] or 0 for h in lignes) or None
+    valeurs = [_holding_value_or_none(h) for h in lignes]
+    current_value = sum(v for v in valeurs if v is not None) if any(v is not None for v in valeurs) else None
+    # Plus-value sur les seules lignes qui ont un cout et une valeur.
+    mesurees = [(h, v) for h, v in zip(lignes, valeurs) if v is not None and h['cost_basis']]
+    cost = sum(h['cost_basis'] or 0 for h in lignes) or None
+    cout_mesure = sum(h['cost_basis'] for h, _ in mesurees)
+    pnl = sum(v - h['cost_basis'] for h, v in mesurees) if mesurees else None
+    pnl_pct = (pnl / cout_mesure * 100) if pnl is not None and cout_mesure else None
+    # Une raison par arbitrage, sans doublon d'une enveloppe a l'autre.
+    alertes = sorted({a['reason'] for a in (holding_price_warning(h) for h in lignes) if a})
+    lignes_sorted = sorted(zip(lignes, valeurs), key=lambda x: -(x[1] or 0))
 
     return jsonify({
         'isin':            isin,
@@ -183,14 +175,15 @@ def history(isin):
             'current_value': current_value,
             'pnl':           pnl,
             'pnl_pct':       pnl_pct,
+            'alertes':       alertes,
             'positions': [{
-                'owner':         r['owner'],
-                'envelope':      r['envelope'],
-                'establishment': r['establishment'],
-                'category':      r['category'],
-                'quantity':      r['quantity'],
-                'market_value':  r['market_value'],
-            } for r in positions_detail],
+                'owner':         pos_info[h['position_id']]['owner'],
+                'envelope':      pos_info[h['position_id']]['envelope'],
+                'establishment': pos_info[h['position_id']]['establishment'],
+                'category':      pos_info[h['position_id']]['category'],
+                'quantity':      h['quantity'],
+                'market_value':  v,
+            } for h, v in lignes_sorted],
         } if qty else None,
     })
 

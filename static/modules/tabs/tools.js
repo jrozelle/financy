@@ -1,5 +1,6 @@
 import { S } from '../state.js';
-import { fmt, fmtDate, esc, getColors, chartBorderColor, destroyChart, parseLocaleNumber, fmtAxis } from '../utils.js';
+import { fmt, fmtDate, esc, getColors, chartBorderColor, destroyChart, parseLocaleNumber, fmtAxis,
+         tsJour, echelleTemps, titreDate } from '../utils.js';
 import { api } from '../api.js';
 import { toast } from '../dialogs.js';
 import { refreshDates } from '../main.js';
@@ -59,13 +60,14 @@ function renderTimelineChart(snapshots) {
   const colors = getColors();
   const border = chartBorderColor();
 
+  // Echelle de temps : des arretes irreguliers restent a leur vraie date.
+  snapshots = [...snapshots].sort((a, b) => a.date.localeCompare(b.date));
   _timelineChart = new Chart(canvas, {
     type: 'line',
     data: {
-      labels: snapshots.map(s => fmtDate(s.date)),
       datasets: [{
         label: 'Patrimoine net',
-        data: snapshots.map(s => s.value),
+        data: snapshots.map(s => ({ x: tsJour(s.date), y: s.value })),
         borderColor: colors[0],
         backgroundColor: colors[0] + '18',
         fill: true,
@@ -89,6 +91,7 @@ function renderTimelineChart(snapshots) {
         legend: { display: false },
         tooltip: {
           callbacks: {
+            title: titreDate,
             label: ctx => ` ${fmt(ctx.parsed.y)}`,
             afterBody: () => 'Cliquer pour voir la composition',
           },
@@ -102,7 +105,7 @@ function renderTimelineChart(snapshots) {
           },
           grid: { color: border },
         },
-        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+        x: echelleTemps(snapshots.map(s => s.date)),
       },
     },
   });

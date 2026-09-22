@@ -159,12 +159,16 @@ export function closeModal(id) {
 }
 
 // ─── Focus trap for static HTML modals ─────────────────────────────────────
-export function trapModalFocus(modalId) {
+export function trapModalFocus(modalId, { onEscape = null } = {}) {
   const modal = document.getElementById(modalId);
   if (!modal) return;
   _trapFocus(modal);
-  // Escape key closes the modal
+  // Echap ferme la modale — ou passe par `onEscape` quand la fermeture doit
+  // d'abord demander confirmation (un brouillon non enregistre). L'evenement
+  // s'arrete ici : le gestionnaire du document ne le traite pas une 2e fois.
   modal.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { closeModal(modalId); }
+    if (e.key !== 'Escape') return;
+    e.stopPropagation();
+    onEscape ? onEscape() : closeModal(modalId);
   });
 }

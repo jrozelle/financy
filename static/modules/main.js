@@ -752,7 +752,9 @@ function wireEvents() {
   });
 
   // Focus traps on static modals
-  ['position-modal', 'flux-modal', 'entity-modal', 'targets-modal', 'holdings-modal', 'settings-modal'].forEach(trapModalFocus);
+  ['position-modal', 'flux-modal', 'entity-modal', 'targets-modal', 'settings-modal'].forEach(id => trapModalFocus(id));
+  // Les lignes de titres ont un brouillon : Echap demande avant de le perdre.
+  trapModalFocus('holdings-modal', { onEscape: confirmCloseHoldings });
 
   // Body scroll-lock : observe toutes les modales statiques + popover ISIN
   installModalScrollLock();

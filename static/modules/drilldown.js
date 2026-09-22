@@ -1,7 +1,16 @@
 import { S } from './state.js';
-import { fmt, fmtDate, esc, liqText, getColors, chartBorderColor, destroyChart, fmtAxis, fmtPct } from './utils.js';
+import { fmt, fmtDate, esc, liqText, getColors, chartBorderColor, destroyChart, fmtAxis, fmtPct,
+         tsJour, echelleTemps, titreDate } from './utils.js';
 import { api } from './api.js';
 import { closeModal, confirmDialog } from './dialogs.js';
+
+/** Montant d'en-tete du panneau. Un net negatif en vert d'accent se lisait
+ *  comme un gain : la couleur suit le signe. */
+export function montantPanneau(texte, valeur) {
+  const el = document.getElementById('dd-amount');
+  el.textContent = texte;
+  el.classList.toggle('neg', valeur < 0);
+}
 
 let _historyChart = null;
 const _navStack = [];
@@ -13,6 +22,7 @@ function _snapshot() {
     subtitle: document.getElementById('dd-subtitle').textContent,
     title:    document.getElementById('dd-title').textContent,
     amount:   document.getElementById('dd-amount').textContent,
+    negatif:  document.getElementById('dd-amount').classList.contains('neg'),
     body:     document.getElementById('dd-body').innerHTML,
   };
 }
@@ -21,7 +31,7 @@ function _restore(snap) {
   _historyChart = destroyChart(_historyChart);
   document.getElementById('dd-subtitle').textContent = snap.subtitle;
   document.getElementById('dd-title').textContent    = snap.title;
-  document.getElementById('dd-amount').textContent   = snap.amount;
+  montantPanneau(snap.amount, snap.negatif ? -1 : 1);
   document.getElementById('dd-body').innerHTML        = snap.body;
   _updateBackBtn();
 }
@@ -61,7 +71,7 @@ export function drilldownPositions(positions, title, subtitle, { showOwner = fal
 
   document.getElementById('dd-subtitle').textContent = subtitle || '';
   document.getElementById('dd-title').textContent    = title   || '';
-  document.getElementById('dd-amount').textContent   = fmt(total);
+  montantPanneau(fmt(total), total);
 
   document.getElementById('dd-body').innerHTML = `
     <div class="dd-section">
@@ -112,7 +122,7 @@ export function drilldownMobilizable() {
 
     document.getElementById('dd-subtitle').textContent = 'Liquidité';
     document.getElementById('dd-title').textContent    = 'Mobilisable';
-    document.getElementById('dd-amount').textContent   = fmt(total);
+    montantPanneau(fmt(total), total);
 
     const sectionsHtml = S.config.liquidity_order
       .filter(l => byLiq[l]?.length)
@@ -159,7 +169,7 @@ export async function drilldownHistory({ subtitle, title, filters }) {
   document.getElementById('dd-title').textContent = title || '';
 
   if (!history.length) {
-    document.getElementById('dd-amount').textContent = '';
+    montantPanneau('', 0);
     document.getElementById('dd-body').innerHTML =
       '<p style="color:var(--text-muted);padding:.75rem">Aucune donnée historique.</p>';
     document.getElementById('drilldown-panel').classList.remove('hidden');
@@ -168,7 +178,7 @@ export async function drilldownHistory({ subtitle, title, filters }) {
   }
 
   const last = history[history.length - 1];
-  document.getElementById('dd-amount').textContent = fmt(last.net);
+  montantPanneau(fmt(last.net), last.net);
 
   const rows = history.map(h => {
     const prev = history[history.indexOf(h) - 1];
@@ -201,10 +211,9 @@ export async function drilldownHistory({ subtitle, title, filters }) {
     _historyChart = new Chart(canvas, {
       type: 'line',
       data: {
-        labels: history.map(h => fmtDate(h.date)),
         datasets: [{
           label: 'Net',
-          data: history.map(h => h.net),
+          data: history.map(h => ({ x: tsJour(h.date), y: h.net })),
           borderColor: colors[0],
           backgroundColor: colors[0] + '18',
           fill: true,
@@ -216,10 +225,11 @@ export async function drilldownHistory({ subtitle, title, filters }) {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        plugins: { legend: { display: false },
+                   tooltip: { callbacks: { title: titreDate, label: ctx => ` ${fmt(ctx.parsed.y)}` } } },
         scales: {
           y: { ticks: { callback: fmtAxis, font: { size: 11 } }, grid: { color: border } },
-          x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+          x: echelleTemps(history.map(h => h.date)),
         },
       },
     });

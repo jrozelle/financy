@@ -1,9 +1,11 @@
 import { S } from '../state.js';
-import { fmt, fmtDate, esc, sortArr, updateSortIndicators, today, getColors, chartBorderColor, destroyChart, parseLocaleNumber, fmtAxis } from '../utils.js';
+import { fmt, fmtDate, esc, sortArr, updateSortIndicators, today, getColors, chartBorderColor, destroyChart, parseLocaleNumber, fmtAxis,
+         tsJour, echelleTemps, titreDate } from '../utils.js';
 import { api, refreshEntitySelect } from '../api.js';
 import { confirmDialog, toast, closeModal } from '../dialogs.js';
 import { switchTab } from '../main.js';
 import { openPosModal } from './positions.js';
+import { montantPanneau } from '../drilldown.js';
 
 let _entityTimelineChart = null;
 
@@ -101,14 +103,15 @@ function showEntitySnapshots(entityName) {
       <td class="num ${s.debt > 0 ? 'neg' : ''}">${s.debt > 0 ? fmt(s.debt) : '—'}</td>
       <td class="num ${net < 0 ? 'neg' : 'pos'}">${fmt(net)}</td>
       <td style="text-align:center">
-        <button class="btn-icon del" style="font-size:11px" data-sid="${s.id}" data-action="del-snap">Supprimer</button>
+        <button class="btn-icon del ent-suppr" data-sid="${s.id}" data-action="del-snap"
+          aria-label="Supprimer la valeur du ${fmtDate(s.date)}">×</button>
       </td>
     </tr>`;
   }).join('') || '<tr><td colspan="5" style="color:var(--text-muted);padding:.75rem">Aucune valorisation enregistrée.</td></tr>';
 
   document.getElementById('dd-subtitle').textContent = 'Entité';
   document.getElementById('dd-title').textContent = entityName;
-  document.getElementById('dd-amount').textContent = entity ? fmt(entity.net_assets) + ' (actuel)' : '';
+  montantPanneau(entity ? fmt(entity.net_assets) + ' (actuel)' : '', entity?.net_assets || 0);
   const showChart = snaps.length >= 2;
   document.getElementById('dd-body').innerHTML = `
     ${showChart ? '<div style="position:relative;height:200px;margin-bottom:1rem"><canvas id="entity-timeline-canvas"></canvas></div>' : ''}
@@ -210,16 +213,16 @@ function renderEntityTimeline(snaps) {
   _entityTimelineChart = destroyChart(_entityTimelineChart);
 
   const sorted = [...snaps].sort((a, b) => a.date.localeCompare(b.date));
-  const labels = sorted.map(s => fmtDate(s.date));
-  const netData = sorted.map(s => (s.gross_assets || 0) - (s.debt || 0));
-  const grossData = sorted.map(s => s.gross_assets || 0);
+  // Echelle de temps : les valeurs d'une entite se saisissent a intervalles
+  // irreguliers, et une echelle `category` les espacerait regulierement.
+  const netData = sorted.map(s => ({ x: tsJour(s.date), y: (s.gross_assets || 0) - (s.debt || 0) }));
+  const grossData = sorted.map(s => ({ x: tsJour(s.date), y: s.gross_assets || 0 }));
   const colors = getColors();
   const border = chartBorderColor();
 
   _entityTimelineChart = new Chart(canvas, {
     type: 'line',
     data: {
-      labels,
       datasets: [
         {
           label: 'Actif net',
@@ -248,6 +251,7 @@ function renderEntityTimeline(snaps) {
       maintainAspectRatio: false,
       plugins: {
         legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: { mode: 'nearest', intersect: false, callbacks: { title: titreDate, label: ctx => ` ${ctx.dataset.label} : ${fmt(ctx.parsed.y)}` } },
       },
       scales: {
         y: {
@@ -257,7 +261,7 @@ function renderEntityTimeline(snaps) {
           },
           grid: { color: border },
         },
-        x: { ticks: { font: { size: 10 } }, grid: { display: false } },
+        x: echelleTemps(sorted.map(s => s.date)),
       },
     },
   });

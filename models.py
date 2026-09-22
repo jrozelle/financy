@@ -794,6 +794,22 @@ def _holding_effective_value(h):
     return _holding_decision(h)[0]
 
 
+def _holding_value_or_none(h):
+    """Valorisation d'une ligne, ou None quand RIEN ne la fonde : ni valeur
+    enregistree, ni cours utilisable (titre non cote, cours absent, devise sans
+    taux). `_holding_effective_value` rend alors 0, ce qui convient a une
+    somme d'actifs mais pas a une plus-value : une ligne en dollars sans taux
+    comptait son prix de revient en perte."""
+    if h.get('market_value') is not None:
+        return _holding_effective_value(h)
+    if not h.get('is_priceable') or h.get('last_price') is None:
+        return None
+    devise = (h.get('currency') or 'EUR').upper()
+    if devise != 'EUR' and not (h.get('fx_rate') or 0) > 0:
+        return None
+    return _holding_effective_value(h)
+
+
 def compute_position(pos, entity_map=None, ref=None, holdings_map=None):
     """Calcule les agrégats d'une position.
 
@@ -875,8 +891,11 @@ def _plus_value(holdings, ownership_pct):
         cb, mv = h.get('cost_basis'), h.get('market_value')
         if not cb or (mv is not None and abs(cb - mv) < 0.01):
             continue
+        valeur = _holding_value_or_none(h)
+        if valeur is None:           # non valorisable : ni gain ni perte connus
+            continue
         cout += cb
-        gain += _holding_effective_value(h) - cb
+        gain += valeur - cb
         mesurees += 1
     if not mesurees:
         return {'gain_lignes': 0}

@@ -536,9 +536,19 @@ def update_security(isin):
             updates.append('is_priceable=?')
             params.append(int(bool(d['is_priceable'])))
         if 'last_price' in d:
+            if d['last_price'] is not None and (not validate_number(d['last_price'])
+                                                or parse_number(d['last_price'], 0) <= 0):
+                return jsonify({'error': 'Cours invalide'}), 400
             updates.append('last_price=?')
             params.append(parse_number(d['last_price']) if d['last_price'] is not None else None)
+            # Un cours saisi a la main date d'aujourd'hui : sans cela il restait
+            # marque « perime » avec la date du dernier cours du fournisseur.
+            if d['last_price'] is not None and 'last_price_date' not in d:
+                updates.append('last_price_date=?'); params.append(datetime.now().strftime('%Y-%m-%d'))
+                updates.append('data_source=?'); params.append('manual')
         if 'last_price_date' in d:
+            if d['last_price_date'] is not None and not validate_date(d['last_price_date']):
+                return jsonify({'error': 'Date de cours invalide'}), 400
             updates.append('last_price_date=?')
             params.append(d['last_price_date'])
 

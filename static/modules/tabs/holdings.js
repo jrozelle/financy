@@ -61,6 +61,10 @@ function makeRow(h = {}) {
     quantity:        h.quantity ?? '',
     cost_basis:      qty > 0 && totalCost !== '' && totalCost != null ? (parseLocaleNumber(totalCost, 0) / qty) : '',
     market_value:    h.market_value ?? '',
+    // Valeur calculee par le serveur, en euros (cours converti par fx_rates),
+    // valable tant que la quantite chargee n'a pas change.
+    effective_value: h.effective_value ?? null,
+    qty_initiale:    qty,
     is_priceable:    h.is_priceable ?? null,
     last_price:      h.last_price ?? null,
     last_price_date: h.last_price_date ?? null,
@@ -195,12 +199,21 @@ function _freshnessBadge(r) {
   return `<span class="h-badge ${cls}" title="${esc(title)}">${label}</span>`;
 }
 
+/** Valeur d'une ligne en euros, ou null. Jamais `quantite x cours` : le cours
+ *  est dans la devise du titre, et un titre du Nasdaq s'affichait en dollars
+ *  suffixes d'un euro. La valeur du serveur, elle, est convertie. */
+function _valeur(r) {
+  const mv = parseLocaleNumber(r.market_value);
+  if (!isNaN(mv)) return mv;
+  if (r.effective_value != null && parseLocaleNumber(r.quantity, 0) === r.qty_initiale) return r.effective_value;
+  return null;
+}
+
 function _pnlCell(r) {
   const qty  = parseLocaleNumber(r.quantity, 0);
-  const mv   = parseLocaleNumber(r.market_value);
   const cost = _totalCost(r);
   if (!qty || isNaN(cost) || cost <= 0) return '—';
-  const currentValue = !isNaN(mv) ? mv : (r.last_price != null ? qty * r.last_price : null);
+  const currentValue = _valeur(r);
   if (currentValue == null) return '—';
   const pnl = currentValue - cost;
   const pct = (pnl / cost) * 100;
@@ -209,10 +222,15 @@ function _pnlCell(r) {
 }
 
 function renderTotals() {
-  const totalMv = state.rows.reduce((s, r) => s + parseLocaleNumber(r.market_value, 0), 0);
+  const totalMv = state.rows.reduce((s, r) => s + (_valeur(r) ?? 0), 0);
   const totalCost = state.rows.reduce((s, r) => s + (isNaN(_totalCost(r)) ? 0 : _totalCost(r)), 0);
-  const pnl = totalMv - totalCost;
-  const pct = totalCost > 0 ? (pnl / totalCost * 100) : 0;
+  // La plus-value ne compare que les lignes qui ont un cout ET une valeur :
+  // une ligne sans valorisation comptait son cout en perte.
+  const mesurees = state.rows.filter(r => _totalCost(r) > 0 && _valeur(r) != null);
+  const coutMesure = mesurees.reduce((s, r) => s + _totalCost(r), 0);
+  const pnl = mesurees.reduce((s, r) => s + _valeur(r) - _totalCost(r), 0);
+  const pct = coutMesure > 0 ? (pnl / coutMesure * 100) : 0;
+  const partiel = mesurees.length < state.rows.filter(r => _totalCost(r) > 0).length;
   const foot = document.getElementById('holdings-tfoot');
   if (!foot) return;
   foot.innerHTML = `
@@ -220,7 +238,8 @@ function renderTotals() {
       <td colspan="3">TOTAL</td>
       <td class="num">${fmt(totalCost)}</td>
       <td class="num">${fmt(totalMv)}</td>
-      <td class="num ${pnl >= 0 ? 'pos' : 'neg'}">${fmt(pnl)}${totalCost > 0 ? ` (${fmtPct(pct)})` : ''}</td>
+      <td class="num ${pnl >= 0 ? 'pos' : 'neg'}">${fmt(pnl)}${coutMesure > 0 ? ` (${fmtPct(pct)})` : ''}${
+        partiel ? `<span class="pv-partiel">${mesurees.length} ligne${mesurees.length > 1 ? 's' : ''} valorisée${mesurees.length > 1 ? 's' : ''}</span>` : ''}</td>
       <td></td>
     </tr>`;
 }
@@ -372,8 +391,10 @@ async function openPasteDialog() {
       asset_class: l.asset_class, as_of_date: l.as_of_date,
     }));
     renderHoldingsTable();
+    // Des lignes collees non enregistrees sont un brouillon, comme un import PDF.
+    _markDirty();
     if (status) {
-      status.innerHTML = `<strong>${data.source_label}</strong> · ${data.lines.length} ligne(s) — verifiez puis Enregistrer.`;
+      status.innerHTML = `<strong>${esc(data.source_label || '')}</strong> · ${data.lines.length} ligne(s) — verifiez puis Enregistrer.`;
     }
     toast(`${data.lines.length} ligne(s) detectee(s)`, 'success');
   } catch (err) {

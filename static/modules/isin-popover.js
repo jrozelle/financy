@@ -1,5 +1,6 @@
 import { api } from './api.js';
-import { esc, fmt, fmtDate, destroyChart, getColors, chartBorderColor, parseLocaleNumber, fmtQty, fmtPct } from './utils.js';
+import { esc, fmt, fmtDate, destroyChart, getColors, chartBorderColor, parseLocaleNumber, fmtQty, fmtPct,
+         tsJour, echelleTemps, titreDate } from './utils.js';
 import { toast } from './dialogs.js';
 
 let _chart = null;
@@ -72,7 +73,9 @@ function _summaryHtml(data) {
       </div>`;
   }
 
-  const last = data.last_price != null ? fmt(data.last_price) + ` ${data.currency || ''}` : '—';
+  // Deux decimales dans la devise du titre : `fmt` arrondit a l'euro et
+  // suffixe « € » — 0,85 USD s'affichait « 1 € USD ».
+  const last = data.last_price != null ? `${fmtQty(data.last_price, 2)} ${data.currency || 'EUR'}` : '—';
   const varPct = data.variation_pct;
   const varDisplay = varPct != null
     ? `<span class="${varPct >= 0 ? 'pos' : 'neg'}">${fmtPct(varPct, 2, true)}</span>`
@@ -121,11 +124,11 @@ function _holdingHtml(h) {
   if (h.positions && h.positions.length) {
     const rows = h.positions.map(p => {
       const label = [p.establishment, p.envelope, p.category].filter(Boolean).join(' / ');
-      const pct = h.current_value ? fmtPct((p.market_value || 0) / h.current_value * 100) : '—';
+      const pct = h.current_value && p.market_value != null ? fmtPct(p.market_value / h.current_value * 100) : '—';
       return `<tr>
         <td style="font-size:12px">${esc(label)}</td>
         <td class="num" style="font-size:12px">${fmtQty(p.quantity || 0, 2)}</td>
-        <td class="num" style="font-size:12px">${fmt(p.market_value || 0)}</td>
+        <td class="num" style="font-size:12px">${p.market_value != null ? fmt(p.market_value) : '—'}</td>
         <td class="num" style="font-size:12px;color:var(--text-muted)">${pct}</td>
       </tr>`;
     }).join('');
@@ -151,6 +154,7 @@ function _holdingHtml(h) {
       ${pru != null ? `<div class="isin-holding-row"><span>PRU</span><strong>${fmt(pru, 2)}</strong></div>` : ''}
       ${h.current_value != null ? `<div class="isin-holding-row"><span>Valorisation</span><strong>${fmt(h.current_value)}</strong></div>` : ''}
       ${pnl != null ? `<div class="isin-holding-row"><span>P&amp;L latent</span><strong class="${pnlCls}">${fmt(pnl)}${pnlPct != null ? ` (${fmtPct(pnlPct, 2, true)})` : ''}</strong></div>` : ''}
+      ${h.alertes?.length ? `<p class="isin-alerte">Valorisation : ${h.alertes.map(esc).join(' · ')}</p>` : ''}
       ${posHtml}
     </div>`;
 }
@@ -168,13 +172,15 @@ function _renderChart(data) {
 
   const colors = getColors();
   const border = chartBorderColor();
-  const labels = data.points.map(p => fmtDate(p.date));
-  const values = data.points.map(p => p.price);
+  // Les cours manquent les week-ends et jours feries : sur une echelle de
+  // temps, le trou se voit au lieu de comprimer la courbe.
+  const values = data.points.map(p => ({ x: tsJour(p.date), y: p.price }));
+  const longue = data.points.length > 1
+    && tsJour(data.points[data.points.length - 1].date) - tsJour(data.points[0].date) > 200 * 864e5;
 
   _chart = new Chart(canvas, {
     type: 'line',
     data: {
-      labels,
       datasets: [{
         label: 'Cours',
         data: values,
@@ -195,6 +201,7 @@ function _renderChart(data) {
         legend: { display: false },
         tooltip: {
           callbacks: {
+            title: titreDate,
             label: ctx => ` ${fmtQty(ctx.parsed.y, 4)} ${data.currency || ''}`,
           },
         },
@@ -207,10 +214,7 @@ function _renderChart(data) {
           },
           grid: { color: border },
         },
-        x: {
-          ticks: { font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 6 },
-          grid: { display: false },
-        },
+        x: echelleTemps(data.points.map(p => p.date), { jour: !longue }),
       },
     },
   });

@@ -1,6 +1,7 @@
 import { S, syntheseHistChart, setSyntheseHistChart } from '../state.js';
 import { dessinerCourbe } from '../courbe.js';
-import { fmt, fmtDate, esc, kpiDelta, getColors, destroyChart, parseLocaleNumber, fmtAxis, sparkline, fmtPct } from '../utils.js';
+import { fmt, fmtDate, esc, kpiDelta, getColors, destroyChart, parseLocaleNumber, fmtAxis, sparkline, fmtPct,
+         tsJour, echelleTemps, titreDate } from '../utils.js';
 import { api } from '../api.js';
 import { loadTodo } from '../todo.js';
 import { loadContribution } from './contribution.js';
@@ -202,7 +203,7 @@ export async function renderSyntheseHistory() {
   const gardees = classees.slice(0, MAX_SERIES);
   const fondues = classees.slice(MAX_SERIES);
 
-  const serie = g => history.map(h => ({ x: _ts(h.date), y: Math.round(h.by_group?.[g] || 0) }));
+  const serie = g => history.map(h => ({ x: tsJour(h.date), y: Math.round(h.by_group?.[g] || 0) }));
   const colors = getColors();
   const datasets = gardees.map((g, i) => ({
     label: g,
@@ -218,7 +219,7 @@ export async function renderSyntheseHistory() {
     datasets.push({
       label: `${fondues.length} autres`,
       data: history.map(h => ({
-        x: _ts(h.date),
+        x: tsJour(h.date),
         y: Math.round(fondues.reduce((t, g) => t + (h.by_group?.[g] || 0), 0)),
       })),
       backgroundColor: gris + '55',
@@ -253,8 +254,7 @@ export async function renderSyntheseHistory() {
         scales: {
           // Bornes aux arretes : sans elles, l'axe s'arrondit a la graduation
           // suivante et laisse une marge vide avant le premier et apres le dernier.
-          x: { type: 'linear', min: _ts(history[0].date), max: _ts(history[history.length - 1].date),
-               ticks: { font: { size: 11 }, maxRotation: 0, autoSkip: true, callback: _tsTick } },
+          x: { ...echelleTemps(history.map(h => h.date), { taille: 11, max: 8 }), grid: undefined },
           y: { stacked: true, ticks: {
             font: { size: 11 },
             callback: fmtAxis
@@ -263,7 +263,7 @@ export async function renderSyntheseHistory() {
         plugins: {
           legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 8, boxWidth: 12 } },
           tooltip: { callbacks: {
-            title: _tsTitle,
+            title: titreDate,
             label: ctx => ` ${ctx.dataset.label} : ${fmt(ctx.parsed.y)}`,
             afterBody: () => 'Cliquer pour détailler',
           }},
@@ -278,11 +278,7 @@ export async function loadHistorique() {
   if (S.currentTab === 'synthese') renderHistChart();
 }
 
-// ─── Axe temporel (Chart.js sans adaptateur) : axe X 'linear' + timestamps
-// -> espacement proportionnel au temps (points a leur vraie date).
-const _ts      = d => new Date(d + 'T12:00:00').getTime();
-const _tsTick  = v => new Date(v).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
-const _tsTitle = items => items.length ? new Date(items[0].parsed.x).toLocaleDateString('fr-FR') : '';
+
 
 /** « Evolution du patrimoine net » : la courbe du titulaire choisi, et sous
  *  elle ce qui explique la variation — l'epargne versee, puis l'effet des
