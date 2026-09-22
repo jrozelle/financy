@@ -191,14 +191,29 @@ function _aPlat(positions) {
 }
 
 // ── Recherche ────────────────────────────────────────────────────────────
-// Un noeud reste s'il correspond ou si l'un de ses descendants correspond ;
-// tout ce qui reste est deplie, sinon on ne verrait pas ce qu'on a trouve.
+// Un noeud reste s'il correspond ou si l'un de ses descendants correspond.
+// Garde pour ses descendants seulement, il ne compte que ce qu'il montre : ses
+// montants se recalculent, sans quoi le pied « filtre » additionnait des
+// groupes entiers pour un seul compte visible. Les GROUPES retenus s'ouvrent
+// d'office, pour qu'on voie ce qu'on a trouve ; un compte a titres, non —
+// chercher « PEA » aurait charge les lignes de chaque PEA.
+let _forces = new Set();          // groupes ouverts d'office par la recherche
+let _fermesRecherche = new Set(); // ... et que l'utilisateur a replies depuis
+let _rechercheVue = '';
+
 function _filtrer(noeuds, q) {
   const texte = n => `${n.nom} ${n.sous} ${n.position?.owner || ''} ${n.position?.establishment || ''}`.toLowerCase();
   return noeuds.map(n => {
+    if (texte(n).includes(q)) {
+      if (!n.position && n.enfants?.length) _forces.add(n.cle);
+      return n;
+    }
     const enfants = _filtrer(n.enfants || [], q);
-    if (texte(n).includes(q) || enfants.length) return { ...n, enfants: texte(n).includes(q) ? n.enfants : enfants, _force: true };
-    return null;
+    if (!enfants.length) return null;
+    _forces.add(n.cle);
+    // « 15 comptes » quand six s'affichent : le decompte suit le filtre.
+    const sous = (n.sous || '').replace(/\d+ comptes?\b/, `${enfants.length} sur ${n.enfants.length} compte${n.enfants.length > 1 ? 's' : ''}`);
+    return { ...n, enfants, sous, ..._somme(enfants) };
   }).filter(Boolean);
 }
 
@@ -206,12 +221,19 @@ function _filtrer(noeuds, q) {
 
 const CHEVRON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M9 6l6 6-6 6"/></svg>';
 
+/** Defaut : les groupes de tete ouverts, jamais un compte. A plat, les comptes
+ *  SONT la tete — tous ouverts, ils chargeaient chacun leurs lignes de titres. */
+const _ouvertParDefaut = n => n.niveau === 0 && !n.position;
+
 function _estOuvert(n) {
-  if (n._force) return true;
-  // Defaut : les groupes de tete ouverts, jamais un compte. A plat, les comptes
-  // SONT la tete — tous ouverts, ils chargeaient chacun leurs lignes de titres.
-  if (!_ouverts) return n.niveau === 0 && !n.position;
+  if (_forces.has(n.cle)) return !_fermesRecherche.has(n.cle);
+  if (!_ouverts) return _ouvertParDefaut(n);
   return _ouverts.has(n.cle);
+}
+
+function _racines() {
+  const ps = _dernier.positions;
+  return _groupe === 'titulaire' ? _parTitulaire(ps) : _groupe === 'plat' ? _aPlat(ps) : _parNature(ps);
 }
 
 function _cellulePv(n) {
@@ -331,10 +353,11 @@ export function renderArbo(positions) {
   if (!hote) return;
   _cablerBarre();
 
-  let racines = _groupe === 'titulaire' ? _parTitulaire(positions)
-              : _groupe === 'plat' ? _aPlat(positions) : _parNature(positions);
-  racines = _trier(racines);
+  let racines = _trier(_racines());
   const q = _recherche.trim().toLowerCase();
+  // Une nouvelle recherche repart des groupes ouverts d'office.
+  if (q !== _rechercheVue) { _fermesRecherche = new Set(); _rechercheVue = q; }
+  _forces = new Set();
   if (q) racines = _filtrer(racines, q);
   const t = _somme(racines);
 
@@ -407,7 +430,7 @@ function _cablerBarre() {
   });
   document.getElementById('arbo-deplier')?.addEventListener('click', () => {
     const toutes = new Set();
-    const racines = _groupe === 'titulaire' ? _parTitulaire(_dernier.positions) : _groupe === 'plat' ? _aPlat(_dernier.positions) : _parNature(_dernier.positions);
+    const racines = _racines();
     const parcourir = ns => ns.forEach(n => { if (n.enfants?.length) { toutes.add(n.cle); parcourir(n.enfants); } });
     parcourir(racines);
     _ouverts = toutes; _memoriser(); rerendre();
@@ -432,14 +455,17 @@ function _cablerBarre() {
     const bas = e.target.closest('[data-arbo-basculer]');
     if (bas) {
       const cle = bas.dataset.arboBasculer;
-      if (!_ouverts) {
-        // Premier geste : on part de l'etat par defaut (groupes ouverts).
-        _ouverts = new Set();
-        const racines = _groupe === 'titulaire' ? _parTitulaire(_dernier.positions) : _groupe === 'plat' ? _aPlat(_dernier.positions) : _parNature(_dernier.positions);
-        racines.forEach(r => _ouverts.add(r.cle));
+      if (_forces.has(cle)) {
+        // Ouvert par la recherche : le replier ne touche pas l'etat memorise.
+        _fermesRecherche.has(cle) ? _fermesRecherche.delete(cle) : _fermesRecherche.add(cle);
+      } else {
+        if (!_ouverts) {
+          // Premier geste : on part de l'etat par defaut, meme regle qu'au rendu.
+          _ouverts = new Set(_racines().filter(_ouvertParDefaut).map(r => r.cle));
+        }
+        _ouverts.has(cle) ? _ouverts.delete(cle) : _ouverts.add(cle);
+        _memoriser();
       }
-      _ouverts.has(cle) ? _ouverts.delete(cle) : _ouverts.add(cle);
-      _memoriser();
       rerendre();
       // Le focus reste sur le chevron qu'on vient d'actionner.
       hote.querySelector(`[data-arbo-basculer="${CSS.escape(cle)}"]`)?.focus();

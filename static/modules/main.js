@@ -49,7 +49,7 @@ async function init() {
     S.syntheseDate = cible;
     S.positionsDate = cible;
     await refreshDates();
-    _ecrireContexte();
+    ecrireContexte();
     await loadHistorique();
     _lastLoadedTab = null;
     await switchTab(S.currentTab, { pushHistory: false });
@@ -58,7 +58,7 @@ async function init() {
   await migrateLocalStorageToDB();
   _lireContexte();
   _refleterContexte();
-  _ecrireContexte();          // une valeur ignoree disparait aussi de l'adresse
+  ecrireContexte();          // une valeur ignoree disparait aussi de l'adresse
   await switchTab(_tabFromUrl() || 'synthese', { pushHistory: false });
   initDemoToggle();
 }
@@ -143,7 +143,7 @@ function _contexteQuery() {
   return t ? `?${t}` : '';
 }
 
-function _ecrireContexte() {
+export function ecrireContexte() {
   const url = location.pathname + _contexteQuery();
   if (url !== location.pathname + location.search) history.replaceState(history.state, '', url);
 }
@@ -183,7 +183,7 @@ function _buildGlobalOwnerFilter() {
 
 function _onGlobalOwnerChange(e) {
   S.syntheseOwner = e.target.value;
-  _ecrireContexte();
+  ecrireContexte();
   // Sync actifs filter
   const actifsSel = document.getElementById('actifs-owner-filter');
   if (actifsSel) actifsSel.value = S.syntheseOwner === 'Famille' ? '' : S.syntheseOwner;
@@ -386,7 +386,7 @@ function wireEvents() {
   document.getElementById('synthese-date-select').addEventListener('change', async e => {
     S.syntheseDate = e.target.value;
     S.positionsDate = e.target.value;
-    _ecrireContexte();
+    ecrireContexte();
     const positionsSelect = document.getElementById('positions-date-select');
     if (positionsSelect) positionsSelect.value = e.target.value;
     if (S.currentTab === 'positions') {
@@ -403,7 +403,7 @@ function wireEvents() {
   document.getElementById('positions-date-select').addEventListener('change', async e => {
     S.positionsDate = e.target.value;
     S.syntheseDate = e.target.value;
-    _ecrireContexte();
+    ecrireContexte();
     const syntheseSelect = document.getElementById('synthese-date-select');
     if (syntheseSelect) syntheseSelect.value = e.target.value;
     showLoading('tab-positions');
@@ -425,6 +425,7 @@ function wireEvents() {
   document.getElementById('filter-owner').addEventListener('change', () => {
     const val = document.getElementById('filter-owner').value;
     S.syntheseOwner = val || 'Famille';
+    ecrireContexte();
     persistPositionFilters();
     const globalSel = document.getElementById('global-owner-filter');
     if (globalSel) globalSel.value = S.syntheseOwner;
@@ -635,7 +636,7 @@ function wireEvents() {
       b.setAttribute('aria-pressed', String(p.cle === S.periodeComparaison));
       b.addEventListener('click', () => {
         S.periodeComparaison = p.cle;
-        _ecrireContexte();
+        ecrireContexte();
         segPeriode.querySelectorAll('[data-periode]').forEach(o => {
           o.setAttribute('aria-pressed', String(o.dataset.periode === p.cle));
         });
@@ -655,6 +656,7 @@ function wireEvents() {
       if (id === 'flux-filter-owner') {
         const val = el.value;
         S.syntheseOwner = val || 'Famille';
+        ecrireContexte();
         const globalSel = document.getElementById('global-owner-filter');
         if (globalSel) globalSel.value = S.syntheseOwner;
       }

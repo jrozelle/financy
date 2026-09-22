@@ -4,7 +4,7 @@ import { api, refreshEntitySelect } from '../api.js';
 import { confirmDialog, promptDialog, toast, closeModal } from '../dialogs.js';
 import { loadSynthese, loadHistorique } from './synthese.js';
 import { openHoldingsModal } from './holdings.js';
-import { refreshDates } from '../main.js';
+import { refreshDates, ecrireContexte } from '../main.js';
 import { saveFilters, loadFilters, clearFilterKey, applyIfValid } from '../filter-persist.js';
 import { renderArbo, oublierTitres } from './arbo.js';
 import { reapplyColumns } from '../column-picker.js';
@@ -367,6 +367,7 @@ export async function duplicateSnapshot() {
   } catch { return; }
   S.positionsDate = newDate;
   S.syntheseDate  = newDate;
+  ecrireContexte();
   await refreshDates();
   await loadPositions();
   await loadHistorique();
@@ -400,6 +401,7 @@ export async function renameSnapshot() {
   } catch { return; }
   S.positionsDate = newDate;
   S.syntheseDate  = newDate;
+  ecrireContexte();
   await refreshDates();
   await loadPositions();
   await loadHistorique();
@@ -427,6 +429,7 @@ export async function deleteSnapshot() {
   const fallback = S.dates.filter(d => d !== date)[0] || null;
   S.positionsDate = fallback;
   S.syntheseDate  = fallback;
+  ecrireContexte();
   await refreshDates();
   await loadPositions();
   await loadHistorique();
@@ -622,6 +625,7 @@ export async function savePosition(e) {
       });
       S.positionsDate = targetDate;
       S.syntheseDate  = targetDate;
+      ecrireContexte();
     } else {
       await api('PUT', `/api/positions/${S.editPosId}`, data);
     }

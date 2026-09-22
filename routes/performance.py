@@ -330,28 +330,33 @@ def get_benchmark():
     with get_db() as conn:
         impose = conn.execute("SELECT value FROM config WHERE key='benchmark_isin'").fetchone()
         candidats = conn.execute(
-            """SELECT p.isin, s.name, COUNT(*) n, MIN(p.date) d0
+            """SELECT p.isin, s.name, COALESCE(s.currency, 'EUR') devise, COUNT(*) n, MIN(p.date) d0
                FROM price_history p JOIN securities s ON s.isin = p.isin
-               WHERE p.date <= ? GROUP BY p.isin ORDER BY n DESC, d0""", (fin,)).fetchall()
+               WHERE p.date <= ? AND p.price > 0 GROUP BY p.isin ORDER BY n DESC, d0""", (fin,)).fetchall()
         choix = None
         if impose and impose['value']:
             choix = next((c for c in candidats if c['isin'] == impose['value']), None)
         if choix is None:
             for c in candidats:
                 nom = (c['name'] or '').upper()
-                if re.search(_INDICE_RE, nom) and not any(m in nom for m in _DECLINAISONS):
+                # En euros seulement : un ETF cote en dollars comparerait une
+                # performance en dollars a un TWR en euros, change compris.
+                if (c['devise'] == 'EUR' and re.search(_INDICE_RE, nom)
+                        and not any(m in nom for m in _DECLINAISONS)):
                     choix = c
                     break
         if choix is None:
             return jsonify({'isin': None, 'points': []})
         # Le dernier cours AVANT le debut sert d'ancre a la premiere date.
-        ancre = conn.execute('SELECT date, price FROM price_history WHERE isin=? AND date<=? '
+        ancre = conn.execute('SELECT date, price FROM price_history WHERE isin=? AND date<=? AND price>0 '
                              'ORDER BY date DESC LIMIT 1', (choix['isin'], debut)).fetchone()
         rows = conn.execute('SELECT date, price FROM price_history WHERE isin=? AND date>? AND date<=? '
                             'ORDER BY date', (choix['isin'], debut, fin)).fetchall()
     points = ([{'date': ancre['date'], 'price': ancre['price']}] if ancre else []) + \
              [{'date': r['date'], 'price': r['price']} for r in rows if r['price']]
-    return jsonify({'isin': choix['isin'], 'name': choix['name'], 'points': points})
+    # Un ETF impose peut etre cote hors euro : on ne le refuse pas, on le dit.
+    return jsonify({'isin': choix['isin'], 'name': choix['name'], 'devise': choix['devise'],
+                    'points': points})
 
 
 @performance_bp.route('/api/performance')

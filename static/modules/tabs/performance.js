@@ -327,7 +327,11 @@ function renderList(d) {
 
 // Cours de l'ETF de comparaison, gardes pour la periode affichee : changer de
 // compte dans la liste ne doit pas les redemander.
-let _bench = null, _benchCle = '';
+// Une Map par periode, remplie au RETOUR de la requete : une reponse lente ne
+// peut plus s'inscrire sous la cle d'une autre periode. Le jeton ecarte le
+// rendu dont la reponse arrive apres celui d'un clic plus recent.
+const _benchs = new Map();
+let _rendu = 0;
 
 /** La courbe des placements — ou du compte choisi dans la liste — face a un
  *  ETF World. Comparaison honnete ici, et ici seulement : le TWR neutralise
@@ -347,22 +351,37 @@ async function renderChart(d) {
     return;
   }
   const debut = serie[0].date, fin = serie[serie.length - 1].date;
-  if (_benchCle !== debut + fin) {
-    _benchCle = debut + fin;
-    try { _bench = await api('GET', `/api/benchmark?debut=${debut}&fin=${fin}`, null, { silent: true }); }
-    catch { _bench = null; }
+  const jeton = ++_rendu, cle = debut + fin;
+  if (!_benchs.has(cle)) {
+    let b = null;
+    try { b = await api('GET', `/api/benchmark?debut=${debut}&fin=${fin}`, null, { silent: true }); }
+    catch { /* pas de comparaison, la courbe seule */ }
+    _benchs.set(cle, b);
   }
-  const cours = (_bench?.points || []);
+  if (jeton !== _rendu) return;
+  const etf = _benchs.get(cle);
+  const cours = (etf?.points || []).filter(c => c.price > 0);
   // Le cours a une date d'arrete : le dernier connu a ce jour. Aligner l'ETF
   // sur les arretes garde une seule liste d'abscisses pour les deux series.
   const prixA = date => { let p = null; for (const c of cours) { if (c.date <= date) p = c.price; else break; } return p; };
-  const communs = serie.filter(p => prixA(p.date) != null);
+  // Un historique de cours qui commence le lendemain d'un arrete ne doit pas
+  // perdre cet arrete : pour le PREMIER point seulement, le premier cours sert
+  // s'il suit de quatre jours au plus. La legende nomme alors sa date.
+  const JOURS = 864e5, TOLERANCE = 4;
+  const premierApres = date => cours.find(c => c.date > date
+    && (Date.parse(c.date) - Date.parse(date)) / JOURS <= TOLERANCE);
+  let communs = serie.filter(p => prixA(p.date) != null);
+  let recale = null;
+  const avant = serie.filter(p => prixA(p.date) == null);
+  const proche = avant.length ? premierApres(avant[avant.length - 1].date) : null;
+  if (proche) { recale = { arrete: avant[avant.length - 1].date, cours: proche }; communs = [avant[avant.length - 1], ...communs]; }
+  const prixDe = date => (recale && date === recale.arrete ? recale.cours.price : prixA(date));
   let bench = null, comp = null;
   if (communs.length >= 2) {
-    const a = communs[0], p0 = prixA(a.date);
-    bench = communs.map(p => ({ date: p.date, v: a.index * prixA(p.date) / p0 }));
+    const a = communs[0], p0 = prixDe(a.date);
+    bench = communs.map(p => ({ date: p.date, v: a.index * prixDe(p.date) / p0 }));
     const z = communs[communs.length - 1];
-    comp = { debut: a.date, fin: z.date, moi: z.index / a.index - 1, etf: prixA(z.date) / p0 - 1 };
+    comp = { debut: a.date, fin: z.date, moi: z.index / a.index - 1, etf: prixDe(z.date) / p0 - 1 };
   }
   const nom = V.focus ? g.label : 'Vos placements';
   dessinerCourbe(hote, {
@@ -384,8 +403,10 @@ async function renderChart(d) {
   const pts = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(Math.abs(ecart));
   legende.innerHTML = `
     <span><i style="background:var(--primary)"></i>${esc(nom)} <b>${pct(comp.moi)}</b></span>
-    <span><i style="background:var(--text-muted)"></i>${esc(_bench.name || 'ETF World')} <b>${pct(comp.etf)}</b></span>
+    <span><i style="background:var(--text-muted)"></i>${esc(etf.name || 'ETF World')} <b>${pct(comp.etf)}</b></span>
     <span class="courbe-note">${Math.abs(ecart) < 0.05 ? 'au niveau de l’ETF' : `${pts} point${Math.abs(ecart) >= 2 ? 's' : ''} ${ecart > 0 ? 'de mieux' : 'de moins'}`}
-      du ${fmtDate(comp.debut)} au ${fmtDate(comp.fin)}${comp.debut !== debut ? ' — les cours de l’ETF commencent là' : ''}</span>`;
+      du ${fmtDate(comp.debut)} au ${fmtDate(comp.fin)}${comp.debut !== debut ? ' — les cours de l’ETF commencent là' : ''}${
+      recale ? ` (cours de l’ETF du ${fmtDate(recale.cours.date)} pour l’arrêté du ${fmtDate(recale.arrete)})` : ''}</span>
+    ${etf.devise && etf.devise !== 'EUR' ? `<span class="courbe-note">L’ETF est coté en ${esc(etf.devise)} : l’écart inclut l’effet du change.</span>` : ''}`;
 }
 

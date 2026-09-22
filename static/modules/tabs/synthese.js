@@ -316,9 +316,12 @@ function renderHistChart() {
   _legendeEvolution(owner, debut, fin);
 }
 
+let _legendeJeton = 0;
 async function _legendeEvolution(owner, debut, fin) {
   const hote = document.getElementById('evolution-legende');
   if (!hote) return;
+  // Changer vite de titulaire lance deux requetes : seule la derniere ecrit.
+  const jeton = ++_legendeJeton;
   const variation = fin.v - debut.v;
   const pct = debut.v ? variation / Math.abs(debut.v) * 100 : null;
   let decompo = '';
@@ -326,11 +329,17 @@ async function _legendeEvolution(owner, debut, fin) {
     const q = new URLSearchParams({ limit: '40' });
     if (owner) q.set('owner', owner);
     const d = await api('GET', `/api/contribution?${q}`, null, { silent: true });
-    if (d.periodes?.length) {
+    if (jeton !== _legendeJeton) return;
+    // L'epargne et les marches expliquent la variation seulement s'ils couvrent
+    // la meme periode : au-dela de 40 arretes, le serveur tronque, et les
+    // trois chiffres ne s'additionneraient plus.
+    const du = d.periodes?.[0]?.debut, au = d.periodes?.[d.periodes.length - 1]?.fin;
+    if (d.periodes?.length && du === debut.date && au === fin.date) {
       decompo = `<span><i style="background:var(--chart-4)"></i>Épargne versée <b>${fmtSigne(d.total_apports)}</b></span>`
               + `<span><i style="background:var(--chart-1)"></i>Marchés <b>${fmtSigne(d.total_performance)}</b></span>`;
     }
   } catch { /* la decomposition est un plus : sans elle, la courbe reste lisible */ }
+  if (jeton !== _legendeJeton) return;
   hote.innerHTML = `
     <span>Variation <b>${fmtSigne(variation)}</b>${
       pct != null ? ` <b>${fmtPct(pct, 1, true)}</b>` : ''}</span>

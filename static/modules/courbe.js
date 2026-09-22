@@ -177,7 +177,10 @@ function _dessiner(hote) {
     return meilleur;
   };
   svg.addEventListener('pointermove', e => montrer(plusProche(e.clientX)));
-  svg.addEventListener('pointerleave', () => { if (document.activeElement !== svg) cacher(); });
+  // Un clic donne aussi le focus : seul un focus CLAVIER garde la bulle quand
+  // la souris s'en va, sinon elle restait figee jusqu'au clic suivant.
+  const auClavier = () => document.activeElement === svg && svg.matches(':focus-visible');
+  svg.addEventListener('pointerleave', () => { if (!auClavier()) cacher(); });
   if (o.onPoint) {
     svg.style.cursor = 'pointer';
     svg.addEventListener('click', e => o.onPoint(dates[plusProche(e.clientX)]));
@@ -185,12 +188,14 @@ function _dessiner(hote) {
   // Au clavier : le graphe prend le focus, les fleches parcourent les arretes,
   // Entree ouvre la composition. Sans cela le detail n'existait qu'a la souris.
   svg.setAttribute('tabindex', '0');
-  svg.addEventListener('focus', () => montrer(dates.length - 1));
+  svg.addEventListener('focus', () => { if (svg.matches(':focus-visible')) montrer(dates.length - 1); });
   svg.addEventListener('blur', cacher);
   svg.addEventListener('keydown', e => {
     // Les fleches changent d'arrete ailleurs dans l'application : ici elles
     // parcourent le graphe, et seulement lui.
     if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) e.stopPropagation();
+    // Au clavier apres un clic souris : la premiere fleche part du dernier arrete.
+    if (actif < 0 && ['ArrowLeft', 'ArrowRight'].includes(e.key)) actif = dates.length;
     if (e.key === 'ArrowLeft') { e.preventDefault(); montrer(actif - 1); }
     else if (e.key === 'ArrowRight') { e.preventDefault(); montrer(actif + 1); }
     else if (e.key === 'Home') { e.preventDefault(); montrer(0); }
