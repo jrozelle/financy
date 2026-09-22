@@ -10,7 +10,13 @@
  * - PAR NATURE (defaut) : comment mon patrimoine est reparti — liquidites,
  *   placements, immobilier, biens. Le titulaire devient une etiquette ;
  * - PAR TITULAIRE puis ETABLISSEMENT : le chemin du pointage, quand on
- *   verifie ses chiffres releve par releve, banque par banque.
+ *   verifie ses chiffres releve par releve, banque par banque ;
+ * - A PLAT : tous les comptes sur un rang, pour les classer — ce que seule la
+ *   vue Tableau permettait.
+ *
+ * Chaque colonne se trie, et le tri s'applique a tous les niveaux : les comptes
+ * d'une nature, les etablissements d'un titulaire. Une valeur absente (une
+ * plus-value inconnue) reste en bas dans les deux sens.
  *
  * Les lignes de titres d'un compte se chargent a l'ouverture de ce compte :
  * inutile de les demander toutes pour n'en regarder qu'une.
@@ -26,21 +32,26 @@ import { NATURES, natureDe } from '../categories.js';
 
 const CLE_GROUPE = 'financy_arbo_groupe';
 const CLE_OUVERTS = 'financy_arbo_ouverts';
+const CLE_TRI = 'financy_arbo_tri';
 
 let _groupe = 'nature';
 let _ouverts = null;              // Set des cles depliees ; null = defaut
 let _recherche = '';
+let _tri = { col: 'brut', sens: -1 };
 const _lignesTitres = new Map();  // id position -> holdings, ou 'chargement'
 
 try {
   _groupe = localStorage.getItem(CLE_GROUPE) || 'nature';
   const o = localStorage.getItem(CLE_OUVERTS);
   if (o) _ouverts = new Set(JSON.parse(o));
+  const t = localStorage.getItem(CLE_TRI);
+  if (t) _tri = { ..._tri, ...JSON.parse(t) };
 } catch { /* session privee : on garde les valeurs par defaut */ }
 
 function _memoriser() {
   try {
     localStorage.setItem(CLE_GROUPE, _groupe);
+    localStorage.setItem(CLE_TRI, JSON.stringify(_tri));
     if (_ouverts) localStorage.setItem(CLE_OUVERTS, JSON.stringify([..._ouverts]));
   } catch { /* idem */ }
 }
@@ -147,6 +158,38 @@ function _parTitulaire(positions) {
   }).sort((a, b) => b.brut - a.brut);
 }
 
+// ── Tri ──────────────────────────────────────────────────────────────────
+const CLES_TRI = {
+  nom:  n => (n.nom || '').toLocaleLowerCase('fr'),
+  brut: n => n.brut,
+  dette: n => n.dette,
+  net:  n => n.brut - n.dette,
+  pv:   n => (n.position ? (n.position.gain_lignes ? n.position.gain_attributed : null)
+                         : (n.mesures ? n.gain : null)),
+};
+function _trier(noeuds) {
+  const cle = CLES_TRI[_tri.col] || CLES_TRI.brut;
+  const out = [...noeuds].sort((a, b) => {
+    const x = cle(a), y = cle(b);
+    if (x == null || y == null) return (x == null) - (y == null);
+    if (typeof x === 'string') return _tri.sens * x.localeCompare(y, 'fr');
+    return _tri.sens * (x - y);
+  });
+  out.forEach(n => { if (n.enfants?.length) n.enfants = _trier(n.enfants); });
+  return out;
+}
+
+function _aPlat(positions) {
+  return positions.map(p => {
+    const f = _feuille(p, 0);
+    f.visuel = 1;                    // un compte, pas un groupe : sans fond
+    f.couleur = NATURES.find(n => n.id === natureDe(p.category, p.envelope))?.couleur;
+    f.pastille = true;               // la nature se lit a la pastille
+    if (p.entity) f.sous = [p.entity, f.sous].filter(Boolean).join(' · ');
+    return f;
+  });
+}
+
 // ── Recherche ────────────────────────────────────────────────────────────
 // Un noeud reste s'il correspond ou si l'un de ses descendants correspond ;
 // tout ce qui reste est deplie, sinon on ne verrait pas ce qu'on a trouve.
@@ -165,7 +208,9 @@ const CHEVRON = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><
 
 function _estOuvert(n) {
   if (n._force) return true;
-  if (!_ouverts) return n.niveau === 0;         // defaut : les groupes ouverts
+  // Defaut : les groupes de tete ouverts, jamais un compte. A plat, les comptes
+  // SONT la tete — tous ouverts, ils chargeaient chacun leurs lignes de titres.
+  if (!_ouverts) return n.niveau === 0 && !n.position;
   return _ouverts.has(n.cle);
 }
 
@@ -209,7 +254,7 @@ function _ligne(n, total, couleurHeritee) {
       <button type="button" class="arbo-act" data-action="add-pos-ctx" ${attrs} aria-label="Ajouter un compte chez ${libelle}">Ajouter</button>`;
   }
   return `
-    <tr class="arbo-l${n.niveau}" role="row" aria-level="${n.niveau + 1}"
+    <tr class="arbo-l${n.visuel ?? n.niveau}" role="row" aria-level="${n.niveau + 1}"
         ${ouvrable ? `aria-expanded="${ouvert}"` : ''} data-cle="${esc(n.cle)}">
       <td class="arbo-nom" role="gridcell">
         <div class="arbo-nom-in" style="--niv:${n.niveau}">
@@ -217,7 +262,7 @@ function _ligne(n, total, couleurHeritee) {
             ? `<button type="button" class="arbo-chevron" data-arbo-basculer="${esc(n.cle)}"
                  aria-label="${ouvert ? 'Replier' : 'Déplier'} ${esc(n.nom)}">${CHEVRON}</button>`
             : '<span class="arbo-chevron-vide"></span>'}
-          ${n.niveau === 0 && n.couleur ? `<span class="arbo-pastille" style="background:${couleur}"></span>` : ''}
+          ${(n.niveau === 0 || n.pastille) && n.couleur ? `<span class="arbo-pastille" style="background:${couleur}"></span>` : ''}
           <span class="arbo-texte">
             <span class="arbo-titre">${esc(n.nom)}</span>
             ${n.sous ? `<span class="arbo-sous">${esc(n.sous)}</span>` : ''}
@@ -286,7 +331,9 @@ export function renderArbo(positions) {
   if (!hote) return;
   _cablerBarre();
 
-  let racines = _groupe === 'titulaire' ? _parTitulaire(positions) : _parNature(positions);
+  let racines = _groupe === 'titulaire' ? _parTitulaire(positions)
+              : _groupe === 'plat' ? _aPlat(positions) : _parNature(positions);
+  racines = _trier(racines);
   const q = _recherche.trim().toLowerCase();
   if (q) racines = _filtrer(racines, q);
   const t = _somme(racines);
@@ -300,12 +347,12 @@ export function renderArbo(positions) {
       <table class="arbo" role="treegrid" aria-label="Arborescence des positions">
         <thead>
           <tr>
-            <th scope="col">Nom</th>
-            <th scope="col" class="arbo-part">Part du brut</th>
-            <th scope="col" class="num arbo-valeur">Valeur</th>
-            <th scope="col" class="num arbo-dette">Dette</th>
-            <th scope="col" class="num arbo-net">Net</th>
-            <th scope="col" class="num arbo-pv">Plus-value</th>
+            ${_th('nom', 'Nom', '')}
+            ${_th('brut', 'Part du brut', 'arbo-part')}
+            ${_th('brut', 'Valeur', 'num arbo-valeur', true)}
+            ${_th('dette', 'Dette', 'num arbo-dette')}
+            ${_th('net', 'Net', 'num arbo-net')}
+            ${_th('pv', 'Plus-value', 'num arbo-pv')}
             <th scope="col" class="arbo-actions"><span class="sr-only">Actions</span></th>
           </tr>
         </thead>
@@ -323,6 +370,17 @@ export function renderArbo(positions) {
         </tfoot>
       </table>
     </div>`;
+}
+
+/** Un en-tete triable : un vrai bouton, et l'etat annonce par aria-sort.
+ *  « Part du brut » et « Valeur » trient la meme chose ; seule la seconde
+ *  porte l'etat, pour ne pas l'annoncer deux fois. */
+function _th(col, texte, cls, porteEtat = col !== 'brut') {
+  const actif = _tri.col === col;
+  const sens = actif ? (_tri.sens > 0 ? 'ascending' : 'descending') : 'none';
+  const fleche = actif ? (_tri.sens > 0 ? ' ▲' : ' ▼') : '';
+  return `<th scope="col" class="${cls}"${porteEtat ? ` aria-sort="${sens}"` : ''}>
+    <button type="button" class="arbo-tri" data-arbo-tri="${col}">${texte}<span aria-hidden="true">${fleche}</span></button></th>`;
 }
 
 // ── Barre d'outils : recherche, regroupement, tout deplier ──────────────
@@ -349,7 +407,7 @@ function _cablerBarre() {
   });
   document.getElementById('arbo-deplier')?.addEventListener('click', () => {
     const toutes = new Set();
-    const racines = _groupe === 'titulaire' ? _parTitulaire(_dernier.positions) : _parNature(_dernier.positions);
+    const racines = _groupe === 'titulaire' ? _parTitulaire(_dernier.positions) : _groupe === 'plat' ? _aPlat(_dernier.positions) : _parNature(_dernier.positions);
     const parcourir = ns => ns.forEach(n => { if (n.enfants?.length) { toutes.add(n.cle); parcourir(n.enfants); } });
     parcourir(racines);
     _ouverts = toutes; _memoriser(); rerendre();
@@ -360,13 +418,24 @@ function _cablerBarre() {
 
   const hote = document.getElementById('positions-tree-body');
   hote?.addEventListener('click', e => {
+    const tri = e.target.closest('[data-arbo-tri]');
+    if (tri) {
+      const col = tri.dataset.arboTri;
+      // Premier clic : decroissant sur un montant — on cherche le plus gros —,
+      // croissant sur un nom.
+      _tri = _tri.col === col ? { col, sens: -_tri.sens } : { col, sens: col === 'nom' ? 1 : -1 };
+      _memoriser();
+      rerendre();
+      hote.querySelector(`[data-arbo-tri="${col}"]`)?.focus();
+      return;
+    }
     const bas = e.target.closest('[data-arbo-basculer]');
     if (bas) {
       const cle = bas.dataset.arboBasculer;
       if (!_ouverts) {
         // Premier geste : on part de l'etat par defaut (groupes ouverts).
         _ouverts = new Set();
-        const racines = _groupe === 'titulaire' ? _parTitulaire(_dernier.positions) : _parNature(_dernier.positions);
+        const racines = _groupe === 'titulaire' ? _parTitulaire(_dernier.positions) : _groupe === 'plat' ? _aPlat(_dernier.positions) : _parNature(_dernier.positions);
         racines.forEach(r => _ouverts.add(r.cle));
       }
       _ouverts.has(cle) ? _ouverts.delete(cle) : _ouverts.add(cle);

@@ -29,6 +29,7 @@ from flask import Blueprint, jsonify, request
 
 from models import (get_db, load_referential, compute_position, get_entity_map,
                     get_holdings_map, freeze_holdings_prices, holding_price_warning)
+from models import validate_date
 from auth import login_required
 
 performance_bp = Blueprint('performance', __name__)
@@ -299,6 +300,58 @@ def _tri(dates, values, flux):
         return taux / 100.0, None, jours
     p = _period_return(cf)
     return None, (p['return'] if p else None), jours
+
+
+# Un « ETF World » de comparaison : un indice large, pas une declinaison
+# sectorielle ou thematique, qui ne dirait pas « le marche ».
+_INDICE_RE = r'MSCI\s+(ALL\s+COUNTRY\s+)?WORLD|MSCI\s+ACWI|FTSE\s+ALL[-\s]WORLD'
+_DECLINAISONS = ('INFORMATION', 'TECH', 'SRI', 'CLIMATE', 'ESG', 'SMALL', 'MOMENTUM',
+                 'VALUE', 'QUALITY', 'MIN VOL', 'HEALTH', 'ENERGY', 'FINANCIAL', 'SELECT')
+
+
+@performance_bp.route('/api/benchmark')
+@login_required
+def get_benchmark():
+    """Cours d'un ETF World, pour comparer la performance des placements.
+
+    Sans appel reseau : on lit l'historique deja collecte a chaque
+    rafraichissement des cours (`price_history`). L'ETF retenu est, parmi les
+    titres de ce type que l'historique connait, celui qui a la plus longue
+    serie — sauf si la configuration en impose un (`benchmark_isin`). Sa
+    serie commence a son premier cours enregistre, pas au premier arrete : le
+    front compare sur la periode COMMUNE et le dit.
+
+    Params : `debut`, `fin` (AAAA-MM-JJ).
+    """
+    import re
+    debut, fin = request.args.get('debut'), request.args.get('fin')
+    if not validate_date(debut) or not validate_date(fin):
+        return jsonify({'error': 'Dates invalides (format AAAA-MM-JJ attendu)'}), 400
+    with get_db() as conn:
+        impose = conn.execute("SELECT value FROM config WHERE key='benchmark_isin'").fetchone()
+        candidats = conn.execute(
+            """SELECT p.isin, s.name, COUNT(*) n, MIN(p.date) d0
+               FROM price_history p JOIN securities s ON s.isin = p.isin
+               WHERE p.date <= ? GROUP BY p.isin ORDER BY n DESC, d0""", (fin,)).fetchall()
+        choix = None
+        if impose and impose['value']:
+            choix = next((c for c in candidats if c['isin'] == impose['value']), None)
+        if choix is None:
+            for c in candidats:
+                nom = (c['name'] or '').upper()
+                if re.search(_INDICE_RE, nom) and not any(m in nom for m in _DECLINAISONS):
+                    choix = c
+                    break
+        if choix is None:
+            return jsonify({'isin': None, 'points': []})
+        # Le dernier cours AVANT le debut sert d'ancre a la premiere date.
+        ancre = conn.execute('SELECT date, price FROM price_history WHERE isin=? AND date<=? '
+                             'ORDER BY date DESC LIMIT 1', (choix['isin'], debut)).fetchone()
+        rows = conn.execute('SELECT date, price FROM price_history WHERE isin=? AND date>? AND date<=? '
+                            'ORDER BY date', (choix['isin'], debut, fin)).fetchall()
+    points = ([{'date': ancre['date'], 'price': ancre['price']}] if ancre else []) + \
+             [{'date': r['date'], 'price': r['price']} for r in rows if r['price']]
+    return jsonify({'isin': choix['isin'], 'name': choix['name'], 'points': points})
 
 
 @performance_bp.route('/api/performance')

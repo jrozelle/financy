@@ -437,6 +437,7 @@ export async function deleteSnapshot() {
 
 export function openPosModal(id = null, prefill = {}) {
   S.editPosId = id;
+  document.getElementById('pos-supprimer')?.classList.toggle('hidden', !id);
   document.getElementById('position-modal-title').textContent =
     id ? 'Modifier la position' : 'Ajouter une position';
 
@@ -639,9 +640,12 @@ export async function savePosition(e) {
 
 export async function deletePosition(id) {
   const pos = S.positions.find(p => p.id === id);
-  const label = pos ? `${pos.category} — ${pos.owner}` : `Position #${id}`;
-  if (!await confirmDialog('Supprimer la position ?', `<strong>${esc(label)}</strong><br>Cette action est irréversible.`)) return;
+  const label = pos ? `${pos.envelope || pos.category} — ${pos.owner}` : `Position #${id}`;
+  if (!await confirmDialog('Supprimer la position ?',
+      `<strong>${esc(label)}</strong><br>Elle disparaît de l’arrêté du ${fmtDate(pos?.date || S.positionsDate)} seulement ; les autres arrêtés sont intacts.`,
+      { confirmText: 'Supprimer', danger: true })) return;
   await api('DELETE', `/api/positions/${id}`);
+  document.getElementById('position-modal')?.classList.add('hidden');
   toast('Position supprimée');
   await loadPositions();
   await loadSynthese();

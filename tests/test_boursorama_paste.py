@@ -396,3 +396,22 @@ class TestBoutonsAchatVente:
         b = d['FR0010342592']
         assert b.quantity == 71.3
         assert b.market_value == 648.20
+
+
+class TestBoutonsDInterface:
+    """Les pages des assureurs placent sous le tableau des boutons
+    « Actualiser », « Recuperer les releves de compte ». Colles avec le reste,
+    ils fabriquaient de faux fonds euros (FONDS_EUROS_ACTUALISER, collage CA31
+    du 02/09/2026)."""
+
+    def test_un_verbe_d_interface_n_est_pas_un_support(self):
+        from services.parsers.boursorama_paste import _is_name_line
+        for bouton in ('Actualiser', 'Récupérer les relevés de compte',
+                       'Télécharger le relevé', 'Voir le détail', 'Arbitrer'):
+            assert not _is_name_line(bouton), bouton
+
+    def test_un_vrai_support_reste_un_nom(self):
+        from services.parsers.boursorama_paste import _is_name_line
+        for nom in ('ACTIF EURO', 'Fonds en euros Euro Exclusif', 'Amundi MSCI World',
+                    'Vendôme Sélection', 'Actions Europe'):
+            assert _is_name_line(nom), nom

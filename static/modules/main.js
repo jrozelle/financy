@@ -411,6 +411,9 @@ function wireEvents() {
   });
 
   // Positions buttons
+  document.getElementById('pos-supprimer')?.addEventListener('click', () => {
+    if (S.editPosId) deletePosition(S.editPosId);
+  });
   document.getElementById('head-ajouter')?.addEventListener('click', () => {
     AJOUTS[S.currentTab]?.ouvrir();
   });

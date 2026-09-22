@@ -1,6 +1,7 @@
 import { api } from '../api.js';
-import { S, perfChart, setPerfChart } from '../state.js';
-import { fmt, esc, fmtDate, getColors, chartBorderColor, destroyChart } from '../utils.js';
+import { S } from '../state.js';
+import { dessinerCourbe } from '../courbe.js';
+import { fmt, esc, fmtDate } from '../utils.js';
 
 // Etat local : donnees, groupe isole, maille, tri de la liste.
 // Le tri par defaut est celui que produit l'API — valeur decroissante — pour
@@ -58,6 +59,16 @@ const sign = v => v == null ? '' : (v >= 0 ? 'positive' : 'negative');
  *  selon quand il a ete verse. Annuel au-dela de six mois d'historique ; en
  *  deca, le rendement de la periode, dit comme tel — annualiser deux mois
  *  fabriquerait un taux qu'on ne verra jamais. */
+/** Le TWR ne s'affiche a cote du TRI que s'il en differe. Sans versement ni
+ *  retrait sur la periode, les deux sont egaux par construction : ecrire deux
+ *  fois « +7,95 % » n'apprend rien, et fait douter de l'un des deux. */
+function twrDiffere(g) {
+  const r = rend(g);
+  if (!r || g.twr == null) return false;
+  const t = g.tri != null ? (g.annualisable ? g.twr_annualise : null) : g.twr;
+  return t != null && Math.abs(t - r.v) >= 0.0005;
+}
+
 function rend(g) {
   if (g?.tri != null) return { v: g.tri, sub: 'par an' };
   if (g?.tri_periode != null) return { v: g.tri_periode, sub: `sur ${duree(g.tri_jours)}` };
@@ -233,7 +244,7 @@ function renderList(d) {
         </div>
         <div class="perf-num ${sign(r?.v)}">${r ? pct(r.v) : '—'}
           <span class="perf-num-sub">${
-            r ? `${r.sub}${g.twr != null ? ` · TWR ${pct(g.annualisable ? g.twr_annualise : g.twr)}` : ''}`
+            r ? `${r.sub}${twrDiffere(g) ? ` · TWR ${pct(g.annualisable ? g.twr_annualise : g.twr)}` : ''}`
             : `${g.dates_count} arrêté${g.dates_count > 1 ? 's' : ''}`}</span>
         </div>
         <div class="perf-val">${fmt(g.value)}
@@ -266,7 +277,7 @@ function renderList(d) {
         <span class="perf-sub">${(g.groups || []).length} ${V.group === 'account' ? 'compte' : 'enveloppe'}${(g.groups || []).length > 1 ? 's' : ''}</span></div>
       <div class="perf-bar"></div>
       <div class="perf-num ${sign(rend(g)?.v)}">${rend(g) ? pct(rend(g).v) : '—'}
-        <span class="perf-num-sub">${rend(g) ? rend(g).sub : ''}${g.twr != null
+        <span class="perf-num-sub">${rend(g) ? rend(g).sub : ''}${twrDiffere(g)
           ? ` · TWR ${pct(g.annualisable ? g.twr_annualise : g.twr)}` : ''}</span></div>
       <div class="perf-val">${fmt(g.value)}</div>
     </div>` : ''}
@@ -314,91 +325,67 @@ function renderList(d) {
   });
 }
 
-function renderChart(d) {
-  const el = document.getElementById('perf-chart');
-  if (!el || typeof Chart === 'undefined') return;
-  destroyChart(perfChart);
-  const colors = getColors();
-  const border = chartBorderColor();
-  const shown = visible();
-  // La couleur suit le groupe, jamais son rang : isoler une ligne ne doit pas
-  // repeindre les autres.
-  const hue = g => colors[Math.max(0, d.groups.findIndex(x => x.key === g.key)) % colors.length];
-  const series = (V.focus ? shown.filter(g => g.key === V.focus) : shown)
-    .filter(g => g.serie?.length > 1);
-  const labels = [...new Set(series.flatMap(g => g.serie.map(p => p.date)))].sort();
-  // Abscisse en millisecondes sur une echelle lineaire, et non une echelle
-  // categorielle : les arretes ne sont pas equidistants dans le temps — 15
-  // jours entre les deux premiers, 47 entre les suivants — et les espacer
-  // regulierement faussait la pente des courbes, donc la lecture du rendement.
-  // Une echelle `time` demanderait un adaptateur de dates, absent du vendor.
-  const ms = iso => Date.parse(`${iso}T00:00:00Z`);
-  const xs = labels.map(ms);
-  // Chaque serie est alignee sur la liste complete des arretes, un trou valant
-  // null. Les series n'ont pas toutes la meme longueur — un compte ouvert en
-  // cours de periode en a moins — et le mode d'interaction `index` de Chart.js
-  // regroupe les points par POSITION dans le tableau, pas par abscisse : la
-  // crypto, apparue plus tard, voyait sa valeur du 13/05 s'afficher sous le
-  // titre 07/06. `spanGaps` garde le trait continu par-dessus les trous.
-  const aligned = serie => {
-    const par = new Map(serie.map(p => [p.date, p.index]));
-    return labels.map((l, i) => ({ x: xs[i], y: par.has(l) ? par.get(l) : null }));
-  };
-  const datasets = series.map(g => ({
-    label: g.label, borderColor: hue(g), backgroundColor: hue(g),
-    data: aligned(g.serie), spanGaps: true,
-    borderWidth: 2, pointRadius: 2.5, pointHoverRadius: 6, tension: 0,
-  }));
-  if (!V.focus && d.global && series.length > 1) {
-    datasets.push({
-      label: 'Ensemble', data: aligned(d.global.serie), spanGaps: true,
-      borderColor: border, backgroundColor: border,
-      borderWidth: 2, borderDash: [5, 3], pointRadius: 0, tension: 0,
-    });
+// Cours de l'ETF de comparaison, gardes pour la periode affichee : changer de
+// compte dans la liste ne doit pas les redemander.
+let _bench = null, _benchCle = '';
+
+/** La courbe des placements — ou du compte choisi dans la liste — face a un
+ *  ETF World. Comparaison honnete ici, et ici seulement : le TWR neutralise
+ *  les versements, comme un indice qui n'en recoit pas. (Sur la synthese, le
+ *  patrimoine net grossit aussi de l'epargne : le comparer a un ETF ferait
+ *  passer l'epargne pour du talent.) L'ETF est recale sur la premiere date
+ *  commune, et l'ecart se chiffre sur cette periode, nommee. */
+async function renderChart(d) {
+  const hote = document.getElementById('perf-courbe');
+  const legende = document.getElementById('perf-legende');
+  if (!hote) return;
+  const g = V.focus ? d.groups.find(x => x.key === V.focus) : d.global;
+  const serie = (g?.serie || []).filter(p => p.index != null);
+  if (serie.length < 2) {
+    hote.innerHTML = '<p class="courbe-vide">Deux arrêtés valorisés au moins sont nécessaires pour une courbe.</p>';
+    if (legende) legende.innerHTML = '';
+    return;
   }
-  const toggle = lbl => {
-    const hit = d.groups.find(g => g.label === lbl);
-    if (!hit) return;
-    V.focus = V.focus === hit.key ? null : hit.key;
-    renderPerformance();
-  };
-  setPerfChart(new Chart(el.getContext('2d'), {
-    type: 'line',
-    data: { datasets },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      onClick(ev, els) {
-        if (els.length) toggle(this.data.datasets[els[0].datasetIndex].label);
-      },
-      scales: {
-        x: { type: 'linear', min: xs[0], max: xs[xs.length - 1],
-             grid: { display: false },
-             // Graduations aux seuls arretes : entre deux, aucune date n'a ete
-             // relevee, et une graduation intermediaire suggererait le contraire.
-             afterBuildTicks: a => { a.ticks = xs.map(value => ({ value })); },
-             ticks: { autoSkip: true, maxRotation: 0, includeBounds: true,
-                      callback: v => fmtDate(new Date(v).toISOString().slice(0, 10)) } },
-        y: { title: { display: true, text: 'base 100 au premier arrêté' },
-             grid: { color: border } },
-      },
-      plugins: {
-        legend: { position: 'bottom',
-                  labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 24, padding: 12 },
-                  onClick: (ev, item) => toggle(item.text) },
-        tooltip: {
-          // Onze lignes empilees se lisent mal : les ordonner du plus haut au
-          // plus bas fait correspondre l'ordre de lecture a l'ordre des
-          // courbes a l'ecran.
-          itemSort: (a, b) => b.parsed.y - a.parsed.y,
-          boxWidth: 8, boxHeight: 8, boxPadding: 3,
-          padding: 8, bodySpacing: 2, titleMarginBottom: 6, caretPadding: 8,
-          callbacks: {
-            title: items => fmtDate(labels[items[0].dataIndex]),
-            label: it => `${it.dataset.label} : ${pct(it.parsed.y / 100 - 1)}`,
-          },
-        },
-      },
-    },
-  }));
+  const debut = serie[0].date, fin = serie[serie.length - 1].date;
+  if (_benchCle !== debut + fin) {
+    _benchCle = debut + fin;
+    try { _bench = await api('GET', `/api/benchmark?debut=${debut}&fin=${fin}`, null, { silent: true }); }
+    catch { _bench = null; }
+  }
+  const cours = (_bench?.points || []);
+  // Le cours a une date d'arrete : le dernier connu a ce jour. Aligner l'ETF
+  // sur les arretes garde une seule liste d'abscisses pour les deux series.
+  const prixA = date => { let p = null; for (const c of cours) { if (c.date <= date) p = c.price; else break; } return p; };
+  const communs = serie.filter(p => prixA(p.date) != null);
+  let bench = null, comp = null;
+  if (communs.length >= 2) {
+    const a = communs[0], p0 = prixA(a.date);
+    bench = communs.map(p => ({ date: p.date, v: a.index * prixA(p.date) / p0 }));
+    const z = communs[communs.length - 1];
+    comp = { debut: a.date, fin: z.date, moi: z.index / a.index - 1, etf: prixA(z.date) / p0 - 1 };
+  }
+  const nom = V.focus ? g.label : 'Vos placements';
+  dessinerCourbe(hote, {
+    series: [
+      { nom, couleur: 'var(--primary)', points: serie.map(p => ({ date: p.date, v: p.index })), aire: true },
+      ...(bench ? [{ nom: 'ETF World', couleur: 'var(--text-muted)', points: bench, pointille: true }] : []),
+    ],
+    formatY: v => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(v),
+    formatV: v => pct(v / 100 - 1),
+    aide: `${nom}, base 100 au ${fmtDate(debut)} : ${pct(serie[serie.length - 1].index / 100 - 1)} au ${fmtDate(fin)}.`,
+  });
+  if (!legende) return;
+  if (!comp) {
+    legende.innerHTML = `<span><i style="background:var(--primary)"></i>${esc(nom)} <b>${pct(serie[serie.length - 1].index / 100 - 1)}</b></span>
+      <span class="courbe-note">Aucun ETF World dans l'historique des cours sur cette période : la comparaison apparaîtra avec lui.</span>`;
+    return;
+  }
+  const ecart = (comp.moi - comp.etf) * 100;
+  const pts = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(Math.abs(ecart));
+  legende.innerHTML = `
+    <span><i style="background:var(--primary)"></i>${esc(nom)} <b>${pct(comp.moi)}</b></span>
+    <span><i style="background:var(--text-muted)"></i>${esc(_bench.name || 'ETF World')} <b>${pct(comp.etf)}</b></span>
+    <span class="courbe-note">${Math.abs(ecart) < 0.05 ? 'au niveau de l’ETF' : `${pts} point${Math.abs(ecart) >= 2 ? 's' : ''} ${ecart > 0 ? 'de mieux' : 'de moins'}`}
+      du ${fmtDate(comp.debut)} au ${fmtDate(comp.fin)}${comp.debut !== debut ? ' — les cours de l’ETF commencent là' : ''}</span>`;
 }
+

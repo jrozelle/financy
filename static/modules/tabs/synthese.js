@@ -1,5 +1,6 @@
-import { S, histChart, syntheseHistChart, setHistChart, setSyntheseHistChart } from '../state.js';
-import { fmt, fmtDate, esc, kpiDelta, getColors, chartFamilyColors, destroyChart, parseLocaleNumber, fmtAxis, sparkline, fmtPct } from '../utils.js';
+import { S, syntheseHistChart, setSyntheseHistChart } from '../state.js';
+import { dessinerCourbe } from '../courbe.js';
+import { fmt, fmtDate, esc, kpiDelta, getColors, destroyChart, parseLocaleNumber, fmtAxis, sparkline, fmtPct } from '../utils.js';
 import { api } from '../api.js';
 import { loadTodo } from '../todo.js';
 import { loadContribution } from './contribution.js';
@@ -165,7 +166,7 @@ export function renderSynthese() {
   loadComptes();
   loadFiscalite();
   renderEntityWarnings(syn.entity_warnings || []);
-  renderHistChart(owner);
+  renderHistChart();
   renderSyntheseHistory();
   renderLiqBars(liqFiltered);
   renderEntitiesSynthese();
@@ -279,85 +280,61 @@ const _ts      = d => new Date(d + 'T12:00:00').getTime();
 const _tsTick  = v => new Date(v).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
 const _tsTitle = items => items.length ? new Date(items[0].parsed.x).toLocaleDateString('fr-FR') : '';
 
-function renderHistChart(filterOwner = 'Famille') {
-  if (!S.historique.length) return;
-  const pt = (h, y) => ({ x: _ts(h.date), y });
-
-  const colors = getColors();
-  const fam = chartFamilyColors();
-  let datasets;
-  if (filterOwner === 'Famille') {
-    const ownerSets = _owners().map((o, i) => ({
-      label: o,
-      data: S.historique.map(h => pt(h, h.by_owner[o] || 0)),
-      borderColor: colors[i],
-      backgroundColor: colors[i] + '18',
-      tension: .35, borderWidth: 2, pointRadius: 4, fill: false,
-    }));
-    datasets = [
-      { label: 'Famille', data: S.historique.map(h => pt(h, h.family_net)),
-        borderColor: fam.line, backgroundColor: fam.bg, tension: .35,
-        borderWidth: 3, pointRadius: 5, fill: true },
-      ...ownerSets,
-    ];
-  } else {
-    const i = _owners().indexOf(filterOwner);
-    datasets = [{
-      label: filterOwner,
-      data: S.historique.map(h => pt(h, h.by_owner[filterOwner] || 0)),
-      borderColor: colors[i] || colors[0],
-      backgroundColor: (colors[i] || colors[0]) + '18',
-      tension: .35, borderWidth: 3, pointRadius: 5, fill: true,
-    }];
-  }
-
-  destroyChart(histChart);
-  const ctx = document.getElementById('history-chart').getContext('2d');
-  setHistChart(new Chart(ctx, {
-    type: 'line',
-    data: { datasets },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      onClick: (_, elements) => {
-        if (!elements.length) return;
-        const idx = elements[0].index;
-        const h = S.historique[idx];
-        if (!h) return;
-        // If clicked on an owner line, drill down that owner; otherwise show all
-        const dsIdx = elements[0].datasetIndex;
-        const clickedLabel = datasets[dsIdx]?.label;
-        const isOwnerLine = clickedLabel && clickedLabel !== 'Famille' && _owners().includes(clickedLabel);
-        api('GET', `/api/positions?date=${h.date}`).then(positions => {
-          const filtered = isOwnerLine ? positions.filter(p => p.owner === clickedLabel) : positions;
-          const title = isOwnerLine ? clickedLabel : 'Famille';
-          drilldownPositions(filtered, `${title} — ${fmtDate(h.date)}`, 'Composition à cette date', { showOwner: !isOwnerLine });
-        });
-      },
-      plugins: {
-        legend: { labels: { font: { size: 11 }, boxWidth: 12 } },
-        tooltip: {
-          callbacks: {
-            title: _tsTitle,
-            label: ctx =>
-              ` ${ctx.dataset.label} : ${fmt(ctx.parsed.y)}`,
-            afterBody: () => 'Cliquer pour voir la composition',
-          },
-        },
-      },
-      scales: {
-        x: {
-          type: 'linear',
-          ticks: { font: { size: 11 }, maxRotation: 0, autoSkip: true, callback: _tsTick },
-        },
-        y: {
-          ticks: { callback: fmtAxis },
-        },
-      },
-    },
+/** « Evolution du patrimoine net » : la courbe du titulaire choisi, et sous
+ *  elle ce qui explique la variation — l'epargne versee, puis l'effet des
+ *  marches. Comparer ce patrimoine a un indice serait trompeur : il grossit
+ *  aussi de ce qu'on y verse. La comparaison a un ETF vit dans Performance,
+ *  ou le TWR neutralise les versements.
+ *
+ *  Le titulaire se lit dans S : appelee sans argument apres un rechargement
+ *  de l'historique, l'ancienne version revenait a la famille sous un filtre
+ *  nominatif. */
+function renderHistChart() {
+  const hote = document.getElementById('evolution-courbe');
+  if (!hote || !S.historique.length) return;
+  const owner = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : null;
+  const points = S.historique.map(h => ({
+    date: h.date, v: owner ? (h.by_owner?.[owner] || 0) : h.family_net,
   }));
+  const qui = owner || 'Famille';
+  const debut = points[0], fin = points[points.length - 1];
+  dessinerCourbe(hote, {
+    series: [{ nom: `Patrimoine net — ${qui}`, couleur: 'var(--primary)', points, aire: true }],
+    formatV: v => fmt(v),
+    aide: `Patrimoine net ${qui} : ${fmt(debut.v)} le ${fmtDate(debut.date)}, ${fmt(fin.v)} le ${fmtDate(fin.date)}.`,
+    onPoint: date => api('GET', `/api/positions?date=${date}`).then(positions => {
+      const lignes = owner ? positions.filter(p => p.owner === owner) : positions;
+      drilldownPositions(lignes, `${qui} — ${fmtDate(date)}`, 'Composition à cette date', { showOwner: !owner });
+    }),
+  });
+  const sous = document.getElementById('evolution-sous');
+  if (sous) sous.textContent = `${points.length} arrêtés · du ${fmtDate(debut.date)} au ${fmtDate(fin.date)}`;
+  _legendeEvolution(owner, debut, fin);
 }
+
+async function _legendeEvolution(owner, debut, fin) {
+  const hote = document.getElementById('evolution-legende');
+  if (!hote) return;
+  const variation = fin.v - debut.v;
+  const pct = debut.v ? variation / Math.abs(debut.v) * 100 : null;
+  let decompo = '';
+  try {
+    const q = new URLSearchParams({ limit: '40' });
+    if (owner) q.set('owner', owner);
+    const d = await api('GET', `/api/contribution?${q}`, null, { silent: true });
+    if (d.periodes?.length) {
+      decompo = `<span><i style="background:var(--chart-4)"></i>Épargne versée <b>${fmtSigne(d.total_apports)}</b></span>`
+              + `<span><i style="background:var(--chart-1)"></i>Marchés <b>${fmtSigne(d.total_performance)}</b></span>`;
+    }
+  } catch { /* la decomposition est un plus : sans elle, la courbe reste lisible */ }
+  hote.innerHTML = `
+    <span>Variation <b>${fmtSigne(variation)}</b>${
+      pct != null ? ` <b>${fmtPct(pct, 1, true)}</b>` : ''}</span>
+    ${decompo}
+    <span class="courbe-note">Chaque arrêté ouvre sa composition</span>`;
+}
+
+const fmtSigne = v => `${v >= 0 ? '+' : '−'}${fmt(Math.abs(v))}`;
 
 function renderEntityWarnings(warnings) {
   // Ces avertissements ne s'affichent plus dans leur propre bandeau : ils

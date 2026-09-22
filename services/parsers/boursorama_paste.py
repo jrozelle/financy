@@ -36,6 +36,15 @@ _EURO_RE = re.compile(r'(?<![\d.,])(' + _NUM + r')\s*€')
 _CODE_RE = re.compile(r'^[A-Z0-9]{5,12}$')          # ISIN ou code interne (ex: FGPERIN)
 _NO_LETTER_RE = re.compile(r'[A-Za-z]')
 _CASH_RE = re.compile(r'esp[eè]ces|liquidit|\bcash\b|compte\s*esp', re.I)
+# Libelles d'interface : les pages des assureurs placent sous le tableau des
+# boutons « Actualiser », « Recuperer les releves de compte »... Colles avec le
+# reste, ils ouvraient un bloc et fabriquaient un faux fonds euros — trois
+# lignes FONDS_EUROS_ACTUALISER en base depuis le collage CA31 du 02/09/2026.
+# Un support ne commence jamais par un verbe d'action.
+_BOUTON_RE = re.compile(
+    r'^(actualiser|r[eé]cup[eé]rer|t[eé]l[eé]charger|exporter|imprimer|afficher|'
+    r'masquer|voir|consulter|modifier|arbitrer|verser|racheter|investir|'
+    r'acheter|vendre|fermer|retour|suivant|pr[eé]c[eé]dent)\b', re.I)
 
 
 def _normalize_ws(text: str) -> str:
@@ -100,6 +109,8 @@ def _is_name_line(line: str, next_line: str = '') -> bool:
     if not s or not _NO_LETTER_RE.search(s):
         return False
     if _is_header(s):
+        return False
+    if _BOUTON_RE.match(s):
         return False
     # Colonne de boutons : le tableau Boursorama expose "A" / "V" (Acheter /
     # Vendre) et chaque libelle est colle sur sa propre ligne. Promu en nom, il

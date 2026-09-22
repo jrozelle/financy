@@ -12,7 +12,7 @@ export const S = {
   historique:    [],
   entities:        [],
   entitySnapshots: [],
-  positionsView:   localStorage.getItem('financy_positionsView') || 'table',
+  positionsView:   localStorage.getItem('financy_positionsView') || 'tree',   // l'arborescence par defaut
   currentTab:      'synthese',
   editPosId:       null,
   editFluxId:      null,
@@ -26,13 +26,9 @@ export const S = {
   entityPositions: null,
 };
 
-export let histChart         = null;
 export let syntheseHistChart = null;
-export let perfChart          = null;
 
-export function setHistChart(v)         { histChart = v; }
 export function setSyntheseHistChart(v) { syntheseHistChart = v; }
-export function setPerfChart(v)         { perfChart = v; }
 
 export let _targetsCache = null;
 export let _alertsCache  = null;

@@ -175,8 +175,9 @@
 
       <div class="card" data-carte="historique">
         <h2>Évolution du patrimoine net</h2>
-          <p class="card-sub">Tous les arrêtés enregistrés</p>
-        <div class="chart-wrap-wide"><canvas id="history-chart"></canvas></div>
+        <p class="card-sub" id="evolution-sous">Tous les arrêtés enregistrés</p>
+        <div id="evolution-courbe" class="courbe-hote"></div>
+        <div id="evolution-legende" class="courbe-legende" aria-live="polite"></div>
       </div>
 
       <div class="card" id="synthese-history-detail-card" data-carte="evolution">
@@ -281,6 +282,7 @@
           <div class="seg" role="group" aria-label="Regrouper par" id="arbo-groupes">
             <button type="button" class="seg-btn" data-arbo-groupe="nature" aria-pressed="true">Nature</button>
             <button type="button" class="seg-btn" data-arbo-groupe="titulaire" aria-pressed="false">Titulaire</button>
+            <button type="button" class="seg-btn" data-arbo-groupe="plat" aria-pressed="false">À plat</button>
           </div>
           <span class="arbo-espace"></span>
           <button type="button" class="arbo-bouton" id="arbo-deplier">Tout déplier</button>
@@ -519,10 +521,11 @@
         <div class="kpi-grid" id="perf-kpi"></div>
         <div id="perf-controls"></div>
         <div class="card">
-          <h2>Performance des placements, versements neutralisés</h2>
-          <p class="card-sub">Base 100 au premier arrêté. Les versements et retraits sont neutralisés :
-          la courbe montre le rendement des placements, pas l'effet du calendrier d'apport.</p>
-          <div class="chart-container" style="height:320px"><canvas id="perf-chart"></canvas></div>
+          <h2>Vos placements face au marché</h2>
+          <p class="card-sub">Base 100 au premier arrêté, versements neutralisés (TWR) — comparable à un indice.
+          Choisissez un compte dans la liste pour le voir seul.</p>
+          <div id="perf-courbe" class="courbe-hote"></div>
+          <div id="perf-legende" class="courbe-legende" aria-live="polite"></div>
         </div>
         <div class="card" id="perf-list"></div>
       </div>
@@ -1047,6 +1050,10 @@
           <div class="snapshot-hint">Le snapshot d'origine reste intact.</div>
         </div>
         <div class="modal-actions">
+          <!-- La suppression vit ici plutot que dans une colonne du tableau :
+               elle est ainsi disponible depuis toutes les vues, et a l'endroit
+               ou l'on regarde deja la position qu'on s'apprete a retirer. -->
+          <button type="button" class="btn btn-danger-quiet hidden" id="pos-supprimer">Supprimer</button>
           <button type="button" class="btn btn-secondary" data-close="position-modal">Annuler</button>
           <button type="submit" class="btn btn-primary">Enregistrer</button>
         </div>
