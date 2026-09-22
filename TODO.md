@@ -245,7 +245,7 @@ Backlog :
 --- Actifs & conseil patrimonial ---
 
 Spec détaillée : docs/plan-actifs-conseil.md
-Branche : claude/asset-import-tracking-8psft
+Branche : main (claude/asset-import-tracking-8psft abandonnée à d045e86)
 
 Setup :
 - [x] Dev local : venv + .env.example + DB isolée financy_dev.db
@@ -331,6 +331,19 @@ Phase 7 — Advisor 2 : macro LLM + arbitrages :
 - [x] Vue consommation API Claude dans onglet Conseil
 - [x] Mode démo et tests : LLM 100% mocké (aucun appel réseau)
 - [x] Tests : 17 nouveaux tests, 205 au total
+
+Phase 8 — Conseil : constats et réserve (22-23/09/2026) :
+- [x] services/advisor/constats.py : faits vérifiables avant les propositions
+      (plafonds des livrets, livret fiscalisé, espèces dormantes, comptes
+      courants hors trésorerie de société, dette > valeur, concentration immo)
+- [x] GET /api/advisor/constats, carte « Constats » en tête de l'onglet
+- [x] Migration _migration_012 : owner_profiles.reserve_eur (réserve à garder
+      disponible), champ du profil ; les propositions ne l'entament pas
+- [x] Plafond PEA sur les versements du journal (valeur à défaut, signalée)
+- [x] Montants des propositions marqués ⟦v⟧ : masqués en mode discrétion
+- [x] Lignes à alléger valorisées comme les positions (devise convertie)
+- [ ] Constats : versements PER vs plafond de déduction (revenus à saisir)
+- [ ] Constats : ancienneté réelle des assurances-vie (date d'ouverture à saisir)
 
 Déploiement prod nas (après validation locale complète) :
 - [ ] Backup DB prod
