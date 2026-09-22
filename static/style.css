@@ -3535,6 +3535,15 @@ main > .tab-content > .page-header > h1 { display: none; }
 .kpi-grid > .kpi-card.kpi-debt       { grid-column: 9 / 11; }
 .kpi-grid > .kpi-card.kpi-mobilizable{ grid-column: 11 / 13; }
 
+/* `align-items: start` (plus haut) evite qu'une carte courte ne s'etire a cote
+   d'une longue — bon pour Repartition et Cible, faux pour une rangee
+   d'indicateurs : celui dont le sous-titre passe sur deux lignes depassait
+   ses voisins d'une ligne. Ceux-la s'etirent donc a la hauteur du rang. */
+.kpi-hero,
+.kpi-card.kpi-gross,
+.kpi-card.kpi-debt,
+.kpi-card.kpi-mobilizable { align-self: stretch; }
+
 /* ── Le chiffre dominant ──────────────────────────────────────────────── */
 .kpi-hero { box-shadow: 0 0 0 1px var(--primary) inset; }
 .kpi-hero .kpi-value { font-size: 2.1rem; font-weight: 600; letter-spacing: -.03em; }
@@ -3589,16 +3598,14 @@ main > .tab-content > .page-header > h1 { display: none; }
   .kpi-card { padding: calc(.8rem * var(--d)); }
   .kpi-label { font-size: .6rem; letter-spacing: .07em; }
 
-  /* En-tete : deux lignes pleines de reglages avant le premier chiffre. La
-     densite ne veut rien dire sur un telephone — elle disparait ; la periode
-     et le masquage restent, ce sont des lectures, pas des preferences. */
-  .page-head-tools [aria-label="Densité d'affichage"] { display: none; }
+  /* En-tete : « Masquer » occupait une ligne entiere a lui seul. Il remonte
+     dans le coin, au niveau du titre — c'est un interrupteur de lecture, pas
+     un filtre, et il n'a pas a pousser les chiffres vers le bas. */
+  .page-head { position: relative; gap: .45rem; margin-bottom: calc(.7rem * var(--d)); }
   .page-head-tools { gap: .3rem; row-gap: .35rem; }
-  .page-head-titre h1 { font-size: 1.15rem; }
-  .page-head { position: relative; }
   .page-head-titre { padding-right: 7rem; }
+  .page-head-titre h1 { font-size: 1.15rem; }
   .page-head-tools #mask-btn { position: absolute; top: 0; right: 0; margin: 0; }
-  .page-head { gap: .45rem; margin-bottom: calc(.7rem * var(--d)); }
 }
 
 /* Sous-titre d'indicateur : un montant seul ne se situe pas. */

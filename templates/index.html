@@ -142,10 +142,9 @@
       <div class="page-head-tools">
         <div id="head-filtres"></div>
         <div class="seg" role="group" aria-label="Période de comparaison" id="seg-periode"></div>
-        <div class="seg" role="group" aria-label="Densité d'affichage">
-          <button type="button" class="seg-btn" data-den="confortable" aria-pressed="true">Confort</button>
-          <button type="button" class="seg-btn" data-den="compacte" aria-pressed="false">Compact</button>
-        </div>
+        <!-- La densite a quitte cette barre : on la regle une fois, et elle
+             occupait la place qui faisait deborder « Masquer » sur une ligne a
+             lui seul. Elle reste dans la fenetre Reglages. -->
         <span id="demo-badge" class="demo-badge hidden" title="Mode demo / LLM mocke" aria-hidden="true"></span>
         <button type="button" class="seg-solo" id="mask-btn" aria-pressed="false">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
