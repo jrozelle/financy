@@ -144,6 +144,10 @@
   --rail-ink:      #9aa3b5;
   --rail-ink-on:   #ffffff;
   --rail-group:    #616b80;
+  /* Le rail restant sombre dans les deux themes, son accent et son filet ne
+     varient pas non plus : une seule definition suffit. */
+  --rail-actif:    #5fb3a8;
+  --rail-border:   rgba(255,255,255,.08);
   --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --radius:        11px;
@@ -3145,32 +3149,72 @@ html.is-masked body::before {
 body { padding-left: var(--rail-w); }
 /* Les onglets vivent dans le rail : la barre du haut ne garde que les outils. */
 
+/* Le bouton « Plus » n'a de sens que dans la barre du bas ; declare avant le
+   media pour que celui-ci le rallume. */
+.fin-rail-plus { display: none; }
+
+/* ── Telephone : le rail devient une barre d'onglets en bas ─────────────── */
+/* Une barre horizontale defilante en haut cachait les premieres entrees hors
+   ecran — on ne voyait donc plus ou l'on se trouvait. Cinq destinations fixes
+   en bas, atteignables au pouce, et le reste derriere « Plus » qui deplie le
+   rail entier : meme markup, deux geometries. */
 @media (max-width: 780px) {
-  /* Sous 900 px le rail passe en barre horizontale : garder une colonne de
-     216 px mangerait la moitie de la largeur utile. */
   .fin-rail {
-    position: static; width: auto; flex-direction: row; align-items: center;
-    gap: .15rem; padding: .35rem .5rem; overflow-x: auto; bottom: auto;
-    scrollbar-width: none;
+    position: fixed; inset: auto 0 0 0; width: auto; height: auto;
+    flex-direction: row; align-items: stretch; justify-content: space-around;
+    gap: 0; padding: .25rem .25rem calc(.25rem + env(safe-area-inset-bottom, 0px));
+    border-right: 0; border-top: 1px solid var(--rail-border, rgba(255,255,255,.08));
+    overflow: visible; z-index: 80;
   }
-  .fin-rail::-webkit-scrollbar { display: none; }
-  .fin-rail-brand { padding: 0 .4rem 0 0; font-size: .85rem; }
-  .fin-rail-brand .fin-rail-mark { width: 22px; height: 22px; font-size: 11px; }
-  .fin-rail-group, .fin-rail-foot .fin-rail-group { display: none; }
-  .fin-rail-foot { margin-top: 0; display: flex; gap: .15rem; }
-  /* Compacte : dix entrees sur une ligne de telephone ne tiennent qu'au prix
-     d'un defilement, autant qu'il en montre le plus possible d'un coup. */
-  .fin-rail .tab-btn {
-    width: auto; white-space: nowrap; font-size: .78rem; padding: .3rem .45rem;
-  }
-  .fin-rail .fin-rail-sub { padding-left: .45rem; }
   body { padding-left: 0; }
-  /* Le titre reste : sur une barre reduite a des filtres, il est la seule
-     indication de l'endroit ou l'on se trouve. */
-  .fin-title { display: block; flex: 1 1 100%; order: -1; padding: 0 0 .3rem; }
-  .fin-title h1 { font-size: .95rem; }
-  .fin-title p { display: none; }
+
+  /* Ne restent que les cinq destinations et le bouton « Plus ». */
+  .fin-rail-brand,
+  .fin-rail-group,
+  #rail-recherche,
+  .fin-rail .fin-rail-sub,
+  .fin-rail-foot { display: none; }
+  .fin-rail-plus { display: flex; }
+
+  .fin-rail .fin-rail-item {
+    flex: 1 1 0; min-width: 0;
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: .15rem; padding: .35rem .15rem; margin: 0;
+    font-size: .625rem; line-height: 1.1; letter-spacing: .01em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    border-radius: 10px;
+  }
+  .fin-rail .fin-rail-item svg { width: 21px; height: 21px; }
+  /* L'entree courante se marque par la couleur : un fond plein sur une barre
+     de cinq cases fait un pave qui deborde du rythme. */
+  .fin-rail .fin-rail-item.active { background: transparent; color: var(--rail-actif, #7fd1c8); }
+
+  /* Deplie : le rail reprend sa colonne, par-dessus la page. */
+  .fin-rail.is-open {
+    inset: 0 0 0 0; flex-direction: column; justify-content: flex-start;
+    align-items: stretch; overflow-y: auto;
+    gap: .1rem; padding: calc(.75rem + env(safe-area-inset-top, 0px)) .75rem
+                        calc(.75rem + env(safe-area-inset-bottom, 0px));
+  }
+  .fin-rail.is-open .fin-rail-brand,
+  .fin-rail.is-open .fin-rail-group,
+  .fin-rail.is-open #rail-recherche,
+  .fin-rail.is-open .fin-rail-sub,
+  .fin-rail.is-open .fin-rail-foot { display: block; }
+  .fin-rail.is-open .fin-rail-foot { margin-top: auto; }
+  .fin-rail.is-open .fin-rail-item {
+    flex: 0 0 auto; flex-direction: row; justify-content: flex-start;
+    gap: .6rem; padding: .6rem .7rem; font-size: .9rem; text-align: left;
+  }
+  .fin-rail.is-open .fin-rail-item svg { width: 18px; height: 18px; }
+  .fin-rail.is-open .fin-rail-item.active { background: var(--rail-hover); }
+
+  /* Le contenu doit pouvoir defiler au-dessus de la barre. */
+  main { padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px)); }
+  body.rail-ouvert { overflow: hidden; }
 }
+
+
 
 /* Titre de la page dans la barre du haut */
 /* Le titre reclame sa place : sans base explicite, la recherche prenait tout
@@ -3519,10 +3563,29 @@ main > .tab-content > .page-header > h1 { display: none; }
   .kpi-grid > .kpi-card.kpi-mobilizable { grid-column: span 4; }
   [data-carte] { grid-column: span 12 !important; }
 }
+/* Telephone : empiler les quatre indicateurs pleine largeur demandait un
+   ecran par chiffre. Deux par ligne pour les deux comparables — ce qu'on
+   possede et ce qu'on doit —, le mobilisable en dessous, le net au-dessus. */
 @media (max-width: 700px) {
-  .kpi-grid > .kpi-card.kpi-gross,
-  .kpi-grid > .kpi-card.kpi-debt,
+  .kpi-grid > .kpi-card.kpi-gross       { grid-column: span 6; }
+  .kpi-grid > .kpi-card.kpi-debt        { grid-column: span 6; }
   .kpi-grid > .kpi-card.kpi-mobilizable { grid-column: span 12; }
+  .kpi-hero .kpi-value { font-size: 1.75rem; }
+  .kpi-hero .spark { height: 28px; }
+  .kpi-card.kpi-gross .kpi-value,
+  .kpi-card.kpi-debt .kpi-value { font-size: 1rem; }
+  .kpi-card.kpi-gross .kpi-sub,
+  .kpi-card.kpi-debt .kpi-sub { font-size: .66rem; }
+  .kpi-card { padding: calc(.8rem * var(--d)); }
+  .kpi-label { font-size: .6rem; letter-spacing: .07em; }
+
+  /* En-tete : deux lignes pleines de reglages avant le premier chiffre. La
+     densite ne veut rien dire sur un telephone — elle disparait ; la periode
+     et le masquage restent, ce sont des lectures, pas des preferences. */
+  .page-head-tools [aria-label="Densité d'affichage"] { display: none; }
+  .page-head-tools { gap: .3rem; row-gap: .35rem; }
+  .page-head-titre h1 { font-size: 1.15rem; }
+  .page-head { gap: .45rem; margin-bottom: calc(.7rem * var(--d)); }
 }
 
 /* Sous-titre d'indicateur : un montant seul ne se situe pas. */

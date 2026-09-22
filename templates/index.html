@@ -15,7 +15,7 @@
        revenait a se battre contre douze regles invisibles. Les boutons portent
        les memes data-tab / data-group, le JS existant les cable sans rien
        savoir de ce changement. -->
-  <nav class="fin-rail" aria-label="Navigation principale">
+  <nav class="fin-rail" id="fin-rail" aria-label="Navigation principale">
     <div class="fin-rail-brand"><span class="fin-rail-mark">F</span>Financy</div>
     <div id="rail-recherche"></div>
 
@@ -31,6 +31,14 @@
     <button type="button" class="tab-btn fin-rail-sub" data-tab="flux">Flux et versements</button>
 
     <button type="button" class="tab-btn fin-rail-item" data-tab="conseil"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>Conseil</button>
+
+    <!-- Sur telephone le rail devient une barre du bas a cinq entrees ; ce
+         bouton y deplie le rail complet, sous-entrees et recherche comprises.
+         Masque des que la colonne tient a l'ecran. -->
+    <button type="button" class="fin-rail-item fin-rail-plus" id="rail-plus"
+            aria-expanded="false" aria-controls="fin-rail">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Plus
+    </button>
 
     <div class="fin-rail-foot">
       <button type="button" class="fin-rail-item fin-rail-reglages" id="ouvrir-reglages">

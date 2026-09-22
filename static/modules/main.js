@@ -670,6 +670,31 @@ function wireEvents() {
   deplacer('#settings-menu', 'rail-reglages');     // les reglages aussi
   // Videe de tout, la barre du haut n'a plus lieu d'etre.
 
+  // ── Barre du bas : le bouton « Plus » deplie le rail entier ─────────
+  // Sur telephone le rail ne montre que cinq destinations ; les sous-entrees,
+  // la recherche et les reglages vivent derriere ce bouton. C'est le meme
+  // element qui change de geometrie, donc rien a recabler.
+  const rail = document.getElementById('fin-rail');
+  const plus = document.getElementById('rail-plus');
+  const replierRail = () => {
+    rail?.classList.remove('is-open');
+    document.body.classList.remove('rail-ouvert');
+    plus?.setAttribute('aria-expanded', 'false');
+  };
+  plus?.addEventListener('click', () => {
+    const ouvert = rail.classList.toggle('is-open');
+    document.body.classList.toggle('rail-ouvert', ouvert);
+    plus.setAttribute('aria-expanded', String(ouvert));
+  });
+  // Choisir une destination referme la feuille ; le bouton lui-meme la bascule.
+  rail?.addEventListener('click', e => {
+    if (e.target.closest('#rail-plus')) return;
+    if (e.target.closest('.tab-btn, #ouvrir-reglages')) replierRail();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && rail?.classList.contains('is-open')) replierRail();
+  });
+
   // L'en-tete figé ne prend son filet qu'une fois decolle du haut : souligner
   // un en-tete au repos ajoute un trait qui ne separe rien.
   const tete = document.querySelector('.page-head');
