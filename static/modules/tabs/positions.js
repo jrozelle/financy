@@ -291,7 +291,7 @@ export function renderPositions() {
 
   reapplyColumns('positions', 'positions-thead');
   _applyPositionTableContext();
-  document.getElementById('positions-tbody').addEventListener('click', onPosTableClick, { once: true });
+  document.getElementById('positions-tbody').addEventListener('click', onPosTableClick);
 }
 
 const signe = v => `<span class="${v >= 0 ? 'pv-hausse' : 'pv-baisse'}">${v >= 0 ? '+' : '−'}${fmt(Math.abs(v))}</span>`;
@@ -316,7 +316,6 @@ function onPosTableClick(e) {
   if (btn.dataset.action === 'edit-pos')         openPosModal(id);
   if (btn.dataset.action === 'del-pos')          deletePosition(id);
   if (btn.dataset.action === 'manage-holdings')  _openHoldingsForPosition(id);
-  document.getElementById('positions-tbody').addEventListener('click', onPosTableClick, { once: true });
 }
 
 function _openHoldingsForPosition(id) {

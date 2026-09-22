@@ -343,14 +343,11 @@
         <table class="data-table">
           <thead id="entities-thead">
             <tr>
-              <th data-sort="name">Nom</th>
-              <th data-sort="type">Type</th>
-              <th data-sort="valuation_mode">Valorisation</th>
-              <th class="num" data-sort="gross_assets">Actif brut</th>
+              <th data-sort="name">Entité</th>
+              <th class="num" data-sort="gross_assets">Valeur</th>
               <th class="num" data-sort="debt">Dette</th>
-              <th class="num" data-sort="net_assets">Actif net</th>
-              <th>Détenteurs (dernier snapshot)</th>
-              <th>Commentaire</th>
+              <th class="num" data-sort="net_assets">Net</th>
+              <th>Détenteurs</th>
               <th>Historique</th>
               <th></th>
             </tr>
@@ -358,15 +355,15 @@
           <tbody id="entities-tbody"></tbody>
         </table>
       </div>
-      <div class="card" style="max-width:680px">
-        <h2>Comment utiliser les entités ?</h2>
-        <p class="text-muted" style="font-size:13px;line-height:1.7">
+      <details class="card ent-aide" id="ent-aide">
+        <summary>Comment fonctionnent les entités ?</summary>
+        <p class="text-muted">
           Crée ici une SCI ou indivision avec sa valeur globale et sa dette.<br>
           Ensuite dans <strong>Positions</strong>, sélectionne l'entité et renseigne
           le <strong>% de propriété</strong> de chaque personne.<br>
           Le net de chaque titulaire = <em>(Actif brut × % propriété) – (Dette × % dette)</em>.
         </p>
-      </div>
+      </details>
     </div>
 
     <!-- ── RÉFÉRENTIEL ───────────────────────────────────────────────────── -->

@@ -30,6 +30,18 @@ const ACTIFS_TABLE_COLUMNS = [
   { key: 'freshness', label: 'Fraicheur' },
 ];
 
+/** Plus-value d'une ligne, au format de Positions : montant signe, pourcentage
+ *  dessous. Une plus-value nulle au centime pres n'est pas une performance
+ *  mesuree : un fonds euros sans cours, ou un releve sans prix de revient dont
+ *  la saisie a repris la valeur. On le dit plutot qu'afficher « +0 € ». */
+function cellulePnl(l) {
+  if (l.pnl == null) return '<span class="pv-na">—</span>';
+  if (l.pnl === 0) return '<span class="pv-na">PRU = valeur</span>';
+  const v = l.pnl;
+  const montant = `<span class="${v >= 0 ? 'pv-hausse' : 'pv-baisse'}">${v >= 0 ? '+' : '−'}${fmt(Math.abs(v))}</span>`;
+  return montant + (l.pnl_pct != null ? `<span class="pv-pct">${fmtPct(l.pnl_pct, 1, true)}</span>` : '');
+}
+
 function ensureActifsTableScaffold() {
   const thead = document.getElementById('actifs-thead');
   if (!thead) return;
@@ -133,10 +145,6 @@ function _renderTable(lines) {
   }
   const sorted = sortArr([...filtered], _sortCol, _sortDesc ? -1 : 1);
   tbody.innerHTML = sorted.map(l => {
-    const pnl = l.pnl;
-    const pnlCls = pnl == null ? '' : pnl >= 0 ? 'pos' : 'neg';
-    const pnlStr = pnl == null ? '—'
-      : `${pnl >= 0 ? '+' : ''}${fmt(pnl)}${l.pnl_pct != null ? ` (${fmtPct(l.pnl_pct)})` : ''}`;
     const fresh = _freshnessBadge(l);
     return `<tr>
       <td><button type="button" class="h-isin-btn" data-action="open-popover" data-isin="${esc(l.isin)}">${esc(l.isin)}</button></td>
@@ -147,7 +155,7 @@ function _renderTable(lines) {
       <td class="num">${l.avg_cost != null ? fmt(l.avg_cost) : '—'}</td>
       <td class="num">${l.last_price != null ? fmt(l.last_price) : '—'}</td>
       <td class="num">${fmt(l.market_value)}</td>
-      <td class="num ${pnlCls}">${pnlStr}</td>
+      <td class="num">${cellulePnl(l)}</td>
       <td class="num">${fmtPct(l.weight_pct)}</td>
       <td>${esc((l.envelopes || []).join(', ') || '—')}</td>
       <td>${fresh}</td>
@@ -155,10 +163,6 @@ function _renderTable(lines) {
   }).join('');
   if (cards) {
     cards.innerHTML = sorted.map(l => {
-      const pnl = l.pnl;
-      const pnlCls = pnl == null ? '' : pnl >= 0 ? 'pos' : 'neg';
-      const pnlStr = pnl == null ? '—'
-        : `${pnl >= 0 ? '+' : ''}${fmt(pnl)}${l.pnl_pct != null ? ` (${fmtPct(l.pnl_pct)})` : ''}`;
       const fresh = _freshnessBadge(l);
       return `<article class="actif-card">
         <div class="actif-card-main">
@@ -170,7 +174,7 @@ function _renderTable(lines) {
           <div><dt>Valo</dt><dd>${fmt(l.market_value)}</dd></div>
           <div><dt>PRU</dt><dd>${l.avg_cost != null ? fmt(l.avg_cost) : '—'}</dd></div>
           <div><dt>Qté</dt><dd>${fmtQty(l.quantity)}</dd></div>
-          <div><dt>+/-</dt><dd class="${pnlCls}">${pnlStr}</dd></div>
+          <div><dt>+/-</dt><dd>${cellulePnl(l)}</dd></div>
           <div><dt>Poids</dt><dd>${fmtPct(l.weight_pct)}</dd></div>
           <div><dt>Cours</dt><dd>${l.last_price != null ? fmt(l.last_price) : '—'}</dd></div>
         </dl>

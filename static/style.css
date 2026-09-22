@@ -3444,7 +3444,7 @@ a.settings-item { display: inline-flex; align-items: center; text-decoration: no
 .pv-hausse { color: var(--success); font-variant-numeric: tabular-nums; }
 .pv-baisse { color: var(--danger); font-variant-numeric: tabular-nums; }
 .pv-pct { display: block; font-size: .72rem; color: var(--text-muted); }
-.pv-na { color: var(--text-muted); font-size: .76rem; }
+.pv-na { color: var(--text-muted); font-size: .76rem; white-space: nowrap; }
 /* Couverture partielle : dite sous le chiffre, pas dans une infobulle. */
 .pv-partiel { display: block; font-size: .68rem; color: var(--warning); }
 th[data-sort]:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
@@ -3692,3 +3692,14 @@ td.arbo-part > * { vertical-align: middle; }
   .constat-niveau { grid-row: auto; grid-column: 1 / -1; justify-self: start; }
   .constat-detail { grid-column: 1 / -1; }
 }
+
+/* ── Entites ─────────────────────────────────────────────────────────── */
+.ent-note { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+.ent-alerte { color: var(--danger); font-size: 12px; margin-top: 3px; }
+.ent-detenteurs .badge { margin: 1px 4px 1px 0; }
+.ent-histo { font-size: 12px; line-height: 1.3; text-align: left; }
+.ent-histo span { display: block; color: var(--text-muted); font-size: 11px; }
+.ent-actions { white-space: nowrap; text-align: right; }
+.ent-aide { max-width: 680px; }
+.ent-aide > summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.ent-aide > p { font-size: 13px; line-height: 1.7; margin-top: 10px; }

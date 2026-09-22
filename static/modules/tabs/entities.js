@@ -29,8 +29,12 @@ function snapshotsByEntity() {
 
 export function renderEntities() {
   const tbody = document.getElementById('entities-tbody');
+  // Ouverte d'office tant qu'il n'y a rien : c'est alors qu'on en a besoin.
+  const aide = document.getElementById('ent-aide');
+  if (aide && !S.entities.length) aide.open = true;
+  if (!tbody._cable) { tbody.addEventListener('click', onEntTableClick); tbody._cable = true; }
   if (!S.entities.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">Aucune entité. Ajoutez une SCI ou indivision.</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Aucune entité. Ajoutez une SCI ou une indivision.</td></tr>';
     return;
   }
   const snapMap = snapshotsByEntity();
@@ -39,38 +43,37 @@ export function renderEntities() {
     const linked   = (S.entityPositions || []).filter(p => p.entity === e.name);
     const totalPct = linked.reduce((s, p) => s + (p.ownership_pct || 0), 0);
     const owners   = linked.map(p =>
-      `<span class="badge badge-j27" style="margin:1px 2px">${esc(p.owner)} ${Math.round((p.ownership_pct||0)*100)}%</span>`
+      `<span class="badge badge-j27">${esc(p.owner)} ${Math.round((p.ownership_pct||0)*100)} %</span>`
     ).join('');
-    const warn = linked.length > 0 && Math.abs(totalPct - 1) > 0.01
-      ? `<div style="color:var(--danger);font-size:11px;margin-top:3px">⚠ Total ${Math.round(totalPct*100)}% — vérifier les %</div>`
-      : '';
-    const noLink = linked.length === 0
-      ? '<span style="color:var(--text-muted);font-size:12px">Aucune position liée</span>'
-      : '';
+    // Moins de 100 % dans le foyer n'est pas une erreur : un bien indivis avec
+    // un frere, une SCI avec un associe. Plus de 100 %, si.
+    let repartition = '';
+    if (linked.length && totalPct > 1.01) {
+      repartition = `<div class="ent-alerte">Total ${Math.round(totalPct*100)} % : les parts dépassent l'entité</div>`;
+    } else if (linked.length && totalPct < 0.99) {
+      repartition = `<div class="ent-note">${Math.round((1 - totalPct)*100)} % hors foyer</div>`;
+    }
+    const noLink = linked.length === 0 ? '<span class="ent-note">Aucune position liée</span>' : '';
+    const nature = [e.type, e.valuation_mode && e.valuation_mode.toLowerCase()].filter(Boolean).join(' · ');
     const snaps = snapMap[e.name] || [];
     const lastSnap = snaps[0];
     const snapCell = snaps.length
-      ? `<button class="btn-icon" style="font-size:11px;padding:.15rem .45rem" data-id="${e.id}" data-name="${esc(e.name)}" data-action="snap-hist">${snaps.length} entrée${snaps.length > 1 ? 's' : ''}<br><span style="color:var(--text-muted)">${fmtDate(lastSnap.date)}</span></button>`
-      : '<span style="color:var(--text-muted);font-size:12px">—</span>';
+      ? `<button class="btn-icon ent-histo" data-id="${e.id}" data-name="${esc(e.name)}" data-action="snap-hist">${snaps.length} valeur${snaps.length > 1 ? 's' : ''}<span>${fmtDate(lastSnap.date)}</span></button>`
+      : '<span class="ent-note">—</span>';
     return `<tr>
-      <td><strong>${esc(e.name)}</strong></td>
-      <td>${esc(e.type || '—')}</td>
-      <td>${esc(e.valuation_mode || '—')}</td>
+      <td><strong>${esc(e.name)}</strong>${nature ? `<div class="ent-note">${esc(nature)}</div>` : ''}${e.comment ? `<div class="ent-note">${esc(e.comment)}</div>` : ''}</td>
       <td class="num">${fmt(e.gross_assets)}</td>
       <td class="num ${e.debt > 0 ? 'neg' : ''}">${e.debt > 0 ? fmt(e.debt) : '—'}</td>
       <td class="num ${e.net_assets < 0 ? 'neg' : 'pos'}">${fmt(e.net_assets)}</td>
-      <td>${owners}${noLink}${warn}</td>
-      <td>${esc(e.comment || '—')}</td>
-      <td style="text-align:center">${snapCell}</td>
-      <td style="white-space:nowrap">
-        <button class="btn-icon add" data-action="add-pos-entity" data-name="${esc(e.name)}" title="Ajouter une position liée à cette entité">+ Position</button>
+      <td class="ent-detenteurs">${owners}${noLink}${repartition}</td>
+      <td>${snapCell}</td>
+      <td class="ent-actions">
+        <button class="btn-icon add" data-action="add-pos-entity" data-name="${esc(e.name)}">+ Position</button>
         <button class="btn-icon edit" data-id="${e.id}" data-action="edit-ent">Éditer</button>
-        <button class="btn-icon del"  data-id="${e.id}" data-action="del-ent">Supprimer</button>
+        <button class="btn-icon del"  data-id="${e.id}" data-action="del-ent" aria-label="Supprimer ${esc(e.name)}">Supprimer</button>
       </td>
     </tr>`;
   }).join('');
-
-  tbody.addEventListener('click', onEntTableClick, { once: true });
 }
 
 function onEntTableClick(e) {
@@ -84,7 +87,6 @@ function onEntTableClick(e) {
     const entityName = btn.dataset.name;
     switchTab('positions').then(() => openPosModal(null, { entity: entityName }));
   }
-  document.getElementById('entities-tbody').addEventListener('click', onEntTableClick, { once: true });
 }
 
 function showEntitySnapshots(entityName) {

@@ -146,7 +146,7 @@ export function renderFlux() {
       </tr>` : ''}`;
   }
 
-  tbody.addEventListener('click', onFluxTableClick, { once: true });
+  tbody.addEventListener('click', onFluxTableClick);
 }
 
 function onFluxTableClick(e) {
@@ -155,7 +155,6 @@ function onFluxTableClick(e) {
   const id = parseInt(btn.dataset.id);
   if (btn.dataset.action === 'edit-flux') openFluxModal(id);
   if (btn.dataset.action === 'del-flux')  deleteFlux(id);
-  document.getElementById('flux-tbody').addEventListener('click', onFluxTableClick, { once: true });
 }
 
 export function openFluxModal(id = null) {
