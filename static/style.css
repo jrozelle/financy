@@ -3849,3 +3849,40 @@ body { padding-top: 0 !important; }
 }
 /* Le pied du rail se détache : les réglages ne sont pas une destination. */
 .fin-rail-foot { border-top: 1px solid rgba(255,255,255,.07); padding-top: .5rem; }
+
+/* ── Uniformité des contrôles de l'en-tête ────────────────────────────── */
+/* Selects, segments et boutons partageaient des hauteurs differentes (34 a
+   40 px contre 28), et le meme rayon de 8 px produisait alors une pilule d'un
+   cote, un carre de l'autre. Une seule hauteur, un seul rayon, une seule
+   bordure : la barre se lit comme une rangee d'objets de meme nature. */
+.page-head-tools { --ctrl-h: 30px; }
+
+.page-head-tools #global-owner-filter,
+.page-head-tools #synthese-date-select {
+  width: auto !important;
+  height: var(--ctrl-h) !important;
+  min-height: var(--ctrl-h) !important;
+  padding: 0 1.6rem 0 .6rem !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--border) !important;
+  background: var(--card) !important;
+  font-size: .78rem !important;
+  font-family: var(--sans);
+  color: var(--text) !important;
+}
+.page-head-tools .seg { height: var(--ctrl-h); align-items: center; }
+.page-head-tools .seg-btn { height: calc(var(--ctrl-h) - 6px); display: inline-flex; align-items: center; }
+.page-head-tools .seg-solo { height: var(--ctrl-h); }
+/* Le bouton d'actions prend le meme gabarit que ses voisins plutot que celui,
+   carre, des icones de l'ancienne barre. */
+.page-head-tools #snapshot-toggle {
+  width: auto; height: var(--ctrl-h); padding: 0 .5rem;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--card);
+  color: var(--text-muted);
+}
+.page-head-tools #snapshot-toggle:hover { border-color: var(--text-muted); color: var(--text); }
+.page-head-tools #snapshot-toggle svg { width: 15px; height: 15px; }
+/* Le bouton « ajouter » de l'ancienne barre n'a plus sa place ici : l'ajout se
+   fait depuis l'ecran concerne, pas depuis l'en-tete de la synthese. */
+.page-head-tools #nav-add-button { display: none !important; }
+#head-filtres { gap: .35rem; }
