@@ -209,20 +209,21 @@ export async function renderSyntheseHistory() {
     data:  serie(g),
     backgroundColor: colors[i % colors.length] + 'cc',
     borderColor:     colors[i % colors.length],
-    borderWidth: 1.5, tension: .25, pointRadius: 2,
+    borderWidth: 1.5, cubicInterpolationMode: 'monotone', pointRadius: 2,
     fill: true,
   }));
   if (fondues.length) {
+    // Un canvas ne resout pas var(--x) : la couleur se lit une fois ici.
+    const gris = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim();
     datasets.push({
       label: `${fondues.length} autres`,
       data: history.map(h => ({
         x: _ts(h.date),
         y: Math.round(fondues.reduce((t, g) => t + (h.by_group?.[g] || 0), 0)),
       })),
-      backgroundColor: getComputedStyle(document.documentElement)
-        .getPropertyValue('--text-muted').trim() + '55',
-      borderColor: 'var(--text-muted)',
-      borderWidth: 1.5, tension: .25, pointRadius: 2, fill: true,
+      backgroundColor: gris + '55',
+      borderColor: gris,
+      borderWidth: 1.5, cubicInterpolationMode: 'monotone', pointRadius: 2, fill: true,
     });
   }
 
@@ -250,7 +251,10 @@ export async function renderSyntheseHistory() {
           });
         },
         scales: {
-          x: { type: 'linear', ticks: { font: { size: 11 }, maxRotation: 0, autoSkip: true, callback: _tsTick } },
+          // Bornes aux arretes : sans elles, l'axe s'arrondit a la graduation
+          // suivante et laisse une marge vide avant le premier et apres le dernier.
+          x: { type: 'linear', min: _ts(history[0].date), max: _ts(history[history.length - 1].date),
+               ticks: { font: { size: 11 }, maxRotation: 0, autoSkip: true, callback: _tsTick } },
           y: { stacked: true, ticks: {
             font: { size: 11 },
             callback: fmtAxis
@@ -521,19 +525,46 @@ async function renderSnapshotDiff(owner, isFamily) {
   // La VARIATION est l'information ; l'avant et l'apres ne servaient qu'a la
   // calculer de tete. Le montant passe donc a gauche, en gros, et le compte a
   // droite — on lit d'abord ce qui a bouge, ensuite ou.
+  const VISIBLES = 6;
+  const ligne = (m, i) => `
+        <div class="mv-item"${i >= VISIBLES ? ' data-mv-reste hidden' : ''}>
+          <button type="button" class="mv-ligne" aria-expanded="false">
+            <span class="mv-montant ${m.delta >= 0 ? 'pos' : 'neg'}">${
+              m.delta >= 0 ? '+' : '−'}${fmt(Math.abs(m.delta))}</span>
+            <span class="mv-ou">${esc(m.label || '—')}${badge(m.status)}</span>
+            <span class="mv-qui">${esc([m.owner, m.establishment].filter(Boolean).join(' · '))}</span>
+          </button>
+          <p class="mv-detail" hidden>${
+            m.status === 'new' ? `Ouvert depuis le ${fmtDate(data.from_date)} : ${fmt(m.net_after)} au ${fmtDate(data.to_date)}`
+            : m.status === 'closed' ? `${fmt(m.net_before)} au ${fmtDate(data.from_date)}, absent au ${fmtDate(data.to_date)}`
+            : `${fmt(m.net_before)} au ${fmtDate(data.from_date)} → ${fmt(m.net_after)} au ${fmtDate(data.to_date)}${
+                m.net_before ? ` (${fmtPct((m.net_after / m.net_before - 1) * 100, 1, true)})` : ''}`}</p>
+        </div>`;
   el.innerHTML = `
     <p class="mv-total">Variation nette
       <b class="${(t.delta || 0) >= 0 ? 'pos' : 'neg'}">${(t.delta || 0) >= 0 ? '+' : ''}${
         fmt(t.delta || 0)}</b> depuis le ${fmtDate(data.from_date)}</p>
-    <div class="mv-liste">
-      ${moves.map(m => `
-        <div class="mv-ligne">
-          <span class="mv-montant ${m.delta >= 0 ? 'pos' : 'neg'}">${
-            m.delta >= 0 ? '+' : '−'}${fmt(Math.abs(m.delta))}</span>
-          <span class="mv-ou">${esc(m.label || '—')}${badge(m.status)}</span>
-          <span class="mv-qui">${esc([m.owner, m.establishment].filter(Boolean).join(' · '))}</span>
-        </div>`).join('')}
-    </div>`;
+    <div class="mv-liste">${moves.map(ligne).join('')}</div>
+    ${moves.length > VISIBLES ? `<button type="button" class="btn-link mv-plus" aria-expanded="false">
+      Voir les ${moves.length - VISIBLES} autres comptes</button>` : ''}`;
+  // L'avant et l'apres ne sont plus affiches d'office : ils se deplient au
+  // clic, a l'ecran, plutot que de dormir dans une infobulle.
+  el.onclick = e => {
+    const b = e.target.closest('.mv-ligne');
+    if (b) {
+      const ouvert = b.getAttribute('aria-expanded') === 'true';
+      b.setAttribute('aria-expanded', String(!ouvert));
+      b.nextElementSibling.hidden = ouvert;
+      return;
+    }
+    const plus = e.target.closest('.mv-plus');
+    if (plus) {
+      const ouvert = plus.getAttribute('aria-expanded') === 'true';
+      el.querySelectorAll('[data-mv-reste]').forEach(x => { x.hidden = ouvert; });
+      plus.setAttribute('aria-expanded', String(!ouvert));
+      plus.textContent = ouvert ? `Voir les ${moves.length - VISIBLES} autres comptes` : 'Réduire';
+    }
+  };
 }
 
 // ─── Snapshot notes ──────────────────────────────────────────────────────

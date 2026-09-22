@@ -181,7 +181,7 @@ function _renderChart(data) {
         borderColor: colors[0],
         backgroundColor: colors[0] + '18',
         fill: true,
-        tension: 0.25,
+        cubicInterpolationMode: 'monotone',
         pointRadius: 0,
         pointHoverRadius: 4,
         borderWidth: 2,

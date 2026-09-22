@@ -208,7 +208,7 @@ export async function drilldownHistory({ subtitle, title, filters }) {
           borderColor: colors[0],
           backgroundColor: colors[0] + '18',
           fill: true,
-          tension: 0.3,
+          cubicInterpolationMode: 'monotone',
           pointRadius: 4,
           borderWidth: 2,
         }],
