@@ -685,3 +685,46 @@ def todo():
             return jsonify({'error': 'Date invalide (format AAAA-MM-JJ attendu)'}), 400
         data = collect(conn, date)
     return jsonify({'date': date, **data})
+
+
+@synthese_bp.route('/api/contribution')
+@login_required
+def contribution():
+    """Decomposition de la variation du net : apports externes / performance.
+
+    Params : `owner` (defaut : famille), `limit` (nombre de periodes, defaut 8).
+    Lecture seule, s'appuie sur les arretes existants.
+    """
+    from services.contribution import decompose
+
+    owner = request.args.get('owner') or None
+    if owner in ('Famille', ''):
+        owner = None
+    limite = request.args.get('limit', type=int) or 8
+    limite = max(1, min(limite, 40))
+
+    with get_db() as conn:
+        dates = [r['date'] for r in conn.execute(
+            'SELECT DISTINCT date FROM positions ORDER BY date').fetchall()]
+        if len(dates) < 2:
+            # Une seule photo ne fait pas une variation : rien a decomposer.
+            return jsonify({'periodes': [], 'total_apports': 0,
+                            'total_performance': 0, 'total_variation': 0})
+        ref = load_referential(conn)
+        dernier = dates[-1]
+        arretes = []
+        for date in dates:
+            rows = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
+            holdings_map = get_holdings_map(conn, [r['id'] for r in rows])
+            if date != dernier:
+                _freeze_holdings(holdings_map)
+            positions = [compute_position(dict(r), get_entity_map(conn, date), ref, holdings_map)
+                         for r in rows]
+            arretes.append({
+                'date': date,
+                'family_net': sum(p['net_attributed'] for p in positions),
+                'by_owner': {o: sum(p['net_attributed'] for p in positions if p['owner'] == o)
+                             for o in set(p['owner'] for p in positions)},
+            })
+        data = decompose(conn, arretes, owner, limite)
+    return jsonify(data)
