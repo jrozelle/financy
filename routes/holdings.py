@@ -3,7 +3,8 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 from models import (get_db, validate_isin, validate_number, validate_string,
                     validate_date, snapshot_holdings_to_date,
-                    _holding_effective_value, parse_number, sync_position_value)
+                    _holding_effective_value, parse_number, sync_position_value,
+                    get_holdings_map)
 from services.securities import upsert_security as _upsert_security
 from auth import login_required, csrf_protect
 
@@ -122,6 +123,14 @@ def get_holdings(position_id):
         if not _position_exists(conn, position_id):
             return jsonify({'error': 'Position introuvable'}), 404
         holdings = _fetch_holdings(conn, position_id)
+        # La valeur que le modele retient pour chaque ligne — cours x quantite
+        # converti, ou valeur enregistree — celle qui compose le total de la
+        # position. Sans elle, les lignes affichees ne s'additionnaient pas au
+        # compte qu'elles detaillent.
+        effectives = {h['id']: _holding_effective_value(h)
+                      for h in get_holdings_map(conn, [position_id]).get(position_id, [])}
+        for h in holdings:
+            h['effective_value'] = effectives.get(h['id'])
     total_mv = sum(h['market_value'] or 0 for h in holdings)
     total_cost = sum(h['cost_basis'] or 0 for h in holdings)
     return jsonify({

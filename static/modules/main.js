@@ -2,7 +2,7 @@ import { S } from './state.js';
 import { initMask, toggleMask, isMasked, onMaskChange } from './mask.js';
 import { wireTodo } from './todo.js';
 import { wireReglages, estUnReglage, ouvrir as ouvrirReglages } from './reglages.js';
-import { fmtDate, treeFilter, treeExpandCollapse, treeToggleRow, esc } from './utils.js';
+import { fmtDate, esc } from './utils.js';
 import { api, buildSelects } from './api.js';
 import { closeModal, trapModalFocus, installModalScrollLock } from './dialogs.js';
 import { wireDrilldownEvents, drilldownHistory } from './drilldown.js';
@@ -13,8 +13,8 @@ import { wireSortableTable } from './utils.js';
 
 import { loadSynthese, renderSynthese, renderSyntheseHistory, loadHistorique } from './tabs/synthese.js';
 import { loadPositions, renderPositions, clearFilters, openPosModal, duplicateSnapshot, renameSnapshot, deleteSnapshot,
-         onEntitySelectChange, updatePosInfo, savePosition, startInlineEdit, deletePosition,
-         persistPositionFilters, persistPositionsTreeState, ensurePositionsTableScaffold } from './tabs/positions.js';
+         onEntitySelectChange, updatePosInfo, savePosition, deletePosition,
+         persistPositionFilters, ensurePositionsTableScaffold } from './tabs/positions.js';
 import { openHoldingsModal, wireHoldingsEvents, confirmCloseHoldings } from './tabs/holdings.js';
 import { wireIsinPopoverEvents } from './isin-popover.js';
 import { loadAdvisor, wireAdvisorEvents } from './tabs/advisor.js';
@@ -477,47 +477,12 @@ function wireEvents() {
         const label = btn.dataset.establishment || btn.dataset.entity || '';
         drilldownHistory({ subtitle: 'Évolution établissement', title: label, filters: f });
       }
-      return;
     }
-    const amt = ev.target.closest('.tree-inline-amount');
-    if (amt) startInlineEdit(amt);
   });
 
   // Snapshot date
   document.getElementById('pos-snapshot-check').addEventListener('change', e => {
     document.getElementById('pos-snapshot-date').style.visibility = e.target.checked ? '' : 'hidden';
-  });
-
-  // Positions tree search (debounced)
-  let _treeSearchTimer = null;
-  document.getElementById('pos-tree-search').addEventListener('input', e => {
-    clearTimeout(_treeSearchTimer);
-    _treeSearchTimer = setTimeout(() => treeFilter('positions-tree-body', e.target.value), 150);
-  });
-
-  // Positions tree depth bar
-  const depthBar = document.querySelector('.tree-depth-bar');
-  if (depthBar) depthBar.addEventListener('click', e => {
-    const btn = e.target.closest('.tree-depth-btn');
-    if (!btn) return;
-    const depth = btn.dataset.depth;
-    const cid = 'positions-tree-body';
-    const container = document.getElementById(cid);
-    if (!container) return;
-
-    depthBar.querySelectorAll('.tree-depth-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-
-    treeExpandCollapse(cid, false);
-    const levels = ['tree-owner', 'tree-etabl', 'tree-env'];
-    const depthIndex = { owner: 0, etabl: 1, env: 2, all: 3 }[depth] ?? 3;
-    for (let i = 0; i < Math.min(depthIndex, levels.length); i++) {
-      treeExpandCollapse(cid, true, levels[i]);
-    }
-    if (depthIndex >= levels.length) {
-      treeExpandCollapse(cid, true);
-    }
-    persistPositionsTreeState();
   });
 
   // Menu d'actions sur l'arrete courant.

@@ -158,6 +158,12 @@
   /* Le rail restant sombre dans les deux themes, son accent et son filet ne
      varient pas non plus : une seule definition suffit. */
   --rail-actif:    #5fb3a8;
+  /* Natures de l'arborescence : une teinte chacune, lisible dans les deux
+     themes (meme luminosite, chroma moyen). */
+  --nature-liq:    #3d74b8;
+  --nature-fin:    #2f6f6a;
+  --nature-immo:   #b07a2f;
+  --nature-biens:  #7e62a8;
   --rail-border:   rgba(255,255,255,.08);
   --sans: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -521,7 +527,8 @@ main {
 .btn-icon.del   { color: var(--danger); }
 .btn-icon.del:hover   { background: var(--danger-light); }
 .btn-icon.add   { color: var(--success); font-weight: 700; }
-.btn-icon.add:hover   { background: var(--success-light); }.nav-icon-btn {
+.btn-icon.add:hover   { background: var(--success-light); }
+.nav-icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -532,10 +539,12 @@ main {
   background: var(--card);
   color: var(--text);
   transition: background .12s, border-color .12s, color .12s;
-}.nav-icon-btn:hover {
+}
+.nav-icon-btn:hover {
   background: var(--bg);
   border-color: var(--text-muted);
-}.nav-icon-btn svg {
+}
+.nav-icon-btn svg {
   width: 19px;
   height: 19px;
   fill: none;
@@ -543,7 +552,8 @@ main {
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
-}.theme-toggle.nav-icon-btn,
+}
+.theme-toggle.nav-icon-btn,
 .btn-icon.nav-icon-btn {
   padding: 0;
   color: var(--text);
@@ -918,69 +928,6 @@ input[type="file"] {
 .view-toggle-btn.active { background: var(--card); color: var(--primary); font-weight: 600; box-shadow: var(--shadow); }
 
 /* ── Arborescence (vue tree) ─────────────────────────────────────────────── */
-.tree-owner-section { margin-bottom: .125rem; }
-.tree-owner { cursor: pointer; }
-
-.tree-row {
-  display: flex;
-  align-items: baseline;
-  gap: .5rem;
-  padding: .25rem .5rem;
-  border-radius: 5px;
-  transition: background .1s;
-}
-.tree-owner  { font-weight: 700; font-size: 15px; padding: .4rem .5rem; border-bottom: 1px solid var(--border); margin-bottom: .125rem; }
-.tree-etabl  { font-weight: 600; font-size: 13.5px; cursor: pointer; padding-left: 1.25rem; }
-.tree-env    { font-size: 13px; cursor: pointer; padding-left: 2rem; color: var(--text); font-weight: 500; }
-.tree-env-merged { cursor: default; }
-.tree-dot-env {
-  width: 8px; height: 8px;
-  /* Centrer dans l'espace du toggle (24px) : (24 - 8) / 2 = 8px de chaque cote */
-  margin: 0 8px;
-  /* Le gap .5rem s'ajoute apres, comme pour le toggle */
-}
-.tree-cat    { font-size: 12.5px; padding-left: 3.5rem; }
-
-.tree-row:hover { background: var(--bg); }
-.tree-owner:hover, .tree-etabl:hover, .tree-env:hover { background: var(--primary-light); }
-.tree-etabl { margin-top: .125rem; border-top: 1px solid color-mix(in srgb, var(--border) 40%, transparent); padding-top: .25rem; }
-.tree-etabl:first-child { border-top: none; margin-top: 0; }
-.tree-children { margin-left: 0; }
-
-.tree-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-  font-size: 11px;
-  color: var(--text-muted);
-  flex-shrink: 0;
-  user-select: none;
-  transition: background .12s, color .12s;
-  border: 1px solid transparent;
-}
-.tree-owner:hover .tree-toggle,
-.tree-etabl:hover .tree-toggle,
-.tree-env:hover .tree-toggle {
-  background: var(--border);
-  color: var(--text);
-  border-color: var(--border);
-}
-.tree-icon   { flex-shrink: 0; font-size: 14px; }
-.tree-label  { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tree-amount { font-weight: 600; white-space: nowrap; margin-left: auto; padding-left: .75rem; font-variant-numeric: tabular-nums; }
-.tree-badges { flex-shrink: 0; }
-.tree-dot    { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--border); margin-right: .5rem; vertical-align: middle; }
-
-.tree-toolbar {
-  display: flex;
-  align-items: center;
-  gap: .4rem;
-  margin-bottom: .75rem;
-  flex-wrap: wrap;
-}
 .alert-row {
   display: flex;
   align-items: center;
@@ -997,42 +944,7 @@ input[type="file"] {
   color: var(--warning);
 }
 
-.tree-search-input {
-  padding: .3rem .6rem;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  font-size: 12.5px;
-  width: 160px;
-  outline: none;
-  background: var(--card);
-}
-.tree-search-input:focus { border-color: var(--primary); }
-
-.tree-toolbar-label {
-  font-size: 12px;
-  color: var(--text-muted);
-  white-space: nowrap;
-  margin-left: .25rem;
-}
-.tree-toolbar-sep {
-  width: 1px;
-  height: 16px;
-  background: var(--border);
-  margin: 0 .2rem;
-}
-
 /* Feuilles de positions */
-.tree-pos-leaf {
-  padding-left: 3.5rem;
-  gap: .375rem;
-  align-items: center;
-  font-size: 13px;
-}
-.tree-pos-leaf .tree-dot { margin-left: .25rem; }
-.tree-badge-pct { font-size: 10px; opacity: .7; margin-left: .25rem; }
-.tree-badge-warn { font-size: 11px; cursor: default; margin-left: .2rem; color: var(--warning); }
-.tree-badge-notes { font-size: 11px; cursor: default; margin-left: .2rem; opacity: .5; }
-.tree-debt-label { color: var(--danger); font-size: 11px; margin-left: .5rem; }
 /* ── Column picker ────────────────────────────────────────────────────── */
 .col-picker-dropdown {
   position: absolute;
@@ -1061,24 +973,6 @@ input[type="file"] {
 .col-picker-item:hover { background: var(--bg); }
 .col-picker-item input { margin: 0; }
 
-.tree-inline-amount { cursor: pointer; border-bottom: 1px dashed var(--text-muted); }
-.tree-inline-amount:hover { border-bottom-color: var(--primary); color: var(--primary); }
-.tree-inline-input {
-  width: 100px;
-  padding: .1rem .35rem;
-  border: 1px solid var(--primary);
-  border-radius: 4px;
-  font-size: 13px;
-  font-weight: 600;
-  text-align: right;
-  outline: none;
-}
-.tree-actions { display: flex; gap: .25rem; margin-left: .5rem; flex-shrink: 0; opacity: 0; transition: opacity .15s; }
-.tree-pos-leaf:hover .tree-actions,
-.tree-owner:hover .tree-actions,
-.tree-etabl:hover .tree-actions,
-.tree-env:hover .tree-actions { opacity: 1; }
-@media (hover: none) { .tree-actions { opacity: 1; } }
 
 /* ── Référentiel ─────────────────────────────────────────────────────────── */
 .ref-chip {
@@ -1178,25 +1072,6 @@ input[type="file"] {
 .settings-item + .settings-item { border-top: 1px solid var(--border); }
 
 /* ── Tree depth bar ───────────────────────────────────────────────────── */
-.tree-depth-bar {
-  display: flex;
-  align-items: center;
-  gap: .25rem;
-}
-.tree-depth-btn {
-  padding: .25rem .6rem;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--card);
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all .12s;
-  white-space: nowrap;
-}
-.tree-depth-btn:hover { border-color: var(--primary); color: var(--primary); }
-.tree-depth-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 
 /* ── Dark mode toggle ─────────────────────────────────────────────────── */
 .theme-toggle {
@@ -1339,8 +1214,6 @@ input[type="file"] {
 .btn-icon,
 .filters-bar,
 .header-actions,
-.tree-toolbar,
-.tree-actions,
 #toast,
 .confirm-overlay,
 .tab-loading,
@@ -2142,7 +2015,8 @@ kbd {
 #global-owner-filter {
   width: 100%;
   min-height: 38px;
-}#tab-synthese .page-header #btn-print {
+}
+#tab-synthese .page-header #btn-print {
   display: none !important;
 }
 
@@ -2224,22 +2098,26 @@ kbd {
   .tab-content:not(#tab-synthese) > .page-header {
     display: block;
     margin: 0 0 .85rem;
-  }.tab-content:not(#tab-synthese) .header-actions,
-.filters-bar {
-    display: grid !important;
+  }
+  /* Sans !important : la seule regle concurrente est celle du grand ecran. Il
+     empechait de masquer les filtres en vue Arborescence, ou ils n'ont pas
+     d'objet — le style en ligne `display: none` perdait contre lui. */
+  .tab-content:not(#tab-synthese) .header-actions,
+  .filters-bar {
+    display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: .55rem !important;
-    align-items: stretch !important;
+    gap: .55rem;
+    align-items: stretch;
     width: 100%;
     margin: 0 0 .85rem;
-  }.tab-content:not(#tab-synthese) .header-actions > *,
-.filters-bar > * {
+  }
+  .tab-content:not(#tab-synthese) .header-actions > *,
+  .filters-bar > * {
     min-width: 0 !important;
     width: 100% !important;
     max-width: none !important;
   }.filter-select,
 .tab-content:not(#tab-synthese) .btn,
-.tree-search-input,
 .view-toggle-btn,
 #advisor-owner-select {
     width: 100% !important;
@@ -2318,33 +2196,6 @@ kbd {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
-  #positions-tree-body {
-    min-width: 560px;
-  }
-  .tree-toolbar {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: .65rem;
-    align-items: stretch;
-  }
-  .tree-toolbar-sep {
-    display: none;
-  }
-  .tree-depth-bar {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: .4rem;
-  }
-  .tree-toolbar-label {
-    grid-column: 1 / -1;
-    margin: 0;
-  }
-  .tree-depth-btn {
-    min-width: 0;
-    min-height: 36px;
-    padding: .35rem .45rem;
-    text-align: center;
-  }
   .advisor-disclaimer {
     margin: 0 0 .85rem;
     padding: .85rem 1rem;
@@ -2374,7 +2225,8 @@ kbd {
 @media (max-width: 430px) {.tab-content:not(#tab-synthese) .header-actions,
 .filters-bar {
     gap: .5rem !important;
-  }.filter-select,
+  }
+.filter-select,
 .tab-content:not(#tab-synthese) .btn {
     font-size: 13.5px;
   }
@@ -3610,3 +3462,138 @@ th[data-sort]:focus-visible { outline: 2px solid var(--primary); outline-offset:
 .card-head { flex-wrap: wrap; row-gap: .5rem; }
 .card-head .seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
 .card-head .seg::-webkit-scrollbar { display: none; }
+
+/* ── Arborescence des positions ───────────────────────────────────────── */
+/* Un vrai tableau : l'indentation ne touche que la colonne du nom, les montants
+   restent alignes d'un niveau a l'autre. Les teintes viennent des jetons, donc
+   le theme sombre suit. */
+.arbo-barre-outils {
+  display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+  padding: .75rem 1rem; border-bottom: 1px solid var(--border);
+}
+.arbo-recherche {
+  width: min(260px, 100%); height: 32px; box-sizing: border-box; padding: 0 .65rem;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--card);
+  color: var(--text); font: inherit; font-size: .84rem;
+}
+.arbo-recherche:focus { outline: 2px solid var(--primary); outline-offset: -1px; border-color: transparent; }
+.arbo-lib { font-size: .8rem; color: var(--text-muted); margin-left: .4rem; }
+.arbo-espace { flex: 1 1 auto; }
+
+.arbo-wrap { overflow-x: auto; }
+.arbo { width: 100%; border-collapse: collapse; font-size: .86rem; }
+.arbo th {
+  padding: .6rem .75rem; text-align: left; white-space: nowrap;
+  font-size: .64rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-muted); border-bottom: 1px solid var(--border);
+}
+.arbo td { padding: calc(.45rem * var(--d)) .75rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.arbo th.num, .arbo td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.arbo td.num { font-family: var(--mono); font-size: .82rem; }
+
+/* Niveaux : le groupe se detache par un fond, le compte par sa graisse. */
+.arbo tr.arbo-l0 > td { background: var(--bg); font-weight: 600; }
+.arbo tr.arbo-l0 .arbo-titre { font-size: .95rem; }
+.arbo tr.arbo-l1 .arbo-titre { font-weight: 500; }
+.arbo tr.arbo-l2 .arbo-titre, .arbo tr.arbo-l3 .arbo-titre { color: var(--text-muted); }
+@media (hover: hover) { .arbo tbody tr:hover > td { background: var(--card-hover); } }
+
+.arbo-nom { min-width: 260px; }
+.arbo-nom-in {
+  display: flex; align-items: center; gap: .5rem; min-width: 0;
+  padding-left: calc(var(--niv, 0) * 1.4rem);
+}
+.arbo-chevron {
+  flex: none; width: 26px; height: 26px; display: grid; place-items: center;
+  padding: 0; border: 0; border-radius: 6px; background: none; color: var(--text-muted); cursor: pointer;
+}
+.arbo-chevron svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round; transition: transform .15s ease; }
+tr[aria-expanded="true"] > td .arbo-chevron svg { transform: rotate(90deg); }
+@media (hover: hover) { .arbo-chevron:hover { background: var(--border); color: var(--text); } }
+.arbo-chevron:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.arbo-chevron-vide { flex: none; width: 26px; }
+.arbo-pastille { flex: none; width: 10px; height: 10px; border-radius: 3px; }
+.arbo-texte { display: flex; flex-direction: column; min-width: 0; }
+.arbo-titre, .arbo-sous { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arbo-sous { font-size: .74rem; font-weight: 400; color: var(--text-muted); }
+.arbo-chip {
+  flex: none; min-width: 22px; height: 20px; padding: 0 .35rem; box-sizing: border-box;
+  display: grid; place-items: center; border-radius: 10px; font-size: .66rem; font-weight: 600;
+  background: color-mix(in srgb, var(--primary) 12%, transparent); color: var(--primary);
+}
+.arbo-attente { color: var(--text-muted); font-size: .8rem; font-style: italic; }
+
+.arbo-part { width: 180px; }
+td.arbo-part { display: table-cell; }
+td.arbo-part > * { vertical-align: middle; }
+.arbo-barre { display: inline-block; width: calc(100% - 3.4rem); height: 6px; border-radius: 3px;
+  background: var(--border); overflow: hidden; }
+.arbo-barre i { display: block; height: 100%; border-radius: 3px; }
+.arbo tr:not(.arbo-l0) .arbo-barre i { opacity: .55; }
+.arbo-part-txt { display: inline-block; width: 3rem; text-align: right; font-family: var(--mono);
+  font-size: .74rem; color: var(--text-muted); }
+.arbo-barre--mobile { display: none; }
+
+.arbo-dette { color: var(--text-muted); }
+.arbo-dette.is-dette { color: var(--danger); }
+.arbo-net.is-negatif { color: var(--danger); font-weight: 600; }
+.arbo-pv > span, .arbo-pv-mobile > span { display: block; }
+.arbo-pv-note { font-family: var(--sans); font-size: .68rem; color: var(--text-muted); }
+.arbo-pv-note:not(.arbo-pv-pct) { color: var(--warning); }
+.arbo-pv-na { font-family: var(--sans); font-size: .74rem; color: var(--text-muted); }
+.arbo-pv-mobile { display: none; }
+
+/* Les actions n'encombrent pas la lecture : visibles au survol ou au focus. */
+.arbo-actions { width: 1%; white-space: nowrap; text-align: right; }
+.arbo-act {
+  border: 0; background: none; padding: .2rem .35rem; border-radius: 6px;
+  font: inherit; font-size: .74rem; color: var(--primary); cursor: pointer;
+}
+@media (hover: hover) {
+  .arbo tbody tr .arbo-act { opacity: 0; }
+  .arbo tbody tr:hover .arbo-act, .arbo tbody tr:focus-within .arbo-act { opacity: 1; }
+  .arbo-act:hover { background: var(--border); }
+}
+.arbo-act:focus-visible { outline: 2px solid var(--primary); opacity: 1; }
+
+.arbo tfoot td { font-weight: 600; border-top: 1px solid var(--text-muted); border-bottom: 0; background: var(--bg); }
+.arbo-vide { padding: 1.5rem 1rem; color: var(--text-muted); font-size: .86rem; }
+
+/* Telephone : deux colonnes. Le nom avec sa barre dessous, le net avec la
+   plus-value dessous. Le reste se lit en vue Tableau. */
+@media (max-width: 640px) {
+  .arbo thead, .arbo .arbo-part, .arbo .arbo-valeur, .arbo .arbo-dette,
+  .arbo .arbo-pv, .arbo .arbo-actions { display: none; }
+  .arbo-nom { min-width: 0; }
+  .arbo td { padding: .5rem .6rem; }
+  .arbo-nom-in { padding-left: calc(var(--niv, 0) * .9rem); }
+  .arbo-barre--mobile { display: block; width: auto; height: 4px; margin: .3rem 0 0 calc(var(--niv-mobile, 0) + 26px + .5rem); }
+  .arbo-pv-mobile { display: block; }
+  .arbo-pv-mobile > span { font-size: .72rem; }
+  .arbo-lib { display: none; }
+  .arbo-recherche { width: 100%; order: -1; }
+}
+
+.arbo-bouton {
+  height: 32px; padding: 0 .75rem; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--card); color: var(--text); font: inherit; font-size: .8rem; cursor: pointer;
+}
+@media (hover: hover) { .arbo-bouton:hover { border-color: var(--text-muted); } }
+.arbo-bouton:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+@media (max-width: 640px) {
+  /* Disposition fixe : le nom prend ce qui reste, le net garde sa colonne.
+     En disposition automatique, un long nom repoussait les montants hors de
+     l'ecran. */
+  .arbo { table-layout: fixed; }
+  .arbo td.arbo-net { width: 7.5rem; }
+  .arbo-barre-outils { gap: .45rem; padding: .6rem; }
+  .arbo-espace { display: none; }
+  .arbo-bouton { height: 30px; padding: 0 .6rem; font-size: .76rem; }
+
+  /* Barre du haut : trois lignes de controles avant le premier chiffre. Le
+     masquage garde son oeil, sans son mot. */
+  .page-head-tools #mask-btn span { display: none; }
+  .page-head-tools #mask-btn { padding: 0 .5rem; }
+  .page-head-tools #head-maj, .page-head-tools #head-ajouter { padding-inline: .6rem; }
+}

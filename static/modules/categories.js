@@ -37,3 +37,31 @@ export function macroBucket(category) {
  */
 export const estFinancier = categories =>
   (categories || []).some(c => macroBucket(c) === 'Patrimoine financier');
+
+/**
+ * Nature d'une ligne, pour l'arborescence des positions.
+ *
+ * Plus fine que la poche : le patrimoine financier s'y partage entre ce qui
+ * est DISPONIBLE (comptes, livrets) et ce qui est PLACE (PEA, assurance-vie,
+ * PER...). C'est la premiere question qu'on pose a un patrimoine — combien
+ * je peux sortir, combien travaille — et la poche ne la separait pas.
+ */
+export const NATURES = [
+  { id: 'liq',   nom: 'Liquidités',            couleur: 'var(--nature-liq)',   aide: 'Comptes et livrets' },
+  { id: 'fin',   nom: 'Placements financiers', couleur: 'var(--nature-fin)',   aide: 'PEA, assurance-vie, PER, titres' },
+  { id: 'immo',  nom: 'Immobilier',            couleur: 'var(--nature-immo)',  aide: 'En direct, SCI, indivisions' },
+  { id: 'biens', nom: 'Biens et sociétés',     couleur: 'var(--nature-biens)', aide: 'Objets de valeur, parts de société' },
+];
+
+/** Les especes d'un PEA ou d'une assurance-vie sont des « Cash & depots »,
+ *  mais on ne les retire pas sans fermer ou racheter le contrat : ce ne sont
+ *  pas des liquidites. L'enveloppe tranche. */
+const ENVELOPPES_DE_PLACEMENT = new Set(['PEA', 'PEA-PME', 'Assurance-vie', 'PER', 'CTO', 'Crypto']);
+
+export function natureDe(category, envelope) {
+  if (category === 'Cash & dépôts') return ENVELOPPES_DE_PLACEMENT.has(envelope) ? 'fin' : 'liq';
+  const poche = macroBucket(category);
+  if (poche === 'Patrimoine financier') return 'fin';
+  if (poche === 'Patrimoine immobilier') return 'immo';
+  return 'biens';
+}

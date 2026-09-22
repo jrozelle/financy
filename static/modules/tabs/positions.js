@@ -1,18 +1,14 @@
 import { S } from '../state.js';
-import { fmt, fmtDate, esc, liqBadge, sortArr, updateSortIndicators, today, wireTreeAccordion, treeToggleRow, parseLocaleNumber, fmtPct } from '../utils.js';
+import { fmt, fmtDate, esc, liqBadge, sortArr, updateSortIndicators, today, parseLocaleNumber, fmtPct } from '../utils.js';
 import { api, refreshEntitySelect } from '../api.js';
 import { confirmDialog, promptDialog, toast, closeModal } from '../dialogs.js';
 import { loadSynthese, loadHistorique } from './synthese.js';
 import { openHoldingsModal } from './holdings.js';
 import { refreshDates } from '../main.js';
 import { saveFilters, loadFilters, clearFilterKey, applyIfValid } from '../filter-persist.js';
+import { renderArbo, oublierTitres } from './arbo.js';
 import { reapplyColumns } from '../column-picker.js';
 
-// ─── Persistance etat expand/collapse de l'arborescence positions ──────────
-// On persiste uniquement les rows COLLAPSED (par defaut tout est deplie) pour
-// que de nouveaux noeuds soient visibles par defaut.
-
-const TREE_STATE_KEY = 'financy_positions_tree_collapsed';
 const POSITION_FILTER_COLUMNS = {
   'filter-owner': 'owner',
   'filter-establishment': 'establishment',
@@ -63,55 +59,6 @@ export function ensurePositionsTableScaffold() {
   }
 }
 
-function _loadCollapsedKeys() {
-  try { return new Set(JSON.parse(localStorage.getItem(TREE_STATE_KEY) || '[]')); }
-  catch { return new Set(); }
-}
-
-function _saveCollapsedKeys(container) {
-  const set = new Set();
-  container.querySelectorAll('.tree-row[data-key]').forEach(row => {
-    const children = row.nextElementSibling;
-    if (children && children.classList.contains('tree-children')
-        && children.style.display === 'none') {
-      set.add(row.dataset.key);
-    }
-  });
-  try { localStorage.setItem(TREE_STATE_KEY, JSON.stringify([...set])); } catch {}
-}
-
-function _restoreTreeState(container) {
-  const collapsed = _loadCollapsedKeys();
-  if (!collapsed.size) return;
-  container.querySelectorAll('.tree-row[data-key]').forEach(row => {
-    if (collapsed.has(row.dataset.key)) {
-      const children = row.nextElementSibling;
-      if (children && children.classList.contains('tree-children')
-          && children.style.display !== 'none') {
-        treeToggleRow(row, false);
-      }
-    }
-  });
-}
-
-function _bindTreePersist(container) {
-  if (container.dataset.persistBound) return;
-  container.dataset.persistBound = '1';
-  // Bubbling : s'execute apres les handlers per-row de wireTreeAccordion.
-  container.addEventListener('click', ev => {
-    if (ev.target.closest('.tree-actions')) return;
-    const row = ev.target.closest('.tree-row[data-key]');
-    if (!row) return;
-    // Delai 0 pour laisser le toggle se propager
-    setTimeout(() => _saveCollapsedKeys(container), 0);
-  });
-}
-
-export function persistPositionsTreeState() {
-  const container = document.getElementById('positions-tree-body');
-  if (container) _saveCollapsedKeys(container);
-}
-
 
 let _snapshotEnsured = false;
 async function ensureTodaySnapshot() {
@@ -131,6 +78,7 @@ export async function loadPositions() {
     return;
   }
   S.positions = await api('GET', `/api/positions?date=${S.positionsDate}`);
+  oublierTitres();          // des positions rechargees : leurs lignes aussi
   populateFilters();
   // Sync filtre local avec le selecteur global
   const globalOwner = S.syntheseOwner;
@@ -258,223 +206,6 @@ export function renderPosViewToggle() {
   if (headerActions) headerActions.insertBefore(toggle, headerActions.firstChild);
 }
 
-export function startInlineEdit(span) {
-  if (span.querySelector('input')) return;
-  const posId  = parseInt(span.dataset.id);
-  const curVal = parseLocaleNumber(span.dataset.val, 0);
-  const pos    = S.positions.find(p => p.id === posId);
-  if (!pos) return;
-
-  const input = document.createElement('input');
-  input.type  = 'text';
-  input.inputMode = 'decimal';
-  input.value = curVal;
-  input.className = 'tree-inline-input';
-  span.innerHTML = '';
-  span.appendChild(input);
-  input.focus();
-  input.select();
-
-  const commit = async () => {
-    const newVal = parseLocaleNumber(input.value);
-    if (isNaN(newVal) || newVal === curVal) {
-      await loadPositions(); return;
-    }
-    try {
-      await api('PUT', `/api/positions/${posId}`, {
-        ...pos,
-        value: newVal,
-        debt:  pos.debt || 0,
-      });
-      await loadPositions();
-    } catch (err) {
-      toast(`Erreur : ${err.message}`, 'error');
-      await loadPositions();
-    }
-  };
-
-  input.addEventListener('blur',  commit);
-  input.addEventListener('keydown', e => {
-    if (e.key === 'Enter')  { e.preventDefault(); input.blur(); }
-    if (e.key === 'Escape') { input.removeEventListener('blur', commit); loadPositions(); }
-  });
-}
-
-function _posLeafHtml(p, { showHoldings = true, mergedLabel = null } = {}) {
-  const pctBadge = (p.ownership_pct ?? 1) < 0.999
-    ? `<span class="tree-badge-pct badge badge-j27">${Math.round((p.ownership_pct ?? 1) * 100)}%</span>` : '';
-  const mobMark = p.mobilizable_pct_override != null
-    ? `<span class="tree-badge-warn" title="Mobilisabilite surchargee : ${Math.round(p.mobilizable_pct_override * 100)} %">&#9888;</span>` : '';
-  const notesMark = p.notes
-    ? `<span class="tree-badge-notes" title="${esc(p.notes)}">&#128203;</span>` : '';
-  const hasEntity = !!p.entity;
-  const inlineVal = hasEntity
-    ? `<span class="tree-amount ${p.net_attributed < 0 ? 'neg' : ''}">${fmt(p.net_attributed)}</span>`
-    : `<span class="tree-inline-amount ${p.net_attributed < 0 ? 'neg' : ''}" title="Cliquer pour editer" data-id="${p.id}" data-field="value" data-val="${p.value || 0}">${fmt(p.net_attributed)}</span>`;
-  return `
-    <div class="tree-row tree-pos-leaf" data-pos-id="${p.id}">
-      <span class="tree-dot"></span>
-      <span class="tree-label" title="${esc(mergedLabel || p.label || p.category)}">${esc(mergedLabel || p.label || p.category)}${pctBadge}${notesMark}${mobMark}</span>
-      <span class="tree-badges">${liqBadge(p.liquidity)}</span>
-      ${inlineVal}
-      <span class="tree-actions">
-        ${showHoldings ? `<button class="btn-icon" data-action="manage-holdings" data-id="${p.id}" title="Lignes">&#9776;</button>` : ''}
-        <button class="btn-icon edit" data-id="${p.id}" data-action="edit-pos" title="Editer">&#9998;</button>
-        <button class="btn-icon del" data-id="${p.id}" data-action="del-pos" title="Supprimer">&#10005;</button>
-      </span>
-    </div>`;
-}
-
-function renderPositionsTree(allPositions) {
-  const container = document.getElementById('positions-tree-body');
-  if (!allPositions.length) {
-    container.innerHTML = '<p class="text-muted" style="padding:.75rem">Aucune position pour ce snapshot.</p>';
-    return;
-  }
-
-  const etablKey = p => p.entity ? `Entité : ${p.entity}` : (p.establishment || 'Biens personnels');
-
-  let html = '';
-  for (const owner of S.config.owners) {
-    const ops = allPositions.filter(p => p.owner === owner);
-    if (!ops.length) continue;
-    const ownerNet   = ops.reduce((s, p) => s + (p.net_attributed || 0), 0);
-
-    const byEtabl = {};
-    for (const p of ops) {
-      const k = etablKey(p);
-      if (!byEtabl[k]) byEtabl[k] = [];
-      byEtabl[k].push(p);
-    }
-
-    const etablHtml = Object.entries(byEtabl)
-      .sort((a, b) => b[1].reduce((s, p) => s + (p.net_attributed||0), 0) - a[1].reduce((s, p) => s + (p.net_attributed||0), 0))
-      .map(([etabl, ePoses]) => {
-        const etablNet   = ePoses.reduce((s, p) => s + (p.net_attributed || 0), 0);
-        const isEntity   = etabl.startsWith('Entité : ');
-        const isPersonal = etabl === 'Biens personnels';
-        const etablIcon  = isEntity ? '🏢' : isPersonal ? '' : '🏦';
-        const etablEntityName = isEntity ? etabl.replace(/^Entité : /, '') : '';
-        const etablRealName   = isEntity ? '' : etabl;
-
-        const byEnv = {};
-        for (const p of ePoses) {
-          const k = p.envelope || '(Sans enveloppe)';
-          if (!byEnv[k]) byEnv[k] = [];
-          byEnv[k].push(p);
-        }
-
-        const envHtml = Object.entries(byEnv)
-          .sort((a, b) => b[1].reduce((s, p) => s + (p.net_attributed||0), 0) - a[1].reduce((s, p) => s + (p.net_attributed||0), 0))
-          .map(([env, envPoses]) => {
-            // Pas d'enveloppe (biens personnels) : afficher les positions directement
-            if (env === '(Sans enveloppe)') {
-              return [...envPoses]
-                .sort((a, b) => (b.net_attributed||0) - (a.net_attributed||0))
-                .map(p => _posLeafHtml(p, { showHoldings: false }))
-                .join('');
-            }
-            const envNet   = envPoses.reduce((s, p) => s + (p.net_attributed || 0), 0);
-            const envDebt  = envPoses.reduce((s, p) => s + (p.debt_attributed || 0), 0);
-            const envDebtStr = envDebt > 0 ? `<span class="tree-debt-label">dette ${fmt(envDebt)}</span>` : '';
-
-            // Fusion : si une seule position sous l'enveloppe, merge en une ligne env
-            if (envPoses.length === 1) {
-              const p = envPoses[0];
-              const label = (p.label || p.category) !== env
-                ? `${env} — ${p.label || p.category}` : env;
-              const hasEntity = !!p.entity;
-              const inlineVal = hasEntity
-                ? `<span class="tree-amount ${p.net_attributed < 0 ? 'neg' : ''}">${fmt(p.net_attributed)}</span>`
-                : `<span class="tree-inline-amount ${p.net_attributed < 0 ? 'neg' : ''}" title="Cliquer pour editer" data-id="${p.id}" data-field="value" data-val="${p.value || 0}">${fmt(p.net_attributed)}</span>`;
-              return `
-                <div class="tree-row tree-env tree-env-merged" data-pos-id="${p.id}" data-key="penv-${esc(owner)}-${esc(etabl)}-${esc(env)}">
-                  <span class="tree-dot tree-dot-env"></span>
-                  <span class="tree-label" title="${esc(label)}">${esc(label)}${envDebtStr}</span>
-                  <span class="tree-badges">${liqBadge(p.liquidity)}</span>
-                  ${inlineVal}
-                  <span class="tree-actions">
-                    <button class="btn-icon" data-action="manage-holdings" data-id="${p.id}" title="Lignes">&#9776;</button>
-                    <button class="btn-icon edit" data-id="${p.id}" data-action="edit-pos" title="Editer">&#9998;</button>
-                  </span>
-                </div>`;
-            }
-
-            const catHtml = [...envPoses]
-              .sort((a, b) => (b.net_attributed||0) - (a.net_attributed||0))
-              .map(p => _posLeafHtml(p))
-              .join('');
-
-            const envEntity  = isEntity ? etabl.replace(/^Entité : /, '') : '';
-            const envEtabl   = isEntity ? '' : etabl;
-            return `
-              <div class="tree-row tree-env" data-key="penv-${esc(owner)}-${esc(etabl)}-${esc(env)}">
-                <span class="tree-toggle">▾</span>
-                <span class="tree-label">${esc(env)}${envDebtStr}</span>
-                <span class="tree-amount ${envNet < 0 ? 'neg' : ''}">${fmt(envNet)}</span>
-                <span class="tree-actions">
-                  <button class="btn-icon" data-action="history-env"
-                    data-owner="${esc(owner)}" data-envelope="${esc(env)}"
-                    ${isEntity ? `data-entity="${esc(etablEntityName)}"` : `data-establishment="${esc(etablRealName)}"`}
-                    title="Évolution dans le temps">&#128200;</button>
-                  <button class="btn-icon add" data-action="add-pos-ctx"
-                    data-owner="${esc(owner)}"
-                    data-establishment="${esc(envEtabl)}"
-                    data-envelope="${esc(env)}"
-                    data-entity="${esc(envEntity)}"
-                    title="Ajouter une position">+</button>
-                </span>
-              </div>
-              <div class="tree-children">${catHtml}</div>`;
-          }).join('');
-
-        const etablDebt    = ePoses.reduce((s, p) => s + (p.debt_attributed || 0), 0);
-        const etablDebtStr = etablDebt > 0 ? `<span class="tree-debt-label">dette ${fmt(etablDebt)}</span>` : '';
-        return `
-          <div class="tree-row tree-etabl" data-key="petabl-${esc(owner)}-${esc(etabl)}">
-            <span class="tree-toggle">▾</span>
-            <span class="tree-icon">${etablIcon}</span>
-            <span class="tree-label">${esc(etabl)}${etablDebtStr}</span>
-            <span class="tree-amount ${etablNet < 0 ? 'neg' : ''}">${fmt(etablNet)}</span>
-            <span class="tree-actions">
-              <button class="btn-icon" data-action="history-etabl"
-                data-owner="${esc(owner)}"
-                ${isEntity ? `data-entity="${esc(etablEntityName)}"` : `data-establishment="${esc(etablRealName)}"`}
-                title="Évolution dans le temps">📈</button>
-              <button class="btn-icon add" data-action="add-pos-ctx"
-                data-owner="${esc(owner)}"
-                data-establishment="${esc(etablRealName)}"
-                data-envelope=""
-                data-entity="${esc(etablEntityName)}"
-                title="Ajouter une position dans cet établissement">+</button>
-            </span>
-          </div>
-          <div class="tree-children">${envHtml}</div>`;
-      }).join('');
-
-    html += `
-      <div class="tree-owner-section">
-        <div class="tree-row tree-owner" data-key="powner-${esc(owner)}">
-          <span class="tree-toggle">▾</span>
-          <span class="tree-label">${esc(owner)}</span>
-          <span class="tree-amount">${fmt(ownerNet)}</span>
-          <span class="tree-actions">
-            <button class="btn-icon add" data-action="add-pos-ctx"
-              data-owner="${esc(owner)}"
-              data-establishment="" data-envelope="" data-entity=""
-              title="Ajouter une position pour ${esc(owner)}">+</button>
-          </span>
-        </div>
-        <div class="tree-children">${etablHtml}</div>
-      </div>`;
-  }
-
-  container.innerHTML = html;
-  wireTreeAccordion(container);
-  _restoreTreeState(container);
-  _bindTreePersist(container);
-}
-
 export function renderPositions() {
   ensurePositionsTableScaffold();
   const isTree = S.positionsView === 'tree';
@@ -489,7 +220,7 @@ export function renderPositions() {
   }
 
   if (isTree) {
-    renderPositionsTree(filteredPositions());
+    renderArbo(filteredPositions());
     return;
   }
 

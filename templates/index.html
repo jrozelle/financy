@@ -274,16 +274,17 @@
         </table>
       </div>
       <div id="positions-tree-wrap" class="card" style="display:none">
-        <div class="tree-toolbar">
-          <input type="search" id="pos-tree-search" class="tree-search-input" placeholder="Rechercher…">
-          <span class="tree-toolbar-sep"></span>
-          <div class="tree-depth-bar">
-            <span class="tree-toolbar-label">Profondeur :</span>
-            <button class="tree-depth-btn" data-depth="owner" title="Personnes seulement">Personne</button>
-            <button class="tree-depth-btn" data-depth="etabl" title="Jusqu'aux établissements">Établ.</button>
-            <button class="tree-depth-btn" data-depth="env" title="Jusqu'aux enveloppes">Env.</button>
-            <button class="tree-depth-btn active" data-depth="all" title="Jusqu'aux positions">Position</button>
+        <div class="arbo-barre-outils">
+          <label class="sr-only" for="arbo-recherche">Rechercher un compte</label>
+          <input type="search" id="arbo-recherche" class="arbo-recherche" placeholder="Rechercher un compte…" autocomplete="off">
+          <span class="arbo-lib">Regrouper par</span>
+          <div class="seg" role="group" aria-label="Regrouper par" id="arbo-groupes">
+            <button type="button" class="seg-btn" data-arbo-groupe="nature" aria-pressed="true">Nature</button>
+            <button type="button" class="seg-btn" data-arbo-groupe="titulaire" aria-pressed="false">Titulaire</button>
           </div>
+          <span class="arbo-espace"></span>
+          <button type="button" class="arbo-bouton" id="arbo-deplier">Tout déplier</button>
+          <button type="button" class="arbo-bouton" id="arbo-replier">Tout replier</button>
         </div>
         <div id="positions-tree-body"></div>
       </div>
