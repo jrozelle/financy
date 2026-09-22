@@ -3859,7 +3859,7 @@ body { padding-top: 0 !important; }
   stroke-linecap: round; stroke-linejoin: round;
 }
 /* Le pied du rail se détache : les réglages ne sont pas une destination. */
-.fin-rail-foot { padding-top: .5rem; }
+.fin-rail-foot { padding-top: .5rem; border-top: 1px solid rgba(255,255,255,.07); }
 
 /* ── Uniformité des contrôles de l'en-tête ────────────────────────────── */
 /* Selects, segments et boutons partageaient des hauteurs differentes (34 a
@@ -4130,7 +4130,24 @@ body { padding-top: 0 !important; }
 .reglages-corps .tab-content { padding: 0; }
 .reglages-corps .page-header { margin-top: 0; }
 
-.fin-rail-reglages { margin-top: .3rem; }
+/* Cette entree n'a pas la classe `tab-btn` — elle n'ouvre pas un onglet mais
+   une fenetre — et tombait donc sur l'apparence par defaut d'un bouton : fond
+   clair et bordure, en plein rail sombre. Elle reprend ici le gabarit exact de
+   ses voisines. */
+.fin-rail .fin-rail-reglages {
+  display: flex; align-items: center; gap: .56rem;
+  width: 100%; margin: .3rem 0 0; padding: .44rem .5rem;
+  background: none; border: 0; border-radius: 7px;
+  color: var(--rail-ink); font: inherit; font-size: .82rem; font-weight: 450;
+  text-align: left; cursor: pointer;
+}
+.fin-rail .fin-rail-reglages:hover { background: var(--rail-hover); color: #ced5e2; }
+.fin-rail .fin-rail-reglages:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.fin-rail .fin-rail-reglages svg {
+  width: 16px; height: 16px; flex: none;
+  stroke: currentColor; fill: none; stroke-width: 1.6;
+  stroke-linecap: round; stroke-linejoin: round;
+}
 
 @media (max-width: 700px) {
   .reglages-content { grid-template-columns: 1fr; height: min(90vh, 700px); }

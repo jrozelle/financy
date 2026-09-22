@@ -55,13 +55,18 @@ export function sparkline(valeurs, { couleur = 'var(--primary)', hauteur = 26 } 
   const d = pts.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ');
   const dernier = { x: x(pts.length - 1), y: y(pts[pts.length - 1]) };
 
+  // Le point final est un SEGMENT DE LONGUEUR NULLE a bout rond, pas un
+  // `<circle>` : l'etirement en largeur (`preserveAspectRatio="none"`, qui
+  // permet a la courbe de remplir la carte) transforme un cercle en ellipse,
+  // alors qu'une epaisseur de trait non mise a l'echelle reste ronde.
+  const pt = `${dernier.x.toFixed(1)} ${dernier.y.toFixed(1)}`;
   return `<svg class="spark" viewBox="0 0 ${L} ${H}" preserveAspectRatio="none"
                aria-hidden="true" focusable="false">
     <path d="${d} L${L} ${H} L0 ${H} Z" fill="${couleur}" fill-opacity=".10"/>
     <path d="${d}" fill="none" stroke="${couleur}" stroke-width="1.6"
           stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
-    <circle cx="${dernier.x.toFixed(1)}" cy="${dernier.y.toFixed(1)}" r="2.2"
-            fill="${couleur}" vector-effect="non-scaling-stroke"/>
+    <path d="M${pt} L${pt}" stroke="${couleur}" stroke-width="4.5"
+          stroke-linecap="round" vector-effect="non-scaling-stroke"/>
   </svg>`;
 }
 

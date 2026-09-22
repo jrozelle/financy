@@ -1325,11 +1325,23 @@
           </div>
           <div class="pref-ligne">
             <div><b>Densité</b><p>Espacement des cartes et des tableaux</p></div>
-            <div id="pref-densite"></div>
+            <div id="pref-densite">
+              <div class="seg" role="group" aria-label="Densité d'affichage">
+                <button type="button" class="seg-btn" data-den="confortable" aria-pressed="true">Confort</button>
+                <button type="button" class="seg-btn" data-den="compacte" aria-pressed="false">Compact</button>
+              </div>
+            </div>
           </div>
           <div class="pref-ligne">
             <div><b>Masquer les montants</b><p>Pour montrer l'écran sans révéler le patrimoine</p></div>
-            <div id="pref-masque"></div>
+            <div id="pref-masque">
+              <button type="button" class="seg-solo" id="pref-mask-btn" aria-pressed="false">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>
+                </svg>
+                <span id="pref-mask-label">Masquer</span>
+              </button>
+            </div>
           </div>
           <h3>Colonnes</h3>
           <div class="pref-ligne">

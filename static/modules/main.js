@@ -797,13 +797,20 @@ function wireEvents() {
   });
 
   // Masquage : bouton visible, l'oeil dit l'etat sans avoir a ouvrir un menu.
+  // Deux boutons, un seul etat : celui de l'en-tete et celui de la fenetre de
+  // reglages. Les laisser diverger serait pire que de n'en avoir qu'un.
   const majBoutonMasque = () => {
-    const b = document.getElementById('mask-btn');
-    const l = document.getElementById('mask-btn-label');
-    if (b) b.setAttribute('aria-pressed', String(isMasked()));
-    if (l) l.textContent = isMasked() ? 'Afficher' : 'Masquer';
+    ['mask-btn', 'pref-mask-btn'].forEach(id => {
+      const b = document.getElementById(id);
+      if (b) b.setAttribute('aria-pressed', String(isMasked()));
+    });
+    ['mask-btn-label', 'pref-mask-label'].forEach(id => {
+      const l = document.getElementById(id);
+      if (l) l.textContent = isMasked() ? 'Afficher' : 'Masquer';
+    });
   };
   document.getElementById('mask-btn')?.addEventListener('click', toggleMask);
+  document.getElementById('pref-mask-btn')?.addEventListener('click', toggleMask);
   onMaskChange(majBoutonMasque);
   majBoutonMasque();
 
