@@ -75,31 +75,14 @@ def duplicate_snapshot(conn, source_date, target_date):
     Returns:
         dict {positions_copied, holdings_copied}
     """
-    source_rows = conn.execute(
-        'SELECT * FROM positions WHERE date=?', (source_date,)
-    ).fetchall()
-    if not source_rows:
+    correspondance = _dupliquer_avec_correspondance(conn, source_date, target_date)
+    if not correspondance:
         return {'positions_copied': 0, 'holdings_copied': 0}
-
-    holdings_map = get_holdings_map(conn, [r['id'] for r in source_rows])
-    ref = load_referential(conn)
-    entity_map = get_entity_map(conn, source_date)
-
-    positions_copied = 0
-    holdings_copied = 0
-    for r in source_rows:
-        # Calculer la valeur effective (holdings ou entite)
-        p = compute_position(dict(r), entity_map, ref, holdings_map)
-        override = {'value': p['value'], 'debt': p.get('debt_attributed', r['debt'])}
-
-        new_id = duplicate_position(conn, r, target_date, value_override=override)
-        positions_copied += 1
-        holdings_copied += conn.execute(
-            'SELECT COUNT(*) as c FROM holdings WHERE position_id=?', (new_id,)
-        ).fetchone()['c']
-
-    snapshot_holdings_to_date(conn, target_date)
-    return {'positions_copied': positions_copied, 'holdings_copied': holdings_copied}
+    ids = list(correspondance.values())
+    holdings = conn.execute(
+        f'SELECT COUNT(*) AS c FROM holdings WHERE position_id IN ({",".join("?" * len(ids))})', ids
+    ).fetchone()['c']
+    return {'positions_copied': len(ids), 'holdings_copied': holdings}
 
 
 def ensure_today_snapshot(conn):
@@ -126,3 +109,129 @@ def ensure_today_snapshot(conn):
                 stats['positions_copied'], stats['holdings_copied'],
                 last['date'], today)
     return True, today
+
+
+# ── Mise a jour d'un arrete ──────────────────────────────────────────────────
+#
+# Mettre a jour ses soldes demandait de dupliquer l'arrete, puis d'ouvrir une
+# modale par compte. Ces deux fonctions portent le parcours en une fois : l'une
+# dit ce qui se met a jour et comment, l'autre applique tout dans une seule
+# transaction — un echec ne laisse pas un arrete a moitie recopie.
+
+def _mode(pos, holdings_count):
+    """Comment une position est valorisee, dans l'ordre de `compute_position`."""
+    if pos.get('entity'):
+        return 'entite'
+    if holdings_count:
+        return 'titres'
+    return 'saisie'
+
+
+def preparer_mise_a_jour(conn, source_date, target_date):
+    """Ce que l'ecran « Mettre a jour » affiche.
+
+    Seules les positions en mode `saisie` s'editent ici : une position liee a
+    une entite tient sa valeur de l'entite (editable dans la meme liste), une
+    position a lignes de titres est valorisee par les cours.
+    """
+    rows = conn.execute('SELECT * FROM positions WHERE date=? ORDER BY owner, establishment, envelope',
+                        (source_date,)).fetchall()
+    holdings_map = get_holdings_map(conn, [r['id'] for r in rows])
+    ref = load_referential(conn)
+    entity_map = get_entity_map(conn, source_date)
+
+    positions = []
+    for r in rows:
+        p = compute_position(dict(r), entity_map, ref, holdings_map)
+        n = len(holdings_map.get(r['id']) or [])
+        positions.append({
+            'id': r['id'], 'owner': r['owner'], 'label': r['label'],
+            'establishment': r['establishment'], 'envelope': r['envelope'],
+            'category': r['category'], 'entity': r['entity'],
+            'value': round(p['value'] or 0, 2), 'debt': round(r['debt'] or 0, 2),
+            'mode': _mode(dict(r), n), 'holdings_count': n,
+        })
+
+    utilisees = {p['entity'] for p in positions if p['entity']}
+    entites = [{'name': nom, 'gross_assets': round(v['gross_assets'], 2), 'debt': round(v['debt'], 2)}
+               for nom, v in sorted(entity_map.items()) if nom in utilisees]
+
+    existe = conn.execute('SELECT 1 FROM positions WHERE date=? LIMIT 1', (target_date,)).fetchone()
+    return {
+        'source_date': source_date, 'target_date': target_date,
+        # Mettre a jour l'arrete lui-meme, ou en creer un nouveau a partir de lui.
+        'en_place': source_date == target_date,
+        'cible_existe': bool(existe) and source_date != target_date,
+        'positions': positions, 'entites': entites,
+    }
+
+
+def appliquer_mise_a_jour(conn, source_date, target_date, soldes, entites):
+    """Cree (ou modifie) l'arrete `target_date` et y applique les soldes.
+
+    Args:
+        soldes:  {id_position_source: {'value': x, 'debt': y}}
+        entites: {nom: {'gross_assets': x, 'debt': y}}
+
+    L'appelant ouvre la transaction. Une position qui n'est pas en mode
+    `saisie` est refusee et rendue dans `refusees` : ecrire sa valeur n'aurait
+    aucun effet, et le taire laisserait croire qu'elle a change.
+    """
+    if source_date != target_date:
+        if conn.execute('SELECT 1 FROM positions WHERE date=? LIMIT 1', (target_date,)).fetchone():
+            raise ValueError(f'Un arrêté existe déjà au {target_date} : ouvrez-le pour le modifier.')
+        correspondance = _dupliquer_avec_correspondance(conn, source_date, target_date)
+    else:
+        correspondance = {r['id']: r['id'] for r in
+                          conn.execute('SELECT id FROM positions WHERE date=?', (source_date,))}
+
+    holdings_map = get_holdings_map(conn, list(correspondance.values()))
+    maj, refusees = 0, []
+    for src_id, vals in (soldes or {}).items():
+        pid = correspondance.get(int(src_id))
+        if pid is None:
+            refusees.append({'id': int(src_id), 'motif': 'position absente de l’arrêté source'})
+            continue
+        row = dict(conn.execute('SELECT * FROM positions WHERE id=?', (pid,)).fetchone())
+        mode = _mode(row, len(holdings_map.get(pid) or []))
+        if mode != 'saisie':
+            refusees.append({'id': int(src_id), 'motif': f'valorisée par {"l’entité" if mode == "entite" else "les cours"}'})
+            continue
+        conn.execute('UPDATE positions SET value=?, debt=? WHERE id=?',
+                     (vals.get('value', row['value']), vals.get('debt', row['debt']), pid))
+        maj += 1
+
+    connues = {r['name'] for r in conn.execute('SELECT name FROM entities')}
+    ent_maj = 0
+    for nom, vals in (entites or {}).items():
+        if nom not in connues:
+            refusees.append({'entite': nom, 'motif': 'entité inconnue'})
+            continue
+        conn.execute('''INSERT OR REPLACE INTO entity_snapshots (entity_name, date, gross_assets, debt)
+                        VALUES (?,?,?,?)''', (nom, target_date, vals['gross_assets'], vals['debt']))
+        ent_maj += 1
+
+    return {'target_date': target_date, 'cree': source_date != target_date,
+            'positions_maj': maj, 'entites_maj': ent_maj, 'refusees': refusees}
+
+
+def _dupliquer_avec_correspondance(conn, source_date, target_date):
+    """Copie l'arrete `source_date` vers `target_date` ; rend {id source: id cible}.
+
+    La valeur est figee a sa valeur effective (cours des lignes, ou entite).
+    La dette, elle, est recopiee BRUTE. On recopiait `debt_attributed`, c'est-
+    a-dire la dette deja multipliee par `debt_pct` — que `compute_position`
+    multiplie a nouveau a la lecture : une dette detenue a 50 % etait divisee
+    par deux a chaque duplication, y compris celle de l'arrete du jour.
+    """
+    rows = conn.execute('SELECT * FROM positions WHERE date=?', (source_date,)).fetchall()
+    holdings_map = get_holdings_map(conn, [r['id'] for r in rows])
+    ref = load_referential(conn)
+    entity_map = get_entity_map(conn, source_date)
+    correspondance = {}
+    for r in rows:
+        p = compute_position(dict(r), entity_map, ref, holdings_map)
+        override = {'value': p['value'], 'debt': r['debt']}
+        correspondance[r['id']] = duplicate_position(conn, r, target_date, value_override=override)
+    snapshot_holdings_to_date(conn, target_date)
+    return correspondance

@@ -1,0 +1,165 @@
+"""Mise a jour d'un arrete : « Mettre a jour » dans la barre du haut.
+
+Remplace « dupliquer l'arrete, puis ouvrir une modale par compte ». L'enjeu :
+un seul appel, tout ou rien, et aucune ecriture qui passerait pour effective
+sans l'etre.
+"""
+import os
+import tempfile
+
+import pytest
+
+import models
+
+_tmp = tempfile.NamedTemporaryFile(suffix='.db', delete=False)
+_tmp.close()
+models.DB_PATH = _tmp.name
+models._BASE_DIR = os.path.dirname(_tmp.name)
+os.environ['FINANCY_PASSWORD'] = 'testpass'
+os.environ['PRICE_PROVIDER'] = 'mock'
+
+from models import init_db, get_db  # noqa: E402
+from app import app  # noqa: E402
+from services.snapshot import duplicate_snapshot  # noqa: E402
+
+SRC, CIBLE = '2026-08-31', '2026-09-22'
+CSRF = {'X-CSRF-Token': 'test'}
+
+
+@pytest.fixture(autouse=True)
+def fresh_db():
+    if os.path.exists(models.DB_PATH):
+        os.unlink(models.DB_PATH)
+    init_db()
+    yield
+    if os.path.exists(models.DB_PATH):
+        os.unlink(models.DB_PATH)
+
+
+@pytest.fixture
+def client():
+    app.config['TESTING'] = True
+    with app.test_client() as c:
+        with c.session_transaction() as s:
+            s['authenticated'] = True
+            s['csrf_token'] = 'test'
+        yield c
+
+
+def _pos(conn, envelope, value, debt=0, entity=None, date=SRC, debt_pct=1.0, category='Cash & dépôts'):
+    return conn.execute(
+        'INSERT INTO positions (date, owner, category, envelope, value, debt, entity, debt_pct) '
+        "VALUES (?,'Paul',?,?,?,?,?,?)", (date, category, envelope, value, debt, entity, debt_pct)).lastrowid
+
+
+@pytest.fixture
+def arrete():
+    """Un livret saisi a la main, un PEA a lignes de titres, un bien d'entite."""
+    with get_db() as c:
+        livret = _pos(c, 'Livret A', 20000)
+        pea = _pos(c, 'PEA', 0, category='Actions')
+        c.execute("INSERT INTO holdings (position_id, isin, quantity, cost_basis, market_value) "
+                  "VALUES (?, 'FR0000000001', 10, 900, 1000)", (pea,))
+        c.execute("INSERT INTO entities (name, type, gross_assets, debt) VALUES ('SCI A', 'SCI', 300000, 200000)")
+        c.execute("INSERT INTO entity_snapshots (entity_name, date, gross_assets, debt) "
+                  "VALUES ('SCI A', ?, 300000, 200000)", (SRC,))
+        sci = _pos(c, 'SCI', 0, entity='SCI A', category='Immobilier')
+        c.commit()
+    return {'livret': livret, 'pea': pea, 'sci': sci}
+
+
+class TestPreparation:
+    def test_modes_de_valorisation(self, client, arrete):
+        d = client.get(f'/api/snapshots/update?source={SRC}&cible={CIBLE}').get_json()
+        modes = {p['envelope']: p['mode'] for p in d['positions']}
+        assert modes == {'Livret A': 'saisie', 'PEA': 'titres', 'SCI': 'entite'}
+
+    def test_entites_a_la_date_source(self, client, arrete):
+        d = client.get(f'/api/snapshots/update?source={SRC}&cible={CIBLE}').get_json()
+        assert d['entites'] == [{'name': 'SCI A', 'gross_assets': 300000, 'debt': 200000}]
+
+    def test_source_par_defaut_le_dernier_arrete(self, client, arrete):
+        assert client.get('/api/snapshots/update').get_json()['source_date'] == SRC
+
+    def test_en_place_si_meme_date(self, client, arrete):
+        assert client.get(f'/api/snapshots/update?source={SRC}&cible={SRC}').get_json()['en_place']
+
+
+class TestApplication:
+    def _post(self, client, **corps):
+        return client.post('/api/snapshots/update', json={'source_date': SRC, 'target_date': CIBLE, **corps},
+                           headers=CSRF)
+
+    def test_cree_l_arrete_et_applique_les_soldes(self, client, arrete):
+        r = self._post(client, soldes={str(arrete['livret']): {'value': 21500}})
+        assert r.status_code == 200 and r.get_json()['positions_maj'] == 1
+        with get_db() as c:
+            v = c.execute("SELECT value FROM positions WHERE date=? AND envelope='Livret A'", (CIBLE,)).fetchone()
+            s = c.execute("SELECT value FROM positions WHERE date=? AND envelope='Livret A'", (SRC,)).fetchone()
+        assert v['value'] == 21500
+        assert s['value'] == 20000                        # la source est intacte
+
+    def test_toutes_les_positions_sont_recopiees(self, client, arrete):
+        self._post(client, soldes={})
+        with get_db() as c:
+            n = c.execute('SELECT COUNT(*) n FROM positions WHERE date=?', (CIBLE,)).fetchone()['n']
+            h = c.execute('SELECT COUNT(*) n FROM holdings h JOIN positions p ON p.id=h.position_id '
+                          'WHERE p.date=?', (CIBLE,)).fetchone()['n']
+        assert n == 3 and h == 1                          # les lignes de titres suivent
+
+    def test_une_position_a_titres_est_refusee_et_dite(self, client, arrete):
+        # Ecrire sa valeur n'aurait aucun effet : les cours la recalculent.
+        # Le taire laisserait croire qu'elle a change.
+        r = self._post(client, soldes={str(arrete['pea']): {'value': 99999}}).get_json()
+        assert r['positions_maj'] == 0
+        assert 'cours' in r['refusees'][0]['motif']
+
+    def test_entite_datee_a_la_cible(self, client, arrete):
+        self._post(client, entites={'SCI A': {'gross_assets': 305000, 'debt': 198500}})
+        with get_db() as c:
+            rows = c.execute("SELECT date, debt FROM entity_snapshots WHERE entity_name='SCI A' ORDER BY date").fetchall()
+        assert [(r['date'], r['debt']) for r in rows] == [(SRC, 200000), (CIBLE, 198500)]
+
+    def test_entite_inconnue_refusee(self, client, arrete):
+        r = self._post(client, entites={'Fantome': {'gross_assets': 1, 'debt': 0}}).get_json()
+        assert r['entites_maj'] == 0 and r['refusees'][0]['entite'] == 'Fantome'
+
+    def test_cible_existante_refusee_sans_rien_ecrire(self, client, arrete):
+        with get_db() as c:
+            _pos(c, 'Livret A', 1, date=CIBLE); c.commit()
+        r = self._post(client, soldes={str(arrete['livret']): {'value': 5}})
+        assert r.status_code == 409
+        with get_db() as c:
+            n = c.execute('SELECT COUNT(*) n FROM positions WHERE date=?', (CIBLE,)).fetchone()['n']
+        assert n == 1                                      # rien n'a ete recopie par-dessus
+
+    def test_en_place(self, client, arrete):
+        r = client.post('/api/snapshots/update', headers=CSRF, json={
+            'source_date': SRC, 'target_date': SRC, 'soldes': {str(arrete['livret']): {'value': 20100}}})
+        assert r.get_json()['cree'] is False
+        with get_db() as c:
+            assert c.execute('SELECT COUNT(DISTINCT date) n FROM positions').fetchone()['n'] == 1
+            assert c.execute("SELECT value FROM positions WHERE envelope='Livret A'").fetchone()['value'] == 20100
+
+    def test_montant_negatif_refuse(self, client, arrete):
+        assert self._post(client, soldes={str(arrete['livret']): {'value': -5}}).status_code == 400
+
+    def test_exige_csrf(self, client, arrete):
+        r = client.post('/api/snapshots/update', json={'source_date': SRC, 'target_date': CIBLE})
+        assert r.status_code in (400, 403)
+
+
+class TestDetteDupliquee:
+    """La duplication recopiait `debt_attributed` — la dette deja multipliee
+    par `debt_pct`, que la lecture multiplie encore. Une dette detenue a 50 %
+    etait divisee par deux a chaque arrete."""
+
+    def test_la_dette_ne_fond_pas_d_arrete_en_arrete(self):
+        with get_db() as c:
+            _pos(c, 'Immobilier', 200000, debt=100000, debt_pct=0.5, category='Immobilier', date='2026-01-31')
+            c.commit()
+            d = '2026-01-31'
+            for cible in ('2026-02-28', '2026-03-31', '2026-04-30'):
+                duplicate_snapshot(c, d, cible); c.commit(); d = cible
+            dettes = [r['debt'] for r in c.execute('SELECT debt FROM positions ORDER BY date')]
+        assert dettes == [100000] * 4

@@ -2,7 +2,8 @@ import logging
 from flask import Blueprint, jsonify, request
 from datetime import datetime
 from models import (get_db, compute_position, get_entity_map, get_holdings_map,
-                    load_referential, snapshot_holdings_to_date, validate_date)
+                    load_referential, snapshot_holdings_to_date, validate_date, validate_number,
+                    validate_string, parse_number)
 from auth import login_required, csrf_protect
 
 logger = logging.getLogger('financy')
@@ -286,6 +287,76 @@ def duplicate_snapshot_route():
 
     logger.info('Duplicate snapshot: %s → %s (%s)', source_date, target_date, stats)
     return jsonify({'ok': True, **stats, 'from_date': source_date, 'to_date': target_date})
+
+
+@tools_bp.route('/api/snapshots/update', methods=['GET'])
+@login_required
+def preparer_mise_a_jour_route():
+    """Ce que l'ecran « Mettre a jour » affiche : les positions de l'arrete
+    source, le mode de valorisation de chacune, et les entites qu'elles
+    utilisent, a leur valeur de cette date.
+
+    Params : `source` (defaut : dernier arrete), `cible` (defaut : aujourd'hui).
+    """
+    from services.snapshot import preparer_mise_a_jour
+    with get_db() as conn:
+        source = request.args.get('source')
+        if not source:
+            row = conn.execute('SELECT MAX(date) d FROM positions').fetchone()
+            source = row['d'] if row else None
+        cible = request.args.get('cible') or datetime.now().strftime('%Y-%m-%d')
+        if not source:
+            return jsonify({'error': 'Aucun arrêté : ajoutez d\u2019abord une position.'}), 404
+        if not validate_date(source) or not validate_date(cible):
+            return jsonify({'error': 'Dates invalides (format AAAA-MM-JJ attendu)'}), 400
+        return jsonify(preparer_mise_a_jour(conn, source, cible))
+
+
+@tools_bp.route('/api/snapshots/update', methods=['POST'])
+@login_required
+@csrf_protect
+def appliquer_mise_a_jour_route():
+    """Cree l'arrete `target_date` depuis `source_date` et y applique les
+    soldes saisis — ou modifie `source_date` lui-meme si les deux sont egales.
+    Tout ou rien : une seule transaction.
+
+    Corps : {source_date, target_date,
+             soldes:  {id_position_source: {value, debt}},
+             entites: {nom: {gross_assets, debt}}}
+    """
+    from services.snapshot import appliquer_mise_a_jour
+    d = request.json or {}
+    source, cible = d.get('source_date'), d.get('target_date')
+    if not validate_date(source) or not validate_date(cible):
+        return jsonify({'error': 'Dates invalides (format AAAA-MM-JJ attendu)'}), 400
+
+    soldes, entites = {}, {}
+    for pid, v in (d.get('soldes') or {}).items():
+        if not str(pid).isdigit() or not isinstance(v, dict):
+            return jsonify({'error': f'Position invalide : {pid}'}), 400
+        if not validate_number(v.get('value')) or not validate_number(v.get('debt')):
+            return jsonify({'error': 'Montant invalide : un solde est un nombre positif'}), 400
+        soldes[int(pid)] = {k: parse_number(v[k]) for k in ('value', 'debt') if v.get(k) is not None}
+    for nom, v in (d.get('entites') or {}).items():
+        if not validate_string(nom, 200) or not isinstance(v, dict):
+            return jsonify({'error': 'Entité invalide'}), 400
+        if not validate_number(v.get('gross_assets')) or not validate_number(v.get('debt')):
+            return jsonify({'error': f'Montant invalide pour l\u2019entité {nom}'}), 400
+        entites[nom] = {'gross_assets': parse_number(v.get('gross_assets'), 0),
+                        'debt': parse_number(v.get('debt'), 0)}
+
+    with get_db() as conn:
+        conn.execute('BEGIN IMMEDIATE')
+        if not conn.execute('SELECT 1 FROM positions WHERE date=? LIMIT 1', (source,)).fetchone():
+            conn.rollback()
+            return jsonify({'error': f'Aucun arrêté au {source}'}), 404
+        try:
+            res = appliquer_mise_a_jour(conn, source, cible, soldes, entites)
+        except ValueError as e:
+            conn.rollback()
+            return jsonify({'error': str(e)}), 409
+    logger.info('Mise a jour d\'arrete %s -> %s : %s', source, cible, res)
+    return jsonify(res)
 
 
 @tools_bp.route('/api/snapshots/rename', methods=['POST'])

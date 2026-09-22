@@ -26,6 +26,7 @@ import { loadReferential, saveReferential, initTemplateSelect } from './tabs/ref
 import { loadTimeline, wireSimulation, triggerAutoSnapshot, triggerPricesRefresh, loadSchedulerStatus } from './tabs/tools.js';
 import { loadPerformance } from './tabs/performance.js';
 import { wireGlobalSearch } from './search.js';
+import { wireMiseAJour, ouvrir as ouvrirMiseAJour } from './mise-a-jour.js';
 import { wireSettingsEvents } from './settings.js';
 import { initColumnPicker, reapplyColumns } from './column-picker.js';
 
@@ -41,6 +42,16 @@ async function init() {
   wireEvents();
   wireDrilldownEvents();
   wireGlobalSearch(switchTab);
+  // Une fois enregistre, on se place sur l'arrete cree et on recharge l'ecran
+  // courant — le nouvel arrete doit apparaitre la ou on l'a lance.
+  wireMiseAJour(async cible => {
+    S.syntheseDate = cible;
+    S.positionsDate = cible;
+    await refreshDates();
+    await loadHistorique();
+    _lastLoadedTab = null;
+    await switchTab(S.currentTab, { pushHistory: false });
+  });
   await Promise.all([refreshDates(), loadEntities(), loadHistorique(), loadTargets(), loadUserAlertsAsync()]);
   await migrateLocalStorageToDB();
   await switchTab(_tabFromUrl() || 'synthese', { pushHistory: false });
@@ -183,12 +194,23 @@ const AJOUTS = {
   entites:   { libelle: 'Ajouter une entité',   ouvrir: () => openEntityModal() },
 };
 
+/** Onglets ou « Mettre a jour » est l'action principale : ceux qui montrent
+ *  les soldes. Sur Positions, il cede la couleur pleine a « Ajouter ». */
+const MISE_A_JOUR = new Set(['synthese', 'positions']);
+
 function _majBoutonAjouter(tab) {
   const btn = document.getElementById('head-ajouter');
-  if (!btn) return;
+  const maj = document.getElementById('head-maj');
   const a = AJOUTS[tab];
-  btn.classList.toggle('hidden', !a);
-  if (a) btn.textContent = a.libelle;
+  if (btn) {
+    btn.classList.toggle('hidden', !a);
+    if (a) btn.textContent = a.libelle;
+  }
+  if (maj) {
+    maj.classList.toggle('hidden', !MISE_A_JOUR.has(tab));
+    maj.classList.toggle('btn-primary', !a);
+    maj.classList.toggle('btn-secondary', !!a);
+  }
 }
 
 
@@ -337,6 +359,8 @@ function wireEvents() {
   document.getElementById('head-ajouter')?.addEventListener('click', () => {
     AJOUTS[S.currentTab]?.ouvrir();
   });
+  document.getElementById('head-maj')?.addEventListener('click', () => ouvrirMiseAJour());
+  document.getElementById('btn-maj')?.addEventListener('click', () => ouvrirMiseAJour());
   document.getElementById('btn-duplicate').addEventListener('click', duplicateSnapshot);
   document.getElementById('btn-rename-snapshot')?.addEventListener('click', renameSnapshot);
   document.getElementById('btn-delete-snapshot')?.addEventListener('click', deleteSnapshot);

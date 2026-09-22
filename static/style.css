@@ -3494,3 +3494,85 @@ a.settings-item { display: inline-flex; align-items: center; text-decoration: no
   position: absolute; top: -3px; bottom: -3px; width: 2px;
   background: var(--text); opacity: .5; border-radius: 1px;
 }
+
+/* ── Mettre à jour les soldes ─────────────────────────────────────────── */
+/* Une colonne de soldes a saisir d'affilee : le precedent a gauche pour
+   memoire, le nouveau dans le champ, l'ecart calcule a la frappe. */
+.maj-contenu { width: min(760px, 96vw); max-height: min(88vh, 900px); display: flex; flex-direction: column; }
+.maj-sous-titre { margin: .2rem 0 0; font-size: .8rem; color: var(--text-muted); }
+.maj-date { display: flex; align-items: center; gap: .6rem; margin: .2rem 0 .7rem; font-size: .82rem; }
+.maj-date input {
+  border: 1px solid var(--border); border-radius: 8px; padding: .35rem .55rem;
+  background: var(--card); color: var(--text); font: inherit;
+}
+.maj-alerte {
+  margin: 0 0 .7rem; padding: .55rem .7rem; border-radius: 8px; font-size: .8rem;
+  background: color-mix(in srgb, var(--warning) 12%, transparent); color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--warning) 40%, transparent);
+}
+
+.maj-entete, .maj-ligne {
+  display: grid; align-items: center; column-gap: .75rem;
+  grid-template-columns: minmax(0, 1fr) 8rem 9.5rem 6.5rem;
+}
+.maj-entete {
+  padding: 0 .1rem .35rem; border-bottom: 1px solid var(--border);
+  font-size: .62rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted);
+}
+.maj-entete span:nth-child(n+2) { text-align: right; }
+
+.maj-corps { overflow-y: auto; flex: 1 1 auto; min-height: 0; padding-right: .2rem; }
+.maj-groupe { padding: .6rem 0 .2rem; }
+.maj-groupe h3 {
+  margin: .2rem 0 .3rem; font-size: .7rem; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted);
+}
+.maj-aide { margin: 0 0 .4rem; font-size: .74rem; color: var(--text-muted); }
+
+.maj-ligne { padding: .32rem .1rem; border-bottom: 1px solid var(--border); font-size: .84rem; }
+.maj-ligne:last-child { border-bottom: 0; }
+.maj-nom { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.maj-avant { text-align: right; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.maj-note { grid-column: 3 / 5; text-align: right; font-size: .74rem; color: var(--text-muted); }
+.maj-ligne--fixe .maj-nom { color: var(--text-muted); }
+
+.maj-champ { display: flex; align-items: center; gap: .35rem; }
+.maj-champ input {
+  width: 100%; min-width: 0; box-sizing: border-box; padding: .34rem .5rem;
+  border: 1px solid var(--border); border-radius: 7px; background: var(--card);
+  color: var(--text); font: inherit; font-size: .85rem; text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.maj-champ input:focus { outline: 2px solid var(--primary); outline-offset: -1px; border-color: transparent; }
+.maj-champ input.is-invalide { border-color: var(--danger); }
+.maj-unite { font-size: .68rem; color: var(--text-muted); }
+/* La dette, quand la position en porte une, sous le solde. */
+.maj-champ--dette { grid-column: 3; }
+.maj-champ--dette input { font-size: .8rem; }
+
+/* Une entite : sa valeur et sa dette cote a cote. */
+.maj-ligne--entite .maj-champ { flex-direction: column; align-items: stretch; gap: .1rem; }
+.maj-ligne--entite .maj-unite { text-align: right; }
+
+.maj-delta { text-align: right; font-size: .8rem; font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.maj-delta.is-hausse { color: var(--success); }
+.maj-delta.is-baisse { color: var(--danger); }
+
+.maj-pied {
+  display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+  padding-top: .8rem; margin-top: .4rem; border-top: 1px solid var(--border);
+}
+.maj-resume { margin: 0 auto 0 0; font-size: .8rem; color: var(--text-muted); }
+.maj-resume.is-erreur { color: var(--danger); }
+
+@media (max-width: 640px) {
+  .maj-entete { display: none; }
+  .maj-ligne { grid-template-columns: minmax(0, 1fr) 8.5rem; row-gap: .2rem; }
+  .maj-nom { grid-column: 1 / -1; white-space: normal; }
+  .maj-avant { text-align: left; }
+  .maj-delta { grid-column: 1 / -1; }
+  .maj-note { grid-column: 2; }
+  .maj-champ--dette { grid-column: 2; }
+  .maj-resume { flex-basis: 100%; }
+  .maj-pied .btn { flex: 1 1 0; justify-content: center; }
+}

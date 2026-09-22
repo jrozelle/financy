@@ -80,6 +80,7 @@
             <div class="menu-pop hidden" id="snapshot-dropdown" role="menu">
               <div class="settings-section-label">Cet arrêté</div>
               <button type="button" class="settings-item" role="menuitem" id="btn-add-snapshot-note">Note de l’arrêté</button>
+              <button type="button" class="settings-item" role="menuitem" id="btn-maj">Mettre à jour les soldes</button>
               <button type="button" class="settings-item" role="menuitem" id="btn-duplicate">Dupliquer</button>
               <button type="button" class="settings-item" role="menuitem" id="btn-rename-snapshot">Modifier la date</button>
               <button type="button" class="settings-item settings-item-danger" role="menuitem" id="btn-delete-snapshot">Supprimer</button>
@@ -98,6 +99,9 @@
         <!-- Libelle et visibilite pilotes par l'onglet courant (main.js). Il
              etait masque par une regle CSS depuis le 22/09 : plus aucun moyen
              visible d'ajouter une position, un flux ou une entite. -->
+        <!-- Le geste le plus frequent : tous les soldes sur un seul ecran. Il
+             passait par « ••• → Dupliquer », puis une modale par compte. -->
+        <button type="button" class="btn btn-primary btn-sm hidden" id="head-maj">Mettre à jour</button>
         <button type="button" class="btn btn-primary btn-sm hidden" id="head-ajouter">Ajouter</button>
         <div class="head-recherche" id="global-search">
           <button type="button" class="head-icone" id="head-loupe" aria-label="Rechercher (touche /)"
@@ -1270,6 +1274,34 @@
        de configuration deviennent des onglets : Referentiel, Import et Outils
        n'ont pas a occuper quatre lignes de navigation permanente pour des
        ecrans qu'on ouvre quelques fois par an. -->
+  <!-- Mettre a jour les soldes : voir static/modules/mise-a-jour.js -->
+  <div id="maj-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="maj-titre">
+    <div class="modal-overlay" data-fermer-maj></div>
+    <form class="modal-content maj-contenu" id="maj-form" novalidate>
+      <div class="modal-header">
+        <div>
+          <h2 id="maj-titre">Mettre à jour les soldes</h2>
+          <p class="maj-sous-titre" id="maj-sous-titre"></p>
+        </div>
+        <button type="button" class="modal-close" data-fermer-maj aria-label="Fermer">&#10005;</button>
+      </div>
+      <div class="maj-date">
+        <label for="maj-date">Date de l’arrêté</label>
+        <input type="date" id="maj-date" required>
+      </div>
+      <p class="maj-alerte hidden" id="maj-alerte" role="alert"></p>
+      <div class="maj-entete" aria-hidden="true">
+        <span>Compte</span><span>Précédent</span><span>Nouveau</span><span>Écart</span>
+      </div>
+      <div class="maj-corps" id="maj-corps"></div>
+      <div class="maj-pied">
+        <p class="maj-resume" id="maj-resume" aria-live="polite"></p>
+        <button type="button" class="btn btn-secondary" data-fermer-maj>Annuler</button>
+        <button type="submit" class="btn btn-primary" id="maj-enregistrer">Enregistrer l’arrêté</button>
+      </div>
+    </form>
+  </div>
+
   <div id="reglages-modal" class="modal hidden" role="dialog" aria-modal="true"
        aria-labelledby="reglages-titre">
     <div class="modal-overlay" data-fermer-reglages></div>
