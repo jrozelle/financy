@@ -4193,3 +4193,58 @@ body { padding-top: 0 !important; }
   color: var(--primary); font-weight: 500; cursor: pointer; white-space: nowrap;
 }
 .link-carte:hover { text-decoration: underline; }
+
+/* ── Ce qui a bougé ───────────────────────────────────────────────────── */
+/* La variation est l'information : elle passe a gauche, en premier. L'avant et
+   l'apres ne servaient qu'a la calculer de tete. */
+.mv-total { margin: 0 0 .7rem; font-size: .78rem; color: var(--text-muted); }
+.mv-total b { font-family: var(--mono); font-weight: 600; }
+.mv-liste { display: flex; flex-direction: column; }
+.mv-ligne {
+  display: grid; grid-template-columns: auto 1fr; gap: .1rem .8rem;
+  padding: calc(.55rem * var(--d)) 0; border-bottom: 1px solid var(--border);
+  align-items: baseline;
+}
+.mv-ligne:last-child { border-bottom: 0; }
+.mv-montant { font-family: var(--mono); font-size: .88rem; font-weight: 600; grid-row: 1 / 3; align-self: center; }
+.mv-ou { font-size: .84rem; font-weight: 450; text-align: right; }
+.mv-qui { grid-column: 2; color: var(--text-muted); font-size: .74rem; text-align: right; }
+.mv-montant.pos { color: var(--success); }
+.mv-montant.neg { color: var(--danger); }
+
+/* ── Si vous aviez besoin d'argent ────────────────────────────────────── */
+.dispo { display: flex; flex-direction: column; gap: calc(.7rem * var(--d)); }
+.dispo-ligne { display: grid; grid-template-columns: 1fr auto; gap: .3rem .8rem; align-items: baseline; }
+.dispo-n { font-size: .84rem; }
+.dispo-v { font-family: var(--mono); font-size: .82rem; font-variant-numeric: tabular-nums; }
+.dispo-track {
+  grid-column: 1 / -1; display: block; height: 6px;
+  background: var(--bg); border-radius: 3px; overflow: hidden;
+}
+.dispo-fill { display: block; height: 100%; border-radius: 3px; }
+.dispo-note { margin: .8rem 0 0; font-size: .72rem; color: var(--text-muted); font-style: italic; }
+
+/* ── Écart à la cible ─────────────────────────────────────────────────── */
+/* Le nom au-dessus, la barre en dessous : la grille a cinq colonnes serrait
+   les libelles et les tronquait. */
+.cible-liste { display: flex; flex-direction: column; gap: calc(.7rem * var(--d)); }
+.cible-ligne { display: grid; grid-template-columns: 1fr auto; gap: .3rem .8rem; align-items: baseline; }
+.cible-n { font-size: .84rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cible-v { display: inline-flex; gap: .5rem; align-items: baseline; font-size: .8rem; }
+.cible-v .num { font-variant-numeric: tabular-nums; }
+.cible-ecart { font-family: var(--mono); font-size: .74rem; font-weight: 500; }
+.cible-ecart--trop { color: var(--warning); }
+.cible-ecart--pas-assez { color: var(--danger); }
+.cible-ecart--ok { color: var(--success); }
+.cible-none { color: var(--text-muted); font-size: .72rem; font-style: italic; }
+.cible-track {
+  grid-column: 1 / -1; position: relative; display: block; height: 6px;
+  background: var(--bg); border-radius: 3px;
+}
+.cible-fill { display: block; height: 100%; border-radius: 3px; background: var(--primary); }
+/* Le trait de cible se lit sur le meme axe que la barre : un ecart se voit
+   alors sans lire le chiffre. */
+.cible-marque {
+  position: absolute; top: -3px; bottom: -3px; width: 2px;
+  background: var(--text); opacity: .5; border-radius: 1px;
+}

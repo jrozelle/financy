@@ -109,24 +109,32 @@ export async function renderAllocationTargets() {
     return;
   }
 
+  // Le nom au-dessus, la barre en dessous : la grille a cinq colonnes serrait
+  // les libelles sur 130 px et les tronquait. L'ecart en POINTS remplace les
+  // trois colonnes reel / cible / ecart — « 31,3 % · −3,7 pt » dit tout, et le
+  // trait sur la barre montre la cible sans avoir a la lire.
   host.innerHTML = `
-    <div style="display:grid;grid-template-columns:130px 1fr 55px 55px 55px;gap:.5rem;padding:.35rem 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted);border-bottom:2px solid var(--border)">
-      <div>Catégorie</div><div></div><div style="text-align:right">Réel</div><div style="text-align:right">Cible</div><div style="text-align:right">Écart</div>
-    </div>
-    ${rows.map(r => {
-      const barActual = Math.min(100, r.actual);
-      const barTarget = r.target ? Math.min(100, r.target) : null;
-      const deltaClass = r.target === 0 ? '' : r.delta > 2 ? 'alloc-delta-pos' : r.delta < -2 ? 'alloc-delta-neg' : '';
-      const deltaStr   = r.target === 0 ? '—' : (r.delta > 0 ? '+' : '') + r.delta.toFixed(1) + ' %';
-      return `<div class="alloc-row">
-        <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.cat)}</div>
-        <div class="alloc-bar-bg">
-          <div class="alloc-bar-actual" style="width:${barActual.toFixed(1)}%"></div>
-          ${barTarget !== null ? `<div class="alloc-bar-target" style="left:${barTarget.toFixed(1)}%"></div>` : ''}
-        </div>
-        <div style="text-align:right;font-weight:600">${r.actual.toFixed(1)} %</div>
-        <div style="text-align:right;color:var(--text-muted)">${r.target ? r.target + ' %' : '—'}</div>
-        <div style="text-align:right" class="${deltaClass}">${deltaStr}</div>
-      </div>`;
-    }).join('')}`;
+    <div class="cible-liste">
+      ${rows.map(r => {
+        const reel = Math.min(100, r.actual);
+        const cible = r.target ? Math.min(100, r.target) : null;
+        const ecart = r.target === 0 ? null : r.delta;
+        const classe = ecart === null ? '' : ecart > 2 ? 'trop' : ecart < -2 ? 'pas-assez' : 'ok';
+        return `
+        <div class="cible-ligne">
+          <span class="cible-n">${esc(r.cat)}</span>
+          <span class="cible-v">
+            <span class="num">${r.actual.toFixed(1)}\u202f%</span>
+            ${ecart === null ? '<span class="cible-none">pas de cible</span>'
+              : `<span class="cible-ecart cible-ecart--${classe}">${
+                  ecart > 0 ? '+' : '−'}${Math.abs(ecart).toFixed(1)}\u202fpt</span>`}
+          </span>
+          <span class="cible-track">
+            <span class="cible-fill" style="width:${reel.toFixed(1)}%"></span>
+            ${cible !== null ? `<span class="cible-marque" style="left:${cible.toFixed(1)}%"
+                 title=""></span>` : ''}
+          </span>
+        </div>`;
+      }).join('')}
+    </div>`;
 }

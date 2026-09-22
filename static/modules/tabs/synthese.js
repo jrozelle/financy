@@ -668,18 +668,41 @@ function renderEntitiesSynthese() {
     </table>`;
 }
 
+/** « Si vous aviez besoin d'argent » : ce qui est disponible, par delai.
+ *
+ *  Les montants sont CUMULES : sous une semaine, on dispose aussi de ce qui
+ *  etait deja mobilisable sous 24 h. Afficher des tranches disjointes obligeait
+ *  a les additionner de tete pour repondre a la seule question qui compte —
+ *  « de combien je dispose d'ici la ? ».
+ */
 function renderLiqBars(byLiq) {
+  const DELAIS = [
+    { cles: ['J0–J1'], libelle: 'Sous 24 heures' },
+    { cles: ['J0–J1', 'J2–J7'], libelle: 'Sous une semaine' },
+    { cles: ['J0–J1', 'J2–J7', 'J8–J30'], libelle: 'Sous un mois' },
+    { cles: ['J0–J1', 'J2–J7', 'J8–J30', '30J+'], libelle: 'Au-delà' },
+  ];
   const total = Object.values(byLiq).reduce((s, v) => s + v, 0);
-  const rows = S.config.liquidity_order.map(liq => {
-    const val = byLiq[liq] || 0;
-    const pct = total > 0 ? (val / total) * 100 : 0;
-    return `<div class="liq-row">
-      <div>${liqBadge(liq)}</div>
-      <div class="liq-bar-bg"><div class="liq-bar" style="width:${pct.toFixed(1)}%"></div></div>
-      <div class="liq-value">${fmt(val)}</div>
+  const bloque = byLiq['Bloqué'] || 0;
+  const cumule = d => d.cles.reduce((s, k) => s + (byLiq[k] || 0), 0);
+  const max = Math.max(...DELAIS.map(cumule), bloque, 1);
+
+  const ligne = (libelle, valeur, couleur) => `
+    <div class="dispo-ligne">
+      <span class="dispo-n">${libelle}</span>
+      <span class="dispo-v">${fmt(valeur)}</span>
+      <span class="dispo-track"><span class="dispo-fill"
+            style="width:${((valeur / max) * 100).toFixed(1)}%;background:${couleur}"></span></span>
     </div>`;
-  }).join('');
-  document.getElementById('liquidity-bars').innerHTML = `<div class="liq-grid">${rows}</div>`;
+
+  document.getElementById('liquidity-bars').innerHTML = `
+    <div class="dispo">
+      ${DELAIS.map((d, i) => ligne(d.libelle, cumule(d),
+          `var(--chart-${i === 3 ? 2 : 1})`)).join('')}
+      ${bloque ? ligne('Bloqué', bloque, 'var(--chart-11)') : ''}
+    </div>
+    ${total ? `<p class="dispo-note">Les montants sont cumulés : chaque délai
+      inclut ce qui était déjà disponible avant.</p>` : ''}`;
 }
 
 // Mapping categorie -> poche patrimoniale (miroir de MACRO_BUCKETS dans
@@ -759,24 +782,22 @@ async function renderSnapshotDiff(owner, isFamily) {
   const t = data.totals || {};
   const badge = s => s === 'new' ? ' <span class="h-badge h-badge-fresh">nouveau</span>'
     : s === 'closed' ? ' <span class="h-badge h-badge-expired">clôturé</span>' : '';
+  // La VARIATION est l'information ; l'avant et l'apres ne servaient qu'a la
+  // calculer de tete. Le montant passe donc a gauche, en gros, et le compte a
+  // droite — on lit d'abord ce qui a bouge, ensuite ou.
   el.innerHTML = `
-    <div class="text-muted" style="font-size:12px;margin-bottom:.5rem">
-      ${fmtDate(data.from_date)} → ${fmtDate(data.to_date)} · variation nette
-      <strong class="${(t.delta || 0) >= 0 ? 'pos' : 'neg'}">${(t.delta || 0) >= 0 ? '+' : ''}${fmt(t.delta || 0)}</strong>
-    </div>
-    <table class="data-table" style="width:100%">
-      <thead><tr><th>Compte</th><th class="num">Avant</th><th class="num">Après</th><th class="num">Variation</th></tr></thead>
-      <tbody>
-        ${moves.map(m => `<tr>
-          <td>${esc(m.label || '—')}${badge(m.status)}${
-            [m.establishment, m.owner].filter(Boolean).length
-              ? `<div class="dd-row-sub">${esc([m.establishment, m.owner].filter(Boolean).join(' · '))}</div>` : ''}</td>
-          <td class="num">${fmt(m.net_before)}</td>
-          <td class="num">${fmt(m.net_after)}</td>
-          <td class="num ${m.delta >= 0 ? 'pos' : 'neg'}">${m.delta >= 0 ? '+' : ''}${fmt(m.delta)}</td>
-        </tr>`).join('')}
-      </tbody>
-    </table>`;
+    <p class="mv-total">Variation nette
+      <b class="${(t.delta || 0) >= 0 ? 'pos' : 'neg'}">${(t.delta || 0) >= 0 ? '+' : ''}${
+        fmt(t.delta || 0)}</b> depuis le ${fmtDate(data.from_date)}</p>
+    <div class="mv-liste">
+      ${moves.map(m => `
+        <div class="mv-ligne">
+          <span class="mv-montant ${m.delta >= 0 ? 'pos' : 'neg'}">${
+            m.delta >= 0 ? '+' : '−'}${fmt(Math.abs(m.delta))}</span>
+          <span class="mv-ou">${esc(m.label || '—')}${badge(m.status)}</span>
+          <span class="mv-qui">${esc([m.owner, m.establishment].filter(Boolean).join(' · '))}</span>
+        </div>`).join('')}
+    </div>`;
 }
 
 // ─── Snapshot notes ──────────────────────────────────────────────────────
