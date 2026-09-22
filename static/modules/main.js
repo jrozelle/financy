@@ -751,6 +751,19 @@ function wireEvents() {
   // Videe de tout, la barre du haut n'a plus lieu d'etre.
   document.querySelector('.navbar')?.classList.add('hidden');
 
+  // L'en-tete figé ne prend son filet qu'une fois decolle du haut : souligner
+  // un en-tete au repos ajoute un trait qui ne separe rien.
+  const tete = document.querySelector('.page-head');
+  if (tete && 'IntersectionObserver' in window) {
+    const sentinelle = document.createElement('div');
+    sentinelle.style.cssText = 'position:absolute;top:0;height:1px;width:1px';
+    tete.parentNode.insertBefore(sentinelle, tete);
+    new IntersectionObserver(
+      ([e]) => tete.classList.toggle('is-stuck', !e.isIntersecting),
+      { threshold: 0 }
+    ).observe(sentinelle);
+  }
+
   // ── Contrôles de l'en-tête ──────────────────────────────────────────
   // Densite : segment visible plutot qu'entree de menu. Tout l'espacement
   // derive d'une variable unique, donc rien ne se desaligne.

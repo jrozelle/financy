@@ -3822,17 +3822,18 @@ body { padding-top: 0 !important; }
 /* L'engrenage prend la forme d'une entree de rail et porte son libelle :
    une icone muette a cote d'un groupe nomme « Réglages » entretenait la
    confusion entre les preferences et les ecrans d'administration. */
-#rail-reglages { margin-top: .5rem; padding-top: .4rem;
-                 border-top: 1px solid rgba(255,255,255,.07); }
+#rail-reglages { margin: 0; padding: 0; }
 #rail-reglages .settings-menu { display: block; }
 #rail-reglages .settings-toggle {
-  display: flex; align-items: center; gap: .55rem; width: 100%;
-  padding: .42rem .55rem; border-radius: 7px; border: 0; background: none;
-  color: var(--rail-ink); font: inherit; font-size: .84rem; cursor: pointer;
+  /* Meme gabarit que .fin-rail-sub : meme retrait, meme taille, meme couleur. */
+  display: flex; align-items: center; width: 100%;
+  margin: 0; padding: .42rem .55rem .42rem 1.1rem;
+  border-radius: 7px; border: 0; background: none;
+  color: #6f7891; font: inherit; font-size: .8rem; cursor: pointer;
 }
 #rail-reglages .settings-toggle::after { content: 'Préférences'; }
-#rail-reglages .settings-toggle svg { width: 16px; height: 16px; flex: none; }
-#rail-reglages .settings-toggle:hover { background: var(--rail-hover); color: #fff; }
+#rail-reglages .settings-toggle svg { display: none; }
+#rail-reglages .settings-toggle:hover { background: var(--rail-hover); color: #b8c0d0; }
 #rail-reglages .settings-dropdown { right: auto; left: .3rem; bottom: calc(100% + 6px); top: auto; }
 @media (max-width: 900px) {
   #rail-recherche { display: none; }   /* la recherche reprend sa place ailleurs sur mobile */
@@ -3848,7 +3849,7 @@ body { padding-top: 0 !important; }
   stroke-linecap: round; stroke-linejoin: round;
 }
 /* Le pied du rail se détache : les réglages ne sont pas une destination. */
-.fin-rail-foot { border-top: 1px solid rgba(255,255,255,.07); padding-top: .5rem; }
+.fin-rail-foot { padding-top: .5rem; }
 
 /* ── Uniformité des contrôles de l'en-tête ────────────────────────────── */
 /* Selects, segments et boutons partageaient des hauteurs differentes (34 a
@@ -3886,3 +3887,35 @@ body { padding-top: 0 !important; }
    fait depuis l'ecran concerne, pas depuis l'en-tete de la synthese. */
 .page-head-tools #nav-add-button { display: none !important; }
 #head-filtres { gap: .35rem; }
+
+/* ── En-tête figé au défilement ───────────────────────────────────────── */
+/* Le titulaire, l'arrêté et la période restent accessibles quand on descend
+   dans la page : ce sont eux qui disent ce qu'on est en train de lire, et une
+   liste longue les faisait disparaitre au premier coup de molette. */
+.page-head {
+  position: sticky; top: 0; z-index: 60;
+  background: var(--bg);
+  margin-inline: calc(-1 * var(--page-gutter, 1.5rem));
+  padding: .75rem var(--page-gutter, 1.5rem) .6rem;
+  border-bottom: 1px solid transparent;
+}
+/* Le filet n'apparait qu'une fois decolle du haut, sinon il souligne un
+   en-tete qui n'a encore rien a separer. */
+.page-head.is-stuck { border-bottom-color: var(--border); }
+
+/* ── « D'où vient la hausse » ─────────────────────────────────────────── */
+.contrib-svg { display: block; width: 100%; height: 172px; overflow: visible; }
+.contrib-zero { stroke: var(--border); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.contrib-axe  { font-size: 7px; fill: var(--text-muted); font-family: var(--mono); }
+.contrib-val  { font-size: 7px; fill: var(--text); font-family: var(--mono); font-weight: 500; }
+.stack-legend {
+  display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;
+  margin-top: .7rem; font-size: .78rem; color: var(--text-muted);
+}
+.stack-legend span { display: inline-flex; align-items: center; gap: .4rem; }
+.stack-legend i { width: 9px; height: 9px; border-radius: 3px; display: block; }
+.stack-legend b { color: var(--text); font-weight: 600; }
+.contrib-part { margin-left: auto; font-style: italic; }
+.card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: .9rem; }
+.card-hint { margin: .1rem 0 0; color: var(--text-muted); font-size: .76rem; }
+@media (max-width: 640px) { .contrib-part { margin-left: 0; flex-basis: 100%; } }

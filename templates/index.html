@@ -33,11 +33,11 @@
     <button type="button" class="tab-btn fin-rail-item" data-tab="conseil"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>Conseil</button>
 
     <div class="fin-rail-foot">
-      <div class="fin-rail-group">Administration</div>
+      <div class="fin-rail-group">Réglages</div>
+      <div id="rail-reglages"></div>
       <button type="button" class="tab-btn fin-rail-sub" data-tab="referentiel">Référentiel</button>
       <button type="button" class="tab-btn fin-rail-sub" data-tab="import">Import / Export</button>
       <button type="button" class="tab-btn fin-rail-sub" data-tab="tools">Outils</button>
-      <div id="rail-reglages"></div>
     </div>
   </nav>
 
@@ -220,6 +220,18 @@
           </select>
         </div>
         <div class="chart-wrap-wide"><canvas id="synthese-history-detail-chart"></canvas></div>
+      </div>
+
+
+      <div class="card" id="card-contribution" style="display:none">
+        <div class="card-head">
+          <div>
+            <h2>D'où vient la hausse</h2>
+            <p class="card-hint">Épargne versée et performance des marchés, par période</p>
+          </div>
+        </div>
+        <div id="contribution-chart"></div>
+        <div class="stack-legend" id="contribution-legend"></div>
       </div>
 
       <div class="charts-row">

@@ -3,6 +3,7 @@ import { S, catChart, histChart, syntheseEnvChart, syntheseHistChart,
 import { fmt, fmtDate, esc, kpiDelta, liqBadge, getColors, doughnutConfig, chartBorderColor, chartFamilyColors, destroyChart, parseLocaleNumber, fmtAxis, sparkline} from '../utils.js';
 import { api } from '../api.js';
 import { loadTodo } from '../todo.js';
+import { loadContribution } from './contribution.js';
 import { drilldownPositions } from '../drilldown.js';
 import { loadUserAlerts } from '../alerts.js';
 import { renderAllocationTargets } from '../targets.js';
@@ -148,6 +149,7 @@ export function renderSynthese() {
         return byLiq;
       })();
 
+  loadContribution();
   renderEntityWarnings(syn.entity_warnings || []);
   renderOwnersTable(totals_by_owner, family, Object.values(totals_by_owner).reduce((s,o)=>s+o.mobilizable,0));
   renderCatChart(catFiltered);
