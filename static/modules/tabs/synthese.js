@@ -805,20 +805,41 @@ function renderWealthTarget(currentNet) {
   const cls = pct >= 100 ? 'pos' : '';
 
   bar.style.display = '';
-  bar.innerHTML = `<div class="wealth-target-card card" style="padding:.75rem 1rem">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.375rem">
-      <span style="font-size:13px;font-weight:600">Objectif patrimoine net</span>
-      <span style="display:flex;gap:.5rem;align-items:center">
-        <span class="text-muted" style="font-size:12px">${fmt(currentNet)} / ${fmt(target)}</span>
-        <span class="${cls}" style="font-weight:700;font-size:13px">${pct.toFixed(1)}\u202f%</span>
-        <button class="btn-icon" id="btn-edit-wealth-target" title="Modifier l'objectif" style="font-size:14px">&#9998;</button>
-      </span>
-    </div>
-    <div class="wealth-progress-bg">
-      <div class="wealth-progress-bar ${pct >= 100 ? 'complete' : ''}" style="width:${pct.toFixed(1)}%"></div>
-    </div>
-  </div>`;
-  bar.querySelector('#btn-edit-wealth-target')?.addEventListener('click', openWealthTargetEditor);
+  // L'objectif rejoint le chiffre qu'il vise : une trajectoire n'a de sens
+  // qu'accolee au montant qu'elle projette, pas dans un bandeau separe en haut
+  // de page. Le bandeau disparait donc, la jauge vit dans le heros.
+  bar.style.display = 'none';
+  bar.innerHTML = '';
+
+  const hote = document.getElementById('kpi-hero-goal');
+  if (!hote) return;
+
+  // Rythme observe sur l'historique : de quoi dire QUAND l'objectif tombe, et
+  // pas seulement ou l'on en est.
+  const h = S.historique || [];
+  let projection = '';
+  if (h.length >= 2 && currentNet < target) {
+    const debut = h[0], fin = h[h.length - 1];
+    const jours = (new Date(fin.date) - new Date(debut.date)) / 86400000;
+    const progression = (fin.family_net || 0) - (debut.family_net || 0);
+    if (jours > 30 && progression > 0) {
+      const parMois = progression / (jours / 30.44);
+      const mois = (target - currentNet) / parMois;
+      const quand = new Date();
+      quand.setMonth(quand.getMonth() + Math.ceil(mois));
+      projection = mois < 120
+        ? `Atteint en <b>${quand.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</b> au rythme actuel`
+        : '';
+    }
+  }
+
+  hote.className = 'hero-goal';
+  hote.innerHTML = `
+    <div class="g-track"><span class="g-fill" style="width:${pct.toFixed(1)}%"></span></div>
+    <div class="g-foot">
+      <span>Objectif <b>${fmt(target)}</b> · ${pct.toFixed(1)}\u202f% atteint</span>
+      <span>${projection || `Reste <b>${fmt(Math.max(target - currentNet, 0))}</b>`}</span>
+    </div>`;
 }
 
 async function openWealthTargetEditor() {

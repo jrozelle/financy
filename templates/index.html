@@ -161,10 +161,14 @@
 
       <div id="snapshot-note-bar" style="display:none;margin-bottom:1rem"></div>
       <div id="wealth-target-bar" style="margin-bottom:1rem;display:none"></div>
-      <div class="kpi-grid">
-        <div class="kpi-card">
+      <!-- Un chiffre domine, trois le qualifient : on ouvre cette page pour le
+           net ; le brut, la dette et le mobilisable l'expliquent. Quatre cartes
+           de meme taille ne disaient pas laquelle regarder. -->
+      <div class="kpi-grid" data-carte="chiffres">
+        <div class="kpi-card kpi-hero">
           <div class="kpi-label" id="kpi-net-label">Patrimoine net famille</div>
           <div class="kpi-value" id="kpi-net">—</div>
+          <div id="kpi-hero-goal"></div>
         </div>
         <div class="kpi-card kpi-gross">
           <div class="kpi-label" id="kpi-gross-label">Actifs bruts</div>
@@ -181,25 +185,25 @@
       </div>
 
       <div class="charts-row charts-row-pies">
-        <div class="card card-repartition" id="repartition-card"></div>
+        <div class="card card-repartition" id="repartition-card" data-carte="repartition"></div>
         
       </div>
 
       
 
-      <div class="card">
+      <div class="card" data-carte="mouvements">
         <h2>Mouvements depuis le snapshot précédent</h2>
         <div id="snapshot-diff"></div>
       </div>
 
       
 
-      <div class="card">
+      <div class="card" data-carte="historique">
         <h2>Historique patrimoine net</h2>
         <div class="chart-wrap-wide"><canvas id="history-chart"></canvas></div>
       </div>
 
-      <div class="card" id="synthese-history-detail-card">
+      <div class="card" id="synthese-history-detail-card" data-carte="evolution">
         <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:.875rem">
           <h2 style="margin:0">Évolution par</h2>
           <select id="synthese-history-group" class="filter-select" style="width:auto">
@@ -211,7 +215,7 @@
       </div>
 
 
-      <div class="card" id="card-contribution" style="display:none">
+      <div class="card" id="card-contribution" data-carte="contribution" style="display:none">
         <div class="card-head">
           <div>
             <h2>D'où vient la hausse</h2>
@@ -223,11 +227,11 @@
       </div>
 
       <div class="charts-row">
-        <div class="card">
+        <div class="card" data-carte="liquidite">
           <h2>Mobilisable par liquidité</h2>
           <div id="liquidity-bars"></div>
         </div>
-        <div class="card">
+        <div class="card" data-carte="cible">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.875rem;gap:.5rem">
             <h2 style="margin:0">Allocation cible vs réelle</h2>
             <div style="display:flex;align-items:center;gap:.5rem">
@@ -239,7 +243,7 @@
         </div>
       </div>
 
-      <div class="card" id="entities-synthese-card" style="display:none">
+      <div class="card" id="entities-synthese-card" style="display:none" data-carte="entites">
         <h2>Entités (SCI / Indivision)</h2>
         <div id="entities-synthese"></div>
       </div>

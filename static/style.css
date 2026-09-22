@@ -3971,3 +3971,83 @@ body { padding-top: 0 !important; }
 @media (max-width: 720px) {
   .rep th:nth-child(4), .rep td:nth-child(4) { display: none; }  /* % brut : la barre le dit deja */
 }
+
+/* ═══ Composition de la synthèse ════════════════════════════════════════ */
+/* Une grille de douze colonnes pour tout l'écran. Les conteneurs
+   intermédiaires (`charts-row`, `kpi-grid`) passent en `display: contents` :
+   ils disparaissent de la mise en page sans qu'on touche au gabarit, et leurs
+   cartes deviennent items de la grille. Ordre et largeur se pilotent alors par
+   attribut, carte par carte. */
+#tab-synthese {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: calc(.75rem * var(--d));
+  align-items: start;
+}
+#tab-synthese > .kpi-grid,
+#tab-synthese > .charts-row { display: contents; }
+/* Ce qui n'est pas une carte occupe toute la largeur et reste en tête. */
+#tab-synthese > #todo-zone,
+#tab-synthese > #entity-warnings-bar,
+#tab-synthese > #snapshot-note-bar,
+#tab-synthese > #wealth-target-bar,
+#tab-synthese > .page-header { grid-column: 1 / -1; order: 0; margin-bottom: 0; }
+
+/* L'ordre suit les questions dans l'ordre où on se les pose : où j'en suis,
+   d'où vient la hausse, comment ça évolue, comment c'est réparti, suis-je sur
+   ma cible, qu'est-ce qui a bougé, de quoi je dispose. */
+[data-carte="chiffres"]     { order: 1; }
+.kpi-hero                   { grid-column: span 5; order: 1; }
+.kpi-card.kpi-gross,
+.kpi-card.kpi-debt,
+.kpi-card.kpi-mobilizable   { grid-column: span 7; order: 1; }
+[data-carte="contribution"] { order: 2; grid-column: span 5; }
+[data-carte="historique"]   { order: 3; grid-column: span 7; }
+[data-carte="evolution"]    { order: 4; grid-column: span 12; }
+[data-carte="repartition"]  { order: 5; grid-column: span 7; }
+[data-carte="cible"]        { order: 6; grid-column: span 5; }
+[data-carte="mouvements"]   { order: 7; grid-column: span 7; }
+[data-carte="liquidite"]    { order: 8; grid-column: span 5; }
+[data-carte="entites"]      { order: 9; grid-column: span 12; }
+
+/* Les trois indicateurs secondaires partagent la colonne de droite du héros. */
+.kpi-grid > .kpi-card.kpi-gross      { grid-column: 6 / 9; }
+.kpi-grid > .kpi-card.kpi-debt       { grid-column: 9 / 11; }
+.kpi-grid > .kpi-card.kpi-mobilizable{ grid-column: 11 / 13; }
+
+/* ── Le chiffre dominant ──────────────────────────────────────────────── */
+.kpi-hero { box-shadow: 0 0 0 1px var(--primary) inset; }
+.kpi-hero .kpi-value { font-size: 2.1rem; font-weight: 600; letter-spacing: -.03em; }
+.kpi-hero .spark { height: 34px; }
+.kpi-card.kpi-gross .kpi-value,
+.kpi-card.kpi-debt .kpi-value,
+.kpi-card.kpi-mobilizable .kpi-value { font-size: 1.15rem; }
+
+/* Objectif intégré au héros : la trajectoire appartient au chiffre qu'elle
+   vise, pas à un bandeau séparé en haut de page. */
+.hero-goal { margin-top: .6rem; }
+.hero-goal .g-track { height: 6px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+.hero-goal .g-fill { display: block; height: 100%; border-radius: 4px;
+                     background: linear-gradient(90deg, var(--chart-1), var(--primary)); }
+.hero-goal .g-foot { display: flex; justify-content: space-between; gap: .6rem;
+                     margin-top: .35rem; font-size: .72rem; color: var(--text-muted); }
+.hero-goal .g-foot b { color: var(--text); font-family: var(--mono); font-weight: 600; }
+
+/* ── Cartes : le liseré coloré disparaît ──────────────────────────────── */
+/* Il identifiait la carte par une couleur qui ne voulait rien dire ; la
+   hiérarchie passe désormais par la taille, et l'accent est réservé au héros. */
+#tab-synthese .kpi-card { border-left: 1px solid var(--border); box-shadow: none; }
+#tab-synthese .card { box-shadow: none; }
+
+@media (max-width: 1200px) {
+  .kpi-hero { grid-column: span 12; }
+  .kpi-grid > .kpi-card.kpi-gross       { grid-column: span 4; }
+  .kpi-grid > .kpi-card.kpi-debt        { grid-column: span 4; }
+  .kpi-grid > .kpi-card.kpi-mobilizable { grid-column: span 4; }
+  [data-carte] { grid-column: span 12 !important; }
+}
+@media (max-width: 700px) {
+  .kpi-grid > .kpi-card.kpi-gross,
+  .kpi-grid > .kpi-card.kpi-debt,
+  .kpi-grid > .kpi-card.kpi-mobilizable { grid-column: span 12; }
+}
