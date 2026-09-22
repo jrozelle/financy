@@ -1,6 +1,6 @@
 import { S, catChart, histChart, syntheseEnvChart, syntheseHistChart,
          setCatChart, setHistChart, setSyntheseEnvChart, setSyntheseHistChart } from '../state.js';
-import { fmt, fmtDate, esc, kpiDelta, liqBadge, getColors, doughnutConfig, chartBorderColor, chartFamilyColors, destroyChart, parseLocaleNumber, fmtAxis } from '../utils.js';
+import { fmt, fmtDate, esc, kpiDelta, liqBadge, getColors, doughnutConfig, chartBorderColor, chartFamilyColors, destroyChart, parseLocaleNumber, fmtAxis, sparkline} from '../utils.js';
 import { api } from '../api.js';
 import { loadTodo } from '../todo.js';
 import { drilldownPositions } from '../drilldown.js';
@@ -107,10 +107,21 @@ export function renderSynthese() {
     }
     return html;
   };
-  document.getElementById('kpi-net').innerHTML         = fmt(kpi.net) + varHtml('net_delta', 'net_pct');
-  document.getElementById('kpi-gross').innerHTML       = fmt(kpi.gross) + varHtml('gross_delta');
-  document.getElementById('kpi-debt').innerHTML        = fmt(kpi.debt) + varHtml('debt_delta', null, { invert: true });
-  document.getElementById('kpi-mobilizable').innerHTML = fmt(kpi.mob) + varHtml('mob_delta');
+  // Sparklines : la tendance sous le chiffre. Series prises dans l'historique
+  // deja charge, filtrees sur le titulaire courant comme le reste de la page.
+  const serie = cle => (S.historique || []).map(h =>
+    isFamily ? h[`family_${cle}`] : h.by_owner_detail?.[owner]?.[cle]);
+
+  document.getElementById('kpi-net').innerHTML         = fmt(kpi.net) + varHtml('net_delta', 'net_pct')
+    + sparkline(serie('net'), { couleur: 'var(--primary)' });
+  document.getElementById('kpi-gross').innerHTML       = fmt(kpi.gross) + varHtml('gross_delta')
+    + sparkline(serie('gross'), { couleur: 'var(--primary)' });
+  // La dette prend une couleur neutre : elle n'est ni bonne ni mauvaise en soi,
+  // et la teindre en rouge ferait lire une baisse comme un probleme.
+  document.getElementById('kpi-debt').innerHTML        = fmt(kpi.debt) + varHtml('debt_delta', null, { invert: true })
+    + sparkline(serie('debt'), { couleur: 'var(--text-muted)' });
+  document.getElementById('kpi-mobilizable').innerHTML = fmt(kpi.mob) + varHtml('mob_delta')
+    + sparkline(serie('mob'), { couleur: 'var(--primary)' });
 
   document.getElementById('kpi-net-label').textContent   = isFamily ? 'Patrimoine net famille' : `Patrimoine net — ${owner}`;
   document.getElementById('kpi-gross-label').textContent = isFamily ? 'Actifs bruts' : `Actifs bruts — ${owner}`;

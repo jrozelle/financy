@@ -28,6 +28,43 @@ export const fmtAxis = v => {
   return new Intl.NumberFormat('fr-FR', { notation: 'compact' }).format(v) + '\u202f€';
 };
 
+
+/** Sparkline : la tendance d'un indicateur, sous son chiffre.
+ *
+ * Un montant seul ne dit pas s'il monte depuis six mois ou s'il vient de
+ * rebondir. La forme le dit d'un coup d'oeil, sans place ni axe.
+ *
+ * Non masquee en mode discretion : sans echelle ni graduation, une courbe ne
+ * revele aucun montant — seulement un sens, au meme titre qu'un pourcentage.
+ *
+ * @param {number[]} valeurs  serie chronologique, au moins deux points
+ * @param {object}   opts     couleur CSS, inversion du sens « bon/mauvais »
+ */
+export function sparkline(valeurs, { couleur = 'var(--primary)', hauteur = 26 } = {}) {
+  const pts = (valeurs || []).filter(v => typeof v === 'number' && isFinite(v));
+  if (pts.length < 2) return '';            // un point ne fait pas une tendance
+
+  const min = Math.min(...pts), max = Math.max(...pts);
+  const amp = max - min;
+  const L = 100, H = hauteur;
+  // Une serie plate se dessine au milieu plutot que sur un bord : une division
+  // par zero la collerait en haut et simulerait un sommet.
+  const y = v => amp === 0 ? H / 2 : H - 2 - ((v - min) / amp) * (H - 4);
+  const x = i => (i / (pts.length - 1)) * L;
+
+  const d = pts.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ');
+  const dernier = { x: x(pts.length - 1), y: y(pts[pts.length - 1]) };
+
+  return `<svg class="spark" viewBox="0 0 ${L} ${H}" preserveAspectRatio="none"
+               aria-hidden="true" focusable="false">
+    <path d="${d} L${L} ${H} L0 ${H} Z" fill="${couleur}" fill-opacity=".10"/>
+    <path d="${d}" fill="none" stroke="${couleur}" stroke-width="1.6"
+          stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+    <circle cx="${dernier.x.toFixed(1)}" cy="${dernier.y.toFixed(1)}" r="2.2"
+            fill="${couleur}" vector-effect="non-scaling-stroke"/>
+  </svg>`;
+}
+
 export const fmtDate = d => {
   if (!d) return '—';
   const [y, m, day] = d.split('-');

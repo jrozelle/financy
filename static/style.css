@@ -3453,3 +3453,14 @@ html.is-masked body::before {
   .todo-item { grid-template-columns: 3px 1fr; row-gap: .4rem; }
   .todo-action { grid-column: 2; justify-self: start; }
 }
+
+/* ── Sparkline des indicateurs ────────────────────────────────────────── */
+/* Sous le chiffre et sa variation : la tendance, sans axe ni graduation.
+   Non masquee en discretion — une forme ne revele aucun montant. */
+.kpi-value .spark, .kpi-card .spark {
+  display: block; width: 100%; height: 26px;
+  margin-top: .45rem; overflow: visible;
+}
+@media (max-width: 640px) {
+  .kpi-value .spark, .kpi-card .spark { height: 20px; }
+}

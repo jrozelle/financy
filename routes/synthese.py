@@ -336,11 +336,23 @@ def get_historique():
             if owner:
                 positions = [p for p in positions if p['owner'] == owner]
             snap_owners = sorted(set(p['owner'] for p in positions))
+            # Brut, dette et mobilisable sont deja calcules par compute_position :
+            # les sommer ici ne coute rien et evite un second parcours de
+            # l'historique cote client pour les sparklines des indicateurs.
             entry = {
-                'date':       date,
-                'family_net': sum(p['net_attributed'] for p in positions),
-                'by_owner':   {o: sum(p['net_attributed'] for p in positions if p['owner'] == o)
-                              for o in snap_owners},
+                'date':         date,
+                'family_net':   sum(p['net_attributed'] for p in positions),
+                'family_gross': sum(p['gross_attributed'] for p in positions),
+                'family_debt':  sum(p['debt_attributed'] for p in positions),
+                'family_mob':   sum(p['mobilizable_value'] for p in positions),
+                'by_owner':     {o: sum(p['net_attributed'] for p in positions if p['owner'] == o)
+                                for o in snap_owners},
+                'by_owner_detail': {o: {
+                    'net':   sum(p['net_attributed'] for p in positions if p['owner'] == o),
+                    'gross': sum(p['gross_attributed'] for p in positions if p['owner'] == o),
+                    'debt':  sum(p['debt_attributed'] for p in positions if p['owner'] == o),
+                    'mob':   sum(p['mobilizable_value'] for p in positions if p['owner'] == o),
+                } for o in snap_owners},
             }
             if group_by == 'envelope':
                 by_env = {}
