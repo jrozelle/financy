@@ -702,6 +702,35 @@ def todo():
     return jsonify({'date': date, **data})
 
 
+@synthese_bp.route('/api/impot-latent')
+@login_required
+def impot_latent_api():
+    """Impot qui resterait du si tout etait vendu a l'arrete demande.
+
+    Params : `date` (defaut : dernier arrete), `owner` (defaut : famille).
+    Lecture seule. Les enveloppes dont l'assiette n'est pas sure sont rendues
+    a part dans `non_calculees`, avec leur valeur et leur motif : elles pesent
+    dans le patrimoine sans peser dans l'estimation, et le dire est le seul
+    moyen de ne pas faire passer un plancher pour un total.
+    """
+    from services.fiscalite import impot_latent
+
+    owner = request.args.get('owner') or None
+    if owner in ('Famille', ''):
+        owner = None
+
+    with get_db() as conn:
+        date = request.args.get('date')
+        if not date:
+            row = conn.execute('SELECT MAX(date) d FROM positions').fetchone()
+            date = row['d'] if row else None
+        if not date:
+            return jsonify({'brut': 0, 'plus_value': 0, 'impot': 0,
+                            'net_apres_impot': 0, 'enveloppes': [],
+                            'non_calculees': [], 'valeur_ecartee': 0})
+        return jsonify(impot_latent(conn, date, owner))
+
+
 @synthese_bp.route('/api/contribution')
 @login_required
 def contribution():

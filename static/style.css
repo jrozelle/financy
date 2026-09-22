@@ -3688,6 +3688,78 @@ main > .tab-content > .page-header > h1 { display: none; }
    existaient separement et ne se lisaient jamais ensemble. */
 [data-carte="comptes"] { order: 9; grid-column: span 12; }
 [data-carte="entites"] { order: 10; }
+[data-carte="fiscalite"] { order: 11; grid-column: span 12; }
+
+/* ── Si vous vendiez tout : l'impot latent ────────────────────────────── */
+/* Trois chiffres, et la portee du calcul juste dessous. Celle-ci n'est pas
+   dans le panneau depliable a dessein : un montant d'impot presente seul,
+   alors qu'il ne couvre qu'une part du patrimoine, se lit comme un total. */
+.fisc-chiffres {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .75rem; margin: .25rem 0 .7rem;
+}
+.fisc-bloc { display: flex; flex-direction: column; gap: .2rem; }
+.fisc-label {
+  font-size: .62rem; font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.fisc-val { font-size: 1.05rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.fisc-bloc--impot .fisc-val { color: var(--danger); }
+.fisc-bloc--net   .fisc-val { color: var(--text); }
+
+.fisc-portee {
+  margin: 0 0 .7rem; font-size: .74rem; line-height: 1.5; color: var(--text-muted);
+  border-left: 2px solid var(--border); padding-left: .6rem;
+}
+.fisc-portee strong { color: var(--text); font-weight: 600; }
+
+.fisc-detail-btn {
+  background: none; border: 0; padding: 0; font: inherit; font-size: .76rem;
+  color: var(--text-muted); cursor: pointer;
+  border-bottom: 1px dotted var(--border);
+}
+.fisc-detail-btn:hover { color: var(--text); }
+.fisc-detail-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.fisc-detail-btn::before { content: "▸ "; }
+.fisc-detail-btn[aria-expanded="true"]::before { content: "▾ "; }
+.fisc-detail { margin-top: .8rem; }
+
+.fisc-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+.fisc-table th, .fisc-table td {
+  padding: calc(.45rem * var(--d)) .4rem; border-bottom: 1px solid var(--border);
+  text-align: right; font-variant-numeric: tabular-nums; vertical-align: top;
+}
+.fisc-table th {
+  font-size: .62rem; font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--text-muted); white-space: nowrap;
+}
+.fisc-table th:first-child, .fisc-table td:first-child,
+.fisc-table th:last-child,  .fisc-table td:last-child { text-align: left; }
+.fisc-regime { font-size: .7rem; color: var(--text-muted); line-height: 1.4; max-width: 22rem; }
+.fisc-reserve { display: block; color: var(--warning); margin-top: .15rem; }
+
+.fisc-h3 {
+  margin: 1.1rem 0 .4rem; font-size: .68rem; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted);
+}
+.fisc-ecartees { list-style: none; margin: 0; padding: 0; display: grid; gap: .4rem; }
+.fisc-ecartees li {
+  display: grid; grid-template-columns: minmax(0, 8rem) minmax(0, 7rem) 1fr;
+  gap: .5rem; align-items: baseline; font-size: .78rem;
+  padding-bottom: .4rem; border-bottom: 1px solid var(--border);
+}
+.fisc-ecartees li:last-child { border-bottom: 0; }
+.fisc-ec-val { text-align: right; font-variant-numeric: tabular-nums; }
+.fisc-ec-motif { font-size: .72rem; color: var(--text-muted); line-height: 1.4; }
+
+@media (max-width: 700px) {
+  .fisc-chiffres { grid-template-columns: 1fr 1fr; gap: .6rem .75rem; }
+  .fisc-bloc--net { grid-column: span 2; }
+  .fisc-ecartees li { grid-template-columns: 1fr auto; }
+  .fisc-ec-motif { grid-column: 1 / -1; }
+  .fisc-detail { overflow-x: auto; }
+  .fisc-table { min-width: 34rem; }
+}
 .comptes-wrap { overflow-x: auto; }
 .comptes { width: 100%; border-collapse: collapse; }
 .comptes th, .comptes td {

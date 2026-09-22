@@ -1,0 +1,7 @@
+# Outils de developpement. Pas dans requirements.txt : l'image Docker n'en a
+# pas besoin, et chaque paquet embarque y est une surface a maintenir.
+#   ./venv/bin/python -m pip install -r requirements-dev.txt
+#   ./venv/bin/python -m pytest -q
+-r requirements.txt
+pytest>=8.0
+fpdf2>=2.7,<3.0        # tests/test_pdf_parser.py fabrique ses PDF

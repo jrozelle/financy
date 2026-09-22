@@ -6,6 +6,7 @@ import { loadTodo } from '../todo.js';
 import { loadContribution } from './contribution.js';
 import { renderRepartition } from './repartition.js';
 import { loadComptes } from './comptes.js';
+import { loadFiscalite } from './fiscalite.js';
 import { drilldownPositions } from '../drilldown.js';
 import { loadUserAlerts } from '../alerts.js';
 import { renderAllocationTargets } from '../targets.js';
@@ -173,6 +174,7 @@ export function renderSynthese() {
   renderRepartition();
   loadContribution();
   loadComptes();
+  loadFiscalite();
   renderEntityWarnings(syn.entity_warnings || []);
   renderOwnersTable(totals_by_owner, family, Object.values(totals_by_owner).reduce((s,o)=>s+o.mobilizable,0));
   renderCatChart(catFiltered);
