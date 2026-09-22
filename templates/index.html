@@ -70,6 +70,16 @@
     </div>
     <div class="nav-date-filter">
       <select id="synthese-date-select" aria-label="Date du snapshot"></select>
+      <div class="menu-wrap" id="snapshot-menu">
+        <button class="nav-icon-btn" id="snapshot-toggle" type="button"
+                aria-haspopup="true" aria-expanded="false"
+                aria-label="Actions sur cet arrêté">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>
+          </svg>
+        </button>
+        <div class="menu-pop hidden" id="snapshot-dropdown" role="menu"></div>
+      </div>
     </div>
     <div class="global-search" id="global-search">
       <span class="global-search-icon" aria-hidden="true">&#128269;</span>

@@ -1281,9 +1281,13 @@ input[type="file"] {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-md);
-  min-width: 240px;
+  min-width: 250px;
   z-index: 150;
-  overflow: hidden;
+  /* `overflow: hidden` coupait le menu sans permettre de le faire defiler :
+     les dernieres entrees etaient inatteignables sur un ecran court. */
+  max-height: calc(100vh - 5rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .settings-item {
   display: block;
@@ -3706,8 +3710,11 @@ body { padding-left: var(--rail-w); }
 /* Titre de la page dans la barre du haut */
 /* Le titre reclame sa place : sans base explicite, la recherche prenait tout
    et « Synthèse du patrimoine » s'affichait tronque. */
-.fin-title { flex: 1 1 300px; min-width: 0; padding-right: 1rem; }
-.navbar .global-search { flex: 0 1 300px; }
+/* Le titre passe avant la recherche dans le partage de la largeur : il nomme
+   la page, elle n'est qu'un outil. Sans cette priorite, « Synthèse du
+   patrimoine » s'affichait tronque des 1500 px. */
+.fin-title { flex: 3 1 260px; min-width: 0; padding-right: 1rem; }
+.navbar .global-search { flex: 1 1 180px; min-width: 0; }
 .fin-title h1 {
   margin: 0; font-size: 1.05rem; font-weight: 600; letter-spacing: -.02em;
   color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -3717,3 +3724,27 @@ body { padding-left: var(--rail-w); }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 @media (max-width: 900px) { .fin-title { display: none; } }
+
+/* ── Menu d'actions sur l'arrêté ──────────────────────────────────────── */
+/* Même apparence que l'engrenage — ce sont deux menus de même nature pour
+   l'utilisateur, seul leur contenu diffère : régler d'un côté, agir de l'autre. */
+.menu-wrap { position: relative; display: inline-flex; }
+.menu-pop {
+  position: absolute; top: calc(100% + 6px); right: 0;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-md);
+  min-width: 230px; z-index: 150;
+  max-height: calc(100vh - 5rem); overflow-y: auto; overscroll-behavior: contain;
+}
+.nav-date-filter { display: inline-flex; align-items: center; gap: .25rem; }
+
+/* ── Densité ──────────────────────────────────────────────────────────── */
+/* Tout l'espacement dérive de --d : un seul réglage, et rien ne se désaligne. */
+:root { --d: 1; }
+.card        { padding: calc(1rem * var(--d)); }
+.kpi-card    { padding: calc(1rem * var(--d)); }
+.kpi-grid    { gap: calc(.75rem * var(--d)); }
+.settings-item { padding-block: calc(.625rem * var(--d)); }
+.todo-item   { padding-block: calc(.6rem * var(--d)); }
+.data-table td, .data-table th,
+.owners-table td, .owners-table th { padding-block: calc(.55rem * var(--d)); }

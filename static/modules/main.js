@@ -199,37 +199,49 @@ function _normalizeLegacyLayout() {
     };
 
     const logout = menu.querySelector('a[href="/logout"]') || document.querySelector('a.logout-link[href="/logout"]');
-    const items = [
-      section('Synthèse'),
-      ensureMenuButton('btn-add-snapshot-note', '&#128221; Note du snapshot'),
-      ensureMenuButton('btn-open-wealth-target', '&#127919; Objectif patrimoine'),
-      ensureMenuButton('btn-print', '&#128424; Imprimer', { title: 'Imprimer la synthèse' }),
-      section('Positions'),
-      ensureMenuButton('btn-duplicate', 'Dupliquer snapshot'),
-      ensureMenuButton('btn-rename-snapshot', 'Modifier la date du snapshot'),
-      ensureMenuButton('btn-delete-snapshot', 'Supprimer ce snapshot'),
-      ensureMenuButton('positions-col-picker', 'Colonnes positions'),
-      section('Actifs'),
-      ensureMenuButton('actifs-refresh-prices', 'Rafraîchir cours'),
-      ensureMenuButton('actifs-col-picker', 'Colonnes actifs'),
+
+    // Deux menus, deux natures. L'engrenage ne contient QUE ce qui se regle et
+    // reste vrai d'un ecran a l'autre. Ce qui AGIT — dupliquer un arrete, le
+    // supprimer, rafraichir des cours — part dans un menu d'actions accole au
+    // selecteur de date, puisque ces operations portent sur l'arrete qu'il
+    // designe. Melanger les deux obligeait a relire tout le menu pour trouver
+    // un reglage, et faisait cotoyer « Thème » et « Supprimer ce snapshot ».
+    const reglages = [
       section('Affichage'),
       ensureMenuButton('theme-toggle', 'Thème'),
+      ensureMenuButton('density-toggle', 'Densité : confortable',
+                       { 'data-density-toggle': '1' }),
       ensureMenuButton('mask-toggle', 'Masquer les montants',
                        { 'data-mask-toggle': '1', 'aria-pressed': String(isMasked()) }),
-      ensureMenuButton('btn-keyboard-help', '? Raccourcis clavier'),
-      section('Administration'),
-      ensureMenuButton('btn-open-settings', '&#128273; Clés API'),
-      // Referentiel, Outils et Import sont desormais dans la navigation, sous
-      // « Réglages » : un menu de reglages ne contient que ce qui se regle.
+      section('Colonnes'),
+      ensureMenuButton('positions-col-picker', 'Colonnes des positions'),
+      ensureMenuButton('actifs-col-picker', 'Colonnes des actifs'),
+      section('Application'),
+      ensureMenuButton('btn-open-settings', 'Clés API'),
+      ensureMenuButton('btn-keyboard-help', 'Raccourcis clavier'),
     ];
-
     if (logout) {
       logout.className = 'settings-item settings-item-danger';
       logout.textContent = 'Déconnexion';
-      items.push(section('Compte'), logout);
+      reglages.push(section('Compte'), logout);
     }
+    menu.replaceChildren(...reglages);
 
-    menu.replaceChildren(...items);
+    const actions = document.getElementById('snapshot-dropdown');
+    if (actions) {
+      actions.replaceChildren(
+        section('Cet arrêté'),
+        ensureMenuButton('btn-add-snapshot-note', 'Note de l\u2019arrêté'),
+        ensureMenuButton('btn-duplicate', 'Dupliquer'),
+        ensureMenuButton('btn-rename-snapshot', 'Modifier la date'),
+        ensureMenuButton('btn-delete-snapshot', 'Supprimer', { 'data-danger': '1' }),
+        section('Données'),
+        ensureMenuButton('actifs-refresh-prices', 'Rafraîchir les cours'),
+        ensureMenuButton('btn-open-wealth-target', 'Objectif de patrimoine'),
+        ensureMenuButton('btn-print', 'Imprimer la synthèse'),
+      );
+      actions.querySelector('[data-danger]')?.classList.add('settings-item-danger');
+    }
   }
 
   const positionsDate = document.getElementById('positions-date-select');
@@ -692,6 +704,55 @@ function wireEvents() {
       }
     });
   }
+
+  // Menu d'actions sur l'arrete courant. Meme mecanique que l'engrenage, mais
+  // les deux ne peuvent pas rester ouverts ensemble : ouvrir l'un ferme l'autre.
+  const snapToggle = document.getElementById('snapshot-toggle');
+  const snapDropdown = document.getElementById('snapshot-dropdown');
+  if (snapToggle && snapDropdown) {
+    snapToggle.addEventListener('click', e => {
+      e.stopPropagation();
+      settingsDropdown?.classList.add('hidden');
+      const ouvert = snapDropdown.classList.toggle('hidden');
+      snapToggle.setAttribute('aria-expanded', String(!ouvert));
+    });
+    snapDropdown.addEventListener('click', e => {
+      if (!e.target.closest('.settings-item')) return;
+      snapDropdown.classList.add('hidden');
+      snapToggle.setAttribute('aria-expanded', 'false');
+    });
+    document.addEventListener('click', e => {
+      if (!e.target.closest('#snapshot-menu')) {
+        snapDropdown.classList.add('hidden');
+        snapToggle.setAttribute('aria-expanded', 'false');
+      }
+    });
+    settingsToggle?.addEventListener('click', () => {
+      snapDropdown.classList.add('hidden');
+      snapToggle.setAttribute('aria-expanded', 'false');
+    });
+  }
+
+  // Densite d'affichage. Tout l'espacement derive d'une variable unique, donc
+  // rien ne se desaligne : c'est un reglage, pas une seconde feuille de style.
+  const DENSITES = [
+    { cle: 'confortable', valeur: '1',   libelle: 'Densité : confortable' },
+    { cle: 'compacte',    valeur: '.78', libelle: 'Densité : compacte' },
+  ];
+  const appliquerDensite = cle => {
+    const d = DENSITES.find(x => x.cle === cle) || DENSITES[0];
+    document.documentElement.style.setProperty('--d', d.valeur);
+    const btn = document.getElementById('density-toggle');
+    if (btn) btn.textContent = d.libelle;
+    try { localStorage.setItem('financy_density', d.cle); } catch { /* session privee */ }
+  };
+  let densite = 'confortable';
+  try { densite = localStorage.getItem('financy_density') || 'confortable'; } catch { /* idem */ }
+  appliquerDensite(densite);
+  document.getElementById('density-toggle')?.addEventListener('click', () => {
+    densite = densite === 'confortable' ? 'compacte' : 'confortable';
+    appliquerDensite(densite);
+  });
 
   // Synthèse — évolution groupée
   document.getElementById('synthese-history-group').addEventListener('change', renderSyntheseHistory);
