@@ -3007,6 +3007,9 @@ main > .tab-content > .page-header > h1 { display: none; }
 #tab-synthese > #snapshot-note-bar,
 #tab-synthese > #wealth-target-bar,
 #tab-synthese > .page-header { grid-column: 1 / -1; order: 0; margin-bottom: 0; }
+/* Une case vide de la grille ajoute quand meme un espacement : le bandeau
+   d'avertissements, vide la plupart du temps, doublait l'ecart sous les alertes. */
+#tab-synthese > #entity-warnings-bar:empty { display: none; }
 
 /* L'ordre suit les questions dans l'ordre où on se les pose : où j'en suis,
    d'où vient la hausse, comment ça évolue, comment c'est réparti, suis-je sur
