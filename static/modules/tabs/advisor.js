@@ -45,6 +45,13 @@ function _installSidebarScrollSpy() {
   });
 }
 
+// Les montants des constats et des propositions arrivent marques ⟦v⟧ :
+// formates ici, ils suivent le mode discretion comme tous les autres. Ecrits
+// en clair par le serveur, ils s'affichaient meme masques.
+const montants = t => esc(t).replace(/⟦(-?[\d.]+)⟧/g, (_, v) => fmt(Number(v)));
+
+const GENRES = { bucket: 'Poche', fiscal: 'Fiscalité', security: 'Ligne' };
+
 let _allocChart = null;
 let _currentOwner = null;
 
@@ -98,9 +105,6 @@ async function _loadConstats() {
     return;
   }
   const LIB = { alerte: 'À vérifier', action: 'À faire', info: 'À savoir' };
-  // Les montants arrivent marques ⟦v⟧ : formates ici, ils suivent le mode
-  // discretion comme tous les autres montants de l'application.
-  const montants = t => esc(t).replace(/⟦(-?[\d.]+)⟧/g, (_, v) => fmt(Number(v)));
   liste.innerHTML = d.constats.map(k => `
     <li class="constat constat--${k.niveau}">
       <span class="constat-niveau">${LIB[k.niveau] || k.niveau}</span>
@@ -152,6 +156,7 @@ function _fillProfileForm(p) {
   document.getElementById('adv-employment').value     = p.employment_type ?? '';
   document.getElementById('adv-pension-age').value    = p.pension_age ?? '';
   document.getElementById('adv-children').value       = p.children_count ?? 0;
+  document.getElementById('adv-reserve').value        = p.reserve_eur ?? '';
   document.getElementById('adv-main-residence').checked = !!p.main_residence_owned;
   document.getElementById('adv-lbo').checked          = !!p.has_lbo;
   document.getElementById('adv-notes').value          = p.notes ?? '';
@@ -166,6 +171,7 @@ async function saveProfile(e) {
     employment_type: document.getElementById('adv-employment').value || null,
     pension_age: _num('adv-pension-age'),
     children_count: _num('adv-children'),
+    reserve_eur: _num('adv-reserve'),
     main_residence_owned: document.getElementById('adv-main-residence').checked,
     has_lbo: document.getElementById('adv-lbo').checked,
     notes: document.getElementById('adv-notes').value.trim(),
@@ -450,14 +456,12 @@ function _renderProposals(list) {
   empty.style.display = 'none';
   wrap.innerHTML = list.map(p => {
     const cls = `proposal-item kind-${p.kind} status-${p.status}`;
-    const amount = p.amount != null ? `<strong>${fmt(p.amount)} €</strong>` : '';
     return `
       <div class="${cls}" data-pid="${p.id}">
         <div class="proposal-head">
           <div>
-            <span class="proposal-kind">${esc(p.kind)}</span>
-            <strong style="margin-left:.4rem">${esc(p.label)}</strong>
-            ${amount ? '· ' + amount : ''}
+            <span class="proposal-kind">${esc(GENRES[p.kind] || p.kind)}</span>
+            <strong style="margin-left:.4rem">${montants(p.label)}</strong>
           </div>
           <div class="proposal-actions">
             ${p.status === 'pending' ? `
@@ -468,7 +472,7 @@ function _renderProposals(list) {
             `}
           </div>
         </div>
-        ${p.rationale ? `<div class="proposal-rationale">${esc(p.rationale)}</div>` : ''}
+        ${p.rationale ? `<div class="proposal-rationale">${montants(p.rationale)}</div>` : ''}
       </div>`;
   }).join('');
 }

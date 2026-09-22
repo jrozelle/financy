@@ -17,6 +17,8 @@ import logging
 from datetime import datetime
 from typing import List, Dict, Optional
 
+from models import _holding_value_or_none
+
 logger = logging.getLogger('financy.advisor.rebalance')
 
 # Plafond PEA classique (hors PEA-PME)
@@ -49,11 +51,25 @@ NON_ARBITRABLE = {'Immobilier', 'Objets de valeur', 'Société', 'Parts sociales
 
 # ─── Bucket level ────────────────────────────────────────────────────────────
 
-def _bucket_proposals(gap, threshold_eur=2000):
+LIQUIDITES = 'Cash / Fond Euro'
+
+
+def _eur(v):
+    """Un montant marque ⟦v⟧, que le front formate — et masque en mode
+    discretion. Ecrit en toutes lettres, il s'affichait en clair. Meme
+    convention que les constats."""
+    return f'⟦{round(v, 2)}⟧'
+
+
+def _bucket_proposals(gap, threshold_eur=2000, total_eur=0.0, reserve=None):
     """A partir du gap (cf. allocation.compute_gap), genere des allegements
     par couple (categorie surponderee → categorie sous-ponderee).
 
     Exclut les categories non-arbitrables (immobilier, objets de valeur, etc.).
+
+    `reserve` : montant que le titulaire garde disponible (profil). Les
+    liquidites mobilisables sont `reel - max(cible, reserve)` : sans elle, le
+    conseiller proposait d'investir l'argent destine a nantir un credit.
     """
     arbitrable = [g for g in gap if g['category'] not in NON_ARBITRABLE]
 
@@ -61,10 +77,19 @@ def _bucket_proposals(gap, threshold_eur=2000):
     # (le fonds euro est du quasi-cash securise, meme profil de risque)
     merged = {}
     for g in arbitrable:
-        key = 'Cash / Fond Euro' if g['category'] in ('Cash & dépôts', 'Fond Euro', 'Monétaire') else g['category']
+        key = LIQUIDITES if g['category'] in ('Cash & dépôts', 'Fond Euro', 'Monétaire') else g['category']
         if key not in merged:
-            merged[key] = {'category': key, 'delta_eur': 0}
+            merged[key] = {'category': key, 'delta_eur': 0, 'actual_eur': 0, 'target_eur': 0}
         merged[key]['delta_eur'] += g['delta_eur']
+        merged[key]['actual_eur'] += (g.get('actual_pct') or 0) * total_eur
+        merged[key]['target_eur'] += (g.get('target_pct') or 0) * total_eur
+    liq = merged.get(LIQUIDITES)
+    note_reserve = ''
+    if liq and liq['delta_eur'] < 0:
+        garde = max(liq['target_eur'], reserve or 0)
+        liq['delta_eur'] = min(0, -(liq['actual_eur'] - garde))
+        note_reserve = (f' Réserve déclarée de {_eur(reserve)} préservée.' if reserve
+                        else ' Aucune réserve déclarée dans le profil : tout l’excédent sur la cible est proposé.')
     arbitrable = list(merged.values())
 
     over  = sorted([g for g in arbitrable if g['delta_eur'] < -threshold_eur],
@@ -82,9 +107,10 @@ def _bucket_proposals(gap, threshold_eur=2000):
         amt = min(src_amt, dst_amt)
         out.append(_proposal(
             kind='bucket',
-            label=f'Allegir {src_cat} de {round(amt):,.0f} € vers {dst_cat}'.replace(',', ' '),
+            label=f'Alléger {src_cat} de {_eur(amt)} vers {dst_cat}',
             from_ref=src_cat, to_ref=dst_cat, amount=amt,
-            rationale=f'Cible : {src_cat} surponderee de {round(src_amt):,.0f} €, {dst_cat} sous-ponderee de {round(dst_amt):,.0f} €.'.replace(',', ' '),
+            rationale=(f'{src_cat} au-dessus de la cible de {_eur(src_amt)}, {dst_cat} en dessous de {_eur(dst_amt)}.'
+                       + (note_reserve if src_cat == LIQUIDITES else '')),
         ))
         if amt >= src_amt:
             over_left.pop(0)
@@ -99,8 +125,14 @@ def _bucket_proposals(gap, threshold_eur=2000):
 
 # ─── Fiscal level ────────────────────────────────────────────────────────────
 
-def _fiscal_proposals(profile, positions):
-    """Detecte des opportunites fiscales standard."""
+def _fiscal_proposals(profile, positions, versements_pea=None):
+    """Detecte des opportunites fiscales standard.
+
+    `versements_pea` : somme des versements enregistres sur le PEA. Le plafond
+    de 150 000 € porte sur les VERSEMENTS, pas sur la valeur : un PEA qui a
+    double laisse la meme marge qu'avant. Faute de versements enregistres, la
+    valeur sert d'estimation, et la proposition le dit.
+    """
     out = []
 
     # Calculs preparatoires par enveloppe
@@ -112,13 +144,16 @@ def _fiscal_proposals(profile, positions):
         by_env.setdefault(env, []).append(p)
 
     pea_value = sum(p.get('value') or 0 for p in by_env.get('PEA', []))
-    if pea_value > 0 and pea_value < PEA_PLAFOND:
-        room = PEA_PLAFOND - pea_value
+    base, source = ((versements_pea, 'versements enregistrés') if versements_pea
+                    else (pea_value, 'valeur actuelle, faute de versements enregistrés — estimation'))
+    if pea_value > 0 and base < PEA_PLAFOND:
+        room = PEA_PLAFOND - base
         out.append(_proposal(
             kind='fiscal',
-            label=f'Renforcer le PEA : marge restante {round(room):,.0f} € avant le plafond'.replace(',', ' '),
+            label=f'Renforcer le PEA : {_eur(room)} de versements possibles avant le plafond',
             from_ref='CTO', to_ref='PEA', amount=room,
-            rationale=f'Le PEA actuel est a {round(pea_value):,.0f} € sur {PEA_PLAFOND:,.0f} € autorises. Tout achat d\'eligibles supplementaires beneficie de l\'exo apres 5 ans.'.replace(',', ' '),
+            rationale=(f'Plafond de {_eur(PEA_PLAFOND)} sur les versements ; {_eur(base)} versés ({source}). '
+                       'Les gains réalisés dans le PEA sont exonérés d’impôt sur le revenu après cinq ans.'),
         ))
 
     cto_value = sum(p.get('value') or 0 for p in by_env.get('CTO', []))
@@ -126,26 +161,26 @@ def _fiscal_proposals(profile, positions):
         # Suggestion generique : verifier MV purgeables
         out.append(_proposal(
             kind='fiscal',
-            label='Verifier les moins-values latentes du CTO (purge eventuelle)',
+            label='Vérifier les moins-values latentes du CTO',
             from_ref='CTO',
-            rationale='Une moins-value realisee sur CTO est imputable sur les plus-values des 10 prochaines annees. A faire en fin d\'annee si pertinent.',
+            rationale='Une moins-value réalisée sur un CTO s’impute sur les plus-values des dix années suivantes. À examiner en fin d’année.',
         ))
 
     av_positions = by_env.get('Assurance-vie', [])
     if av_positions:
         out.append(_proposal(
             kind='fiscal',
-            label='Verifier l\'anciennete des contrats AV (>8 ans = abattement annuel 4 600 € / 9 200 €)',
+            label='Vérifier l’ancienneté des assurances-vie (abattement après 8 ans)',
             from_ref='Assurance-vie',
-            rationale='Apres 8 ans, les rachats sont exoneres dans la limite de 4 600 € (celibataire) ou 9 200 € (couple) de gains par an. Source de tresorerie defiscalisee.',
+            rationale='Après huit ans, les gains retirés sont exonérés d’impôt sur le revenu jusqu’à 4 600 € par an (9 200 € pour un couple), hors prélèvements sociaux.',
         ))
 
     if profile.get('employment_type') == 'TNS':
         out.append(_proposal(
             kind='fiscal',
-            label='Optimiser l\'arbitrage remuneration / dividendes / PER',
+            label='Arbitrer rémunération, dividendes et versements PER',
             from_ref='Remuneration',
-            rationale='En tant que TNS, les versements PER sont deductibles du revenu pro dans la limite des plafonds. A rapprocher du calcul dividendes vs salaire selon la TMI marginale.',
+            rationale='Travailleur non salarié : les versements sur un PER se déduisent du revenu professionnel dans la limite du plafond. À rapprocher de l’arbitrage dividendes / rémunération selon la tranche marginale.',
         ))
 
     pension_age = profile.get('pension_age')
@@ -153,9 +188,9 @@ def _fiscal_proposals(profile, positions):
     if pension_age and horizon and horizon <= 10:
         out.append(_proposal(
             kind='fiscal',
-            label='Anticiper la sortie en capital ou rente du PER',
+            label='Anticiper la sortie du PER, en capital ou en rente',
             from_ref='PER',
-            rationale=f'Approche de la retraite ({horizon} ans). Le PER permet une sortie en capital (TMI), en rente (annuite viagere imposee), ou un mix. Choix structurant a calibrer.',
+            rationale=f'Retraite dans {horizon} ans. Le PER se dénoue en capital (imposé au barème), en rente viagère, ou un mélange des deux : un choix à préparer.',
         ))
 
     return out
@@ -166,7 +201,11 @@ def _fiscal_proposals(profile, positions):
 def _security_proposals(positions, gap, threshold_eur=2000):
     """Pour chaque categorie surponderee (delta_eur fortement negatif), liste
     les holdings reelles a alleger. On suggere par ordre de poids decroissant."""
-    over_categories = {g['category'] for g in gap if g['delta_eur'] < -threshold_eur}
+    # Les liquidites se traitent en poche (_bucket_proposals), reserve deduite :
+    # proposer ici d'alleger un fonds euros ignorait la reserve, et sa
+    # « plus-value +0 € » ne mesurait rien.
+    over_categories = {g['category'] for g in gap if g['delta_eur'] < -threshold_eur
+                       and g['category'] not in ('Cash & dépôts', 'Fond Euro', 'Monétaire')}
     if not over_categories:
         return []
 
@@ -181,9 +220,12 @@ def _security_proposals(positions, gap, threshold_eur=2000):
                 isin = h.get('isin')
                 if not isin:
                     continue
-                qty = h.get('quantity') or 0
-                price = h.get('last_price') or 0
-                mv = (qty * price) if price else (h.get('market_value') or 0)
+                # Meme valorisation que les positions : cours converti en
+                # euros, rien a defaut de taux. `quantite x cours` comptait en
+                # euros un cours en dollars.
+                mv = _holding_value_or_none(h)
+                if mv is None:
+                    continue
                 cost = h.get('cost_basis') or 0
                 rec = isin_totals.setdefault(isin, {'isin': isin, 'name': h.get('name'),
                                                     'mv': 0, 'cost': 0})
@@ -196,26 +238,27 @@ def _security_proposals(positions, gap, threshold_eur=2000):
             label_isin = r['name'] or r['isin']
             pnl = r['mv'] - r['cost'] if r['cost'] else None
             pnl_txt = ''
-            if pnl is not None:
-                pnl_txt = f' (P&L latent {round(pnl):+,.0f} €)'.replace(',', ' ')
+            if pnl is not None and abs(pnl) >= 1:
+                pnl_txt = f' (plus-value latente {"+" if pnl >= 0 else "−"}{_eur(abs(pnl))})'
             out.append(_proposal(
                 kind='security',
-                label=f'Alleger {label_isin} ({r["isin"]}) — exposition {round(r["mv"]):,.0f} €'.replace(',', ' '),
+                label=f'Alléger {label_isin} ({r["isin"]}) — {_eur(r["mv"])} détenus',
                 from_ref=r['isin'], to_ref=cat,
                 amount=r['mv'],
-                rationale=f'Categorie {cat} surponderee. {label_isin} est l\'une des plus grosses lignes ({round(r["mv"]):,.0f} €){pnl_txt}.'.replace(',', ' '),
+                rationale=f'{cat} au-dessus de la cible. {label_isin} est l’une des plus grosses lignes ({_eur(r["mv"])}){pnl_txt}.',
             ))
     return out
 
 
 # ─── Orchestration + persistence ─────────────────────────────────────────────
 
-def generate_proposals(profile, positions, allocation):
+def generate_proposals(profile, positions, allocation, versements_pea=None):
     """Renvoie une liste de propositions (sans les sauvegarder)."""
     gap = allocation.get('gap') or []
     return [
-        *_bucket_proposals(gap),
-        *_fiscal_proposals(profile, positions),
+        *_bucket_proposals(gap, total_eur=allocation.get('total_eur') or 0,
+                           reserve=(profile or {}).get('reserve_eur')),
+        *_fiscal_proposals(profile, positions, versements_pea),
         *_security_proposals(positions, gap),
     ]
 

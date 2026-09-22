@@ -107,6 +107,52 @@ class TestRebalanceEngine:
         assert any('Cash' in p['from_ref'] for p in bucket)
         assert any('Actions' in p['to_ref'] for p in bucket)
 
+    def _gap_liquidites(self):
+        # 40 000 € de liquidites pour une cible de 20 000 € : 20 000 d'excedent.
+        return {
+            'gap': [
+                {'category': 'Actions',       'delta_eur':  20000, 'target_pct': 0.7, 'actual_pct': 0.5},
+                {'category': 'Cash & dépôts', 'delta_eur': -20000, 'target_pct': 0.2, 'actual_pct': 0.4},
+            ],
+            'target': {}, 'actual': {}, 'total_eur': 100000,
+        }
+
+    def test_la_reserve_n_est_pas_proposee(self):
+        """Avec 35 000 € a garder disponibles, seuls 5 000 € sont mobilisables."""
+        from services.advisor.rebalance import generate_proposals
+        props = generate_proposals({'reserve_eur': 35000}, [], self._gap_liquidites())
+        bucket = [p for p in props if p['kind'] == 'bucket']
+        assert bucket and bucket[0]['amount'] == pytest.approx(5000)
+        assert 'Réserve déclarée' in bucket[0]['rationale']
+
+    def test_une_reserve_superieure_aux_liquidites_bloque_l_allegement(self):
+        from services.advisor.rebalance import generate_proposals
+        props = generate_proposals({'reserve_eur': 50000}, [], self._gap_liquidites())
+        assert not [p for p in props if p['kind'] == 'bucket']
+
+    def test_sans_reserve_la_proposition_le_dit(self):
+        from services.advisor.rebalance import generate_proposals
+        props = generate_proposals({}, [], self._gap_liquidites())
+        bucket = [p for p in props if p['kind'] == 'bucket']
+        assert bucket[0]['amount'] == pytest.approx(20000)
+        assert 'Aucune réserve' in bucket[0]['rationale']
+
+    def test_plafond_pea_sur_les_versements(self):
+        """80 000 € verses devenus 120 000 € : la marge est de 70 000, pas 30 000."""
+        from services.advisor.rebalance import generate_proposals
+        positions = [{'category': 'Actions', 'envelope': 'PEA', 'value': 120000, 'net_attributed': 120000}]
+        props = generate_proposals({}, positions, {'gap': [], 'total_eur': 120000}, versements_pea=80000)
+        pea = [p for p in props if p['to_ref'] == 'PEA']
+        assert pea[0]['amount'] == pytest.approx(70000)
+        assert 'versements enregistrés' in pea[0]['rationale']
+
+    def test_plafond_pea_estime_sur_la_valeur_le_dit(self):
+        from services.advisor.rebalance import generate_proposals
+        positions = [{'category': 'Actions', 'envelope': 'PEA', 'value': 120000, 'net_attributed': 120000}]
+        props = generate_proposals({}, positions, {'gap': [], 'total_eur': 120000})
+        pea = [p for p in props if p['to_ref'] == 'PEA']
+        assert 'estimation' in pea[0]['rationale']
+
     def test_non_arbitrable_excluded(self):
         """Immobilier, Objets de valeur, etc. ne genere pas de bucket proposals."""
         from services.advisor.rebalance import generate_proposals

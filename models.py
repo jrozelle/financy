@@ -656,6 +656,20 @@ def _migration_011(conn):
         pass
 
 
+def _migration_012(conn):
+    """Reserve a garder disponible, par titulaire.
+
+    Le conseiller proposait d'alleger « 130 000 € de liquidites » vers les
+    actions sans savoir que ces liquidites servaient a nantir un credit : il
+    n'avait aucun moyen de le savoir. Le montant se declare dans le profil, et
+    les propositions ne l'entament plus.
+    """
+    try:
+        conn.execute('ALTER TABLE owner_profiles ADD COLUMN reserve_eur REAL')
+    except Exception:
+        pass            # colonne deja presente
+
+
 MIGRATIONS = [
     (1, _migration_001),
     (2, _migration_002),
@@ -668,6 +682,7 @@ MIGRATIONS = [
     (9, _migration_009),
     (10, _migration_010),
     (11, _migration_011),
+    (12, _migration_012),
 ]
 
 

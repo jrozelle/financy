@@ -105,14 +105,21 @@ def upsert_profile(owner):
     notes = d.get('notes')
     if not validate_string(notes, 2000):
         return jsonify({'error': 'Notes trop longues'}), 400
+    reserve = d.get('reserve_eur')
+    if reserve in ('', None):
+        reserve = None
+    elif not validate_number(reserve) or parse_number(reserve) < 0:
+        return jsonify({'error': 'Réserve invalide (montant positif en euros)'}), 400
+    else:
+        reserve = parse_number(reserve)
 
     with get_db() as conn:
         conn.execute(
             '''INSERT INTO owner_profiles (
                  owner, horizon_years, risk_tolerance, employment_type,
                  has_lbo, children_count, main_residence_owned,
-                 pension_age, notes, updated_at
-               ) VALUES (?,?,?,?,?,?,?,?,?, CURRENT_TIMESTAMP)
+                 pension_age, notes, reserve_eur, updated_at
+               ) VALUES (?,?,?,?,?,?,?,?,?,?, CURRENT_TIMESTAMP)
                ON CONFLICT(owner) DO UPDATE SET
                  horizon_years=excluded.horizon_years,
                  risk_tolerance=excluded.risk_tolerance,
@@ -122,6 +129,7 @@ def upsert_profile(owner):
                  main_residence_owned=excluded.main_residence_owned,
                  pension_age=excluded.pension_age,
                  notes=excluded.notes,
+                 reserve_eur=excluded.reserve_eur,
                  updated_at=CURRENT_TIMESTAMP''',
             (owner,
              int(parse_number(horizon)) if horizon is not None else None,
@@ -130,7 +138,7 @@ def upsert_profile(owner):
              children if children is not None else 0,
              1 if d.get('main_residence_owned') else 0,
              int(parse_number(pension_age)) if pension_age is not None else None,
-             notes)
+             notes, reserve)
         )
         row = _get_profile_row(conn, owner)
     return jsonify(_normalize_profile_dict(row))
@@ -418,8 +426,13 @@ def refresh_proposals(owner):
         gap = compute_gap(target, actual, total)
         allocation = {'target': target, 'actual': actual, 'gap': gap, 'total_eur': total}
 
+        # Le plafond du PEA porte sur les versements : ceux du titulaire,
+        # tels que le journal des flux les connait (None s'il n'en a aucun).
+        versements_pea = conn.execute(
+            "SELECT SUM(ABS(amount)) FROM flux WHERE owner=? AND envelope='PEA' "
+            "AND type='Versement'", (owner,)).fetchone()[0]
         proposals = rebalance_svc.generate_proposals(
-            _normalize_profile_dict(profile), positions, allocation
+            _normalize_profile_dict(profile), positions, allocation, versements_pea
         )
         rebalance_svc.replace_proposals(conn, owner, date, proposals)
         listed = rebalance_svc.list_proposals(conn, owner)
