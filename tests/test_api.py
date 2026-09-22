@@ -389,6 +389,25 @@ class TestFlux:
         resp = _make_flux(client, notes='x' * 2001)
         assert resp.status_code == 400
 
+    def test_update_flux_sans_montant_ni_titulaire(self, client):
+        """Le PUT validait moins que le POST : montant vide ou titulaire
+        absent finissaient en erreur 500 (contrainte NOT NULL, KeyError)."""
+        fid = _make_flux(client).get_json()['id']
+        for corps in ({'date': '2024-06-01', 'owner': 'Alice', 'amount': None},
+                      {'date': '2024-06-01', 'amount': 100}):
+            assert client.put(f'/api/flux/{fid}', json=corps, headers=CSRF_HEADERS).status_code == 400
+
+    def test_update_flux_inexistant(self, client):
+        resp = client.put('/api/flux/9999', json={'date': '2024-06-01', 'owner': 'Alice', 'amount': 1},
+                          headers=CSRF_HEADERS)
+        assert resp.status_code == 404
+
+    def test_update_flux_etablissement_trop_long(self, client):
+        fid = _make_flux(client).get_json()['id']
+        resp = client.put(f'/api/flux/{fid}', json={'date': '2024-06-01', 'owner': 'Alice', 'amount': 1,
+                                                    'establishment': 'x' * 121}, headers=CSRF_HEADERS)
+        assert resp.status_code == 400
+
     def test_create_flux_negative_amount(self, client):
         resp = _make_flux(client, amount=-500)
         assert resp.status_code == 201  # negative amounts are allowed

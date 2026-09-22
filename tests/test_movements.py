@@ -692,3 +692,30 @@ class TestFluxProvisoires:
         with get_db() as conn:
             assert conn.execute("SELECT date FROM flux WHERE amount=75.0"
                                 ).fetchone()[0] == '2025-06-10', 'apercu n ecrit rien'
+
+
+class TestUploadReleves:
+    """Le filtre « .pdf » n'existe que dans le navigateur : le serveur verifie."""
+    H = {'X-CSRF-Token': 'test'}
+
+    def test_un_faux_pdf_est_rejete(self, client):
+        r = client.post('/api/import/movements?step=preview',
+                        data={'owner': 'Alice', 'files': [(io.BytesIO(b'<html>pas un pdf</html>'), 'x.pdf')]},
+                        headers=self.H, content_type='multipart/form-data')
+        rej = r.get_json()['summary']['rejected']
+        assert rej and "pas un PDF" in rej[0]['reason']
+
+    def test_un_envoi_trop_gros_repond_en_json(self, client):
+        gros = io.BytesIO(b'%PDF-' + b'0' * (11 * 1024 * 1024))
+        r = client.post('/api/import/movements?step=preview',
+                        data={'owner': 'Alice', 'files': [(gros, 'gros.pdf')]},
+                        headers=self.H, content_type='multipart/form-data')
+        assert r.status_code == 413
+        assert 'plusieurs fois' in r.get_json()['error']
+
+    def test_etablissement_trop_long(self, client):
+        r = client.post('/api/import/movements?step=preview',
+                        data={'owner': 'Alice', 'establishment': 'x' * 121,
+                              'files': [(_pdf(RELEVE), 'r.pdf')]},
+                        headers=self.H, content_type='multipart/form-data')
+        assert r.status_code == 400

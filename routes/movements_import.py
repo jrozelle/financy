@@ -10,7 +10,7 @@ from datetime import date as _date
 
 from flask import Blueprint, jsonify, request
 
-from models import get_db, validate_date
+from models import get_db, validate_date, validate_string
 from auth import login_required, csrf_protect
 from services.parsers.movements import parse_movements
 
@@ -159,9 +159,16 @@ def _read(files, owner, establishment=None, owners=None):
     """
     items, rejets = [], []
     for f in files:
-        raw = f.read()
+        # Lire au plus la limite + 1 octet : un fichier enorme ne se charge pas
+        # en memoire pour etre refuse ensuite.
+        raw = f.read(MAX_BYTES + 1)
         if len(raw) > MAX_BYTES:
             rejets.append({'file': f.filename, 'reason': 'fichier trop volumineux (5 Mo max)'})
+            continue
+        # Le filtre « .pdf » n'existe que dans le navigateur : la signature
+        # tranche, pas l'extension ni le type annonce.
+        if not raw.startswith(b'%PDF-'):
+            rejets.append({'file': f.filename, 'reason': "ce n'est pas un PDF"})
             continue
         try:
             text, words = _text(raw)
@@ -208,8 +215,11 @@ def import_movements():
     """step=preview (defaut) : lit et rend. step=commit : ecrit."""
     step = request.args.get('step', 'preview')
     owner = request.form.get('owner') or request.args.get('owner')
-    if not owner:
+    if not owner or not validate_string(owner, 80):
         return jsonify({'error': 'Personne requise'}), 400
+    etab_force = request.form.get('establishment') or request.args.get('establishment')
+    if not validate_string(etab_force, 120):
+        return jsonify({'error': 'Établissement trop long (120 car. max)'}), 400
     # Les etablissements deja employes dans les positions : les proposer evite
     # les variantes d'orthographe, qui creeraient des comptes fantomes.
     with get_db() as conn:
@@ -226,8 +236,7 @@ def import_movements():
     if len(files) > MAX_FILES:
         return jsonify({'error': f'{MAX_FILES} fichiers au maximum par lot'}), 400
 
-    items, rejets = _read(files, owner, request.form.get('establishment')
-                          or request.args.get('establishment'), known_owners)
+    items, rejets = _read(files, owner, etab_force, known_owners)
     unresolved_envs = _map_envelopes(items, known_envs)
     with get_db() as conn:
         known = _known_docs(conn)

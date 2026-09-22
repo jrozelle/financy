@@ -145,8 +145,10 @@ function rowHtml(r) {
   let confClass = '';
   let confBadge = '';
   if (r.confidence != null) {
-    if (r.confidence < 0.5)      { confClass = 'row-low-conf';  confBadge = `<span class="h-badge h-badge-expired" title="Confiance ${(r.confidence * 100).toFixed(0)} % — verifier les valeurs">à vérifier</span>`; }
-    else if (r.confidence < 0.8) { confClass = 'row-mid-conf';  confBadge = `<span class="h-badge h-badge-stale"   title="Confiance ${(r.confidence * 100).toFixed(0)} %">moyen</span>`; }
+    // La confiance s'affiche : elle ne vivait que dans l'infobulle.
+    const conf = `${(r.confidence * 100).toFixed(0)}\u202f%`;
+    if (r.confidence < 0.5)      { confClass = 'row-low-conf';  confBadge = `<span class="h-badge h-badge-expired">à vérifier · ${conf}</span>`; }
+    else if (r.confidence < 0.8) { confClass = 'row-mid-conf';  confBadge = `<span class="h-badge h-badge-stale">confiance ${conf}</span>`; }
     else                         { confClass = 'row-high-conf'; }
   }
   return `

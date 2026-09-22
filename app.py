@@ -48,6 +48,17 @@ app.secret_key = _secret
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10 MB
 
 
+@app.errorhandler(413)
+def _trop_volumineux(_e):
+    """Au-dela de la limite, Flask repondait une page HTML que le front
+    affichait « Import refuse (413) ». Une API repond en JSON, et dit quoi faire."""
+    limite = app.config['MAX_CONTENT_LENGTH'] // (1024 * 1024)
+    msg = f'Envoi trop volumineux ({limite} Mo au plus par envoi) : déposez les fichiers en plusieurs fois.'
+    if request.path.startswith('/api/'):
+        return jsonify({'error': msg}), 413
+    return msg, 413
+
+
 # ─── Session config ──────────────────────────────────────────────────────────
 
 def _env_int(key, default, min_val=1, max_val=None):

@@ -97,13 +97,22 @@ export function renderFlux() {
     if (tfoot) tfoot.innerHTML = '';
     return;
   }
+  // L'explication du badge « a preciser » vivait dans une infobulle, ligne a
+  // ligne. Elle se lit une fois, au-dessus du tableau, avec le decompte.
+  const note = document.getElementById('flux-note-etab');
+  const sansEtab = flux.filter(f => !f.establishment).length;
+  if (note) {
+    note.hidden = !sansEtab;
+    note.textContent = sansEtab
+      ? `${sansEtab} flux sans établissement (« à préciser ») : chacun est réparti au prorata entre les comptes de son enveloppe, ce qui fausse le rendement de chaque compte. Éditez-les pour indiquer l'établissement.`
+      : '';
+  }
   tbody.innerHTML = flux.map(f => `
     <tr>
       <td>${fmtDate(f.date)}</td>
       <td>${esc(f.owner)}</td>
       <td>${esc(f.envelope || '—')}</td>
-      <td>${f.establishment ? esc(f.establishment) : `<span class="badge badge-blk"
-        title="Sans établissement, ce flux est réparti au prorata entre les comptes de l'enveloppe : le rendement de chacun en est faussé">à préciser</span>`}</td>
+      <td>${f.establishment ? esc(f.establishment) : '<span class="badge badge-blk">à préciser</span>'}</td>
       <td>${esc(f.category || '—')}</td>
       <td>${esc(f.type || '—')}</td>
       <td class="num ${signed(f) >= 0 ? 'pos' : 'neg'}">${eurSigned(signed(f))}</td>
@@ -331,6 +340,14 @@ async function _send(files, step, owner = null, etab = null) {
 async function _preview(files, owner = _defaultOwner(), etab = '') {
   const pdfs = files.filter(f => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
   if (!pdfs.length) { toast('Déposez des fichiers PDF', 'error'); return; }
+  // Le serveur refuse un envoi de plus de 10 Mo : mieux vaut le dire avant
+  // d'envoyer, avec de quoi decouper le lot.
+  const LOT_MAX = 10 * 1024 * 1024;
+  const poids = pdfs.reduce((t, f) => t + f.size, 0);
+  if (poids > LOT_MAX) {
+    toast(`${pdfs.length} fichiers, ${(poids / 1048576).toFixed(1).replace('.', ',')} Mo : 10 Mo au plus par envoi. Déposez-les en plusieurs fois.`, 'error');
+    return;
+  }
   const zone = document.getElementById('flux-drop');
   zone.classList.add('is-busy');
   try {

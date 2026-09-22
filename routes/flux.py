@@ -26,28 +26,39 @@ def get_flux():
     return jsonify([dict(r) for r in rows])
 
 
+def _erreur(d):
+    """Message d'erreur d'un flux, ou None. Une seule validation pour la
+    creation et la modification : le PUT en omettait la moitie, et un montant
+    vide ou un titulaire absent y finissait en erreur 500."""
+    if not d or not validate_date(d.get('date')):
+        return 'Date invalide'
+    if not d.get('owner') or not validate_string(d.get('owner'), 80):
+        return 'Propriétaire requis'
+    if d.get('amount') is None or not validate_number(d.get('amount'), allow_negative=True):
+        return 'Montant invalide'
+    for champ, lib, n in (('notes', 'Notes', 2000), ('establishment', 'Établissement', 120),
+                          ('envelope', 'Enveloppe', 80), ('type', 'Type', 40), ('category', 'Catégorie', 80)):
+        if not validate_string(d.get(champ), n):
+            return f'{lib} trop long ({n} car. max)'
+    return None
+
+
+def _valeurs(d):
+    return (d['date'], d['owner'], d.get('envelope'), d.get('establishment') or None,
+            d.get('type'), parse_number(d['amount']), d.get('notes'), d.get('category'))
+
+
 @flux_bp.route('/api/flux', methods=['POST'])
 @login_required
 @csrf_protect
 def add_flux():
     d = request.json
-    if not d or not validate_date(d.get('date')):
-        return jsonify({'error': 'Date invalide'}), 400
-    if not d.get('owner'):
-        return jsonify({'error': 'Propriétaire requis'}), 400
-    if not validate_number(d.get('amount'), allow_negative=True) or d.get('amount') is None:
-        return jsonify({'error': 'Montant invalide'}), 400
-    if not validate_string(d.get('notes'), 2000):
-        return jsonify({'error': 'Notes trop longues (2000 car. max)'}), 400
-    if not validate_string(d.get('establishment'), 120):
-        return jsonify({'error': 'Établissement trop long (120 car. max)'}), 400
+    if (err := _erreur(d)):
+        return jsonify({'error': err}), 400
     with get_db() as conn:
         cur = conn.execute(
             'INSERT INTO flux (date, owner, envelope, establishment, type, amount, notes, category) '
-            'VALUES (?,?,?,?,?,?,?,?)',
-            (d['date'], d['owner'], d.get('envelope'), d.get('establishment') or None,
-             d.get('type'), parse_number(d['amount']), d.get('notes'), d.get('category'))
-        )
+            'VALUES (?,?,?,?,?,?,?,?)', _valeurs(d))
         row = conn.execute('SELECT * FROM flux WHERE id=?', (cur.lastrowid,)).fetchone()
     return jsonify(dict(row)), 201
 
@@ -57,19 +68,14 @@ def add_flux():
 @csrf_protect
 def update_flux(fid):
     d = request.json
-    if not d or not validate_date(d.get('date')):
-        return jsonify({'error': 'Date invalide'}), 400
-    if not validate_number(d.get('amount'), allow_negative=True):
-        return jsonify({'error': 'Montant invalide'}), 400
-    if not validate_string(d.get('notes'), 2000):
-        return jsonify({'error': 'Notes trop longues (2000 car. max)'}), 400
+    if (err := _erreur(d)):
+        return jsonify({'error': err}), 400
     with get_db() as conn:
+        if not conn.execute('SELECT 1 FROM flux WHERE id=?', (fid,)).fetchone():
+            return jsonify({'error': 'Flux introuvable'}), 404
         conn.execute(
             'UPDATE flux SET date=?, owner=?, envelope=?, establishment=?, type=?, amount=?, '
-            'notes=?, category=? WHERE id=?',
-            (d['date'], d['owner'], d.get('envelope'), d.get('establishment') or None,
-             d.get('type'), parse_number(d['amount']), d.get('notes'), d.get('category'), fid)
-        )
+            'notes=?, category=? WHERE id=?', (*_valeurs(d), fid))
         row = conn.execute('SELECT * FROM flux WHERE id=?', (fid,)).fetchone()
     return jsonify(dict(row))
 
