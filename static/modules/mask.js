@@ -67,6 +67,15 @@ function _refleterDansLeDom() {
 
 /**
  * Masque un nombre deja formate en francais, en gardant ses decimales.
+ *
+ * INVARIANT : la valeur passee doit etre ecrite EN ENTIER, jamais abregee.
+ * Les trois chiffres laisses lisibles ne sont surs que si ce sont les unites,
+ * dizaines et centaines. Sur une valeur abregee ils changent de rang et
+ * trahissent tout : masquer "500 k€" rendrait "??? ??? 500 k€", soit
+ * 500 000 € annonces en clair. Abreger et masquer ne se composent pas.
+ * Pour un libelle abrege (axe de graphe), utiliser `maskAxis`, qui ne laisse
+ * aucun chiffre.
+ *
  * @param {string} texte  ex. "24 610,75"
  * @returns {string}      ex. "??? ??? 120,50"
  */
@@ -82,5 +91,11 @@ export function maskFormatted(texte) {
   return (neg ? '−' : '') + MASQUE + ' ' + queue + dec;
 }
 
-/** Masque une valeur d'axe : un tick n'a pas de chiffres utiles a montrer. */
+/** Masque une valeur d'axe.
+ *
+ * Ne renvoie AUCUN chiffre, et c'est delibere : les libelles d'axes sont
+ * abreges ("500 k€"), donc tout chiffre conserve y designerait des milliers ou
+ * des millions. Un tick n'a de toute facon pas de chiffres utiles a montrer —
+ * l'echelle se lit sur la forme de la courbe, pas sur ses graduations.
+ */
 export const maskAxis = () => MASQUE;
