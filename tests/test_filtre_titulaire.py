@@ -148,3 +148,28 @@ class TestPerformanceFiltree:
         # +10 % pour Paul ; Claire a double, l'inclure le ferait deraper.
         assert r['global']['twr'] == pytest.approx(0.10, abs=1e-6)
         assert r['global']['value'] == 110000
+
+
+class TestCategoriesRenommees:
+    """« Société » a ete renommee « Parts sociales » dans le referentiel sans
+    que les jeux de categories du code suivent. Le classement en poche n'en
+    souffrait pas — la categorie inconnue tombe en « Patrimoine autre », ce qui
+    se trouvait etre juste —, mais le conseiller, lui, pouvait proposer
+    d'arbitrer des parts de holding comme un ETF."""
+
+    def test_les_parts_sociales_ne_s_arbitrent_pas(self):
+        from services.advisor.rebalance import NON_ARBITRABLE
+        assert 'Parts sociales' in NON_ARBITRABLE
+        assert 'Société' in NON_ARBITRABLE      # base non migree
+
+    def test_les_deux_noms_tombent_dans_la_meme_poche(self):
+        from routes.synthese import _macro_bucket
+        assert _macro_bucket('Parts sociales') == _macro_bucket('Société')
+
+    def test_le_classement_couvre_le_referentiel_par_defaut(self):
+        # Une categorie non listee tombe en « autre » : acceptable, mais elle
+        # doit y tomber par decision, pas par oubli.
+        from routes.synthese import MACRO_BUCKETS
+        from models import _CATEGORIES_FULL
+        classees = {c for cats in MACRO_BUCKETS.values() for c in cats}
+        assert not set(_CATEGORIES_FULL) - classees

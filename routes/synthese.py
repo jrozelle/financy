@@ -16,7 +16,9 @@ MACRO_BUCKETS = {
         'Fond Euro', 'Produits Structurés', 'Crypto',
     },
     'Patrimoine immobilier': {'Immobilier', 'SCPI'},
-    'Patrimoine autre': {'Objets de valeur', 'Société', 'Autre'},
+    # 'Société' est l'ancien nom de 'Parts sociales' : les deux sont listes,
+    # une base non migree restant classee comme avant.
+    'Patrimoine autre': {'Objets de valeur', 'Société', 'Parts sociales', 'Autre'},
 }
 
 

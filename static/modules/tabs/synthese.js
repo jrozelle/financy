@@ -717,7 +717,7 @@ function renderLiqBars(byLiq) {
 const MACRO_BUCKETS = {
   'Patrimoine financier':  ['Cash & dépôts', 'Monétaire', 'Obligations', 'Actions', 'Fond Euro', 'Produits Structurés', 'Crypto'],
   'Patrimoine immobilier': ['Immobilier', 'SCPI'],
-  'Patrimoine autre':      ['Objets de valeur', 'Société', 'Autre'],
+  'Patrimoine autre':      ['Objets de valeur', 'Société', 'Parts sociales', 'Autre'],
 };
 
 function _macroBucket(category) {

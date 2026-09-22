@@ -39,7 +39,12 @@ def _proposal(kind, label, from_ref=None, to_ref=None, amount=None, rationale=''
 
 # Categories non-arbitrables : on ne peut pas "vendre" de l'immobilier
 # ou des objets de valeur pour acheter des ETF.
-NON_ARBITRABLE = {'Immobilier', 'Objets de valeur', 'Société', 'SCPI'}
+#
+# 'Société' est l'ancien nom de 'Parts sociales' ; le referentiel a ete renomme
+# sans que ce jeu suive, si bien que le conseiller pouvait proposer d'arbitrer
+# des parts de sa propre holding. Les deux noms restent listes : une base qui
+# porte encore l'ancien continue d'etre protegee.
+NON_ARBITRABLE = {'Immobilier', 'Objets de valeur', 'Société', 'Parts sociales', 'SCPI'}
 
 
 # ─── Bucket level ────────────────────────────────────────────────────────────
