@@ -210,9 +210,13 @@
 
 /* ── Reset ─────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* `clip` et non `hidden` : `hidden` force `overflow-y: auto`, ce qui fait de
+   <body> un conteneur de defilement qui ne defile jamais — et la barre du haut,
+   en `position: sticky`, s'y accrochait au lieu de la fenetre : elle partait
+   avec la page. `clip` coupe le debordement horizontal sans cet effet. */
 html, body {
   max-width: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body {
@@ -3595,3 +3599,14 @@ th[data-sort]:focus-visible { outline: 2px solid var(--primary); outline-offset:
 
 .taux-duree { display: block; font-size: .68rem; color: var(--text-muted); }
 .taux-alerte { display: block; font-size: .68rem; color: var(--warning); }
+
+/* Une carte de la grille peut retrecir sous la largeur de son contenu : par
+   defaut un element de grille a `min-width: auto` et refuse, si bien que sur
+   telephone la carte Repartition debordait de l'ecran, tiree par son selecteur
+   a quatre boutons. Ce qui est large defile alors dans son propre conteneur. */
+#tab-synthese > [data-carte],
+#tab-synthese > .kpi-grid > *,
+#tab-synthese > .charts-row > * { min-width: 0; }
+.card-head { flex-wrap: wrap; row-gap: .5rem; }
+.card-head .seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.card-head .seg::-webkit-scrollbar { display: none; }
