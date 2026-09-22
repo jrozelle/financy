@@ -100,12 +100,14 @@ export function renderSynthese() {
   // Variation vs precedent + YoY (par owner si pas famille)
   const variation = isFamily ? syn.variation : syn.variation?.by_owner?.[owner];
   const yoyVariation = isFamily ? syn.yoy_variation : syn.yoy_variation?.by_owner?.[owner];
+  // Un seul jeu de deltas, celui de la periode choisie dans l'en-tete. Afficher
+  // variation ET variation annuelle cote a cote doublait la charge de lecture
+  // sur chaque indicateur, pour une comparaison qu'on ne fait pas a chaque fois.
   const varHtml = (field, pctField, opts) => {
-    let html = kpiDelta(variation, field, pctField, opts);
-    if (yoyVariation) {
-      html += kpiDelta(yoyVariation, field, pctField, { ...opts, label: 'N-1' });
-    }
-    return html;
+    const surAn = S.periodeComparaison === 'an';
+    const source = surAn ? yoyVariation : variation;
+    if (!source) return '';
+    return kpiDelta(source, field, pctField, { ...opts, label: surAn ? 'sur 1 an' : null });
   };
   // Sparklines : la tendance sous le chiffre. Series prises dans l'historique
   // deja charge, filtrees sur le titulaire courant comme le reste de la page.

@@ -3748,3 +3748,104 @@ body { padding-left: var(--rail-w); }
 .todo-item   { padding-block: calc(.6rem * var(--d)); }
 .data-table td, .data-table th,
 .owners-table td, .owners-table th { padding-block: calc(.55rem * var(--d)); }
+
+/* ── En-tête de page ──────────────────────────────────────────────────── */
+/* Les réglages utilisés à chaque visite sont posés à l'écran plutôt que rangés
+   dans un menu : un clic pour révéler ce qu'on change tout le temps est un clic
+   de trop. Les menus gardent ce qui se règle rarement. */
+.page-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 1rem; flex-wrap: wrap; margin-bottom: calc(1rem * var(--d));
+}
+.page-head-titre { min-width: 0; }
+.page-head-titre h1 {
+  margin: 0; font-size: 1.35rem; font-weight: 600; letter-spacing: -.02em;
+}
+.page-head-titre p { margin: .15rem 0 0; color: var(--text-muted); font-size: .8rem; }
+.page-head-tools { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
+
+/* Le titre global remplace ceux des onglets : deux titres pour une seule page
+   se contredisent quand l'un des deux est oublie. */
+main > .tab-content > .page-header > h1 { display: none; }
+
+.seg {
+  display: inline-flex; background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 2px; gap: 2px;
+}
+.seg-btn {
+  background: none; border: 0; border-radius: 6px; padding: .28rem .6rem;
+  font: inherit; font-size: .78rem; color: var(--text-muted); cursor: pointer;
+  white-space: nowrap;
+}
+.seg-btn:hover { color: var(--text); }
+.seg-btn[aria-pressed="true"] {
+  background: var(--card); color: var(--text); font-weight: 500;
+  box-shadow: 0 1px 2px rgba(16,20,30,.08);
+}
+.seg-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+
+.seg-solo {
+  display: inline-flex; align-items: center; gap: .35rem;
+  background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+  padding: .3rem .6rem; font: inherit; font-size: .78rem;
+  color: var(--text-muted); cursor: pointer; white-space: nowrap;
+}
+.seg-solo:hover { border-color: var(--text-muted); color: var(--text); }
+.seg-solo[aria-pressed="true"] {
+  background: var(--primary); border-color: var(--primary); color: #fff;
+}
+.seg-solo svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.7; }
+.seg-solo:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+@media (max-width: 640px) {
+  .page-head { gap: .6rem; }
+  .page-head-titre h1 { font-size: 1.15rem; }
+  .page-head-tools { width: 100%; }
+}
+
+/* ── Outils déplacés depuis l'ancienne barre du haut ──────────────────── */
+/* La barre disparait : ses outils rejoignent l'en-tete (ce qui qualifie les
+   donnees affichees) ou le rail (ce qui est global). */
+body { padding-top: 0 !important; }
+#head-filtres { display: inline-flex; gap: .4rem; align-items: center; }
+#head-filtres select {
+  border: 1px solid var(--border); border-radius: 8px; background: var(--card);
+  padding: .28rem .5rem; font-size: .78rem; color: var(--text);
+}
+#rail-recherche { padding: 0 .4rem .6rem; }
+#rail-recherche .global-search { width: 100%; }
+#rail-recherche .global-search-input {
+  width: 100%; background: var(--rail-hover); border-color: transparent;
+  color: #ced5e2; font-size: .78rem;
+}
+#rail-recherche .global-search-input::placeholder { color: #6f7891; }
+/* L'engrenage prend la forme d'une entree de rail et porte son libelle :
+   une icone muette a cote d'un groupe nomme « Réglages » entretenait la
+   confusion entre les preferences et les ecrans d'administration. */
+#rail-reglages { margin-top: .5rem; padding-top: .4rem;
+                 border-top: 1px solid rgba(255,255,255,.07); }
+#rail-reglages .settings-menu { display: block; }
+#rail-reglages .settings-toggle {
+  display: flex; align-items: center; gap: .55rem; width: 100%;
+  padding: .42rem .55rem; border-radius: 7px; border: 0; background: none;
+  color: var(--rail-ink); font: inherit; font-size: .84rem; cursor: pointer;
+}
+#rail-reglages .settings-toggle::after { content: 'Préférences'; }
+#rail-reglages .settings-toggle svg { width: 16px; height: 16px; flex: none; }
+#rail-reglages .settings-toggle:hover { background: var(--rail-hover); color: #fff; }
+#rail-reglages .settings-dropdown { right: auto; left: .3rem; bottom: calc(100% + 6px); top: auto; }
+@media (max-width: 900px) {
+  #rail-recherche { display: none; }   /* la recherche reprend sa place ailleurs sur mobile */
+}
+
+/* Icônes des destinations : elles ancrent le regard et distinguent une
+   navigation d'une simple liste de liens. Les sous-entrées n'en portent pas —
+   leur retrait suffit à marquer la subordination. */
+.fin-rail-item { display: flex !important; align-items: center; gap: .55rem; }
+.fin-rail-item svg {
+  width: 16px; height: 16px; flex: none;
+  stroke: currentColor; fill: none; stroke-width: 1.6;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+/* Le pied du rail se détache : les réglages ne sont pas une destination. */
+.fin-rail-foot { border-top: 1px solid rgba(255,255,255,.07); padding-top: .5rem; }

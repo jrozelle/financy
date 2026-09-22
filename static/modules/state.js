@@ -3,6 +3,8 @@ export const S = {
   dates:         [],
   syntheseDate:  null,
   positionsDate: null,
+  // Periode sur laquelle tous les deltas de la synthese sont calcules.
+  periodeComparaison: 'periode',
   synthese:      null,
   syntheseOwner: 'Famille',
   positions:     [],

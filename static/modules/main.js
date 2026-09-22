@@ -209,10 +209,6 @@ function _normalizeLegacyLayout() {
     const reglages = [
       section('Affichage'),
       ensureMenuButton('theme-toggle', 'Thème'),
-      ensureMenuButton('density-toggle', 'Densité : confortable',
-                       { 'data-density-toggle': '1' }),
-      ensureMenuButton('mask-toggle', 'Masquer les montants',
-                       { 'data-mask-toggle': '1', 'aria-pressed': String(isMasked()) }),
       section('Colonnes'),
       ensureMenuButton('positions-col-picker', 'Colonnes des positions'),
       ensureMenuButton('actifs-col-picker', 'Colonnes des actifs'),
@@ -441,7 +437,12 @@ function majTitrePage(tab) {
   if (!p) return;
   const d = S.syntheseDate || S.positionsDate || S.dates?.[0];
   const qui = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : 'Famille';
-  p.textContent = d ? `Arrêté du ${fmtDate(d)} · ${qui}` : '';
+  const nb = Object.keys(S.synthese?.totals_by_owner || {}).length;
+  const bouts = [];
+  if (d) bouts.push(`Arrêté du ${fmtDate(d)}`);
+  bouts.push(qui);
+  if (nb > 1) bouts.push(`${nb} titulaires`);
+  p.textContent = bouts.join(' · ');
 }
 
 export async function switchTab(tab, { pushHistory = true } = {}) {
@@ -733,8 +734,26 @@ function wireEvents() {
     });
   }
 
-  // Densite d'affichage. Tout l'espacement derive d'une variable unique, donc
-  // rien ne se desaligne : c'est un reglage, pas une seconde feuille de style.
+  // ── Répartition des outils ──────────────────────────────────────────
+  // Les noeuds sont DEPLACES, pas recrees : ils gardent leurs identifiants et
+  // leurs ecouteurs, donc tout le code qui les cible continue de fonctionner
+  // sans rien savoir de ce reamenagement. Fait en JS et non dans le gabarit
+  // parce que ces blocs contiennent des elements auto-fermants qu'un decoupage
+  // textuel du gabarit tronquait.
+  const deplacer = (quoi, ou) => {
+    const n = document.querySelector(quoi), h = document.getElementById(ou);
+    if (n && h) h.appendChild(n);
+  };
+  deplacer('.nav-owner-filter', 'head-filtres');   // titulaire + bouton ajouter
+  deplacer('.nav-date-filter', 'head-filtres');    // arrete + menu d'actions
+  deplacer('.global-search', 'rail-recherche');    // la recherche est globale
+  deplacer('#settings-menu', 'rail-reglages');     // les reglages aussi
+  // Videe de tout, la barre du haut n'a plus lieu d'etre.
+  document.querySelector('.navbar')?.classList.add('hidden');
+
+  // ── Contrôles de l'en-tête ──────────────────────────────────────────
+  // Densite : segment visible plutot qu'entree de menu. Tout l'espacement
+  // derive d'une variable unique, donc rien ne se desaligne.
   const DENSITES = [
     { cle: 'confortable', valeur: '1',   libelle: 'Densité : confortable' },
     { cle: 'compacte',    valeur: '.78', libelle: 'Densité : compacte' },
@@ -742,17 +761,54 @@ function wireEvents() {
   const appliquerDensite = cle => {
     const d = DENSITES.find(x => x.cle === cle) || DENSITES[0];
     document.documentElement.style.setProperty('--d', d.valeur);
-    const btn = document.getElementById('density-toggle');
-    if (btn) btn.textContent = d.libelle;
+    document.querySelectorAll('[data-den]').forEach(b => {
+      b.setAttribute('aria-pressed', String(b.dataset.den === d.cle));
+    });
     try { localStorage.setItem('financy_density', d.cle); } catch { /* session privee */ }
   };
   let densite = 'confortable';
   try { densite = localStorage.getItem('financy_density') || 'confortable'; } catch { /* idem */ }
   appliquerDensite(densite);
-  document.getElementById('density-toggle')?.addEventListener('click', () => {
-    densite = densite === 'confortable' ? 'compacte' : 'confortable';
-    appliquerDensite(densite);
+  document.querySelectorAll('[data-den]').forEach(b => {
+    b.addEventListener('click', () => appliquerDensite(b.dataset.den));
   });
+
+  // Masquage : bouton visible, l'oeil dit l'etat sans avoir a ouvrir un menu.
+  const majBoutonMasque = () => {
+    const b = document.getElementById('mask-btn');
+    const l = document.getElementById('mask-btn-label');
+    if (b) b.setAttribute('aria-pressed', String(isMasked()));
+    if (l) l.textContent = isMasked() ? 'Afficher' : 'Masquer';
+  };
+  document.getElementById('mask-btn')?.addEventListener('click', toggleMask);
+  onMaskChange(majBoutonMasque);
+  majBoutonMasque();
+
+  // Periode de comparaison : un seul jeu de deltas sur toute la page, plutot
+  // que variation et variation annuelle cote a cote sur chaque indicateur.
+  const PERIODES = [
+    { cle: 'periode', libelle: 'Période' },
+    { cle: 'an',      libelle: '1 an' },
+  ];
+  const segPeriode = document.getElementById('seg-periode');
+  if (segPeriode) {
+    segPeriode.replaceChildren(...PERIODES.map(p => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'seg-btn';
+      b.dataset.periode = p.cle;
+      b.textContent = p.libelle;
+      b.setAttribute('aria-pressed', String(p.cle === S.periodeComparaison));
+      b.addEventListener('click', () => {
+        S.periodeComparaison = p.cle;
+        segPeriode.querySelectorAll('[data-periode]').forEach(o => {
+          o.setAttribute('aria-pressed', String(o.dataset.periode === p.cle));
+        });
+        loadSynthese();
+      });
+      return b;
+    }));
+  }
 
   // Synthèse — évolution groupée
   document.getElementById('synthese-history-group').addEventListener('change', renderSyntheseHistory);
