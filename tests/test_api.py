@@ -660,25 +660,6 @@ class TestSynthese:
                         headers=CSRF_HEADERS)
         assert r.status_code == 409
 
-    def test_tri_insufficient_data(self, client):
-        _make_position(client, date='2024-06-01', owner='Alice', value=10000)
-        resp = client.get('/api/tri')
-        assert resp.status_code == 200
-        data = resp.get_json()
-        assert data == {}  # less than 2 dates
-
-    def test_tri_with_data(self, client):
-        _make_position(client, date='2024-01-01', owner='Alice', envelope='PEA', value=10000)
-        _make_position(client, date='2025-01-01', owner='Alice', envelope='PEA', value=11000)
-        _make_flux(client, date='2024-06-01', owner='Alice', amount=500,
-                   envelope='PEA', type='Versement')
-        resp = client.get('/api/tri')
-        assert resp.status_code == 200
-        data = resp.get_json()
-        assert 'tri' in data
-        assert 'first_date' in data
-        assert 'date' in data
-
     def test_snapshot_notes_get_empty(self, client):
         resp = client.get('/api/snapshot-notes?date=2024-06-01')
         assert resp.status_code == 200

@@ -7,8 +7,11 @@
  * assurance-vie a +3,1 % dont 612 EUR de frais n'est pas la meme affaire qu'une
  * assurance-vie a +3,1 % sans frais.
  *
- * La performance affichee est un RENDEMENT PONDERE PAR LE TEMPS, deja calcule
- * par /api/performance. On ne recalcule rien ici : on met en regard.
+ * Le rendement affiche est le TRI : ce que l'argent a rapporte par an, selon
+ * la date ou il a ete verse. C'est la question qu'on se pose devant ses
+ * comptes ; le TWR, qui juge le placement independamment des versements, reste
+ * dans l'onglet Performance. Les deux viennent de /api/performance, calcules
+ * sur les memes flux : on ne recalcule rien ici, on met en regard.
  */
 import { S } from '../state.js';
 import { api } from '../api.js';
@@ -51,7 +54,7 @@ function rendu(groupes, d, clotures = 0, hors = 0) {
     <div class="card-head">
       <div>
         <h2>Vos comptes</h2>
-        <p class="card-sub">Rendement pondéré par le temps, frais déduits${
+        <p class="card-sub">Ce que votre argent a rapporté, selon la date de vos versements · frais déduits${
           d.first_date ? ` · depuis le ${d.first_date.split('-').reverse().join('/')}` : ''}${
           clotures ? ` · ${clotures} compte${clotures > 1 ? 's' : ''} clôturé${
             clotures > 1 ? 's' : ''}, non listé${clotures > 1 ? 's' : ''}` : ''}${
@@ -80,18 +83,39 @@ function rendu(groupes, d, clotures = 0, hors = 0) {
             <td class="num">${fmt(total)}</td>
             <td class="num"></td>
             <td class="num">${frais ? fmt(frais) : '—'}</td>
-            <td></td>
+            <td>${piedRendement(d.global)}</td>
           </tr>
         </tfoot>
       </table>
     </div>`;
 }
 
+/** Le TRI annuel ; a defaut — moins de six mois de donnees — le rendement sur
+ *  la periode, avec sa duree. Annualiser deux mois fabriquerait un taux qu'on
+ *  ne verra jamais, et le presenter comme annuel serait mentir. */
+function rendement(g) {
+  if (g.tri != null) return { taux: g.tri * 100, suffixe: ' <span class="taux-duree">par an</span>' };
+  if (g.tri_periode != null) {
+    return { taux: g.tri_periode * 100, suffixe: ` <span class="taux-duree">sur ${g.tri_jours} j</span>` };
+  }
+  return null;
+}
+
+/** Le TRI de l'ensemble des comptes mesurables : un seul taux pour « ce que
+ *  mon epargne financiere m'a rapporte ». */
+function piedRendement(glob) {
+  const r = glob ? rendement(glob) : null;
+  if (!r) return '';
+  const c = r.taux >= 0 ? 'hausse' : 'baisse';
+  return `<span class="taux taux--${c}">${fmtPct(r.taux, 1, true)}</span>${r.suffixe}`;
+}
+
 function ligne(g) {
   // Un compte non mesurable garde sa ligne et sa valeur : l'ecarter du calcul
   // ne doit pas l'effacer du patrimoine. Sa raison est dite, pas devinee.
-  const mesurable = g.status === 'ok' && g.twr != null;
-  const taux = mesurable ? g.twr * 100 : null;
+  const r = g.status === 'ok' ? rendement(g) : null;
+  const mesurable = r != null;
+  const taux = mesurable ? r.taux : null;
   const classe = taux == null ? 'neutre' : taux >= 0 ? 'hausse' : 'baisse';
 
   return `
@@ -103,7 +127,10 @@ function ligne(g) {
       <td class="num">${g.flux_net ? fmt(g.flux_net) : '—'}</td>
       <td class="num">${g.fees ? fmt(g.fees) : '—'}</td>
       <td>${mesurable
-            ? `<span class="taux taux--${classe}">${fmtPct(taux, 1, true)}</span>`
-            : `<span class="taux taux--neutre" title="">${esc(g.reason || 'hors calcul')}</span>`}</td>
+            ? `<span class="taux taux--${classe}">${fmtPct(taux, 1, true)}</span>${r.suffixe}${
+                // Un taux calcule sur un journal incomplet est un taux faux : il
+                // doit le dire ici, pas seulement dans l'onglet Performance.
+                g.suspect_periods?.length ? ' <span class="taux-alerte">écart inexpliqué : un flux manque au journal ?</span>' : ''}`
+            : `<span class="taux taux--neutre">${esc(g.reason || 'hors calcul')}</span>`}</td>
     </tr>`;
 }

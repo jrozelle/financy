@@ -3168,10 +3168,10 @@ main > .tab-content > .page-header > h1 { display: none; }
    d'où vient la hausse, comment ça évolue, comment c'est réparti, suis-je sur
    ma cible, qu'est-ce qui a bougé, de quoi je dispose. */
 [data-carte="chiffres"]     { order: 1; }
-.kpi-hero                   { grid-column: span 5; order: 1; }
-.kpi-card.kpi-gross,
-.kpi-card.kpi-debt,
-.kpi-card.kpi-mobilizable   { grid-column: span 7; order: 1; }
+#tab-synthese .kpi-hero { grid-column: span 5; order: 1; }
+#tab-synthese .kpi-card.kpi-gross,
+#tab-synthese .kpi-card.kpi-debt,
+#tab-synthese .kpi-card.kpi-mobilizable { grid-column: span 7; order: 1; }
 [data-carte="contribution"] { order: 2; grid-column: span 5; }
 [data-carte="historique"]   { order: 3; grid-column: span 7; }
 [data-carte="evolution"]    { order: 4; grid-column: span 12; }
@@ -3181,10 +3181,9 @@ main > .tab-content > .page-header > h1 { display: none; }
 [data-carte="liquidite"]    { order: 8; grid-column: span 5; }
 [data-carte="entites"]      { order: 9; grid-column: span 12; }
 
-/* Les trois indicateurs secondaires partagent la colonne de droite du héros. */
-.kpi-grid > .kpi-card.kpi-gross      { grid-column: 6 / 9; }
-.kpi-grid > .kpi-card.kpi-debt       { grid-column: 9 / 11; }
-.kpi-grid > .kpi-card.kpi-mobilizable{ grid-column: 11 / 13; }
+#tab-synthese .kpi-grid > .kpi-card.kpi-gross { grid-column: 6 / 9; }
+#tab-synthese .kpi-grid > .kpi-card.kpi-debt { grid-column: 9 / 11; }
+#tab-synthese .kpi-grid > .kpi-card.kpi-mobilizable { grid-column: 11 / 13; }
 
 /* `align-items: start` (plus haut) evite qu'une carte courte ne s'etire a cote
    d'une longue — bon pour Repartition et Cible, faux pour une rangee
@@ -3227,19 +3226,19 @@ main > .tab-content > .page-header > h1 { display: none; }
 #tab-synthese .card > h2:not(:last-child):not(:has(+ .card-sub)) { margin-bottom: .8rem; }
 
 @media (max-width: 1200px) {
-  .kpi-hero { grid-column: span 12; }
-  .kpi-grid > .kpi-card.kpi-gross       { grid-column: span 4; }
-  .kpi-grid > .kpi-card.kpi-debt        { grid-column: span 4; }
-  .kpi-grid > .kpi-card.kpi-mobilizable { grid-column: span 4; }
+  #tab-synthese .kpi-hero { grid-column: span 12; }
+  #tab-synthese .kpi-grid > .kpi-card.kpi-gross { grid-column: span 4; }
+  #tab-synthese .kpi-grid > .kpi-card.kpi-debt { grid-column: span 4; }
+  #tab-synthese .kpi-grid > .kpi-card.kpi-mobilizable { grid-column: span 4; }
   [data-carte] { grid-column: span 12 !important; }
 }
 /* Telephone : empiler les quatre indicateurs pleine largeur demandait un
    ecran par chiffre. Deux par ligne pour les deux comparables — ce qu'on
    possede et ce qu'on doit —, le mobilisable en dessous, le net au-dessus. */
 @media (max-width: 700px) {
-  .kpi-grid > .kpi-card.kpi-gross       { grid-column: span 6; }
-  .kpi-grid > .kpi-card.kpi-debt        { grid-column: span 6; }
-  .kpi-grid > .kpi-card.kpi-mobilizable { grid-column: span 12; }
+  #tab-synthese .kpi-grid > .kpi-card.kpi-gross { grid-column: span 6; }
+  #tab-synthese .kpi-grid > .kpi-card.kpi-debt { grid-column: span 6; }
+  #tab-synthese .kpi-grid > .kpi-card.kpi-mobilizable { grid-column: span 12; }
   .kpi-hero .kpi-value { font-size: 1.75rem; }
   .kpi-hero .spark { height: 28px; }
   .kpi-card.kpi-gross .kpi-value,
@@ -3585,3 +3584,6 @@ a.settings-item { display: inline-flex; align-items: center; text-decoration: no
 /* Couverture partielle : dite sous le chiffre, pas dans une infobulle. */
 .pv-partiel { display: block; font-size: .68rem; color: var(--warning); }
 th[data-sort]:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+
+.taux-duree { display: block; font-size: .68rem; color: var(--text-muted); }
+.taux-alerte { display: block; font-size: .68rem; color: var(--warning); }

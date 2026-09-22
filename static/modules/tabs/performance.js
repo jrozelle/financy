@@ -14,12 +14,12 @@ const V = { data: null, focus: null, group: 'account',
 // l'ordre ou la ligne les affiche.
 const SORTS = {
   name: g => `${g.envelope || g.label || ''} ${g.account_label || ''}`.trim(),
-  twr: g => g.twr,
+  rend: g => rend(g)?.v,
   value: g => g.value,
 };
 // Sens du premier clic : decroissant sur un chiffre — on cherche le plus
 // grand —, croissant sur un texte.
-const SORT_DIR0 = { name: 'asc', twr: 'desc', value: 'desc' };
+const SORT_DIR0 = { name: 'asc', rend: 'desc', value: 'desc' };
 
 function sortRows(rows) {
   const { col, dir } = V.sort;
@@ -53,6 +53,16 @@ const pct = (v, dec = 2) => v == null ? '—'
   : `${v >= 0 ? '+' : '−'}${n(Math.abs(v) * 100, dec)} %`;
 
 const sign = v => v == null ? '' : (v >= 0 ? 'positive' : 'negative');
+
+/** Le rendement qu'on affiche en tete : le TRI, ce que l'argent a rapporte
+ *  selon quand il a ete verse. Annuel au-dela de six mois d'historique ; en
+ *  deca, le rendement de la periode, dit comme tel — annualiser deux mois
+ *  fabriquerait un taux qu'on ne verra jamais. */
+function rend(g) {
+  if (g?.tri != null) return { v: g.tri, sub: 'par an' };
+  if (g?.tri_periode != null) return { v: g.tri_periode, sub: `sur ${duree(g.tri_jours)}` };
+  return null;
+}
 
 function duree(days) {
   if (days == null) return '—';
@@ -152,12 +162,15 @@ function renderKpi(d) {
   const tiles = [
     ['', `Valeur au ${fmtDate(d.date)}`, fmt(g.value),
       V.focus ? esc(g.label) : `${comptes} compte${comptes > 1 ? 's' : ''} mesuré${comptes > 1 ? 's' : ''}`],
-    ['kpi-gross', 'TWR cumulée', pct(g.twr), `sur ${duree(g.days)}`, sign(g.twr)],
-    ['kpi-mobilizable', 'TWR annualisée',
-      g.annualisable ? pct(g.twr_annualise) : '—',
-      g.annualisable ? 'équivalent par an'
-        : `moins de ${d.min_days_annualise} j d'historique`,
-      g.annualisable ? sign(g.twr_annualise) : ''],
+    ['kpi-gross', 'Rendement de votre argent', rend(g) ? pct(rend(g).v) : '—',
+      rend(g) ? `${rend(g).sub} · selon la date de vos versements` : 'historique insuffisant',
+      sign(rend(g)?.v)],
+    // Le TWR ne juge que le placement, versements neutralises : c'est la
+    // mesure a comparer a un indice, ou d'un contrat a l'autre. Second plan.
+    ['kpi-mobilizable', 'Pour comparer à un indice',
+      g.annualisable ? pct(g.twr_annualise) : pct(g.twr),
+      g.annualisable ? 'TWR, par an' : `TWR, sur ${duree(g.days)}`,
+      sign(g.annualisable ? g.twr_annualise : g.twr)],
     // La periode est nommee sur la tuile elle-meme : "de la periode" sans dire
     // laquelle obligeait a aller la chercher a l'autre bout de l'ecran.
     ['kpi-debt', 'Apports nets', fmt(g.flux_net),
@@ -178,11 +191,12 @@ function renderList(d) {
   const host = document.getElementById('perf-list');
   if (!host) return;
   const rows = sortRows(visible());
-  const span = Math.max(0.02, ...rows.map(g => Math.abs(g.twr || 0)));
+  const span = Math.max(0.02, ...rows.map(g => Math.abs(rend(g)?.v || 0)));
   const total = rows.filter(g => g.status === 'ok').length;
   const line = g => {
-    const w = g.twr == null ? 0 : Math.abs(g.twr) / span * 50;
-    const neg = (g.twr || 0) < 0;
+    const r = rend(g);
+    const w = r == null ? 0 : Math.abs(r.v) / span * 50;
+    const neg = (r?.v || 0) < 0;
     const sub = [g.establishment, g.owner].filter(Boolean).join(' · ')
       || (g.categories || []).join(', ');
     // Un seul badge de statut par ligne : "valeur negative" et "non mesurable"
@@ -217,10 +231,9 @@ function renderList(d) {
           <span class="perf-bar-fill ${neg ? 'neg' : 'pos'}"
                 style="width:${w.toFixed(1)}%;${neg ? 'right' : 'left'}:50%"></span>
         </div>
-        <div class="perf-num ${sign(g.twr)}">${pct(g.twr)}
+        <div class="perf-num ${sign(r?.v)}">${r ? pct(r.v) : '—'}
           <span class="perf-num-sub">${
-            g.annualisable ? pct(g.twr_annualise) + ' /an'
-            : g.days != null ? `sur ${duree(g.days)}`
+            r ? `${r.sub}${g.twr != null ? ` · TWR ${pct(g.annualisable ? g.twr_annualise : g.twr)}` : ''}`
             : `${g.dates_count} arrêté${g.dates_count > 1 ? 's' : ''}`}</span>
         </div>
         <div class="perf-val">${fmt(g.value)}
@@ -230,7 +243,7 @@ function renderList(d) {
   };
   const g = d.global;
   // En-tetes triables. La colonne de barres n'en est pas une : elle donne a
-  // voir la TWR, que son propre en-tete trie deja.
+  // voir le rendement, que son propre en-tete trie deja.
   const th = (col, texte, cls = '') => {
     const actif = V.sort.col === col;
     const sens = actif ? V.sort.dir : null;
@@ -245,16 +258,16 @@ function renderList(d) {
     <div class="perf-head">
       ${th('name', V.group === 'account' ? 'Compte' : 'Enveloppe')}
       <span class="perf-axis"><i>−</i><i>0</i><i>+</i></span>
-      ${th('twr', 'TWR', 'ta-r')}${th('value', 'Valeur', 'ta-r')}
+      ${th('rend', 'Rendement', 'ta-r')}${th('value', 'Valeur', 'ta-r')}
     </div>
     ${rows.map(line).join('')}
     ${g && !V.focus && total > 1 ? `<div class="perf-item is-total">
       <div class="perf-name"><span class="perf-title">Ensemble mesurable</span>
         <span class="perf-sub">${(g.groups || []).length} ${V.group === 'account' ? 'compte' : 'enveloppe'}${(g.groups || []).length > 1 ? 's' : ''}</span></div>
       <div class="perf-bar"></div>
-      <div class="perf-num ${sign(g.twr)}">${pct(g.twr)}
-        <span class="perf-num-sub">${
-          g.annualisable ? pct(g.twr_annualise) + ' /an' : `sur ${duree(g.days)}`}</span></div>
+      <div class="perf-num ${sign(rend(g)?.v)}">${rend(g) ? pct(rend(g).v) : '—'}
+        <span class="perf-num-sub">${rend(g) ? rend(g).sub : ''}${g.twr != null
+          ? ` · TWR ${pct(g.annualisable ? g.twr_annualise : g.twr)}` : ''}</span></div>
       <div class="perf-val">${fmt(g.value)}</div>
     </div>` : ''}
     ${V.showExcluded && alertes(d).length ? `<div class="perf-excluded">

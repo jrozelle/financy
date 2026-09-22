@@ -1,9 +1,15 @@
-"""Performance : rentabilite ponderee par le temps (TWR).
+"""Performance : TRI et TWR, pour chaque compte.
 
-Le TWR neutralise les versements et retraits : il mesure le rendement des
-placements, pas l'effet du calendrier d'apport. C'est la seule mesure
-comparable a un indice, contrairement au TRI (`/api/tri`) qui pondere par les
-capitaux.
+Deux mesures, deux questions :
+
+- le TRI (pondere par l'argent) repond « combien mon argent m'a-t-il
+  rapporte, selon quand je l'ai verse ». C'est la mesure principale de
+  l'application : on pilote un patrimoine, on ne note pas un gerant ;
+- le TWR (pondere par le temps) neutralise le calendrier des versements.
+  C'est la seule mesure comparable a un indice, ou d'un contrat a l'autre.
+
+Les deux sont calcules sur les memes groupes, les memes valeurs et les memes
+flux : un compte ecarte de l'un l'est de l'autre, pour la meme raison.
 
 Methode — Dietz modifiee chainee :
   Les `positions` fournissent une valorisation a chaque date d'arrete. Entre
@@ -258,6 +264,43 @@ def _chain(dates, values, flux):
     return serie, idx / 100.0 - 1.0, days, gaps, suspects
 
 
+def _tri(dates, values, flux):
+    """TRI d'un groupe : ce que l'argent a rapporte, selon QUAND il a ete verse.
+
+    La mesure principale de l'application (choix du 22/09/2026). Le TWR, lui,
+    neutralise le calendrier des versements : il juge le placement, pas
+    l'epargnant. Verser 50 000 EUR juste avant une baisse abaisse le TRI, pas
+    le TWR.
+
+    Memes entrees que `_chain`, donc memes flux : ni les dividendes ni les
+    frais n'y figurent (`_flux_signed` les met a zero). Un dividende reste dans
+    l'actif qui l'a produit, il est deja dans la valeur finale ; l'ancien
+    `/api/tri` le comptait en plus comme un encaissement et gonflait le taux.
+
+    Returns (tri_annuel, rendement_periode, jours) :
+    - `tri_annuel` (fraction) si la periode depasse MIN_DAYS_ANNUALISE ;
+    - sinon `rendement_periode`, le rendement sur la periode, NON annualise :
+      annualiser deux mois de donnees fabrique un taux qu'on ne verra jamais.
+    """
+    from routes.synthese import _xirr, _period_return
+
+    vivantes = [d for d in dates if (values.get(d) or 0) > 0]
+    if len(vivantes) < 2:
+        return None, None, None
+    d0, d1 = vivantes[0], dates[-1]
+    # Cote investisseur : un versement est une sortie de sa poche.
+    cf = [(d0, -values[d0])]
+    cf += [(d, -a) for d, a in flux if d0 < d <= d1 and a]
+    cf.append((d1, values.get(d1) or 0))
+    cf.sort()
+    jours = (datetime.strptime(d1, '%Y-%m-%d') - datetime.strptime(d0, '%Y-%m-%d')).days
+    taux = _xirr(cf, min_days=MIN_DAYS_ANNUALISE)
+    if taux is not None:
+        return taux / 100.0, None, jours
+    p = _period_return(cf)
+    return None, (p['return'] if p else None), jours
+
+
 @performance_bp.route('/api/performance')
 @login_required
 def get_performance():
@@ -359,6 +402,7 @@ def get_performance():
 
         comp = _composition_flux(g_dates, mvals) if len(members) > 1 else []
         serie, cumul, days, gaps, suspects = _chain(g_dates, g_values, g_flux + comp)
+        tri, tri_periode, tri_jours = _tri(g_dates, g_values, g_flux + comp)
 
         g_cats = sorted({c for a in members for c in (cats.get(a) or set()) if c})
         # Un compte qui n'est plus valorise au dernier arrete n'est plus detenu.
@@ -395,6 +439,7 @@ def get_performance():
             'account_label': m.get('account_label') if len(gk) > 1 else None,
             'serie': serie, 'twr': cumul, 'days': days,
             'twr_annualise': annualise(cumul, days),
+            'tri': tri, 'tri_periode': tri_periode, 'tri_jours': tri_jours,
             'annualisable': bool(days) and days >= MIN_DAYS_ANNUALISE,
             'categories': g_cats, 'measurable': status == 'ok',
             'suspect_periods': suspects,
@@ -426,11 +471,13 @@ def get_performance():
                   and _flux_signed(f)]
         comp = _composition_flux(g_dates, mvals)
         serie, cumul, days, gaps, suspects = _chain(g_dates, g_values, g_flux + comp)
+        tri, tri_periode, tri_jours = _tri(g_dates, g_values, g_flux + comp)
         if cumul is not None:
             window = [(d, a) for d, a in g_flux
                       if serie[0]['date'] < d <= serie[-1]['date']]
             glob = {'label': 'Ensemble mesurable', 'serie': serie, 'twr': cumul,
                     'days': days, 'twr_annualise': annualise(cumul, days),
+                    'tri': tri, 'tri_periode': tri_periode, 'tri_jours': tri_jours,
                     'annualisable': days >= MIN_DAYS_ANNUALISE,
                     'value': g_values[g_dates[-1]], 'dates_count': len(g_dates),
                     'gaps': gaps, 'suspect_periods': suspects,
