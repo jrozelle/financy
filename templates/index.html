@@ -43,21 +43,11 @@
     </div>
   </nav>
 
-  <nav class="navbar">
-    <!-- Titre de la page courante : la barre du haut ne portait plus que des
-         outils depuis que les onglets ont rejoint le rail, et commencait par
-         un grand vide. -->
-    <button class="navbar-toggle" id="navbar-toggle" aria-label="Menu" aria-expanded="false" aria-controls="nav-tabs">&#9776;</button>
-    <div class="nav-brand">&#9670; Financy</div>
-    <!-- Quatre destinations par intention, plus les reglages. Les onglets d'un
-         groupe apparaissent dans la sous-barre #subnav. -->
-    <div class="nav-tabs" id="nav-tabs">
-      <button class="tab-btn active" data-tab="synthese">Synthèse</button>
-      <button class="tab-btn" data-group="patrimoine">Patrimoine</button>
-      <button class="tab-btn" data-group="suivi">Suivi</button>
-      <button class="tab-btn" data-tab="conseil">Conseil</button>
-      <button class="tab-btn" data-group="reglages">Réglages</button>
-    </div>
+  <!-- Reserve d'outils. Ces blocs sont deplaces au demarrage vers le rail
+       et l'en-tete de page (voir `deplacer()` dans main.js) : ils contiennent
+       des elements auto-fermants qu'un decoupage du gabarit tronquait. Le
+       conteneur reste invisible et ne sert qu'a les porter jusque-la. -->
+  <div id="reserve-outils" style="display:none">
     <div class="nav-owner-filter">
       <button class="nav-icon-btn hidden" id="nav-add-button" type="button" title="Ajouter" aria-label="Ajouter">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -119,9 +109,8 @@
           {% endif %}
         </div>
       </div>
-      <span id="demo-badge" class="demo-badge hidden" title="Mode demo / LLM mocke" aria-hidden="true"></span>
     </div>
-  </nav>
+  </div>
 
 
   {% if auth_warning %}
@@ -144,6 +133,7 @@
           <button type="button" class="seg-btn" data-den="confortable" aria-pressed="true">Confort</button>
           <button type="button" class="seg-btn" data-den="compacte" aria-pressed="false">Compact</button>
         </div>
+        <span id="demo-badge" class="demo-badge hidden" title="Mode demo / LLM mocke" aria-hidden="true"></span>
         <button type="button" class="seg-solo" id="mask-btn" aria-pressed="false">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>

@@ -290,39 +290,6 @@ function _normalizeLegacyLayout() {
   document.querySelector('#tab-actifs .page-filters')?.classList.add('hidden');
 }
 
-let _navbarOffsetInstalled = false;
-
-function _installNavbarOffsetSync() {
-  if (_navbarOffsetInstalled) return;
-  const navbar = document.querySelector('.navbar');
-  if (!navbar) return;
-  _navbarOffsetInstalled = true;
-
-  const apply = () => {
-    const height = Math.ceil(navbar.getBoundingClientRect().height || 0);
-    if (height > 0) {
-      document.documentElement.style.setProperty('--navbar-fixed-offset', `${height}px`);
-    }
-  };
-
-  apply();
-  requestAnimationFrame(apply);
-  window.addEventListener('resize', apply, { passive: true });
-  window.addEventListener('orientationchange', () => setTimeout(apply, 250), { passive: true });
-  if ('ResizeObserver' in window) {
-    new ResizeObserver(apply).observe(navbar);
-  }
-}
-
-function _closeNavDrawer() {
-  const navTabs = document.getElementById('nav-tabs');
-  const navToggle = document.getElementById('navbar-toggle');
-  if (navTabs?.classList.contains('is-open')) {
-    navTabs.classList.remove('is-open');
-    navToggle?.setAttribute('aria-expanded', 'false');
-  }
-}
-
 // Ajoute/retire .has-overflow sur les .card-table selon leur scroll horizontal.
 // Appele une fois au boot + a chaque resize + a chaque changement d'onglet.
 function _installTableOverflowHints() {
@@ -375,17 +342,6 @@ function _updateNavAddButton(tab) {
   btn.setAttribute('aria-label', btn.title);
 }
 
-
-// ─── Navigation par intention ─────────────────────────────────────────────
-// Dix onglets a plat ne disent pas ce qu'on vient faire, et le menu ⚙ servait
-// de rangement a trois d'entre eux — d'ou l'impression de fourre-tout. Les
-// onglets eux-memes ne changent pas : seul leur regroupement est nouveau.
-const GROUPES = [
-  { id: 'synthese',   label: 'Synthèse',   tabs: ['synthese'] },
-  { id: 'patrimoine', label: 'Patrimoine', tabs: ['positions', 'actifs', 'entites'] },
-  { id: 'suivi',      label: 'Suivi',      tabs: ['performance', 'flux'] },
-  { id: 'conseil',    label: 'Conseil',    tabs: ['conseil'] },
-];
 
 const LABELS_ONGLET = {
   synthese: 'Synthèse', positions: 'Positions', actifs: 'Actifs', entites: 'Entités',
@@ -485,18 +441,7 @@ export async function switchTab(tab, { pushHistory = true } = {}) {
 function wireEvents() {
   // Tabs (ferment aussi le drawer mobile s'il est ouvert)
   document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      _closeNavDrawer();
-      // Un bouton de groupe ouvre son premier onglet, sauf si l'onglet courant
-      // appartient deja au groupe : on ne ramene pas l'utilisateur en arriere.
-      if (btn.dataset.group) {
-        const g = GROUPES.find(x => x.id === btn.dataset.group);
-        if (!g) return;
-        switchTab(g.tabs.includes(S.currentTab) ? S.currentTab : g.tabs[0]);
-      } else {
-        switchTab(btn.dataset.tab);
-      }
-    });
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
   });
 
   // Delegation globale : tout bouton avec data-tab-switch (CTA des empty states)
@@ -513,22 +458,6 @@ function wireEvents() {
   });
 
   document.getElementById('btn-print')?.addEventListener('click', () => window.print());
-
-  // Navbar hamburger mobile
-  const navToggle = document.getElementById('navbar-toggle');
-  const navTabs = document.getElementById('nav-tabs');
-  if (navToggle && navTabs) {
-    navToggle.addEventListener('click', e => {
-      e.stopPropagation();
-      const open = navTabs.classList.toggle('is-open');
-      navToggle.setAttribute('aria-expanded', String(open));
-    });
-    document.addEventListener('click', e => {
-      if (!navTabs.classList.contains('is-open')) return;
-      if (e.target.closest('#nav-tabs') || e.target.closest('#navbar-toggle')) return;
-      _closeNavDrawer();
-    });
-  }
 
   // Global owner filter
   document.getElementById('global-owner-filter')?.addEventListener('change', _onGlobalOwnerChange);
@@ -740,7 +669,6 @@ function wireEvents() {
   deplacer('.global-search', 'rail-recherche');    // la recherche est globale
   deplacer('#settings-menu', 'rail-reglages');     // les reglages aussi
   // Videe de tout, la barre du haut n'a plus lieu d'etre.
-  document.querySelector('.navbar')?.classList.add('hidden');
 
   // L'en-tete figé ne prend son filet qu'une fois decolle du haut : souligner
   // un en-tete au repos ajoute un trait qui ne separe rien.
@@ -951,16 +879,9 @@ function wireEvents() {
       if (popover && !popover.classList.contains('hidden')) {
         popover.classList.add('hidden'); return;
       }
-      // Settings dropdown + eventuel drawer navbar mobile
       const settingsDd = document.getElementById('settings-dropdown');
       if (settingsDd && !settingsDd.classList.contains('hidden')) {
         settingsDd.classList.add('hidden'); return;
-      }
-      const navTabs = document.querySelector('.nav-tabs.is-open');
-      if (navTabs) {
-        navTabs.classList.remove('is-open');
-        document.getElementById('navbar-toggle')?.setAttribute('aria-expanded', 'false');
-        return;
       }
       // Holdings : warning si brouillon dirty (intercepte Escape)
       const holdingsModal = document.getElementById('holdings-modal');
@@ -1086,6 +1007,5 @@ function applyTheme(mode) {
 // ─── Boot ─────────────────────────────────────────────────────────────────
 
 _normalizeLegacyLayout();
-_installNavbarOffsetSync();
 initTheme();
 init().catch(err => console.error('Init error:', err));
