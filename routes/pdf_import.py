@@ -136,6 +136,9 @@ def _preview(position_id):
         return jsonify({'error': f'Fichier trop volumineux (>{MAX_PDF_SIZE // 1024 // 1024} Mo)'}), 413
     if not data:
         return jsonify({'error': 'Fichier vide'}), 400
+    # L'extension ne dit rien du contenu : un PDF commence par sa signature.
+    if is_pdf and not data.startswith(b'%PDF-'):
+        return jsonify({'error': "Ce fichier n'est pas un PDF (signature absente)."}), 400
 
     try:
         if is_csv:

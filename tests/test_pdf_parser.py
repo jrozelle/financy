@@ -190,6 +190,18 @@ class TestImportRoute:
         )
         assert r.status_code == 413
 
+    def test_rejette_un_faux_pdf(self, client):
+        """L'extension ne dit rien du contenu : la signature tranche."""
+        pid = _make_position(client, category='Actions', envelope='PEA', value=0, debt=0).get_json()['id']
+        r = client.post(
+            f'/api/envelope/{pid}/import-pdf?step=preview',
+            data={'file': (BytesIO(b'<html>pas un pdf</html>'), 'faux.pdf')},
+            content_type='multipart/form-data',
+            headers=CSRF_HEADERS,
+        )
+        assert r.status_code == 400
+        assert 'signature' in r.get_json()['error']
+
     def test_reject_wrong_extension(self, client):
         r = _make_position(client, category='Actions', envelope='PEA', value=0, debt=0)
         pid = r.get_json()['id']
