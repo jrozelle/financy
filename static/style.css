@@ -1423,6 +1423,7 @@ input[type="file"] {
   text-underline-offset: 2px;
 }
 .h-isin-btn:hover { color: var(--primary); filter: brightness(1.15); }
+.h-isin-pseudo { font-style: italic; }
 
 /* ── Popover ISIN (side panel) ────────────────────────────────────────── */
 .isin-popover {
@@ -3766,3 +3767,6 @@ td.arbo-part > * { vertical-align: middle; }
 /* Une zone defilante recoit le focus clavier (sinon inatteignable sans
    souris) : son contour le montre. */
 [role="region"][tabindex="0"]:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 6px; }
+
+/* Actifs : le nom cede la place aux chiffres. Complet dans la fenetre du titre. */
+#actifs-tbody td.act-nom { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

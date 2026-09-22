@@ -20,14 +20,14 @@ const ACTIFS_TABLE_COLUMNS = [
   { key: 'name', label: 'Nom' },
   { key: 'establishments', label: 'Établissement' },
   { key: 'asset_class', label: 'Classe' },
-  { key: 'quantity', label: 'Qty', num: true },
+  { key: 'quantity', label: 'Qté', num: true },
   { key: 'avg_cost', label: 'PRU', num: true },
   { key: 'last_price', label: 'Cours', num: true },
   { key: 'market_value', label: 'Valo', num: true },
   { key: 'pnl', label: '+/-', num: true },
   { key: 'weight_pct', label: 'Poids', num: true },
   { key: 'envelopes', label: 'Enveloppes' },
-  { key: 'freshness', label: 'Fraicheur' },
+  { key: 'freshness', label: 'Fraîcheur' },
 ];
 
 /** Plus-value d'une ligne, au format de Positions : montant signe, pourcentage
@@ -40,6 +40,17 @@ function cellulePnl(l) {
   const v = l.pnl;
   const montant = `<span class="${v >= 0 ? 'pv-hausse' : 'pv-baisse'}">${v >= 0 ? '+' : '−'}${fmt(Math.abs(v))}</span>`;
   return montant + (l.pnl_pct != null ? `<span class="pv-pct">${fmtPct(l.pnl_pct, 1, true)}</span>` : '');
+}
+
+/** Un pseudo-ISIN (FONDS_EUROS_FGPER2560DC) est un code interne : il
+ *  elargissait la colonne de 100 px sans rien apprendre a personne. Il se lit
+ *  « fonds euros » ou « non coté » ; le code reste dans la fenetre du titre,
+ *  et dans le nom accessible du bouton. */
+function boutonIsin(isin) {
+  const u = (isin || '').toUpperCase();
+  const pseudo = u.startsWith('FONDS_EUROS_') ? 'fonds euros' : u.startsWith('CUSTOM_') ? 'non coté' : null;
+  return `<button type="button" class="h-isin-btn${pseudo ? ' h-isin-pseudo' : ''}" data-action="open-popover"
+    data-isin="${esc(isin)}"${pseudo ? ` aria-label="${esc(isin)}"` : ''}>${esc(pseudo || isin)}</button>`;
 }
 
 function ensureActifsTableScaffold() {
@@ -147,8 +158,8 @@ function _renderTable(lines) {
   tbody.innerHTML = sorted.map(l => {
     const fresh = _freshnessBadge(l);
     return `<tr>
-      <td><button type="button" class="h-isin-btn" data-action="open-popover" data-isin="${esc(l.isin)}">${esc(l.isin)}</button></td>
-      <td>${esc(l.name || '—')}</td>
+      <td>${boutonIsin(l.isin)}</td>
+      <td class="act-nom">${esc(l.name || '—')}</td>
       <td>${esc((l.establishments || []).join(', ') || '—')}</td>
       <td>${esc(l.asset_class || '—')}</td>
       <td class="num">${fmtQty(l.quantity)}</td>
@@ -166,7 +177,7 @@ function _renderTable(lines) {
       const fresh = _freshnessBadge(l);
       return `<article class="actif-card">
         <div class="actif-card-main">
-          <button type="button" class="h-isin-btn" data-action="open-popover" data-isin="${esc(l.isin)}">${esc(l.isin)}</button>
+          ${boutonIsin(l.isin)}
           <strong>${esc(l.name || '—')}</strong>
           <span>${esc((l.establishments || []).join(', ') || '—')} · ${esc((l.envelopes || []).join(', ') || '—')} · ${esc(l.asset_class || '—')}</span>
         </div>

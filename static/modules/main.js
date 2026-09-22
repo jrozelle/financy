@@ -745,8 +745,8 @@ function wireEvents() {
     liquidity: 'Liquidité', mobilizable_value: 'Mobilisable',
   });
   initColumnPicker('actifs', 'actifs-col-picker', 'actifs-thead', {
-    isin: 'ISIN', name: 'Nom', establishments: 'Etablissement',
-    asset_class: 'Classe', quantity: 'Qty',
+    isin: 'ISIN', name: 'Nom', establishments: 'Établissement',
+    asset_class: 'Classe', quantity: 'Qté',
     avg_cost: 'PRU', last_price: 'Cours', market_value: 'Valo',
     pnl: '+/-', weight_pct: 'Poids', envelopes: 'Enveloppes',
   });
