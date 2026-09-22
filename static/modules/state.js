@@ -26,15 +26,11 @@ export const S = {
   entityPositions: null,
 };
 
-export let catChart          = null;
 export let histChart         = null;
-export let syntheseEnvChart  = null;
 export let syntheseHistChart = null;
 export let perfChart          = null;
 
-export function setCatChart(v)          { catChart = v; }
 export function setHistChart(v)         { histChart = v; }
-export function setSyntheseEnvChart(v)  { syntheseEnvChart = v; }
 export function setSyntheseHistChart(v) { syntheseHistChart = v; }
 export function setPerfChart(v)         { perfChart = v; }
 

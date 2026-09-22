@@ -267,24 +267,6 @@ main { padding: 1.5rem; max-width: min(1760px, 100vw); width: 100%; margin: 0 au
 .page-header h1 { font-size: 20px; font-weight: 700; }
 
 .header-actions { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
-.page-header-actions {
-  display: flex;
-  align-items: center;
-  gap: .75rem;
-  margin-left: auto;
-}
-
-.date-selector { display: flex; align-items: center; gap: .5rem; }
-.date-selector label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
-.date-selector select {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: .375rem .75rem;
-  font-size: 13px;
-  background: var(--card);
-  color: var(--text);
-  cursor: pointer;
-}
 
 /* ── KPI grid ──────────────────────────────────────────────────────────── */
 .kpi-grid {
@@ -461,14 +443,8 @@ main { padding: 1.5rem; max-width: min(1760px, 100vw); width: 100%; margin: 0 au
 .owners-table td { padding: .5rem .75rem; text-align: right; border-bottom: 1px solid var(--border); }
 .owners-table td:first-child { text-align: left; font-weight: 600; white-space: nowrap; }
 .owners-table tr:last-child td { border-bottom: none; }
-.owners-table .total-row td { font-weight: 700; background: var(--bg); border-top: 2px solid var(--border); border-bottom: none; }
 
 /* ── Liquidity bars ─────────────────────────────────────────────────────── */
-.liq-grid { display: grid; gap: .625rem; }
-.liq-row  { display: grid; grid-template-columns: 100px 1fr 130px; align-items: center; gap: 1rem; }
-.liq-bar-bg { background: var(--border); border-radius: 4px; height: 8px; overflow: hidden; }
-.liq-bar    { height: 100%; border-radius: 4px; background: var(--primary); transition: width .4s ease; }
-.liq-value  { font-size: 13px; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
 
 /* ── Badges ─────────────────────────────────────────────────────────────── */
 .badge {
@@ -518,9 +494,7 @@ main { padding: 1.5rem; max-width: min(1760px, 100vw); width: 100%; margin: 0 au
 .btn-icon.del   { color: var(--danger); }
 .btn-icon.del:hover   { background: var(--danger-light); }
 .btn-icon.add   { color: var(--success); font-weight: 700; }
-.btn-icon.add:hover   { background: var(--success-light); }
-.nav-icon-btn,
-.logout-link {
+.btn-icon.add:hover   { background: var(--success-light); }.nav-icon-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -531,17 +505,10 @@ main { padding: 1.5rem; max-width: min(1760px, 100vw); width: 100%; margin: 0 au
   background: var(--card);
   color: var(--text);
   transition: background .12s, border-color .12s, color .12s;
-}
-.nav-icon-btn:hover,
-.logout-link:hover {
+}.nav-icon-btn:hover {
   background: var(--bg);
   border-color: var(--text-muted);
-}
-.logout-link:hover {
-  color: var(--danger);
-}
-.nav-icon-btn svg,
-.logout-link svg {
+}.nav-icon-btn svg {
   width: 19px;
   height: 19px;
   fill: none;
@@ -549,9 +516,7 @@ main { padding: 1.5rem; max-width: min(1760px, 100vw); width: 100%; margin: 0 au
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
-}
-.settings-toggle.nav-icon-btn,
-.theme-toggle.nav-icon-btn,
+}.theme-toggle.nav-icon-btn,
 .btn-icon.nav-icon-btn {
   padding: 0;
   color: var(--text);
@@ -685,24 +650,6 @@ input[type="file"] {
 .alert-error   { background: var(--danger-light);  color: var(--danger); }
 
 /* ── Analyse person tabs ─────────────────────────────────────────────────── */
-.analyse-person-tabs {
-  display: flex;
-  gap: .5rem;
-  flex-wrap: wrap;
-}
-.person-tab-btn {
-  padding: .5rem 1.25rem;
-  border-radius: 20px;
-  border: 2px solid var(--border);
-  background: var(--card);
-  cursor: pointer;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--text-muted);
-  transition: all .15s;
-}
-.person-tab-btn:hover  { border-color: var(--primary); color: var(--primary); }
-.person-tab-btn.active { border-color: var(--primary); background: var(--primary); color: #fff; }
 
 /* ── Filters bar ─────────────────────────────────────────────────────────── */
 .filters-bar {
@@ -817,28 +764,9 @@ input[type="file"] {
 .target-row   { display: flex; align-items: center; gap: .625rem; }
 .target-row label { flex: 1; font-size: 13px; font-weight: 500; }
 .target-row input { width: 70px; border: 1px solid var(--border); border-radius: 6px; padding: .375rem .5rem; font-size: 13px; text-align: right; }
-
-.alloc-row { display: grid; grid-template-columns: 130px 1fr 60px 60px 60px; align-items: center; gap: .625rem; padding: .45rem 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
-.alloc-row:last-child { border-bottom: none; }
-.alloc-bar-bg { height: 6px; background: var(--border); border-radius: 3px; position: relative; }
-.alloc-bar-actual { height: 100%; border-radius: 3px; background: var(--primary); position: absolute; top: 0; left: 0; }
-.alloc-bar-target { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--danger); border-radius: 1px; }
-.alloc-delta-pos { color: var(--success); font-weight: 600; }
-.alloc-delta-neg { color: var(--danger);  font-weight: 600; }
-
-.perf-grid { display: grid; gap: .75rem; }
-.perf-row  { display: flex; justify-content: space-between; align-items: baseline; padding: .5rem 0; border-bottom: 1px solid var(--border); font-size: 13px; }
-.perf-row:last-child { border-bottom: none; }
-.perf-label { color: var(--text-muted); }
 .perf-val   { font-weight: 700; font-size: 15px; }
 
 /* ── TRI ───────────────────────────────────────────────────────────────── */
-.tri-grid { display: grid; gap: 0; }
-.tri-row  { display: flex; justify-content: space-between; align-items: baseline; padding: .35rem 0; border-bottom: 1px solid var(--border); font-size: 13px; }
-.tri-row:last-child { border-bottom: none; }
-.tri-global { font-weight: 700; font-size: 14px; padding: .5rem 0; }
-.tri-label { color: var(--text-muted); }
-.tri-val   { font-weight: 600; font-size: 14px; }
 
 /* ── KPI delta label ─────────────────────────────────────────────────────── */
 .kpi-delta-label { font-size: 10px; opacity: .7; margin-right: 2px; text-transform: uppercase; letter-spacing: .5px; }
@@ -854,18 +782,6 @@ input[type="file"] {
 .snapshot-note-text { flex: 1; }
 
 /* ── Wealth target gauge ─────────────────────────────────────────────────── */
-.wealth-target-empty { text-align: center; padding: .25rem 0; }
-.wealth-progress-bg {
-  height: 8px; border-radius: 4px;
-  background: var(--border);
-  overflow: hidden;
-}
-.wealth-progress-bar {
-  height: 100%; border-radius: 4px;
-  background: var(--primary);
-  transition: width .4s ease;
-}
-.wealth-progress-bar.complete { background: var(--success); }
 
 /* ── Template preview ─────────────────────────────────────────────────────── */
 .template-preview { font-size: 13px; line-height: 1.8; }
@@ -997,14 +913,11 @@ input[type="file"] {
   /* Le gap .5rem s'ajoute apres, comme pour le toggle */
 }
 .tree-cat    { font-size: 12.5px; padding-left: 3.5rem; }
-.tree-pos    { font-size: 12px; padding-left: 4.5rem; }
 
 .tree-row:hover { background: var(--bg); }
 .tree-owner:hover, .tree-etabl:hover, .tree-env:hover { background: var(--primary-light); }
 .tree-etabl { margin-top: .125rem; border-top: 1px solid color-mix(in srgb, var(--border) 40%, transparent); padding-top: .25rem; }
 .tree-etabl:first-child { border-top: none; margin-top: 0; }
-
-.tree-root { margin-left: 0 !important; }
 .tree-children { margin-left: 0; }
 
 .tree-toggle {
@@ -1032,7 +945,6 @@ input[type="file"] {
 .tree-label  { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tree-amount { font-weight: 600; white-space: nowrap; margin-left: auto; padding-left: .75rem; font-variant-numeric: tabular-nums; }
 .tree-badges { flex-shrink: 0; }
-.tree-mob    { font-size: 11px; color: var(--text-muted); white-space: nowrap; padding-left: .35rem; }
 .tree-dot    { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--border); margin-right: .5rem; vertical-align: middle; }
 
 .tree-toolbar {
@@ -1109,17 +1021,6 @@ input[type="file"] {
   max-height: 320px;
   overflow-y: auto;
 }
-.col-picker-dropdown-inline {
-  position: static;
-  box-shadow: none;
-  border: 0;
-  border-top: 1px solid var(--border);
-  border-radius: 0;
-  margin: 0;
-  padding: .45rem .75rem .6rem;
-  max-height: 240px;
-  background: color-mix(in srgb, var(--card) 92%, var(--bg));
-}
 .col-picker-item {
   display: flex;
   align-items: center;
@@ -1194,18 +1095,13 @@ input[type="file"] {
   .kpi-grid   { grid-template-columns: repeat(2, 1fr); }
   .charts-row { grid-template-columns: 1fr; }
 }
-@media (max-width: 780px) {
-  .alloc-row { grid-template-columns: 110px 1fr 50px 50px 50px; font-size: 12px; }
-  .liq-row   { grid-template-columns: 80px 1fr 110px; }
-}
+
 @media (max-width: 700px) {
   .kpi-grid   { grid-template-columns: 1fr 1fr; }
   .two-col    { grid-template-columns: 1fr; }
   .form-grid  { grid-template-columns: 1fr; }
   .form-group.full-span { grid-column: span 1; }
   main { padding: 1rem; }
-  .alloc-row { grid-template-columns: 90px 1fr 46px 46px 46px; font-size: 11.5px; gap: .375rem; }
-  .liq-row   { grid-template-columns: 70px 1fr 95px; gap: .625rem; }
   .targets-grid { grid-template-columns: 1fr; }
 }
 
@@ -1237,36 +1133,6 @@ input[type="file"] {
 .toast-msg.toast-show    { opacity: 1; transform: translateY(0); }
 
 /* ── Settings menu (engrenage) ─────────────────────────────────────────── */
-.settings-menu { position: relative; }
-.settings-toggle {
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: .3rem .55rem;
-  cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-  color: var(--text-muted);
-  transition: background .12s, border-color .12s, color .12s;
-  flex-shrink: 0;
-}
-.settings-toggle:hover, .settings-toggle.active { background: var(--bg); border-color: var(--text-muted); color: var(--text); }
-.settings-dropdown {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-md);
-  min-width: 250px;
-  z-index: 150;
-  /* `overflow: hidden` coupait le menu sans permettre de le faire defiler :
-     les dernieres entrees etaient inatteignables sur un ecran court. */
-  max-height: calc(100vh - 5rem);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
 .settings-item {
   display: block;
   width: 100%;
@@ -1486,16 +1352,10 @@ input[type="file"] {
 .tab-btn[data-tab="import"],
 .tab-btn[data-tab="referentiel"],
 #btn-edit-targets,
-.analyse-person-tabs,
-#synthese-person-tabs,
 .analyse-view-toggle,
 #pos-view-toggle,
-.settings-menu,
-.wealth-progress-actions,
-.snapshot-note-actions,
 #btn-add-snapshot-note,
 .page-header .btn,
-.date-selector,
 .page-header,
 #synthese-history-group,
 #synthese-history-detail-card .two-col,
@@ -1565,13 +1425,10 @@ input[type="file"] {
   .owners-table th, .data-table th { background: #f5f5f5 !important; }
 
   /* Wealth progress bar */
-  .wealth-progress-bar { border: 1px solid #ccc; }
 
   /* TRI / allocation sections */
-  .tri-grid, .alloc-row { break-inside: avoid; }
 
   /* Entity warnings — keep readable */
-  .entity-warning { border: 1px solid #f59e0b; background: #fffbeb !important; }
 
   /* Misc */
   a { color: inherit; text-decoration: none; }
@@ -1684,7 +1541,6 @@ input[type="file"] {
   margin-left: .3rem;
   vertical-align: middle;
 }
-.h-badge-ok    { background: rgba(34,197,94,.15);  color: var(--success); }
 .h-badge-muted { background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); }
 .holdings-table .pos { color: var(--success); }
 .holdings-table .neg { color: var(--danger); }
@@ -1919,20 +1775,6 @@ input[type="file"] {
   box-sizing: border-box;
 }
 #advisor-objectives-table .num input { text-align: right; }
-
-.advisor-priority-badge {
-  display: inline-block;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 7px;
-  border-radius: 10px;
-}
-.advisor-priority-1 { background: rgba(148,163,184,.20); color: var(--text-muted); }
-.advisor-priority-2 { background: rgba(148,163,184,.28); color: var(--text-muted); }
-.advisor-priority-3 { background: rgba(99,102,241,.18);  color: var(--primary); }
-.advisor-priority-4 { background: rgba(234,179,8,.22);   color: #a16207; }
-.advisor-priority-5 { background: rgba(239,68,68,.22);   color: var(--danger); }
-[data-theme="dark"] .advisor-priority-4 { color: #fbbf24; }
 
 .proposals-list {
   display: flex;
@@ -2294,9 +2136,6 @@ kbd {
 }
 
 @media (max-width: 640px) {
-  .nav-owner-filter {
-    flex: 0 1 auto;
-  }
   #global-owner-filter { max-width: 120px; }
   .global-search {
     flex: 1 0 100%;
@@ -2308,9 +2147,6 @@ kbd {
 }
 
 .tab-btn { flex: 0 0 auto; }
-.nav-owner-filter {
-  margin-left: 0 !important;
-}
 .global-search {
   width: 100%;
   min-width: 0;
@@ -2322,9 +2158,6 @@ kbd {
 }
 
 @media (max-width: 640px) {
-  .nav-owner-filter {
-    min-width: 0;
-  }
   #global-owner-filter {
     width: 100px;
     max-width: none;
@@ -2347,11 +2180,7 @@ kbd {
 #global-owner-filter {
   width: 100%;
   min-height: 38px;
-}
-.settings-dropdown #btn-keyboard-help {
-  display: block;
-}#tab-synthese #synthese-person-tabs,
-#tab-synthese .page-header #btn-print {
+}#tab-synthese .page-header #btn-print {
   display: none !important;
 }
 
@@ -2362,12 +2191,6 @@ kbd {
 }
 
 /* ── Navigation UX: global context first, page actions second ───────────── */
-.nav-owner-filter,
-.nav-date-filter {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-}
 #global-owner-filter,
 #synthese-date-select,
 .global-search-input {
@@ -2407,10 +2230,6 @@ kbd {
 #tab-import > .page-header {
   display: none !important;
 }
-.settings-dropdown {
-  min-width: 270px;
-  max-width: calc(100vw - 1rem);
-}
 .settings-section-label {
   padding: .55rem 1rem .35rem;
   background: var(--bg);
@@ -2436,12 +2255,6 @@ kbd {
   #synthese-date-select,
   .global-search-input {
     font-size: 14px !important;
-  }
-  .settings-dropdown {
-    right: 0;
-    width: min(300px, calc(100vw - 1rem));
-    max-height: calc(100dvh - 7.25rem);
-    overflow-y: auto;
   }
   .settings-item {
     min-height: 44px;
@@ -2469,37 +2282,24 @@ kbd {
   .tab-content:not(#tab-synthese) > .page-header {
     display: block;
     margin: 0 0 .85rem;
-  }
-  .tab-content:not(#tab-synthese) .header-actions,
-  #tab-actifs .page-filters,
-  .filters-bar {
+  }.tab-content:not(#tab-synthese) .header-actions,
+.filters-bar {
     display: grid !important;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: .55rem !important;
     align-items: stretch !important;
     width: 100%;
     margin: 0 0 .85rem;
-  }
-  .tab-content:not(#tab-synthese) .header-actions > *,
-  #tab-actifs .page-filters > *,
-  .filters-bar > * {
+  }.tab-content:not(#tab-synthese) .header-actions > *,
+.filters-bar > * {
     min-width: 0 !important;
     width: 100% !important;
     max-width: none !important;
-  }
-  .tab-content:not(#tab-synthese) .date-selector {
-    display: block;
-    width: 100%;
-  }
-  .tab-content:not(#tab-synthese) .date-selector label {
-    display: none;
-  }
-  .tab-content:not(#tab-synthese) .date-selector select,
-  .filter-select,
-  .tab-content:not(#tab-synthese) .btn,
-  .tree-search-input,
-  .view-toggle-btn,
-  #advisor-owner-select {
+  }.filter-select,
+.tab-content:not(#tab-synthese) .btn,
+.tree-search-input,
+.view-toggle-btn,
+#advisor-owner-select {
     width: 100% !important;
     min-height: 42px;
     border-radius: 8px;
@@ -2516,9 +2316,6 @@ kbd {
     margin: 0 !important;
     padding: 3px;
     border-radius: 10px;
-  }
-  #tab-positions .date-selector {
-    display: none !important;
   }
   #actifs-col-picker {
     width: 100%;
@@ -2632,15 +2429,11 @@ kbd {
   }
 }
 
-@media (max-width: 430px) {
-  .tab-content:not(#tab-synthese) .header-actions,
-  #tab-actifs .page-filters,
-  .filters-bar {
+@media (max-width: 430px) {.tab-content:not(#tab-synthese) .header-actions,
+.filters-bar {
     gap: .5rem !important;
-  }
-  .tab-content:not(#tab-synthese) .date-selector select,
-  .filter-select,
-  .tab-content:not(#tab-synthese) .btn {
+  }.filter-select,
+.tab-content:not(#tab-synthese) .btn {
     font-size: 13.5px;
   }
   #tab-positions .header-actions {
@@ -2707,30 +2500,12 @@ kbd {
 }
 
 /* ── Final mobile toolbar alignment ───────────────────────────────────── */
-.nav-owner-filter {
-  gap: .375rem;
-}
-.nav-owner-filter #nav-add-button {
-  flex: 0 0 var(--nav-control-height);
-}
-.nav-owner-filter #global-owner-filter {
-  flex: 1 1 auto;
-  min-width: 0;
-}
 #tab-flux .page-toolbar > .page-header,
 #tab-entites > .page-header {
   display: none !important;
 }
 
 @media (max-width: 760px) {
-  .nav-owner-filter #nav-add-button {
-    width: var(--nav-control-height);
-    height: var(--nav-control-height);
-    align-self: center;
-  }
-  .nav-owner-filter #global-owner-filter {
-    width: 100% !important;
-  }
   #global-owner-filter,
   #synthese-date-select,
   .global-search-input {
@@ -2772,10 +2547,7 @@ kbd {
   }
 }
 
-@media (max-width: 390px) {.nav-owner-filter #nav-add-button {
-    width: var(--nav-control-height);
-    height: var(--nav-control-height);
-  }
+@media (max-width: 390px) {
   #global-owner-filter,
   #synthese-date-select {
     font-size: 12px !important;
@@ -2810,7 +2582,6 @@ kbd {
 #perf-kpi .kpi-sub { font-size: .74rem; color: var(--text-muted); margin-top: .2rem; }
 #perf-kpi .kpi-value.positive { color: var(--success); }
 #perf-kpi .kpi-value.negative { color: var(--danger); }
-.checkbox-inline { display: inline-flex; align-items: center; gap: .4rem; font-size: .82rem; cursor: pointer; color: var(--text-muted); }
 
 /* Selecteur de maille */
 .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
@@ -3185,7 +2956,15 @@ body { padding-left: var(--rail-w); }
   #rail-recherche,
   .fin-rail .fin-rail-sub,
   .fin-rail-foot { display: none; }
-  .fin-rail .fin-rail-plus { display: flex; }
+  /* `.fin-rail-item.fin-rail-plus` et non `.fin-rail-plus` : le gabarit qu'il
+     partage avec « Réglages », plus bas dans la feuille, lui imposait sinon
+     sa taille de texte, sa marge et son alignement a gauche — « Plus » sortait
+     plus gros et plus bas que ses quatre voisins. */
+  .fin-rail .fin-rail-item.fin-rail-plus {
+    display: flex; width: auto; margin: 0; padding: .35rem .15rem;
+    font-size: .625rem; justify-content: center; text-align: center;
+  }
+  .fin-rail .fin-rail-item.fin-rail-plus svg { width: 21px; height: 21px; }
 
   .fin-rail .fin-rail-item {
     flex: 1 1 0; min-width: 0;
@@ -3226,23 +3005,13 @@ body { padding-left: var(--rail-w); }
 }
 
 
-
 /* Titre de la page dans la barre du haut */
 /* Le titre reclame sa place : sans base explicite, la recherche prenait tout
    et « Synthèse du patrimoine » s'affichait tronque. */
 /* Le titre passe avant la recherche dans le partage de la largeur : il nomme
    la page, elle n'est qu'un outil. Sans cette priorite, « Synthèse du
    patrimoine » s'affichait tronque des 1500 px. */
-.fin-title { flex: 3 1 260px; min-width: 0; padding-right: 1rem; }
-.fin-title h1 {
-  margin: 0; font-size: 1.05rem; font-weight: 600; letter-spacing: -.02em;
-  color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.fin-title p {
-  margin: 0; font-size: .74rem; color: var(--text-muted);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-@media (max-width: 780px) { .fin-title { display: none; } }
+
 
 /* ── Menu d'actions sur l'arrêté ──────────────────────────────────────── */
 /* Même apparence que l'engrenage — ce sont deux menus de même nature pour
@@ -3255,7 +3024,6 @@ body { padding-left: var(--rail-w); }
   min-width: 230px; z-index: 150;
   max-height: calc(100vh - 5rem); overflow-y: auto; overscroll-behavior: contain;
 }
-.nav-date-filter { display: inline-flex; align-items: center; gap: .25rem; }
 
 /* ── Densité ──────────────────────────────────────────────────────────── */
 /* Tout l'espacement dérive de --d : un seul réglage, et rien ne se désaligne. */
@@ -3272,16 +3040,19 @@ body { padding-left: var(--rail-w); }
 /* Les réglages utilisés à chaque visite sont posés à l'écran plutôt que rangés
    dans un menu : un clic pour révéler ce qu'on change tout le temps est un clic
    de trop. Les menus gardent ce qui se règle rarement. */
-.page-head {
-  display: flex; align-items: flex-end; justify-content: space-between;
-  gap: 1rem; flex-wrap: wrap; margin-bottom: calc(1rem * var(--d));
-}
-.page-head-titre { min-width: 0; }
-.page-head-titre h1 {
-  margin: 0; font-size: 1.35rem; font-weight: 600; letter-spacing: -.02em;
-}
-.page-head-titre p { margin: .15rem 0 0; color: var(--text-muted); font-size: .8rem; }
+.page-head { margin-bottom: calc(1rem * var(--d)); }
 .page-head-tools { display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }
+/* Ce qui qualifie les donnees a gauche, ce qui agit ou change la lecture a
+   droite. */
+.page-head-tools #head-ajouter { margin-left: auto; }
+.page-head-tools #head-ajouter.hidden + #mask-btn,
+.page-head-tools #head-ajouter.hidden ~ #mask-btn { margin-left: auto; }
+
+/* Masque a l'ecran, lu par les technologies d'assistance. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
 
 /* Le titre global remplace ceux des onglets : deux titres pour une seule page
    se contredisent quand l'un des deux est oublie. */
@@ -3316,11 +3087,6 @@ main > .tab-content > .page-header > h1 { display: none; }
 .seg-solo svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.7; }
 .seg-solo:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
-@media (max-width: 640px) {
-  .page-head { gap: .6rem; }
-  .page-head-titre h1 { font-size: 1.15rem; }
-  .page-head-tools { width: 100%; }
-}
 
 /* ── Outils déplacés depuis l'ancienne barre du haut ──────────────────── */
 /* La barre a disparu : ses outils rejoignent l'en-tete (ce qui qualifie les
@@ -3345,22 +3111,8 @@ main > .tab-content > .page-header > h1 { display: none; }
 /* L'engrenage prend la forme d'une entree de rail et porte son libelle :
    une icone muette a cote d'un groupe nomme « Réglages » entretenait la
    confusion entre les preferences et les ecrans d'administration. */
-#rail-reglages { margin: 0; padding: 0; }
 /* Le conteneur d'origine centre son contenu ; dans le rail, l'entree doit
    s'aligner a gauche comme ses voisines. */
-#rail-reglages .settings-menu { display: block; text-align: left; }
-#rail-reglages .settings-toggle {
-  /* Meme gabarit que .fin-rail-sub : meme retrait, meme taille, meme couleur. */
-  display: flex !important; align-items: center; justify-content: flex-start !important;
-  width: 100% !important; height: auto !important; min-height: 0 !important;
-  margin: 0 !important; padding: .42rem .55rem .42rem 2.05rem !important;
-  border-radius: 7px; border: 0; background: none;
-  color: #6f7891; font: inherit; font-size: .8rem; cursor: pointer;
-}
-#rail-reglages .settings-toggle::after { content: 'Préférences'; }
-#rail-reglages .settings-toggle svg { display: none; }
-#rail-reglages .settings-toggle:hover { background: var(--rail-hover); color: #b8c0d0; }
-#rail-reglages .settings-dropdown { right: auto; left: .3rem; bottom: calc(100% + 6px); top: auto; }
 @media (max-width: 780px) {
   #rail-recherche { display: none; }   /* la recherche reprend sa place ailleurs sur mobile */
 }
@@ -3410,7 +3162,6 @@ main > .tab-content > .page-header > h1 { display: none; }
 .page-head-tools #snapshot-toggle svg { width: 15px; height: 15px; }
 /* Le bouton « ajouter » de l'ancienne barre n'a plus sa place ici : l'ajout se
    fait depuis l'ecran concerne, pas depuis l'en-tete de la synthese. */
-.page-head-tools #nav-add-button { display: none !important; }
 #head-filtres { gap: .35rem; }
 
 /* ── En-tête figé au défilement ───────────────────────────────────────── */
@@ -3598,14 +3349,9 @@ main > .tab-content > .page-header > h1 { display: none; }
   .kpi-card { padding: calc(.8rem * var(--d)); }
   .kpi-label { font-size: .6rem; letter-spacing: .07em; }
 
-  /* En-tete : « Masquer » occupait une ligne entiere a lui seul. Il remonte
-     dans le coin, au niveau du titre — c'est un interrupteur de lecture, pas
-     un filtre, et il n'a pas a pousser les chiffres vers le bas. */
-  .page-head { position: relative; gap: .45rem; margin-bottom: calc(.7rem * var(--d)); }
+  /* En-tete : une seule rangee de controles, plus serree. */
+  .page-head { margin-bottom: calc(.7rem * var(--d)); }
   .page-head-tools { gap: .3rem; row-gap: .35rem; }
-  .page-head-titre { padding-right: 7rem; }
-  .page-head-titre h1 { font-size: 1.15rem; }
-  .page-head-tools #mask-btn { position: absolute; top: 0; right: 0; margin: 0; }
 }
 
 /* Sous-titre d'indicateur : un montant seul ne se situe pas. */

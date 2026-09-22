@@ -6,9 +6,10 @@
  * engrenage qui portait les preferences. Un seul point d'entree desormais, et
  * ces ecrans deviennent des onglets — le rail ne garde que ce qu'on consulte.
  *
- * Les ecrans existants ne sont pas reecrits : leurs noeuds sont DEPLACES dans
- * la fenetre. Identifiants et ecouteurs survivent, tout le code qui les cible
- * continue de fonctionner.
+ * Les ecrans d'administration sont DEPLACES dans la fenetre au demarrage :
+ * ce sont de gros blocs de <main>, et leurs identifiants et ecouteurs
+ * survivent au deplacement. Les boutons de preferences, eux, sont poses
+ * directement par le gabarit.
  *
  * Ouvrir un onglet ici ne NAVIGUE PAS : le chargeur injecte remplit l'ecran
  * demande sans toucher a l'onglet courant. Passer par `switchTab` masquait
@@ -24,14 +25,6 @@ export function wireReglages(chargerEcran) {
   _charger = chargerEcran;
   const modal = document.getElementById('reglages-modal');
   if (!modal) return;
-
-  // Les preferences reprennent les boutons deja construits, plutot que de les
-  // dupliquer : un seul comportement, un seul endroit ou le corriger.
-  deplacer('theme-toggle', 'pref-theme');
-  deplacer('positions-col-picker', 'pref-col-positions');
-  deplacer('actifs-col-picker', 'pref-col-actifs');
-  deplacer('btn-open-settings', 'pref-api');
-  deplacer('btn-keyboard-help', 'pref-raccourcis');
 
   // Les ecrans d'administration rejoignent la fenetre.
   const accueil = document.getElementById('reglages-accueil');
@@ -81,10 +74,4 @@ function fermer() {
   document.getElementById('reglages-modal')?.classList.add('hidden');
   _ouvert = false;
   // Rien a restaurer : l'ecran de fond n'a jamais ete quitte.
-}
-
-function deplacer(id, hote) {
-  const el = document.getElementById(id);
-  const h = document.getElementById(hote);
-  if (el && h) h.appendChild(el);
 }

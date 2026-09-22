@@ -22,7 +22,13 @@
     <button type="button" class="fin-rail-brand" data-tab-switch="synthese">
       <span class="fin-rail-mark">F</span>Financy
     </button>
-    <div id="rail-recherche"></div>
+    <div id="rail-recherche">
+      <div class="global-search" id="global-search">
+        <span class="global-search-icon" aria-hidden="true">&#128269;</span>
+        <input type="search" class="global-search-input" id="global-search-input" placeholder="Rechercher…" autocomplete="off" aria-label="Recherche globale">
+        <div class="search-results" id="search-results"></div>
+      </div>
+    </div>
 
     <button type="button" class="tab-btn fin-rail-item" data-tab="synthese"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>Synthèse</button>
 
@@ -52,79 +58,8 @@
           <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>
         </svg>Réglages
       </button>
-      <div id="rail-reglages" hidden></div>
     </div>
   </nav>
-
-  <!-- Reserve d'outils. Ces blocs sont deplaces au demarrage vers le rail
-       et l'en-tete de page (voir `deplacer()` dans main.js) : ils contiennent
-       des elements auto-fermants qu'un decoupage du gabarit tronquait. Le
-       conteneur reste invisible et ne sert qu'a les porter jusque-la. -->
-  <div id="reserve-outils" style="display:none">
-    <div class="nav-owner-filter">
-      <button class="nav-icon-btn hidden" id="nav-add-button" type="button" title="Ajouter" aria-label="Ajouter">
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="M12 5v14M5 12h14"></path>
-        </svg>
-      </button>
-      <select id="global-owner-filter" aria-label="Personne">
-        <option value="Famille">Famille</option>
-      </select>
-    </div>
-    <div class="nav-date-filter">
-      <select id="synthese-date-select" aria-label="Date du snapshot"></select>
-      <div class="menu-wrap" id="snapshot-menu">
-        <button class="nav-icon-btn" id="snapshot-toggle" type="button"
-                aria-haspopup="true" aria-expanded="false"
-                aria-label="Actions sur cet arrêté">
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>
-          </svg>
-        </button>
-        <div class="menu-pop hidden" id="snapshot-dropdown" role="menu"></div>
-      </div>
-    </div>
-    <div class="global-search" id="global-search">
-      <span class="global-search-icon" aria-hidden="true">&#128269;</span>
-      <input type="search" class="global-search-input" id="global-search-input" placeholder="Rechercher…" autocomplete="off" aria-label="Recherche globale">
-      <div class="search-results" id="search-results"></div>
-    </div>
-    <div class="nav-actions" style="display:flex;gap:.375rem;align-items:center">
-      <div class="settings-menu" id="settings-menu">
-        <button class="settings-toggle nav-icon-btn" id="settings-toggle" title="Paramètres" aria-label="Paramètres">
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"></path>
-            <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.05.05a2.1 2.1 0 0 1-2.97 2.97l-.05-.05a1.8 1.8 0 0 0-1.98-.36 1.8 1.8 0 0 0-1.1 1.66V21a2.1 2.1 0 0 1-4.2 0v-.08a1.8 1.8 0 0 0-1.08-1.64 1.8 1.8 0 0 0-1.98.36l-.05.05a2.1 2.1 0 0 1-2.97-2.97l.05-.05a1.8 1.8 0 0 0 .36-1.98 1.8 1.8 0 0 0-1.66-1.1H2a2.1 2.1 0 0 1 0-4.2h.08a1.8 1.8 0 0 0 1.64-1.08 1.8 1.8 0 0 0-.36-1.98l-.05-.05A2.1 2.1 0 0 1 6.28 3.3l.05.05a1.8 1.8 0 0 0 1.98.36A1.8 1.8 0 0 0 9.4 2.05V2a2.1 2.1 0 0 1 4.2 0v.08a1.8 1.8 0 0 0 1.08 1.64 1.8 1.8 0 0 0 1.98-.36l.05-.05a2.1 2.1 0 0 1 2.97 2.97l-.05.05a1.8 1.8 0 0 0-.36 1.98 1.8 1.8 0 0 0 1.66 1.1H21a2.1 2.1 0 0 1 0 4.2h-.08A1.8 1.8 0 0 0 19.4 15Z"></path>
-          </svg>
-        </button>
-        <div class="settings-dropdown hidden" id="settings-dropdown">
-          <div class="settings-section-label">Synthèse</div>
-          <button class="settings-item" id="btn-add-snapshot-note">&#128221; Note du snapshot</button>
-          <button class="settings-item" id="btn-open-wealth-target">&#127919; Objectif patrimoine</button>
-          <button class="settings-item" id="btn-print" title="Imprimer la synthèse">&#128424; Imprimer</button>
-          <div class="settings-section-label">Positions</div>
-          <button class="settings-item" id="btn-duplicate">Dupliquer snapshot</button>
-          <button class="settings-item" id="positions-col-picker">Colonnes positions</button>
-          <div class="settings-section-label">Actifs</div>
-          <button class="settings-item" id="actifs-refresh-prices">Rafraîchir cours</button>
-          <button class="settings-item" id="actifs-col-picker">Colonnes actifs</button>
-          <div class="settings-section-label">Affichage</div>
-          <button class="settings-item" id="theme-toggle">Thème</button>
-          <button class="settings-item" id="btn-keyboard-help">? Raccourcis clavier</button>
-          <div class="settings-section-label">Administration</div>
-          <button class="settings-item" id="btn-open-settings">&#128273; Clés API</button>
-          <button class="settings-item" data-tab="referentiel">&#9881; Référentiel</button>
-          <button class="settings-item" data-tab="tools">&#128295; Outils</button>
-          <button class="settings-item" data-tab="import">&#8645; Import / Export</button>
-          {% if has_auth %}
-          <div class="settings-section-label">Compte</div>
-          <a href="/logout" class="settings-item settings-item-danger">Déconnexion</a>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
-
 
   {% if auth_warning %}
   <div class="security-warning" role="alert">
@@ -135,17 +70,49 @@
   <main>
 
     <header class="page-head">
-      <div class="page-head-titre">
-        <h1 id="page-title">Synthèse du patrimoine</h1>
-        <p id="page-sub"></p>
-      </div>
+      <!-- Le titre n'est plus affiche : le rail dit ou l'on est, les deux
+           selecteurs disent l'arrete et le perimetre. Il reste pour les
+           lecteurs d'ecran, qui n'ont ni l'un ni l'autre sous les yeux. -->
+      <h1 id="page-title" class="sr-only">Synthèse du patrimoine</h1>
       <div class="page-head-tools">
-        <div id="head-filtres"></div>
+        <div id="head-filtres">
+          <select id="global-owner-filter" aria-label="Titulaire">
+            <option value="Famille">Famille</option>
+          </select>
+          <select id="synthese-date-select" aria-label="Arrêté consulté"></select>
+          <!-- Ce qui AGIT sur l'arrete designe a gauche. Les reglages, eux,
+               vivent dans la fenetre Reglages : les melanger faisait cotoyer
+               « Theme » et « Supprimer ce snapshot ». -->
+          <div class="menu-wrap" id="snapshot-menu">
+            <button class="nav-icon-btn" id="snapshot-toggle" type="button"
+                    aria-haspopup="true" aria-expanded="false" aria-controls="snapshot-dropdown"
+                    aria-label="Actions sur cet arrêté">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>
+              </svg>
+            </button>
+            <div class="menu-pop hidden" id="snapshot-dropdown" role="menu">
+              <div class="settings-section-label">Cet arrêté</div>
+              <button type="button" class="settings-item" role="menuitem" id="btn-add-snapshot-note">Note de l’arrêté</button>
+              <button type="button" class="settings-item" role="menuitem" id="btn-duplicate">Dupliquer</button>
+              <button type="button" class="settings-item" role="menuitem" id="btn-rename-snapshot">Modifier la date</button>
+              <button type="button" class="settings-item settings-item-danger" role="menuitem" id="btn-delete-snapshot">Supprimer</button>
+              <div class="settings-section-label">Données</div>
+              <button type="button" class="settings-item" role="menuitem" id="actifs-refresh-prices">Rafraîchir les cours</button>
+              <button type="button" class="settings-item" role="menuitem" id="btn-open-wealth-target">Objectif de patrimoine</button>
+              <button type="button" class="settings-item" role="menuitem" id="btn-print">Imprimer la synthèse</button>
+            </div>
+          </div>
+        </div>
         <div class="seg" role="group" aria-label="Période de comparaison" id="seg-periode"></div>
         <!-- La densite a quitte cette barre : on la regle une fois, et elle
              occupait la place qui faisait deborder « Masquer » sur une ligne a
              lui seul. Elle reste dans la fenetre Reglages. -->
         <span id="demo-badge" class="demo-badge hidden" title="Mode demo / LLM mocke" aria-hidden="true"></span>
+        <!-- Libelle et visibilite pilotes par l'onglet courant (main.js). Il
+             etait masque par une regle CSS depuis le 22/09 : plus aucun moyen
+             visible d'ajouter une position, un flux ou une entite. -->
+        <button type="button" class="btn btn-primary btn-sm hidden" id="head-ajouter">Ajouter</button>
         <button type="button" class="seg-solo" id="mask-btn" aria-pressed="false">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>
@@ -325,7 +292,6 @@
       <div class="page-toolbar">
         <div class="page-header">
           <h1>Flux externes</h1>
-          <button class="btn btn-primary" id="btn-add-flux">+ Ajouter</button>
         </div>
         <div id="flux-drop" class="dropzone" tabindex="0" role="button"
              aria-label="Importer des avis d'opérés ou des relevés d'espèces">
@@ -367,7 +333,6 @@
     <div id="tab-entites" class="tab-content hidden">
       <div class="page-header">
         <h1>Entités (SCI / Indivision)</h1>
-        <button class="btn btn-primary" id="btn-add-entity">+ Ajouter</button>
       </div>
       <div class="card card-table">
         <table class="data-table">
@@ -1325,7 +1290,7 @@
           <h3>Affichage</h3>
           <div class="pref-ligne">
             <div><b>Thème</b><p>Clair, sombre, ou celui du système</p></div>
-            <div id="pref-theme"></div>
+            <div id="pref-theme"><button type="button" class="settings-item" id="theme-toggle">Thème</button></div>
           </div>
           <div class="pref-ligne">
             <div><b>Densité</b><p>Espacement des cartes et des tableaux</p></div>
@@ -1350,21 +1315,28 @@
           <h3>Colonnes</h3>
           <div class="pref-ligne">
             <div><b>Positions</b><p>Colonnes affichées dans le tableau des positions</p></div>
-            <div id="pref-col-positions"></div>
+            <div id="pref-col-positions"><button type="button" class="settings-item" id="positions-col-picker">Choisir</button></div>
           </div>
           <div class="pref-ligne">
             <div><b>Actifs</b><p>Colonnes affichées dans le tableau des actifs</p></div>
-            <div id="pref-col-actifs"></div>
+            <div id="pref-col-actifs"><button type="button" class="settings-item" id="actifs-col-picker">Choisir</button></div>
           </div>
           <h3>Application</h3>
           <div class="pref-ligne">
             <div><b>Clés API</b><p>Nécessaires à l'analyse de l'onglet Conseil</p></div>
-            <div id="pref-api"></div>
+            <div id="pref-api"><button type="button" class="settings-item" id="btn-open-settings">Gérer</button></div>
           </div>
           <div class="pref-ligne">
             <div><b>Raccourcis clavier</b><p>La liste des raccourcis disponibles</p></div>
-            <div id="pref-raccourcis"></div>
+            <div id="pref-raccourcis"><button type="button" class="settings-item" id="btn-keyboard-help">Afficher</button></div>
           </div>
+          {% if has_auth %}
+          <h3>Compte</h3>
+          <div class="pref-ligne">
+            <div><b>Déconnexion</b><p>Ferme la session sur cet appareil</p></div>
+            <div><a href="/logout" class="settings-item settings-item-danger">Se déconnecter</a></div>
+          </div>
+          {% endif %}
         </div>
         <div id="reglages-accueil" class="reglages-panneau hidden"></div>
       </div>

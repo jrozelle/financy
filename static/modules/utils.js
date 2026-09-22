@@ -214,38 +214,6 @@ export function chartBorderColor() { _ensureCache(); return _colorCache.border; 
 
 export function chartFamilyColors() { _ensureCache(); return _colorCache.family; }
 
-export function doughnutConfig(labels, data) {
-  const colors = getColors();
-  return {
-    type: 'doughnut',
-    data: {
-      labels,
-      datasets: [{
-        data,
-        backgroundColor: colors.slice(0, labels.length),
-        borderWidth: 2,
-        borderColor: chartBorderColor(),
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { position: 'right', labels: { font: { size: 11 }, padding: 10, boxWidth: 12 } },
-        tooltip: {
-          callbacks: {
-            label: ctx => {
-              const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
-              const pct = ((ctx.parsed / total) * 100).toFixed(1);
-              return ` ${new Intl.NumberFormat('fr-FR').format(Math.round(ctx.parsed))}\u202f€  (${pct}%)`;
-            },
-          },
-        },
-      },
-    },
-  };
-}
-
 export const liqText = l => l ? `Liq. ${l}` : '';
 
 /**

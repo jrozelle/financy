@@ -136,160 +136,6 @@ const VALID_TABS = new Set([
   'referentiel', 'tools', 'import',
 ]);
 
-function _normalizeLegacyLayout() {
-  const menu = document.getElementById('settings-dropdown');
-  const ownerFilter = document.querySelector('.nav-owner-filter');
-  let dateFilter = document.querySelector('.nav-date-filter');
-  const syntheseDate = document.getElementById('synthese-date-select');
-
-  if (ownerFilter) {
-    let btn = document.getElementById('nav-add-button');
-    if (!btn) {
-      btn = document.createElement('button');
-      btn.id = 'nav-add-button';
-    }
-    btn.type = 'button';
-    btn.className = 'nav-icon-btn hidden';
-    btn.title = 'Ajouter';
-    btn.setAttribute('aria-label', 'Ajouter');
-    btn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"></path></svg>`;
-    ownerFilter.prepend(btn);
-  } else if (!document.getElementById('nav-add-button')) {
-    const navActions = document.querySelector('.nav-actions');
-    const btn = document.createElement('button');
-    btn.id = 'nav-add-button';
-    btn.type = 'button';
-    btn.className = 'nav-icon-btn hidden';
-    btn.title = 'Ajouter';
-    btn.setAttribute('aria-label', 'Ajouter');
-    btn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"></path></svg>`;
-    navActions?.insertBefore(btn, navActions.firstChild);
-  }
-
-  if (ownerFilter && syntheseDate) {
-    if (!dateFilter) {
-      dateFilter = document.createElement('div');
-      dateFilter.className = 'nav-date-filter';
-      ownerFilter.after(dateFilter);
-    }
-    if (!dateFilter.contains(syntheseDate)) dateFilter.appendChild(syntheseDate);
-    syntheseDate.setAttribute('aria-label', 'Date du snapshot');
-    syntheseDate.closest('.date-selector')?.querySelector('label')?.remove();
-  }
-
-  // Old templates can remain cached by the running app process. Moving these
-  // controls here keeps refreshed static JS/CSS compatible with that HTML.
-  if (menu) {
-    const ensureMenuButton = (id, html, attrs = {}) => {
-      let btn = document.getElementById(id);
-      if (!btn) {
-        btn = document.createElement('button');
-        btn.id = id;
-      }
-      btn.type = 'button';
-      btn.className = 'settings-item';
-      btn.innerHTML = html;
-      btn.removeAttribute('onclick');
-      for (const [name, value] of Object.entries(attrs)) btn.setAttribute(name, value);
-      return btn;
-    };
-    const section = label => {
-      const el = document.createElement('div');
-      el.className = 'settings-section-label';
-      el.textContent = label;
-      return el;
-    };
-
-    const logout = menu.querySelector('a[href="/logout"]') || document.querySelector('a.logout-link[href="/logout"]');
-
-    // Deux menus, deux natures. L'engrenage ne contient QUE ce qui se regle et
-    // reste vrai d'un ecran a l'autre. Ce qui AGIT — dupliquer un arrete, le
-    // supprimer, rafraichir des cours — part dans un menu d'actions accole au
-    // selecteur de date, puisque ces operations portent sur l'arrete qu'il
-    // designe. Melanger les deux obligeait a relire tout le menu pour trouver
-    // un reglage, et faisait cotoyer « Thème » et « Supprimer ce snapshot ».
-    const reglages = [
-      section('Affichage'),
-      ensureMenuButton('theme-toggle', 'Thème'),
-      section('Colonnes'),
-      ensureMenuButton('positions-col-picker', 'Colonnes des positions'),
-      ensureMenuButton('actifs-col-picker', 'Colonnes des actifs'),
-      section('Application'),
-      ensureMenuButton('btn-open-settings', 'Clés API'),
-      ensureMenuButton('btn-keyboard-help', 'Raccourcis clavier'),
-    ];
-    if (logout) {
-      logout.className = 'settings-item settings-item-danger';
-      logout.textContent = 'Déconnexion';
-      reglages.push(section('Compte'), logout);
-    }
-    menu.replaceChildren(...reglages);
-
-    const actions = document.getElementById('snapshot-dropdown');
-    if (actions) {
-      actions.replaceChildren(
-        section('Cet arrêté'),
-        ensureMenuButton('btn-add-snapshot-note', 'Note de l\u2019arrêté'),
-        ensureMenuButton('btn-duplicate', 'Dupliquer'),
-        ensureMenuButton('btn-rename-snapshot', 'Modifier la date'),
-        ensureMenuButton('btn-delete-snapshot', 'Supprimer', { 'data-danger': '1' }),
-        section('Données'),
-        ensureMenuButton('actifs-refresh-prices', 'Rafraîchir les cours'),
-        ensureMenuButton('btn-open-wealth-target', 'Objectif de patrimoine'),
-        ensureMenuButton('btn-print', 'Imprimer la synthèse'),
-      );
-      actions.querySelector('[data-danger]')?.classList.add('settings-item-danger');
-    }
-  }
-
-  const positionsDate = document.getElementById('positions-date-select');
-  if (positionsDate) {
-    positionsDate.classList.add('hidden');
-    positionsDate.setAttribute('aria-hidden', 'true');
-    positionsDate.setAttribute('tabindex', '-1');
-    positionsDate.closest('#tab-positions .date-selector')?.classList.add('hidden');
-  }
-
-  const positionsOwner = document.getElementById('filter-owner');
-  if (positionsOwner) {
-    positionsOwner.classList.add('hidden');
-    positionsOwner.setAttribute('aria-hidden', 'true');
-    positionsOwner.setAttribute('tabindex', '-1');
-  }
-
-  const positionsTab = document.getElementById('tab-positions');
-  const positionsHeader = positionsTab?.querySelector(':scope > .page-header');
-  const positionsFilters = document.getElementById('positions-filters');
-  if (positionsTab && positionsHeader && positionsFilters && !positionsTab.querySelector(':scope > .positions-toolbar')) {
-    const toolbar = document.createElement('div');
-    toolbar.className = 'page-toolbar positions-toolbar';
-    positionsTab.insertBefore(toolbar, positionsHeader);
-    toolbar.append(positionsHeader, positionsFilters);
-  }
-  document.querySelectorAll('#tab-positions #btn-add-position').forEach(el => el.remove());
-
-  const fluxOwner = document.getElementById('flux-filter-owner');
-  if (fluxOwner) {
-    fluxOwner.classList.add('hidden');
-    fluxOwner.setAttribute('aria-hidden', 'true');
-    fluxOwner.setAttribute('tabindex', '-1');
-  }
-  const fluxTab = document.getElementById('tab-flux');
-  const fluxHeader = fluxTab?.querySelector(':scope > .page-header');
-  const fluxFilters = fluxTab?.querySelector(':scope > .filters-bar, :scope > #flux-filters');
-  if (fluxTab && fluxHeader && fluxFilters && !fluxTab.querySelector(':scope > .page-toolbar')) {
-    const toolbar = document.createElement('div');
-    toolbar.className = 'page-toolbar';
-    fluxTab.insertBefore(toolbar, fluxHeader);
-    toolbar.append(fluxHeader, fluxFilters);
-  }
-  document.querySelectorAll('#tab-flux #btn-add-flux, #tab-entites #btn-add-entity').forEach(el => el.remove());
-
-  document.getElementById('synthese-person-tabs')?.remove();
-  document.querySelectorAll('#tab-synthese .analyse-person-tabs').forEach(el => el.remove());
-  document.querySelector('#tab-actifs .page-filters')?.classList.add('hidden');
-}
-
 // Ajoute/retire .has-overflow sur les .card-table selon leur scroll horizontal.
 // Appele une fois au boot + a chaque resize + a chaque changement d'onglet.
 function _installTableOverflowHints() {
@@ -328,18 +174,20 @@ function _tabFromUrl() {
 
 let _lastLoadedTab = null;
 
-function _updateNavAddButton(tab) {
-  const btn = document.getElementById('nav-add-button');
+/** Ce que « Ajouter » cree sur chaque onglet. Un onglet absent d'ici n'a pas
+ *  de bouton : rien ne s'y ajoute a la main. */
+const AJOUTS = {
+  positions: { libelle: 'Ajouter une position', ouvrir: () => openPosModal() },
+  flux:      { libelle: 'Ajouter un flux',      ouvrir: () => openFluxModal() },
+  entites:   { libelle: 'Ajouter une entité',   ouvrir: () => openEntityModal() },
+};
+
+function _majBoutonAjouter(tab) {
+  const btn = document.getElementById('head-ajouter');
   if (!btn) return;
-  const labels = {
-    positions: 'Ajouter une position',
-    flux: 'Ajouter un flux',
-    entites: 'Ajouter une entité',
-  };
-  const enabled = tab in labels;
-  btn.classList.toggle('hidden', !enabled);
-  btn.title = labels[tab] || 'Ajouter';
-  btn.setAttribute('aria-label', btn.title);
+  const a = AJOUTS[tab];
+  btn.classList.toggle('hidden', !a);
+  if (a) btn.textContent = a.libelle;
 }
 
 
@@ -351,12 +199,12 @@ const LABELS_ONGLET = {
 
 
 
-/** Titre de la page courante, affiche dans la barre du haut.
- *  Le sous-titre rappelle l'arrete consulte : sur une application patrimoniale,
- *  « quelles donnees je regarde » est aussi important que « ou je suis ». */
+/** Titre de la page courante : pour les lecteurs d'ecran et l'onglet du
+ *  navigateur. Il n'est plus affiche — le rail dit ou l'on est, et les
+ *  selecteurs de l'en-tete disent deja l'arrete et le perimetre ; les repeter
+ *  au-dessus d'eux ne faisait que repousser les chiffres. */
 function majTitrePage(tab) {
   const h = document.getElementById('page-title');
-  const p = document.getElementById('page-sub');
   if (!h) return;
   const TITRES = {
     synthese: 'Synthèse du patrimoine', positions: 'Positions',
@@ -365,17 +213,7 @@ function majTitrePage(tab) {
     referentiel: 'Référentiel', import: 'Import / Export', tools: 'Outils',
   };
   h.textContent = TITRES[tab] || 'Financy';
-  if (!p) return;
-  const d = S.syntheseDate || S.positionsDate || S.dates?.[0];
-  const qui = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : 'Famille';
-  const nb = Object.keys(S.synthese?.totals_by_owner || {}).length;
-  const bouts = [];
-  if (d) bouts.push(`Arrêté du ${fmtDate(d)}`);
-  bouts.push(qui);
-  // Le nombre de titulaires qualifie une vue famille ; sous un filtre nominatif
-  // il annoncait « Paul · 4 titulaires », c'est-a-dire le contraire du filtre.
-  if (qui === 'Famille' && nb > 1) bouts.push(`${nb} titulaires`);
-  p.textContent = bouts.join(' · ');
+  document.title = TITRES[tab] ? `${TITRES[tab]} · Financy` : 'Financy';
 }
 
 
@@ -411,10 +249,8 @@ export async function switchTab(tab, { pushHistory = true } = {}) {
     history.pushState({ tab }, '', `/${tab}`);
   }
 
-  const dd = document.getElementById('settings-dropdown');
-  if (dd) dd.classList.add('hidden');
   updateDemoBadge();
-  _updateNavAddButton(tab);
+  _majBoutonAjouter(tab);
 
   const tabId = `tab-${tab}`;
   // Eviter de recharger l'onglet si on y est deja et qu'on ne force pas
@@ -497,12 +333,9 @@ function wireEvents() {
   });
 
   // Positions buttons
-  document.getElementById('nav-add-button')?.addEventListener('click', () => {
-    if (S.currentTab === 'positions') openPosModal();
-    if (S.currentTab === 'flux') openFluxModal();
-    if (S.currentTab === 'entites') openEntityModal();
+  document.getElementById('head-ajouter')?.addEventListener('click', () => {
+    AJOUTS[S.currentTab]?.ouvrir();
   });
-  document.getElementById('btn-add-position')?.addEventListener('click', () => openPosModal());
   document.getElementById('btn-duplicate').addEventListener('click', duplicateSnapshot);
   document.getElementById('btn-rename-snapshot')?.addEventListener('click', renameSnapshot);
   document.getElementById('btn-delete-snapshot')?.addEventListener('click', deleteSnapshot);
@@ -607,35 +440,12 @@ function wireEvents() {
     persistPositionsTreeState();
   });
 
-  // Settings gear menu
-  const settingsToggle = document.getElementById('settings-toggle');
-  const settingsDropdown = document.getElementById('settings-dropdown');
-  if (settingsToggle && settingsDropdown) {
-    settingsToggle.addEventListener('click', e => {
-      e.stopPropagation();
-      settingsDropdown.classList.toggle('hidden');
-    });
-    settingsDropdown.addEventListener('click', e => {
-      const item = e.target.closest('.settings-item');
-      if (!item) return;
-      settingsDropdown.classList.add('hidden');
-      if (item.dataset.tab) switchTab(item.dataset.tab);
-    });
-    document.addEventListener('click', e => {
-      if (!e.target.closest('#settings-menu')) {
-        settingsDropdown.classList.add('hidden');
-      }
-    });
-  }
-
-  // Menu d'actions sur l'arrete courant. Meme mecanique que l'engrenage, mais
-  // les deux ne peuvent pas rester ouverts ensemble : ouvrir l'un ferme l'autre.
+  // Menu d'actions sur l'arrete courant.
   const snapToggle = document.getElementById('snapshot-toggle');
   const snapDropdown = document.getElementById('snapshot-dropdown');
   if (snapToggle && snapDropdown) {
     snapToggle.addEventListener('click', e => {
       e.stopPropagation();
-      settingsDropdown?.classList.add('hidden');
       const ouvert = snapDropdown.classList.toggle('hidden');
       snapToggle.setAttribute('aria-expanded', String(!ouvert));
     });
@@ -650,27 +460,7 @@ function wireEvents() {
         snapToggle.setAttribute('aria-expanded', 'false');
       }
     });
-    settingsToggle?.addEventListener('click', () => {
-      snapDropdown.classList.add('hidden');
-      snapToggle.setAttribute('aria-expanded', 'false');
-    });
   }
-
-  // ── Répartition des outils ──────────────────────────────────────────
-  // Les noeuds sont DEPLACES, pas recrees : ils gardent leurs identifiants et
-  // leurs ecouteurs, donc tout le code qui les cible continue de fonctionner
-  // sans rien savoir de ce reamenagement. Fait en JS et non dans le gabarit
-  // parce que ces blocs contiennent des elements auto-fermants qu'un decoupage
-  // textuel du gabarit tronquait.
-  const deplacer = (quoi, ou) => {
-    const n = document.querySelector(quoi), h = document.getElementById(ou);
-    if (n && h) h.appendChild(n);
-  };
-  deplacer('.nav-owner-filter', 'head-filtres');   // titulaire + bouton ajouter
-  deplacer('.nav-date-filter', 'head-filtres');    // arrete + menu d'actions
-  deplacer('.global-search', 'rail-recherche');    // la recherche est globale
-  deplacer('#settings-menu', 'rail-reglages');     // les reglages aussi
-  // Videe de tout, la barre du haut n'a plus lieu d'etre.
 
   // ── Barre du bas : le bouton « Plus » deplie le rail entier ─────────
   // Sur telephone le rail ne montre que cinq destinations ; les sous-entrees,
@@ -786,7 +576,6 @@ function wireEvents() {
   document.getElementById('synthese-history-group').addEventListener('change', renderSyntheseHistory);
 
   // Flux buttons
-  document.getElementById('btn-add-flux')?.addEventListener('click', () => openFluxModal());
   ['flux-filter-owner','flux-filter-type','flux-filter-category','flux-filter-year'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('change', () => {
@@ -810,7 +599,6 @@ function wireEvents() {
   wireTargetsEvents();
 
   // Entités
-  document.getElementById('btn-add-entity')?.addEventListener('click', () => openEntityModal());
   document.getElementById('entity-form').addEventListener('submit', saveEntity);
   document.getElementById('entity-modal-overlay').addEventListener('click', () => closeModal('entity-modal'));
   ['ent-gross','ent-debt'].forEach(id =>
@@ -912,9 +700,11 @@ function wireEvents() {
       if (popover && !popover.classList.contains('hidden')) {
         popover.classList.add('hidden'); return;
       }
-      const settingsDd = document.getElementById('settings-dropdown');
-      if (settingsDd && !settingsDd.classList.contains('hidden')) {
-        settingsDd.classList.add('hidden'); return;
+      const snapDd = document.getElementById('snapshot-dropdown');
+      if (snapDd && !snapDd.classList.contains('hidden')) {
+        snapDd.classList.add('hidden');
+        document.getElementById('snapshot-toggle')?.setAttribute('aria-expanded', 'false');
+        return;
       }
       // Holdings : warning si brouillon dirty (intercepte Escape)
       const holdingsModal = document.getElementById('holdings-modal');
@@ -1021,9 +811,7 @@ function applyTheme(mode) {
   const btn = document.getElementById('theme-toggle');
   if (btn) {
     const label = mode === 'auto' ? 'Thème : auto (système)' : mode === 'dark' ? 'Thème : sombre' : 'Thème : clair';
-    if (btn.classList.contains('settings-item') || btn.closest('#settings-dropdown')) {
-      btn.textContent = label;
-    }
+    btn.textContent = label;
     btn.title = label;
     btn.setAttribute('aria-label', label);
     btn.dataset.themeMode = mode;
@@ -1039,6 +827,5 @@ function applyTheme(mode) {
 
 // ─── Boot ─────────────────────────────────────────────────────────────────
 
-_normalizeLegacyLayout();
 initTheme();
 init().catch(err => console.error('Init error:', err));

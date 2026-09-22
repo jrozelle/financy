@@ -1,8 +1,6 @@
-import { S, catChart, histChart, syntheseEnvChart, syntheseHistChart,
-         setCatChart, setHistChart, setSyntheseEnvChart, setSyntheseHistChart } from '../state.js';
-import { fmt, fmtDate, esc, kpiDelta, liqBadge, getColors, doughnutConfig, chartBorderColor, chartFamilyColors, destroyChart, parseLocaleNumber, fmtAxis, sparkline} from '../utils.js';
+import { S, histChart, syntheseHistChart, setHistChart, setSyntheseHistChart } from '../state.js';
+import { fmt, fmtDate, esc, kpiDelta, getColors, chartFamilyColors, destroyChart, parseLocaleNumber, fmtAxis, sparkline } from '../utils.js';
 import { api } from '../api.js';
-import { macroBucket } from '../categories.js';
 import { loadTodo } from '../todo.js';
 import { loadContribution } from './contribution.js';
 import { renderRepartition } from './repartition.js';
@@ -41,7 +39,6 @@ export async function loadSynthese() {
     syn._positions_cache[o] = positions.filter(p => p.owner === o);
   }
   S.synthese = syn;
-  renderSynthesePersonTabs();
   renderSynthese();
 }
 
@@ -73,12 +70,6 @@ function _clearSyntheseEmpty() {
   const host = document.getElementById('tab-synthese');
   host?.querySelector('.empty-state-synthese')?.remove();
   host?.querySelectorAll('.kpi-grid, .charts-row, .card').forEach(el => el.classList.remove('hidden'));
-}
-
-export function renderSynthesePersonTabs() {
-  const container = document.getElementById('synthese-person-tabs');
-  if (!container) return;
-  container.remove();
 }
 
 export function renderSynthese() {
@@ -169,202 +160,19 @@ export function renderSynthese() {
   document.getElementById('kpi-debt-label').textContent  = isFamily ? 'Dettes' : `Dettes — ${owner}`;
   document.getElementById('kpi-mob-label').textContent   = isFamily ? 'Mobilisable' : `Mobilisable — ${owner}`;
 
-  const catFiltered = isFamily
-    ? totals_by_category
-    : Object.fromEntries(
-        Object.entries(totals_by_category).map(([cat, v]) => [
-          cat, { net: v.by_owner?.[owner] || 0, by_owner: v.by_owner }
-        ]).filter(([, v]) => v.net > 0)
-      );
-
   renderRepartition();
   loadContribution();
   loadComptes();
   loadFiscalite();
   renderEntityWarnings(syn.entity_warnings || []);
-  renderOwnersTable(totals_by_owner, family, Object.values(totals_by_owner).reduce((s,o)=>s+o.mobilizable,0));
-  renderCatChart(catFiltered);
-  renderEnvChart(syn._positions_cache, owner);
   renderHistChart(owner);
   renderSyntheseHistory();
   renderLiqBars(liqFiltered);
   renderEntitiesSynthese();
   renderAllocationTargets();
-  renderMacroSynthesis(syn.totals_by_macro, syn._positions_cache, owner, isFamily);
   renderSnapshotDiff(owner, isFamily);
   renderSnapshotNote(syn);
   renderWealthTarget(kpi.net);
-}
-
-function renderOwnersTable(byOwner, family, totalMob) {
-  const activeOwner = S.syntheseOwner;
-  const familyNet = family.net || 0;
-  const rows = _owners().map(o => {
-    const t = byOwner[o] || { gross: 0, debt: 0, net: 0, mobilizable: 0 };
-    const pct = familyNet !== 0 ? ((t.net / familyNet) * 100).toFixed(1) : '—';
-    const highlight = (activeOwner !== 'Famille' && activeOwner === o)
-      ? ' style="background:var(--primary-light);font-weight:700"' : '';
-    return `<tr class="clickable" data-dd-owner="${esc(o)}"${highlight}>
-      <td>${esc(o)}</td>
-      <td>${fmt(t.gross)}</td>
-      <td class="${t.debt > 0 ? 'neg' : ''}">${t.debt > 0 ? fmt(t.debt) : '—'}</td>
-      <td class="${t.net < 0 ? 'neg' : 'pos'}">${fmt(t.net)}</td>
-      <td style="text-align:right;font-size:12px;color:var(--text-muted)">${pct !== '—' ? pct + '\u202f%' : '—'}</td>
-      <td>${fmt(t.mobilizable)}</td>
-    </tr>`;
-  }).join('');
-
-  const hoteOwners = document.getElementById('owners-table');
-  if (!hoteOwners) return;   // fondu dans la carte Répartition
-  hoteOwners.innerHTML = `
-    <table class="owners-table">
-      <thead><tr>
-        <th>Personne</th><th>Actifs</th><th>Dettes</th><th>Net</th><th>% du total</th><th>Mobilisable</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-      <tfoot><tr class="total-row clickable" data-dd-owner="Famille">
-        <td>TOTAL FAMILLE</td>
-        <td>${fmt(family.gross)}</td>
-        <td class="${family.debt > 0 ? 'neg' : ''}">${family.debt > 0 ? fmt(family.debt) : '—'}</td>
-        <td class="${family.net < 0 ? 'neg' : 'pos'}">${fmt(family.net)}</td>
-        <td style="text-align:right;font-size:12px;color:var(--text-muted)">100\u202f%</td>
-        <td>${fmt(totalMob)}</td>
-      </tr></tfoot>
-    </table>`;
-
-  hoteOwners.querySelectorAll('[data-dd-owner]').forEach(tr => {
-    tr.addEventListener('click', () => {
-      const owner = tr.dataset.ddOwner;
-      api('GET', `/api/positions?date=${S.syntheseDate}`).then(positions => {
-        const filtered = owner === 'Famille' ? positions : positions.filter(p => p.owner === owner);
-        drilldownPositions(filtered, owner, 'Patrimoine net');
-      });
-    });
-  });
-}
-
-function renderCatChart(byCat) {
-  const cats = Object.keys(byCat).filter(c => byCat[c].net > 0)
-    .sort((a, b) => byCat[b].net - byCat[a].net);   // poids décroissant
-  const vals = cats.map(c => byCat[c].net);
-
-  destroyChart(catChart);
-  const cvCat = document.getElementById('category-chart');
-  if (!cvCat) return;        // fondu dans la carte Répartition
-  const ctx = cvCat.getContext('2d');
-  setCatChart(new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: cats,
-      datasets: [{
-        data: vals,
-        backgroundColor: getColors().slice(0, cats.length),
-        borderWidth: 2,
-        borderColor: chartBorderColor(),
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      onClick: (_, elements) => {
-        if (!elements.length) return;
-        const cat = cats[elements[0].index];
-        api('GET', `/api/positions?date=${S.syntheseDate}`).then(positions => {
-          const _o = S.syntheseOwner;
-          const filtered = positions.filter(p => p.category === cat && (_o === 'Famille' || p.owner === _o));
-          drilldownPositions(filtered, cat, 'Catégorie', { showOwner: _o === 'Famille' });
-        });
-      },
-      plugins: {
-        legend: {
-          position: 'right',
-          labels: { font: { size: 11 }, padding: 10, boxWidth: 12 },
-          onClick: (e, item, legend) => {
-            const cat = cats[item.index];
-            api('GET', `/api/positions?date=${S.syntheseDate}`).then(positions => {
-              const _o = S.syntheseOwner;
-              const filtered = positions.filter(p => p.category === cat && (_o === 'Famille' || p.owner === _o));
-              drilldownPositions(filtered, cat, 'Catégorie', { showOwner: _o === 'Famille' });
-            });
-          },
-        },
-        tooltip: {
-          callbacks: {
-            label: ctx => {
-              const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
-              const pct = ((ctx.parsed / total) * 100).toFixed(1);
-              return ` ${fmt(ctx.parsed)}  (${pct}%)`;
-            },
-            afterLabel: () => 'Cliquer pour détailler',
-          },
-        },
-      },
-    },
-  }));
-}
-
-function renderEnvChart(posCache, owner) {
-  const positions = owner === 'Famille'
-    ? Object.values(posCache || {}).flat()
-    : (posCache?.[owner] || []);
-
-  const byEnv = {};
-  for (const p of positions) {
-    const k = p.envelope || 'Autre';
-    byEnv[k] = (byEnv[k] || 0) + (p.net_attributed || 0);
-  }
-  const labels = Object.keys(byEnv).filter(k => byEnv[k] > 0)
-    .sort((a, b) => byEnv[b] - byEnv[a]);   // poids décroissant
-  const vals   = labels.map(k => byEnv[k]);
-
-  destroyChart(syntheseEnvChart);
-  const cvEnv = document.getElementById('synthese-env-chart');
-  if (!cvEnv) return;        // fondu dans la carte Répartition
-  const ctx = cvEnv.getContext('2d');
-  const colors = getColors();
-  setSyntheseEnvChart(new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels,
-      datasets: [{
-        data: vals,
-        backgroundColor: colors.slice(0, labels.length),
-        borderWidth: 2,
-        borderColor: chartBorderColor(),
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      onClick: (_, elements) => {
-        if (!elements.length) return;
-        const env = labels[elements[0].index];
-        const envPos = positions.filter(p => (p.envelope || 'Autre') === env);
-        drilldownPositions(envPos, env, 'Enveloppe', { showOwner: true });
-      },
-      plugins: {
-        legend: {
-          position: 'right',
-          labels: { font: { size: 11 }, padding: 10, boxWidth: 12 },
-          onClick: (e, item) => {
-            const env = labels[item.index];
-            const envPos = positions.filter(p => (p.envelope || 'Autre') === env);
-            drilldownPositions(envPos, env, 'Enveloppe', { showOwner: true });
-          },
-        },
-        tooltip: {
-          callbacks: {
-            label: ctx => {
-              const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
-              const pct = ((ctx.parsed / total) * 100).toFixed(1);
-              return ` ${fmt(ctx.parsed)}  (${pct}%)`;
-            },
-            afterLabel: () => 'Cliquer pour détailler',
-          },
-        },
-      },
-    },
-  }));
 }
 
 export async function renderSyntheseHistory() {
@@ -711,48 +519,6 @@ function renderLiqBars(byLiq) {
     </div>
     ${total ? `<p class="dispo-note">Les montants sont cumulés : chaque délai
       inclut ce qui était déjà disponible avant.</p>` : ''}`;
-}
-
-function renderMacroSynthesis(byMacro, posCache, owner, isFamily) {
-  const el = document.getElementById('macro-synthese');
-  if (!el) return;           // fondu dans la carte Répartition
-  if (!el) return;
-  if (!byMacro) { el.innerHTML = ''; return; }
-  const order = ['Patrimoine financier', 'Patrimoine immobilier', 'Patrimoine autre'];
-  const rows = order.map(label => {
-    const m = byMacro[label] || { gross: 0, net: 0, by_owner: {} };
-    const gross = isFamily ? (m.gross || 0) : (m.by_owner?.[owner]?.gross || 0);
-    const net   = isFamily ? (m.net   || 0) : (m.by_owner?.[owner]?.net   || 0);
-    return { label, gross, net };
-  });
-  const totGross = rows.reduce((s, r) => s + r.gross, 0);
-  const totNet   = rows.reduce((s, r) => s + r.net, 0);
-  const pct  = (v, t) => t ? (v / t * 100) : 0;
-  const cell = (v, t) => `<td class="num">${fmt(v)}</td><td class="num text-muted">${pct(v, t).toFixed(1)} %</td>`;
-  el.innerHTML = `<table class="data-table" style="width:100%">
-    <thead><tr><th>Poche</th><th class="num">Brut</th><th class="num">%</th><th class="num">Net</th><th class="num">%</th></tr></thead>
-    <tbody>
-      ${rows.map(r => `<tr class="dd-row-clickable" data-macro="${esc(r.label)}" style="cursor:pointer" title="Voir le détail des positions">
-        <td>${esc(r.label)}</td>${cell(r.gross, totGross)}${cell(r.net, totNet)}</tr>`).join('')}
-    </tbody>
-    <tfoot><tr>
-      <td><strong>Total</strong></td>
-      <td class="num"><strong>${fmt(totGross)}</strong></td><td class="num">100 %</td>
-      <td class="num"><strong>${fmt(totNet)}</strong></td><td class="num">100 %</td>
-    </tr></tfoot>
-  </table>`;
-
-  // Drill-down : clic sur une poche -> positions de cette poche
-  const positions = isFamily
-    ? Object.values(posCache || {}).flat()
-    : (posCache?.[owner] || []);
-  el.querySelectorAll('tr[data-macro]').forEach(tr => {
-    tr.addEventListener('click', () => {
-      const bucket = tr.dataset.macro;
-      const bucketPos = positions.filter(p => macroBucket(p.category) === bucket);
-      drilldownPositions(bucketPos, bucket, 'Poche patrimoniale', { showOwner: isFamily });
-    });
-  });
 }
 
 async function renderSnapshotDiff(owner, isFamily) {

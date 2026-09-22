@@ -41,37 +41,6 @@ function goBack() {
   _restore(_navStack.pop());
 }
 
-// ─── Core ─────────────────────────────────────────────────────────────────
-
-export function openDrilldown({ subtitle, title, amount, sections }) {
-  document.getElementById('dd-subtitle').textContent = subtitle || '';
-  document.getElementById('dd-title').textContent    = title   || '';
-  document.getElementById('dd-amount').textContent   = amount  || '';
-
-  document.getElementById('dd-body').innerHTML = sections.map(sec => `
-    <div class="dd-section">
-      ${sec.title ? `<div class="dd-section-title">${esc(sec.title)}</div>` : ''}
-      ${sec.rows.map(r => {
-        const bar = r.pct != null
-          ? `<div class="dd-bar-wrap"><div class="dd-bar" style="width:${Math.min(100,r.pct).toFixed(1)}%"></div></div>`
-          : '';
-        return `<div class="dd-row">
-          <div class="dd-row-left">
-            <div class="dd-row-name">${esc(r.name)}</div>
-            ${r.sub ? `<div class="dd-row-sub">${esc(r.sub)}</div>` : ''}
-            ${bar}
-          </div>
-          <div class="dd-row-right">
-            <div class="dd-row-val ${r.neg ? 'neg' : ''}">${r.val}</div>
-            ${r.pctLabel ? `<div class="dd-row-pct">${r.pctLabel}</div>` : ''}
-          </div>
-        </div>`;
-      }).join('')}
-    </div>`).join('');
-
-  document.getElementById('drilldown-panel').classList.remove('hidden');
-  _updateBackBtn();
-}
 
 export function closeDrilldown() {
   _navStack.length = 0;

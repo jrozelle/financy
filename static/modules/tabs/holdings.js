@@ -21,8 +21,6 @@ let _dirty = false;
 function _markDirty() { _dirty = true; }
 function _markClean() { _dirty = false; }
 
-export function isHoldingsDirty() { return _dirty; }
-
 /**
  * Tente de fermer la modale holdings. Si le brouillon est dirty, demande
  * confirmation. Retourne true si la modale a été fermée, false sinon.

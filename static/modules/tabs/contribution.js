@@ -32,20 +32,42 @@ export async function loadContribution() {
   // plutot qu'une barre solitaire qui n'apprend rien.
   if (periodes.length < 2) { carte.style.display = 'none'; return; }
   carte.style.display = '';
+  _periodes = periodes;
   dessiner(periodes);
   legende(d);
+  _suivreLargeur();
+}
+
+let _periodes = null;
+let _suivi = null;
+
+/** Redessine a la largeur courante de la carte. Un seul observateur, pose au
+ *  premier affichage ; `requestAnimationFrame` regroupe les rafales d'un
+ *  redimensionnement de fenetre en un dessin. */
+function _suivreLargeur() {
+  const hote = document.getElementById('contribution-chart');
+  if (_suivi || !hote || !('ResizeObserver' in window)) return;
+  let largeur = hote.clientWidth, attente = 0;
+  _suivi = new ResizeObserver(() => {
+    if (Math.abs(hote.clientWidth - largeur) < 4 || !_periodes) return;
+    largeur = hote.clientWidth;
+    cancelAnimationFrame(attente);
+    attente = requestAnimationFrame(() => dessiner(_periodes));
+  });
+  _suivi.observe(hote);
 }
 
 function dessiner(periodes) {
   const hote = document.getElementById('contribution-chart');
   if (!hote) return;
 
-  // Coordonnees ABSOLUES dans un viewBox proportionne, et surtout PAS de
-  // `preserveAspectRatio="none"` : cet etirement deforme le texte autant que
-  // les formes, ce qui rendait les libelles illisibles une fois la carte
-  // etiree sur toute la largeur.
-  // 78 px par periode : en deca, le libelle de valeur deborde sur ses voisins.
-  const L = 78 * periodes.length + 30;
+  // Le viewBox prend la LARGEUR REELLE de la carte, en pixels : le SVG est
+  // alors affiche a l'echelle 1. Un viewBox fixe de 186 unites, etire en
+  // `width: 100%` dans une carte de 700 px, multipliait tout par 3,8 — libelles
+  // de 42 px, barres monumentales. On redessine donc quand la carte change de
+  // taille, plutot que de laisser le navigateur agrandir un dessin trop petit.
+  // 78 px par periode au minimum : en deca, le libelle de valeur deborde.
+  const L = Math.max(Math.round(hote.clientWidth || 0), 78 * periodes.length + 30);
   const H = 150, BAS = 30, MARGE = 26;
 
   const haut = Math.max(...periodes.map(p => Math.max(0, p.apports) + Math.max(0, p.performance)), 0);
@@ -69,14 +91,17 @@ function dessiner(periodes) {
       return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barre.toFixed(1)}" `
            + `height="${Math.max(h, 1).toFixed(1)}" fill="${couleur}" rx="2"/>`;
     };
+    // Les segments d'abord : ce sont eux qui font monter `hautCumul`. Lire le
+    // sommet avant de les dessiner posait le libelle sur la ligne zero, a
+    // l'interieur de la barre.
+    const segments = seg(p.performance, 'var(--chart-1)') + seg(p.apports, 'var(--chart-4)');
     const total = p.apports + p.performance;
     const sommet = Math.min(hautCumul, zero);
     const yVal = sommet - 7;
     // Un libelle par barre, en mois abrege : la date complete se chevauchait
     // des quatre periodes.
     const mois = p.libelle || '';
-    return seg(p.performance, 'var(--chart-1)')
-         + seg(p.apports, 'var(--chart-4)')
+    return segments
          + `<text x="${cx.toFixed(1)}" y="${(H + 15).toFixed(1)}" text-anchor="middle" `
          + `class="contrib-axe">${mois}</text>`
          + `<text x="${cx.toFixed(1)}" y="${yVal.toFixed(1)}" text-anchor="middle" `
