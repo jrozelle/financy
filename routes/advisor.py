@@ -466,6 +466,29 @@ def patch_proposal(pid):
 
 # ─── Consommation LLM (phase 7) ──────────────────────────────────────────────
 
+@advisor_bp.route('/api/advisor/constats', methods=['GET'])
+@login_required
+def get_constats():
+    """Constats deterministes sur l'arrete (defaut : le dernier). Lecture seule.
+
+    Params : `owner` (defaut : famille), `date`.
+    """
+    from services.advisor.constats import constats
+    owner = request.args.get('owner') or None
+    if owner in ('Famille', ''):
+        owner = None
+    with get_db() as conn:
+        date = request.args.get('date')
+        if not date:
+            row = conn.execute('SELECT MAX(date) d FROM positions').fetchone()
+            date = row['d'] if row else None
+        if not date:
+            return jsonify({'date': None, 'owner': owner, 'constats': []})
+        if not validate_date(date):
+            return jsonify({'error': 'Date invalide (format AAAA-MM-JJ attendu)'}), 400
+        return jsonify(constats(conn, date, owner))
+
+
 @advisor_bp.route('/api/advisor/usage', methods=['GET'])
 @login_required
 def get_usage():

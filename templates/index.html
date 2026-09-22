@@ -541,14 +541,26 @@
 
       <div class="advisor-layout">
         <aside class="advisor-sidebar" aria-label="Sections du conseil">
-          <a href="#adv-profile"     class="advisor-sidebar-link" data-anchor="adv-profile">Profil</a>
-          <a href="#adv-objectives"  class="advisor-sidebar-link" data-anchor="adv-objectives">Objectifs</a>
+          <!-- Dans l'ordre ou l'on s'en sert : ce qu'il y a a regarder, ce qu'on
+               pourrait faire, pourquoi ; puis les hypotheses qui fondent le tout. -->
+          <a href="#adv-constats"    class="advisor-sidebar-link" data-anchor="adv-constats">Constats</a>
+          <a href="#adv-proposals"   class="advisor-sidebar-link" data-anchor="adv-proposals">Propositions</a>
           <a href="#adv-allocation"  class="advisor-sidebar-link" data-anchor="adv-allocation">Allocation</a>
           <a href="#adv-macro"       class="advisor-sidebar-link" data-anchor="adv-macro">Macro</a>
-          <a href="#adv-proposals"   class="advisor-sidebar-link" data-anchor="adv-proposals">Propositions</a>
-          <a href="#adv-usage"       class="advisor-sidebar-link" data-anchor="adv-usage">Consommation API</a>
+          <a href="#adv-profile"     class="advisor-sidebar-link" data-anchor="adv-profile">Profil</a>
+          <a href="#adv-objectives"  class="advisor-sidebar-link" data-anchor="adv-objectives">Objectifs</a>
         </aside>
         <div class="advisor-content">
+
+      <div class="card" id="adv-constats">
+        <div class="card-head">
+          <div>
+            <h2>Constats</h2>
+            <p class="card-sub" id="adv-constats-sous">Ce que montrent vos chiffres, sans hypothèse de profil.</p>
+          </div>
+        </div>
+        <ul class="constats" id="adv-constats-liste" aria-live="polite"></ul>
+      </div>
 
       <div class="card" id="adv-profile">
         <h2>Profil de la personne</h2>
@@ -636,7 +648,7 @@
         <h2>Allocation cible vs actuelle</h2>
         <div id="advisor-adjustments" class="advisor-adjustments"></div>
         <div id="advisor-allocation-wrap">
-          <div style="position:relative;height:280px;margin-bottom:1rem">
+          <div id="advisor-allocation-graphe" style="position:relative;height:280px;margin-bottom:1rem">
             <canvas id="advisor-allocation-chart"></canvas>
           </div>
           <div class="table-scroll">

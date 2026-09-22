@@ -15,17 +15,21 @@ function _installSidebarScrollSpy() {
     .filter(Boolean);
   if (!sections.length) return;
 
-  _scrollSpyObserver = new IntersectionObserver(entries => {
-    // Prend la section dont le rect est la plus haute dans le viewport
-    const visible = entries
-      .filter(e => e.isIntersecting)
-      .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
-    if (!visible.length) return;
-    const activeId = visible[0].target.id;
-    links.forEach(a => a.classList.toggle('is-active', a.dataset.anchor === activeId));
-  }, { rootMargin: '-40% 0px -55% 0px', threshold: [0, 0.3, 0.6, 1] });
-
-  sections.forEach(s => _scrollSpyObserver.observe(s));
+  // La section active est la derniere dont le haut a passe sous la barre
+  // figee. Trier par proportion visible, comme avant, desavantageait les
+  // sections longues : Constats, haute d'un ecran, n'etait jamais « la plus
+  // visible », et la navigation surlignait Propositions en haut de page.
+  const marque = () => {
+    const barre = (document.querySelector('.page-head')?.getBoundingClientRect().bottom || 0) + 24;
+    const ordonnees = [...sections].sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
+    let active = ordonnees[0];
+    ordonnees.forEach(sec => { if (sec.getBoundingClientRect().top <= barre) active = sec; });
+    links.forEach(a => a.classList.toggle('is-active', a.dataset.anchor === active.id));
+  };
+  let attente = 0;
+  _scrollSpyObserver = () => { cancelAnimationFrame(attente); attente = requestAnimationFrame(marque); };
+  window.addEventListener('scroll', _scrollSpyObserver, { passive: true });
+  marque();
 
   // Clic : smooth scroll (complement au href="#id" natif)
   links.forEach(a => {
@@ -53,15 +57,57 @@ export async function loadAdvisor() {
   if (sel.options.length !== owners.length) {
     sel.innerHTML = owners.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
   }
-  // Sync avec le selecteur global
+  // Les profils existants d'abord : ouvrir celui d'un enfant qui n'en a pas
+  // montrait un formulaire vide — et demander un profil absent renvoyait un
+  // 404 a chaque visite.
+  try {
+    const liste = await api('GET', '/api/advisor/profiles', null, { silent: true });
+    _profils = new Set((liste || []).map(p => p.owner));
+  } catch { _profils = new Set(); }
+  // Le titulaire choisi dans la barre du haut s'il en est un ; sinon le
+  // premier qui a un profil ; sinon le premier du referentiel.
   const globalOwner = S.syntheseOwner;
   if (globalOwner && globalOwner !== 'Famille' && owners.includes(globalOwner)) {
     _currentOwner = globalOwner;
   } else if (!_currentOwner || !owners.includes(_currentOwner)) {
-    _currentOwner = owners[0] || null;
+    _currentOwner = owners.find(o => _profils.has(o)) || owners[0] || null;
   }
   sel.value = _currentOwner;
-  await _loadOwnerData();
+  await Promise.all([_loadOwnerData(), _loadConstats()]);
+}
+
+let _profils = new Set();
+
+// ── Constats ──────────────────────────────────────────────────────────────
+// Ils suivent le titulaire de la barre du haut, famille comprise : un constat
+// porte sur les donnees, il n'a pas besoin d'un profil de risque.
+async function _loadConstats() {
+  const liste = document.getElementById('adv-constats-liste');
+  if (!liste) return;
+  const owner = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : '';
+  const q = new URLSearchParams();
+  if (owner) q.set('owner', owner);
+  if (S.syntheseDate) q.set('date', S.syntheseDate);
+  let d;
+  try { d = await api('GET', `/api/advisor/constats?${q}`, null, { silent: true }); }
+  catch { liste.innerHTML = ''; return; }
+  const sous = document.getElementById('adv-constats-sous');
+  if (sous) sous.textContent = `${owner || 'Famille'} · ce que montrent vos chiffres, sans hypothèse de profil`;
+  if (!d.constats?.length) {
+    liste.innerHTML = '<li class="constats-vide">Rien à signaler sur cet arrêté.</li>';
+    return;
+  }
+  const LIB = { alerte: 'À vérifier', action: 'À faire', info: 'À savoir' };
+  // Les montants arrivent marques ⟦v⟧ : formates ici, ils suivent le mode
+  // discretion comme tous les autres montants de l'application.
+  const montants = t => esc(t).replace(/⟦(-?[\d.]+)⟧/g, (_, v) => fmt(Number(v)));
+  liste.innerHTML = d.constats.map(k => `
+    <li class="constat constat--${k.niveau}">
+      <span class="constat-niveau">${LIB[k.niveau] || k.niveau}</span>
+      <span class="constat-titre">${montants(k.titre)}</span>
+      ${k.onglet ? `<button type="button" class="constat-voir" data-tab-switch="${esc(k.onglet)}">Voir</button>` : '<span></span>'}
+      <p class="constat-detail">${montants(k.detail)}</p>
+    </li>`).join('');
 }
 
 async function _loadOwnerData() {
@@ -81,6 +127,7 @@ async function _loadOwnerData() {
 }
 
 async function _loadProfile() {
+  if (!_profils.has(_currentOwner)) return null;     // pas de profil : pas de requete
   try {
     return await api('GET', `/api/advisor/profiles/${encodeURIComponent(_currentOwner)}`,
                      null, { silent: true });
@@ -125,6 +172,7 @@ async function saveProfile(e) {
   };
   try {
     await api('PUT', `/api/advisor/profiles/${encodeURIComponent(_currentOwner)}`, payload);
+    _profils.add(_currentOwner);      // sinon le rechargement le croirait absent
     toast('Profil enregistré', 'success');
     await _loadOwnerData();  // recharge allocation (derivee du profil)
   } catch {}
@@ -204,6 +252,9 @@ async function deleteObjective(tr) {
 async function _loadAllocation(profile) {
   const wrap = document.getElementById('advisor-allocation-wrap');
   const adjEl = document.getElementById('advisor-adjustments');
+  // Sans donnees, pas de cadre de graphe vide de 280 px.
+  const graphe = document.getElementById('advisor-allocation-graphe');
+  if (graphe) graphe.style.display = profile ? '' : 'none';
   if (!profile) {
     adjEl.innerHTML = `
       <div class="empty-state" style="padding:1rem 0">

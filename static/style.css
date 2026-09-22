@@ -3650,3 +3650,45 @@ td.arbo-part > * { vertical-align: middle; }
 .arbo th.num .arbo-tri { margin-left: auto; }
 @media (hover: hover) { .arbo-tri:hover { color: var(--text); } }
 .arbo-tri:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 3px; }
+
+/* ── Conseil : ordre des sections et constats ─────────────────────────── */
+/* L'ordre d'usage, sans deplacer les blocs du gabarit : on vient pour savoir
+   quoi regarder et quoi faire ; les hypotheses (profil, objectifs) viennent
+   ensuite, et la consommation d'API ferme la marche. */
+.advisor-content { display: flex; flex-direction: column; gap: calc(1rem * var(--d)); }
+.advisor-content > .card { margin-bottom: 0; }
+#adv-constats   { order: 0; }
+#adv-proposals  { order: 1; }
+#adv-allocation { order: 2; }
+#adv-macro      { order: 3; }
+#adv-profile    { order: 4; }
+#adv-objectives { order: 5; }
+#adv-usage      { order: 6; }
+
+.constats { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.constat {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: .75rem; row-gap: .2rem;
+  padding: .7rem 0; border-top: 1px solid var(--border);
+}
+.constat:first-child { border-top: 0; padding-top: .2rem; }
+.constat-niveau {
+  grid-row: span 2; align-self: start; margin-top: .1rem;
+  font-size: .62rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  padding: .12rem .45rem; border-radius: 5px; white-space: nowrap;
+}
+.constat--alerte .constat-niveau { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
+.constat--action .constat-niveau { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--primary); }
+.constat--info   .constat-niveau { background: var(--bg); color: var(--text-muted); }
+.constat-titre { font-weight: 500; font-size: .88rem; }
+.constat-detail { grid-column: 2 / 4; margin: 0; font-size: .8rem; color: var(--text-muted); line-height: 1.5; max-width: 72ch; }
+.constat-voir {
+  align-self: start; border: 0; background: none; padding: 0; font: inherit; font-size: .78rem;
+  color: var(--primary); cursor: pointer; white-space: nowrap;
+}
+@media (hover: hover) { .constat-voir:hover { text-decoration: underline; } }
+.constats-vide { color: var(--text-muted); font-size: .84rem; padding: .3rem 0; }
+@media (max-width: 640px) {
+  .constat { grid-template-columns: minmax(0, 1fr) auto; }
+  .constat-niveau { grid-row: auto; grid-column: 1 / -1; justify-self: start; }
+  .constat-detail { grid-column: 1 / -1; }
+}
