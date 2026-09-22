@@ -2,6 +2,7 @@ import { S, catChart, histChart, syntheseEnvChart, syntheseHistChart,
          setCatChart, setHistChart, setSyntheseEnvChart, setSyntheseHistChart } from '../state.js';
 import { fmt, fmtDate, esc, kpiDelta, liqBadge, getColors, doughnutConfig, chartBorderColor, chartFamilyColors, destroyChart, parseLocaleNumber, fmtAxis, sparkline} from '../utils.js';
 import { api } from '../api.js';
+import { macroBucket } from '../categories.js';
 import { loadTodo } from '../todo.js';
 import { loadContribution } from './contribution.js';
 import { renderRepartition } from './repartition.js';
@@ -712,21 +713,6 @@ function renderLiqBars(byLiq) {
       inclut ce qui était déjà disponible avant.</p>` : ''}`;
 }
 
-// Mapping categorie -> poche patrimoniale (miroir de MACRO_BUCKETS dans
-// routes/synthese.py — garder les deux synchronises). Categorie non listee -> autre.
-const MACRO_BUCKETS = {
-  'Patrimoine financier':  ['Cash & dépôts', 'Monétaire', 'Obligations', 'Actions', 'Fond Euro', 'Produits Structurés', 'Crypto'],
-  'Patrimoine immobilier': ['Immobilier', 'SCPI'],
-  'Patrimoine autre':      ['Objets de valeur', 'Société', 'Parts sociales', 'Autre'],
-};
-
-function _macroBucket(category) {
-  for (const [bucket, cats] of Object.entries(MACRO_BUCKETS)) {
-    if (cats.includes(category)) return bucket;
-  }
-  return 'Patrimoine autre';
-}
-
 function renderMacroSynthesis(byMacro, posCache, owner, isFamily) {
   const el = document.getElementById('macro-synthese');
   if (!el) return;           // fondu dans la carte Répartition
@@ -763,7 +749,7 @@ function renderMacroSynthesis(byMacro, posCache, owner, isFamily) {
   el.querySelectorAll('tr[data-macro]').forEach(tr => {
     tr.addEventListener('click', () => {
       const bucket = tr.dataset.macro;
-      const bucketPos = positions.filter(p => _macroBucket(p.category) === bucket);
+      const bucketPos = positions.filter(p => macroBucket(p.category) === bucket);
       drilldownPositions(bucketPos, bucket, 'Poche patrimoniale', { showOwner: isFamily });
     });
   });

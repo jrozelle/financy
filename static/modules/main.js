@@ -691,7 +691,7 @@ function wireEvents() {
   // Choisir une destination referme la feuille ; le bouton lui-meme la bascule.
   rail?.addEventListener('click', e => {
     if (e.target.closest('#rail-plus')) return;
-    if (e.target.closest('.tab-btn, #ouvrir-reglages')) replierRail();
+    if (e.target.closest('.tab-btn, #ouvrir-reglages, [data-tab-switch]')) replierRail();
   });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && rail?.classList.contains('is-open')) replierRail();

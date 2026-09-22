@@ -16,7 +16,12 @@
        les memes data-tab / data-group, le JS existant les cable sans rien
        savoir de ce changement. -->
   <nav class="fin-rail" id="fin-rail" aria-label="Navigation principale">
-    <div class="fin-rail-brand"><span class="fin-rail-mark">F</span>Financy</div>
+    <!-- La marque ramene a l'accueil, comme partout ailleurs sur le web. Un
+         vrai bouton plutot qu'un div : atteignable au clavier, annonce comme
+         une commande. `data-tab-switch` est deja delegue dans main.js. -->
+    <button type="button" class="fin-rail-brand" data-tab-switch="synthese">
+      <span class="fin-rail-mark">F</span>Financy
+    </button>
     <div id="rail-recherche"></div>
 
     <button type="button" class="tab-btn fin-rail-item" data-tab="synthese"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>Synthèse</button>

@@ -173,3 +173,30 @@ class TestCategoriesRenommees:
         from models import _CATEGORIES_FULL
         classees = {c for cats in MACRO_BUCKETS.values() for c in cats}
         assert not set(_CATEGORIES_FULL) - classees
+
+
+class TestMappingPartageAvecLeFront:
+    """`MACRO_BUCKETS` existe en double : Python pour les totaux, JavaScript
+    pour la carte Repartition et le filtre de « Vos comptes ». Deux copies qui
+    divergent produiraient des chiffres differents sur le meme ecran sans que
+    rien ne le signale — d'ou ce test, qui lit reellement le fichier JS."""
+
+    def _js(self):
+        import json
+        import re
+        from pathlib import Path
+        src = Path(__file__).resolve().parent.parent / 'static' / 'modules' / 'categories.js'
+        bloc = re.search(r'MACRO_BUCKETS = \{(.*?)\n\};', src.read_text(), re.S).group(1)
+        return {b: sorted(json.loads('[' + lst.replace("'", '"') + ']'))
+                for b, lst in re.findall(r"'([^']+)':\s*\[([^\]]*)\]", bloc)}
+
+    def test_les_deux_copies_sont_identiques(self):
+        from routes.synthese import MACRO_BUCKETS
+        srv = {b: sorted(cats) for b, cats in MACRO_BUCKETS.items()}
+        assert self._js() == srv
+
+    def test_le_front_ne_classe_pas_un_bien_en_financier(self):
+        # C'est la regle qui separe un compte d'un bien dans « Vos comptes ».
+        fin = self._js()['Patrimoine financier']
+        for bien in ('Immobilier', 'SCPI', 'Objets de valeur', 'Parts sociales'):
+            assert bien not in fin

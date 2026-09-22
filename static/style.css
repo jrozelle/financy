@@ -3117,10 +3117,15 @@ html.is-masked body::before {
   background: var(--rail); color: var(--rail-ink);
   padding: 1rem .5rem .75rem; overflow-y: auto;
 }
+/* La marque ramene a la synthese : c'est un bouton, il ne doit pas en avoir
+   l'apparence native. */
 .fin-rail-brand {
-  display: flex; align-items: center; gap: .55rem;
+  display: flex; align-items: center; gap: .55rem; width: 100%;
   padding: 0 .5rem 1.1rem; color: #fff; font-weight: 600; font-size: .95rem;
+  background: none; border: 0; font-family: inherit; text-align: left;
+  cursor: pointer;
 }
+.fin-rail-brand:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
 .fin-rail-mark {
   width: 26px; height: 26px; border-radius: 7px; flex: none;
   background: linear-gradient(145deg, var(--primary), #1f4f4b);
@@ -3138,11 +3143,17 @@ html.is-masked body::before {
   font: inherit; font-size: .82rem; font-weight: 450; padding: .44rem .5rem;
 }
 .fin-rail .fin-rail-sub { padding-left: 2.05rem; font-size: .78rem; color: #6b7486; }
-.fin-rail .tab-btn:hover { background: var(--rail-hover); color: #ced5e2; }
+@media (hover: hover) {
+  .fin-rail .tab-btn:hover { background: var(--rail-hover); color: #ced5e2; }
+}
 .fin-rail .tab-btn.active {
   background: var(--rail-hover); color: var(--rail-ink-on); font-weight: 500;
 }
 .fin-rail .tab-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+/* Une destination porte une icone : elle passe donc en ligne, contre le
+   `display: block` herite de .tab-btn juste au-dessus. Meme specificite, place
+   apres — un !important ici masquait aussi le bouton « Plus » en grand ecran. */
+.fin-rail .fin-rail-item { display: flex; align-items: center; gap: .56rem; }
 .fin-rail-foot { margin-top: auto; }
 
 /* Le corps recule, la barre du haut aussi. */
@@ -3151,7 +3162,7 @@ body { padding-left: var(--rail-w); }
 
 /* Le bouton « Plus » n'a de sens que dans la barre du bas ; declare avant le
    media pour que celui-ci le rallume. */
-.fin-rail-plus { display: none; }
+.fin-rail .fin-rail-plus { display: none; }
 
 /* ── Telephone : le rail devient une barre d'onglets en bas ─────────────── */
 /* Une barre horizontale defilante en haut cachait les premieres entrees hors
@@ -3174,7 +3185,7 @@ body { padding-left: var(--rail-w); }
   #rail-recherche,
   .fin-rail .fin-rail-sub,
   .fin-rail-foot { display: none; }
-  .fin-rail-plus { display: flex; }
+  .fin-rail .fin-rail-plus { display: flex; }
 
   .fin-rail .fin-rail-item {
     flex: 1 1 0; min-width: 0;
@@ -3196,7 +3207,7 @@ body { padding-left: var(--rail-w); }
     gap: .1rem; padding: calc(.75rem + env(safe-area-inset-top, 0px)) .75rem
                         calc(.75rem + env(safe-area-inset-bottom, 0px));
   }
-  .fin-rail.is-open .fin-rail-brand,
+  .fin-rail.is-open .fin-rail-brand { display: flex; }
   .fin-rail.is-open .fin-rail-group,
   .fin-rail.is-open #rail-recherche,
   .fin-rail.is-open .fin-rail-sub,
@@ -3357,7 +3368,6 @@ main > .tab-content > .page-header > h1 { display: none; }
 /* Icônes des destinations : elles ancrent le regard et distinguent une
    navigation d'une simple liste de liens. Les sous-entrées n'en portent pas —
    leur retrait suffit à marquer la subordination. */
-.fin-rail-item { display: flex !important; align-items: center; gap: .56rem; }
 .fin-rail-item svg {
   width: 16px; height: 16px; flex: none;
   stroke: currentColor; fill: none; stroke-width: 1.6;
@@ -3585,6 +3595,9 @@ main > .tab-content > .page-header > h1 { display: none; }
   .page-head-tools [aria-label="Densité d'affichage"] { display: none; }
   .page-head-tools { gap: .3rem; row-gap: .35rem; }
   .page-head-titre h1 { font-size: 1.15rem; }
+  .page-head { position: relative; }
+  .page-head-titre { padding-right: 7rem; }
+  .page-head-tools #mask-btn { position: absolute; top: 0; right: 0; margin: 0; }
   .page-head { gap: .45rem; margin-bottom: calc(.7rem * var(--d)); }
 }
 
@@ -3658,16 +3671,23 @@ main > .tab-content > .page-header > h1 { display: none; }
    une fenetre — et tombait donc sur l'apparence par defaut d'un bouton : fond
    clair et bordure, en plein rail sombre. Elle reprend ici le gabarit exact de
    ses voisines. */
-.fin-rail .fin-rail-reglages {
-  display: flex; align-items: center; gap: .56rem;
+.fin-rail .fin-rail-reglages,
+.fin-rail .fin-rail-plus {
+  align-items: center; gap: .56rem;
   width: 100%; margin: .3rem 0 0; padding: .44rem .5rem;
   background: none; border: 0; border-radius: 7px;
   color: var(--rail-ink); font: inherit; font-size: .82rem; font-weight: 450;
   text-align: left; cursor: pointer;
 }
-.fin-rail .fin-rail-reglages:hover { background: var(--rail-hover); color: #ced5e2; }
-.fin-rail .fin-rail-reglages:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
-.fin-rail .fin-rail-reglages svg {
+.fin-rail .fin-rail-reglages { display: flex; }
+@media (hover: hover) {
+  .fin-rail .fin-rail-reglages:hover,
+  .fin-rail .fin-rail-plus:hover { background: var(--rail-hover); color: #ced5e2; }
+}
+.fin-rail .fin-rail-reglages:focus-visible,
+.fin-rail .fin-rail-plus:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.fin-rail .fin-rail-reglages svg,
+.fin-rail .fin-rail-plus svg {
   width: 16px; height: 16px; flex: none;
   stroke: currentColor; fill: none; stroke-width: 1.6;
   stroke-linecap: round; stroke-linejoin: round;

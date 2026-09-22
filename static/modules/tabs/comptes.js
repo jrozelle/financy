@@ -13,6 +13,7 @@
 import { S } from '../state.js';
 import { api } from '../api.js';
 import { fmt, esc } from '../utils.js';
+import { estFinancier } from '../categories.js';
 
 export async function loadComptes() {
   const carte = document.getElementById('comptes-card');
@@ -24,13 +25,25 @@ export async function loadComptes() {
                   null, { silent: true });
   } catch { carte.style.display = 'none'; return; }
 
-  const groupes = (d.groups || []).filter(g => g.value);
+  // Un compte plus valorise au dernier arrete n'est plus detenu : le lister
+  // avec son solde de cloture le fait passer pour un avoir du jour. Il sort du
+  // tableau mais reste compte sous le titre — disparaitre sans un mot serait
+  // pire que figurer a tort.
+  // Une maison, une voiture ou des parts de SCI ne sont pas des comptes : on
+  // ne les alimente pas, on ne les cloture pas, et leur « rendement » n'a pas
+  // de sens. Les lister ici remplissait la carte de lignes sans apport ni
+  // frais — et parfois d'un montant negatif, qui est une dette nette.
+  const tous = (d.groups || []).filter(g => g.value && estFinancier(g.categories));
+  const hors = (d.groups || []).length - tous.length;
+  const groupes = tous.filter(g => g.status !== 'closed');
+  const clotures = tous.length - groupes.length;
+
   if (!groupes.length) { carte.style.display = 'none'; return; }
   carte.style.display = '';
-  carte.innerHTML = rendu(groupes, d);
+  carte.innerHTML = rendu(groupes, d, clotures, hors);
 }
 
-function rendu(groupes, d) {
+function rendu(groupes, d, clotures = 0, hors = 0) {
   const total = groupes.reduce((s, g) => s + (g.value || 0), 0);
   const frais = groupes.reduce((s, g) => s + (g.fees || 0), 0);
 
@@ -39,7 +52,11 @@ function rendu(groupes, d) {
       <div>
         <h2>Vos comptes</h2>
         <p class="card-sub">Rendement pondéré par le temps, frais déduits${
-          d.first_date ? ` · depuis le ${d.first_date.split('-').reverse().join('/')}` : ''}</p>
+          d.first_date ? ` · depuis le ${d.first_date.split('-').reverse().join('/')}` : ''}${
+          clotures ? ` · ${clotures} compte${clotures > 1 ? 's' : ''} clôturé${
+            clotures > 1 ? 's' : ''}, non listé${clotures > 1 ? 's' : ''}` : ''}${
+          hors ? ` · ${hors} ligne${hors > 1 ? 's' : ''} hors placements financiers
+            (immobilier, biens, sociétés), à voir dans Répartition` : ''}</p>
       </div>
       <button type="button" class="link-carte" data-tab-switch="performance">Tout voir</button>
     </div>
