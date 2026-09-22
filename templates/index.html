@@ -10,45 +10,31 @@
 </head>
 <body>
 
-  <!-- Rail de navigation. Construit a neuf plutot que derive de .navbar :
-       celle-ci est redefinie douze fois dans la feuille, et la surcharger
-       revenait a se battre contre douze regles invisibles. Les boutons portent
-       les memes data-tab / data-group, le JS existant les cable sans rien
-       savoir de ce changement. -->
+  <!-- Rail de navigation : une icone par page, son nom dessous. Etroit pour
+       rendre la largeur aux chiffres ; sur telephone il devient une barre du
+       bas (voir style.css). -->
   <nav class="fin-rail" id="fin-rail" aria-label="Navigation principale">
     <!-- La marque ramene a l'accueil, comme partout ailleurs sur le web. Un
          vrai bouton plutot qu'un div : atteignable au clavier, annonce comme
          une commande. `data-tab-switch` est deja delegue dans main.js. -->
     <button type="button" class="fin-rail-brand" data-tab-switch="synthese">
-      <span class="fin-rail-mark">F</span>Financy
+      <span class="fin-rail-mark">F</span><span class="fin-rail-nom">Financy</span>
     </button>
-    <div id="rail-recherche">
-      <div class="global-search" id="global-search">
-        <span class="global-search-icon" aria-hidden="true">&#128269;</span>
-        <input type="search" class="global-search-input" id="global-search-input" placeholder="Rechercher…" autocomplete="off" aria-label="Recherche globale">
-        <div class="search-results" id="search-results"></div>
-      </div>
-    </div>
 
-    <button type="button" class="tab-btn fin-rail-item" data-tab="synthese"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>Synthèse</button>
-
-    <div class="fin-rail-group">Patrimoine</div>
-    <button type="button" class="tab-btn fin-rail-item" data-tab="positions"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg>Positions</button>
-    <button type="button" class="tab-btn fin-rail-sub" data-tab="actifs">Actifs détenus</button>
-    <button type="button" class="tab-btn fin-rail-sub" data-tab="entites">Entités</button>
-
-    <div class="fin-rail-group">Suivi</div>
-    <button type="button" class="tab-btn fin-rail-item" data-tab="performance"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 18V9M10 18V5M16 18v-6M22 18H2"/></svg>Performance</button>
-    <button type="button" class="tab-btn fin-rail-sub" data-tab="flux">Flux et versements</button>
-
-    <button type="button" class="tab-btn fin-rail-item" data-tab="conseil"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg>Conseil</button>
+    <button type="button" class="tab-btn fin-rail-item" data-tab="synthese"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg><span class="fin-rail-lib">Synthèse</span></button>
+    <button type="button" class="tab-btn fin-rail-item" data-tab="positions"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg><span class="fin-rail-lib">Positions</span></button>
+    <button type="button" class="tab-btn fin-rail-item fin-rail-sub" data-tab="actifs"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 19V5M4 19h16"/><path d="M7 15l4-4 3 3 5-6"/></svg><span class="fin-rail-lib">Actifs</span></button>
+    <button type="button" class="tab-btn fin-rail-item fin-rail-sub" data-tab="entites"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 21V9l9-6 9 6v12"/><path d="M9 21v-6h6v6"/></svg><span class="fin-rail-lib">Entités</span></button>
+    <button type="button" class="tab-btn fin-rail-item" data-tab="performance"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 18V9M10 18V5M16 18v-6M22 18H2"/></svg><span class="fin-rail-lib">Performance</span></button>
+    <button type="button" class="tab-btn fin-rail-item fin-rail-sub" data-tab="flux"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg><span class="fin-rail-lib">Flux</span></button>
+    <button type="button" class="tab-btn fin-rail-item" data-tab="conseil"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg><span class="fin-rail-lib">Conseil</span></button>
 
     <!-- Sur telephone le rail devient une barre du bas a cinq entrees ; ce
          bouton y deplie le rail complet, sous-entrees et recherche comprises.
          Masque des que la colonne tient a l'ecran. -->
     <button type="button" class="fin-rail-item fin-rail-plus" id="rail-plus"
             aria-expanded="false" aria-controls="fin-rail">
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Plus
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span class="fin-rail-lib">Plus</span>
     </button>
 
     <div class="fin-rail-foot">
@@ -56,7 +42,7 @@
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
           <circle cx="12" cy="12" r="3"/>
           <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>
-        </svg>Réglages
+        </svg><span class="fin-rail-lib">Réglages</span>
       </button>
     </div>
   </nav>
@@ -113,6 +99,17 @@
              etait masque par une regle CSS depuis le 22/09 : plus aucun moyen
              visible d'ajouter une position, un flux ou une entite. -->
         <button type="button" class="btn btn-primary btn-sm hidden" id="head-ajouter">Ajouter</button>
+        <div class="head-recherche" id="global-search">
+          <button type="button" class="head-icone" id="head-loupe" aria-label="Rechercher (touche /)"
+                  aria-expanded="false" aria-controls="head-recherche-pop">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          </button>
+          <div class="head-recherche-pop hidden" id="head-recherche-pop">
+            <input type="search" class="head-recherche-champ" id="global-search-input"
+                   placeholder="Un compte, une enveloppe, une note de flux…" autocomplete="off" aria-label="Recherche globale">
+            <div class="search-results" id="search-results"></div>
+          </div>
+        </div>
         <button type="button" class="seg-solo" id="mask-btn" aria-pressed="false">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>

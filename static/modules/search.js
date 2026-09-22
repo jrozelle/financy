@@ -1,7 +1,33 @@
 import { S } from './state.js';
+import { api } from './api.js';
 import { fmt, fmtDate, esc, fluxSigned, fmtSigned } from './utils.js';
 
 let _debounce = null;
+
+/* La recherche lisait `S.positions` et `S.flux`, qui ne se remplissent qu'a
+   la visite des onglets Positions et Flux : lancee depuis la synthese, elle
+   ne trouvait rien. Elle va desormais chercher ce qui lui manque, une fois. */
+let _positions = null;
+let _chargement = null;
+
+function _assurerDonnees() {
+  if (_chargement) return _chargement;
+  _chargement = (async () => {
+    if (!S.flux?.length) {
+      try { S.flux = await api('GET', '/api/flux', null, { silent: true }); } catch { /* reste vide */ }
+    }
+  })();
+  return _chargement;
+}
+
+/** Positions de l'arrete consulte : celles de l'onglet si elles sont la,
+ *  sinon celles que la synthese a deja recuperees. */
+function _positionsCourantes() {
+  if (S.positions?.length) return S.positions;
+  if (_positions) return _positions;
+  const cache = S.synthese?._positions_cache;
+  return cache ? (_positions = Object.values(cache).flat()) : [];
+}
 
 export function wireGlobalSearch(switchTabFn) {
   const input = document.getElementById('global-search-input');
@@ -10,7 +36,10 @@ export function wireGlobalSearch(switchTabFn) {
 
   input.addEventListener('input', () => {
     clearTimeout(_debounce);
-    _debounce = setTimeout(() => renderResults(input.value.trim(), panel, switchTabFn), 150);
+    _debounce = setTimeout(async () => {
+      await _assurerDonnees();
+      renderResults(input.value.trim(), panel, switchTabFn);
+    }, 150);
   });
 
   input.addEventListener('keydown', e => {
@@ -51,7 +80,7 @@ function matchScore(text, query) {
 }
 
 function searchPositions(q) {
-  return (S.positions || [])
+  return _positionsCourantes()
     .map(p => {
       const score = Math.max(
         matchScore(p.owner, q),

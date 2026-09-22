@@ -173,6 +173,7 @@ function _tabFromUrl() {
 }
 
 let _lastLoadedTab = null;
+let ouvrirRecherche = () => {};
 
 /** Ce que « Ajouter » cree sur chaque onglet. Un onglet absent d'ici n'a pas
  *  de bouton : rien ne s'y ajoute a la main. */
@@ -462,21 +463,58 @@ function wireEvents() {
     });
   }
 
+  // ── Recherche : une loupe dans la barre du haut ─────────────────────
+  // Le champ ne s'ouvre qu'a la demande : il occupait en permanence une ligne
+  // du rail pour un geste occasionnel. La touche / l'ouvre aussi.
+  const loupe = document.getElementById('head-loupe');
+  const recherche = document.getElementById('head-recherche-pop');
+  const champ = document.getElementById('global-search-input');
+  const fermerRecherche = () => {
+    recherche?.classList.add('hidden');
+    loupe?.setAttribute('aria-expanded', 'false');
+  };
+  ouvrirRecherche = () => {
+    recherche?.classList.remove('hidden');
+    loupe?.setAttribute('aria-expanded', 'true');
+    champ?.focus();
+    champ?.select();
+  };
+  loupe?.addEventListener('click', e => {
+    e.stopPropagation();
+    recherche.classList.contains('hidden') ? ouvrirRecherche() : fermerRecherche();
+  });
+  // search.js vide et quitte le champ sur Echap ; la surimpression suit.
+  champ?.addEventListener('keydown', e => { if (e.key === 'Escape') fermerRecherche(); });
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#global-search')) fermerRecherche();
+  });
+  // Choisir un resultat mene ailleurs : la surimpression n'a plus lieu d'etre.
+  document.getElementById('search-results')?.addEventListener('click', e => {
+    if (e.target.closest('.search-item')) fermerRecherche();
+  });
+
   // ── Barre du bas : le bouton « Plus » deplie le rail entier ─────────
   // Sur telephone le rail ne montre que cinq destinations ; les sous-entrees,
   // la recherche et les reglages vivent derriere ce bouton. C'est le meme
   // element qui change de geometrie, donc rien a recabler.
   const rail = document.getElementById('fin-rail');
   const plus = document.getElementById('rail-plus');
+  // Dans la feuille depliee, le bouton qui l'a ouverte est celui qui la ferme :
+  // il le dit, plutot que de s'afficher « Plus » au milieu de la liste.
+  const libPlus = plus?.querySelector('.fin-rail-lib');
+  const majPlus = ouvert => {
+    plus?.setAttribute('aria-expanded', String(ouvert));
+    if (libPlus) libPlus.textContent = ouvert ? 'Fermer' : 'Plus';
+  };
   const replierRail = () => {
     rail?.classList.remove('is-open');
     document.body.classList.remove('rail-ouvert');
-    plus?.setAttribute('aria-expanded', 'false');
+    majPlus(false);
   };
   plus?.addEventListener('click', () => {
     const ouvert = rail.classList.toggle('is-open');
     document.body.classList.toggle('rail-ouvert', ouvert);
-    plus.setAttribute('aria-expanded', String(ouvert));
+    majPlus(ouvert);
   });
   // Choisir une destination referme la feuille ; le bouton lui-meme la bascule.
   rail?.addEventListener('click', e => {
@@ -486,19 +524,6 @@ function wireEvents() {
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && rail?.classList.contains('is-open')) replierRail();
   });
-
-  // L'en-tete figé ne prend son filet qu'une fois decolle du haut : souligner
-  // un en-tete au repos ajoute un trait qui ne separe rien.
-  const tete = document.querySelector('.page-head');
-  if (tete && 'IntersectionObserver' in window) {
-    const sentinelle = document.createElement('div');
-    sentinelle.style.cssText = 'position:absolute;top:0;height:1px;width:1px';
-    tete.parentNode.insertBefore(sentinelle, tete);
-    new IntersectionObserver(
-      ([e]) => tete.classList.toggle('is-stuck', !e.isIntersecting),
-      { threshold: 0 }
-    ).observe(sentinelle);
-  }
 
   // ── Densité d'affichage ─────────────────────────────────────────────
   // Compacte par defaut : sur un patrimoine, on vient lire des chiffres et les
@@ -732,10 +757,10 @@ function wireEvents() {
       return;
     }
 
-    // / — focus global search
+    // / — ouvre la recherche
     if (e.key === '/' && !e.ctrlKey && !e.metaKey) {
       e.preventDefault();
-      document.getElementById('global-search-input')?.focus();
+      ouvrirRecherche();
       return;
     }
 
