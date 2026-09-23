@@ -19,7 +19,7 @@ from models import compute_position, get_entity_map, get_holdings_map, load_refe
 # faire depasser le plafond ; les versements, non.
 PLAFONDS = {'Livret A': 22950.0, 'LDDS': 12000.0, 'LEP': 10000.0}
 # Les interets capitalises portent un livret au-dela du plafond de versements,
-# sans limite dans le temps (26 000 € sur un Livret A a 22 950 € : legal). Au-dela
+# sans limite dans le temps (25 000 € sur un Livret A a 22 950 € : legal). Au-dela
 # de cette marge, ce ne sont plus des interets : deux livrets sur une ligne, ou
 # une erreur de saisie.
 MARGE_INTERETS = 1.50
@@ -64,7 +64,7 @@ def constats(conn, date, owner=None):
             # lignes a son nom sont des livrets DISTINCTS — ceux des enfants,
             # tenus par un parent qui y place son epargne. Le plafond vaut donc
             # livret par livret, jamais sur leur somme (deux Livret A de
-            # 23 000 et 26 000 € ne depassent aucun plafond).
+            # 24 000 et 25 000 € ne depassent aucun plafond).
             for p in livrets:
                 if plafond < p['value'] <= plafond * MARGE_INTERETS:
                     au_plafond.append((env, qui, p['value']))

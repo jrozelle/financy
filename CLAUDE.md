@@ -101,11 +101,12 @@
   pas (Credit Agricole).
 - Reimporter un document n'ajoute rien : unicite sur l'operation ou sur
   `(montant, debut, fin)` du pret.
-- Les pieces du patrimoine sont rangees sur le Mac dans `~/Documents` : SCI
-  `Exemplia/` (README de rangement a sa racine), holding `Holding Exemple/`,
-  contrats personnels `Administratif/Banque/` et `Famille/Investissements/`.
-  Un scan sans texte se lit en image ; un formulaire PDF porte ses valeurs dans
+- Un scan sans texte se lit en image ; un formulaire PDF porte ses valeurs dans
   ses champs (`page.annots`).
+- **Depot public** : aucun nom de personne ou d'entite reelle, aucun montant
+  reel, aucun chemin personnel ni detail d'infrastructure dans le code, les
+  tests, la documentation ou les messages de commit. Les jeux d'essai et les
+  exemples sont fictifs (« SCI Exemple », « Holding Exemple », montants ronds).
 
 ## Conseil
 - Les constats ne s'appuient que sur des faits verifiables et ne citent aucun

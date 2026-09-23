@@ -57,7 +57,7 @@ function _memoriser() {
 }
 
 /** Une lettre par titulaire ; deux quand deux prenoms commencent pareil
- *  (Léo, Zoe) — sinon l'etiquette ne distingue plus personne. */
+ *  (les enfants) — sinon l'etiquette ne distingue plus personne. */
 let _initiales = {};
 function _calculerInitiales(positions) {
   const noms = [...new Set(positions.map(p => p.owner).filter(Boolean))];
