@@ -25,6 +25,28 @@ def dettes_par_entite(conn, date):
     return {k: round(v, 2) for k, v in out.items()}
 
 
+def taux_effectif(echeances):
+    """Taux annuel deduit de l'echeancier : interets d'une echeance amortie
+    rapportes au restant du qui la precede. Les tableaux Caisse d'Epargne
+    n'impriment pas le taux ; l'echeancier le contient."""
+    for a, b in zip(echeances, echeances[1:]):
+        if b['capital'] > 0 and b['interets'] > 0 and a['crd'] > 1000:
+            return round(b['interets'] / a['crd'] * 12 * 100, 2)
+    return None
+
+
+def ira(crd, taux_annuel, mode='legale'):
+    """Indemnites de remboursement anticipe si l'on solde `crd` maintenant.
+
+    Plafond legal d'un credit immobilier (art. L313-47 du Code de la
+    consommation) : le plus faible de six mois d'interets sur le capital
+    rembourse, au taux du pret, et de 3 % du capital restant du. Un contrat
+    peut y renoncer : mode 'aucune'."""
+    if mode == 'aucune' or not crd or not taux_annuel:
+        return 0.0
+    return round(min(crd * taux_annuel / 100 / 2, crd * 0.03), 2)
+
+
 def resume(conn, date=None):
     """Chaque pret, vu a `date` (defaut : aujourd'hui)."""
     date = date or _date.today().isoformat()
@@ -33,16 +55,35 @@ def resume(conn, date=None):
         p = dict(p)
         ech = conn.execute('SELECT * FROM pret_echeances WHERE pret_id=? ORDER BY rang', (p['id'],)).fetchall()
         a_venir = [e for e in ech if e['date'] > date]
-        # La mensualite courante : la prochaine echeance, hors franchise.
-        prochaine = next((e for e in a_venir if e['capital'] > 0), a_venir[0] if a_venir else None)
+        # En differe, l'echeance du mois (interets seuls, ou rien) n'est pas la
+        # mensualite qui suivra : les deux se disent. Le differe court tant que
+        # le capital ne baisse pas.
+        prochaine = a_venir[0] if a_venir else None
+        amortie = next((e for e in a_venir if e['capital'] > 0), None)
+        differe = None
+        if prochaine and prochaine['capital'] <= 0:
+            fin_d = [e for e in a_venir if amortie is None or e['rang'] < amortie['rang']]
+            differe = {'type': 'total' if prochaine['capital'] < 0 else 'partiel',
+                       'jusqu_au': fin_d[-1]['date'] if fin_d else None}
         out.append({
             **p,
             'crd': round(crd_a(conn, p['id'], date), 2),
             'echeances': len(ech),
             'restantes': len(a_venir),
             'prochaine': dict(prochaine) if prochaine else None,
-            'mensualite': round(prochaine['capital'] + prochaine['interets'] + prochaine['assurance'], 2)
-                          if prochaine else None,
+            # Ce qui sera preleve a la prochaine echeance (0 en differe total)...
+            'echeance_du_mois': round(max(prochaine['capital'], 0) + prochaine['interets'] + prochaine['assurance'], 2)
+                                if prochaine else None,
+            # ... et la mensualite d'amortissement, une fois le differe fini.
+            'mensualite': round(amortie['capital'] + amortie['interets'] + amortie['assurance'], 2)
+                          if amortie else None,
+            'differe': differe,
+            # Solder aujourd'hui : ce que cela couterait (IRA), et ce que cela
+            # economiserait (les interets et l'assurance a venir).
+            'taux_retenu': p['taux'] or taux_effectif(ech),
+            'taux_deduit': not p['taux'],
+            'ira_contrat': p.get('ira') or 'legale',
+            'ira': ira(crd_a(conn, p['id'], date), p['taux'] or taux_effectif(ech), p.get('ira') or 'legale'),
             'interets_restants': round(sum(e['interets'] + e['assurance'] for e in a_venir), 2),
             'rembourse': round((p['montant'] or 0) - crd_a(conn, p['id'], date), 2),
         })
@@ -85,3 +126,76 @@ def enregistrer(conn, tableau, entity=None, libelle=None, source=None):
                      'VALUES (?,?,?,?,?,?,?)',
                      [(pid, x.rang, x.date, x.capital, x.interets, x.assurance, x.crd) for x in e])
     return pid
+
+
+def calendrier(conn, depuis=None, nb=12):
+    """Les `nb` prochaines echeances, tous prets confondus, et le cumul par
+    annee civile : capital rembourse, interets, assurance, restant du en fin
+    d'annee."""
+    depuis = depuis or _date.today().isoformat()
+    libelles = {r['id']: r['libelle'] for r in conn.execute('SELECT id, libelle FROM prets')}
+    prochaines = [dict(r, pret=libelles.get(r['pret_id'])) for r in conn.execute(
+        'SELECT * FROM pret_echeances WHERE date > ? ORDER BY date, pret_id LIMIT ?', (depuis, nb))]
+    annees = {}
+    for r in conn.execute('SELECT * FROM pret_echeances WHERE date > ? ORDER BY date', (depuis,)):
+        a = annees.setdefault(r['date'][:4], {'annee': r['date'][:4], 'capital': 0.0, 'interets': 0.0,
+                                              'assurance': 0.0, 'echeances': 0})
+        a['capital'] += r['capital']; a['interets'] += r['interets']; a['assurance'] += r['assurance']
+        a['echeances'] += 1
+    ids = list(libelles)
+    for a in annees.values():
+        fin = f"{a['annee']}-12-31"
+        a['crd_fin'] = round(sum(crd_a(conn, i, fin) for i in ids), 2)
+        for k in ('capital', 'interets', 'assurance'):
+            a[k] = round(a[k], 2)
+    return {'prochaines': prochaines, 'annees': [annees[k] for k in sorted(annees)]}
+
+
+def echeancier_calcule(montant, taux_annuel, mois, premiere, assurance=0.0, differe=0, type_differe='partiel'):
+    """Echeancier a mensualite constante, pour un pret sans tableau.
+
+    `mois` : duree totale, differe compris. `differe` : nombre de premieres
+    echeances en differe —
+      - 'partiel' (de capital seul) : on paie les interets, le capital ne
+        bouge pas ;
+      - 'total' : on ne paie rien, les interets s'ajoutent au capital, qui
+        augmente (c'est la franchise d'un pret immobilier).
+    L'amortissement a mensualite constante porte ensuite sur le capital du a la
+    fin du differe, sur les mois restants. `premiere` : date de la premiere
+    echeance ; les suivantes tombent le meme jour des mois suivants (au plus
+    le 28).
+    """
+    from services.parsers.amortissement import Tableau, Echeance
+    r = (taux_annuel or 0) / 100 / 12
+    differe = max(0, min(int(differe or 0), mois - 1))
+    a, m, j = int(premiere[:4]), int(premiere[5:7]), min(int(premiere[8:10]), 28)
+    crd, e = float(montant), []
+
+    def suivant():
+        nonlocal a, m
+        m += 1
+        if m > 12:
+            a, m = a + 1, 1
+
+    for i in range(1, differe + 1):
+        interets = round(crd * r, 2)
+        if type_differe == 'total':
+            # Rien n'est preleve : les interets grossissent le capital du.
+            e.append(Echeance(rang=i, date=f'{a:04d}-{m:02d}-{j:02d}', capital=-interets, interets=0.0,
+                              assurance=round(assurance or 0, 2), crd=round(crd + interets, 2)))
+            crd = round(crd + interets, 2)
+        else:
+            e.append(Echeance(rang=i, date=f'{a:04d}-{m:02d}-{j:02d}', capital=0.0, interets=interets,
+                              assurance=round(assurance or 0, 2), crd=round(crd, 2)))
+        suivant()
+    reste = mois - differe
+    mensu = crd / reste if r == 0 else crd * r / (1 - (1 + r) ** -reste)
+    for i in range(differe + 1, mois + 1):
+        interets = round(crd * r, 2)
+        capital = round(mensu - interets, 2) if i < mois else round(crd, 2)
+        crd = round(crd - capital, 2)
+        e.append(Echeance(rang=i, date=f'{a:04d}-{m:02d}-{j:02d}', capital=capital, interets=interets,
+                          assurance=round(assurance or 0, 2), crd=max(crd, 0.0)))
+        suivant()
+    return Tableau(preteur=None, libelle='Prêt', emprunteur=None, montant=round(montant, 2),
+                   taux=taux_annuel, echeances=e)

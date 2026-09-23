@@ -28,6 +28,7 @@
     <button type="button" class="tab-btn fin-rail-item" data-tab="positions"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg><span class="fin-rail-lib">Positions</span></button>
     <button type="button" class="tab-btn fin-rail-item fin-rail-sub" data-tab="actifs"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 19V5M4 19h16"/><path d="M7 15l4-4 3 3 5-6"/></svg><span class="fin-rail-lib">Actifs</span></button>
     <button type="button" class="tab-btn fin-rail-item fin-rail-sub" data-tab="entites"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 21V9l9-6 9 6v12"/><path d="M9 21v-6h6v6"/></svg><span class="fin-rail-lib">Entités</span></button>
+    <button type="button" class="tab-btn fin-rail-item fin-rail-sub" data-tab="credits"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></svg><span class="fin-rail-lib">Crédits</span></button>
     <button type="button" class="tab-btn fin-rail-item" data-tab="performance"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 18V9M10 18V5M16 18v-6M22 18H2"/></svg><span class="fin-rail-lib">Performance</span></button>
     <button type="button" class="tab-btn fin-rail-item fin-rail-sub" data-tab="flux"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg><span class="fin-rail-lib">Flux</span></button>
     <button type="button" class="tab-btn fin-rail-item" data-tab="conseil"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg><span class="fin-rail-lib">Conseil</span></button>
@@ -342,6 +343,69 @@
     </div>
 
     <!-- ── ENTITÉS ──────────────────────────────────────────────────────── -->
+    <!-- ── CRÉDITS ─────────────────────────────────────────────────────── -->
+    <!-- Un credit se definit (tableau d'amortissement importe, ou saisi) et se
+         rattache a une entite : la dette de l'entite en decoule, pre-remplie a
+         chaque mise a jour des soldes et controlee ici. -->
+    <div id="tab-credits" class="tab-content hidden">
+      <div class="page-header"><h1>Crédits</h1></div>
+      <div class="credits-kpi" id="credits-kpi"></div>
+
+      <div class="card" id="prets-carte">
+        <div class="prets-tete">
+          <div>
+            <h2>Vos crédits</h2>
+            <p class="card-sub" id="prets-sous">Chaque crédit porte la dette de l'entité à laquelle il est rattaché.</p>
+          </div>
+          <div class="prets-actions">
+            <button type="button" class="btn btn-secondary btn-sm" id="prets-definir">Définir un crédit</button>
+            <label class="btn btn-secondary btn-sm prets-import-btn">
+              Importer un tableau d'amortissement
+              <input type="file" id="prets-fichier" accept="application/pdf" hidden>
+            </label>
+          </div>
+        </div>
+        <form id="prets-formulaire" class="prets-apercu" hidden>
+          <p><b>Nouveau crédit</b> — l'échéancier se calcule à mensualité constante. Pour un prêt à paliers ou lissé,
+            importez plutôt le tableau de la banque.</p>
+          <div class="prets-apercu-champs">
+            <label for="pf-libelle">Libellé <input type="text" id="pf-libelle" class="ref-input" required maxlength="120" placeholder="Prêt auto"></label>
+            <label for="pf-preteur">Prêteur <input type="text" id="pf-preteur" class="ref-input" maxlength="120" placeholder="Banque"></label>
+            <label for="pf-montant">Montant emprunté (€) <input type="text" inputmode="decimal" id="pf-montant" class="ref-input" required></label>
+            <label for="pf-taux">Taux annuel (%) <input type="text" inputmode="decimal" id="pf-taux" class="ref-input" required placeholder="3,5"></label>
+            <label for="pf-mois">Durée (mois) <input type="text" inputmode="numeric" id="pf-mois" class="ref-input" required placeholder="240"></label>
+            <label for="pf-premiere">Première échéance <input type="date" id="pf-premiere" class="ref-input" required></label>
+            <label for="pf-assurance">Assurance / mois (€) <input type="text" inputmode="decimal" id="pf-assurance" class="ref-input" placeholder="0"></label>
+            <label for="pf-differe">Différé (mois) <input type="text" inputmode="numeric" id="pf-differe" class="ref-input" placeholder="0"></label>
+            <label for="pf-type-differe">Type de différé <select id="pf-type-differe" class="filter-select">
+              <option value="partiel">Partiel : intérêts payés</option>
+              <option value="total">Total : intérêts ajoutés au capital</option></select></label>
+            <label for="pf-entite">Dette de l'entité <select id="pf-entite" class="filter-select"></select></label>
+            <button type="submit" class="btn btn-primary btn-sm">Enregistrer le crédit</button>
+            <button type="button" class="btn btn-secondary btn-sm" id="pf-annuler">Annuler</button>
+          </div>
+        </form>
+        <div id="prets-apercu" class="prets-apercu" hidden></div>
+        <div id="prets-courbe" class="courbe-hote"></div>
+        <div id="prets-legende" class="courbe-legende"></div>
+        <div id="prets-liste"></div>
+        <div id="prets-ecarts"></div>
+      </div>
+
+      <div class="credits-bas">
+        <div class="card">
+          <h2>Prochaines échéances</h2>
+          <p class="card-sub">Tous crédits confondus.</p>
+          <div id="credits-prochaines" class="table-scroll" tabindex="0" role="region" aria-label="Prochaines échéances"></div>
+        </div>
+        <div class="card">
+          <h2>Par année</h2>
+          <p class="card-sub">Ce que vous rembourserez, et ce qu'il restera dû au 31 décembre.</p>
+          <div id="credits-annees" class="table-scroll" tabindex="0" role="region" aria-label="Remboursements par année"></div>
+        </div>
+      </div>
+    </div>
+
     <div id="tab-entites" class="tab-content hidden">
       <div class="page-header">
         <h1>Entités (SCI / Indivision)</h1>
@@ -362,24 +426,6 @@
           <tbody id="entities-tbody"></tbody>
         </table>
       </div>
-      <div class="card" id="prets-carte">
-        <div class="prets-tete">
-          <div>
-            <h2>Crédits</h2>
-            <p class="card-sub" id="prets-sous">Tableaux d'amortissement : capital restant dû, et sa projection jusqu'au dernier remboursement.</p>
-          </div>
-          <label class="btn btn-secondary btn-sm prets-import-btn">
-            Importer un tableau d'amortissement
-            <input type="file" id="prets-fichier" accept="application/pdf" hidden>
-          </label>
-        </div>
-        <div id="prets-apercu" class="prets-apercu" hidden></div>
-        <div id="prets-courbe" class="courbe-hote"></div>
-        <div id="prets-legende" class="courbe-legende"></div>
-        <div id="prets-liste"></div>
-        <div id="prets-ecarts"></div>
-      </div>
-
       <details class="card ent-aide" id="ent-aide">
         <summary>Comment fonctionnent les entités ?</summary>
         <p class="text-muted">

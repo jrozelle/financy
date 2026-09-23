@@ -8,7 +8,7 @@
  */
 import { S } from '../state.js';
 import { api } from '../api.js';
-import { fmt, fmtDate, esc, today, fmtPct, fmtAxis } from '../utils.js';
+import { fmt, fmtDate, esc, today, fmtPct, fmtAxis, parseLocaleNumber } from '../utils.js';
 import { toast, confirmDialog } from '../dialogs.js';
 import { dessinerCourbe } from '../courbe.js';
 
@@ -19,15 +19,19 @@ export async function loadPrets() {
   const carte = document.getElementById('prets-carte');
   if (!carte) return;
   _cabler();
-  let res, pj, echeancier;
+  let res, pj, echeancier, cal;
   try {
-    [res, pj, echeancier] = await Promise.all([
+    [res, pj, echeancier, cal] = await Promise.all([
       api('GET', '/api/prets', null, { silent: true }),
       api('GET', '/api/prets/projection', null, { silent: true }),
       api('GET', `/api/prets/dettes?date=${today()}`, null, { silent: true }),
+      api('GET', '/api/prets/calendrier', null, { silent: true }),
     ]);
   } catch { return; }
   const prets = res.prets || [];
+  _kpi(prets);
+  _prochaines(cal?.prochaines || [], prets);
+  _annees(cal?.annees || []);
   document.getElementById('prets-liste').innerHTML = prets.length ? _liste(prets) : `
     <p class="text-muted prets-vide">Aucun prêt. Importez le tableau d'amortissement de votre banque (PDF Caisse d'Épargne
       ou Arkéa) : la dette de l'entité se projettera d'elle-même.</p>`;
@@ -54,7 +58,10 @@ function _liste(prets) {
       <label class="pret-entite"><span class="sr-only">Entité de ${esc(p.libelle)}</span>
         <select class="filter-select" data-pret-entite="${p.id}">${options(p.entity)}</select></label>
       <div class="pret-chiffre"><small>Restant dû</small><b>${fmt(p.crd)}</b></div>
-      <div class="pret-chiffre"><small>Mensualité</small><b>${p.mensualite != null ? fmt(p.mensualite) : '—'}</b></div>
+      <div class="pret-chiffre"><small>${p.differe ? 'Échéance du mois' : 'Mensualité'}</small><b>${
+        p.differe ? fmt(p.echeance_du_mois) : (p.mensualite != null ? fmt(p.mensualite) : '—')}</b>${
+        p.differe ? `<small class="pret-differe">différé ${p.differe.type} jusqu'au ${fmtDate(p.differe.jusqu_au)}${
+          p.mensualite ? `, puis ${fmt(p.mensualite)}` : ''}</small>` : ''}</div>
       <div class="pret-chiffre"><small>Fin</small><b>${fmtDate(p.fin)}</b><small>${dans(p.fin)}</small></div>
       <div class="pret-chiffre"><small>Intérêts restants</small><b>${fmt(p.interets_restants)}</b></div>
       <div class="pret-avancement" aria-label="${fmtPct(part, 0)} remboursé">
@@ -62,8 +69,69 @@ function _liste(prets) {
         <small>${fmtPct(part, 0)} remboursé</small>
       </div>
       <button type="button" class="btn-icon del" data-pret-suppr="${p.id}" aria-label="Supprimer ${esc(p.libelle)}">Supprimer</button>
+      ${_solder(p)}
     </div>`;
   }).join('')}</div>`;
+}
+
+/** Solder aujourd'hui : le cout des IRA face aux interets evites. Le taux,
+ *  quand le tableau ne l'imprime pas, est deduit de l'echeancier — et dit. */
+function _solder(p) {
+  if (!p.crd) return '';
+  const taux = p.taux_retenu ? `${String(p.taux_retenu).replace('.', ',')} %${p.taux_deduit ? ' (déduit de l’échéancier)' : ''}` : 'taux inconnu';
+  const gain = p.interets_restants - p.ira;
+  return `<div class="pret-solder">
+      <span>Solder aujourd'hui : <b>${fmt(p.crd + p.ira)}</b>, dont <b>${fmt(p.ira)}</b> d'IRA
+        ${p.ira ? `(plafond légal : 6 mois d'intérêts à ${taux}, ou 3 % du restant dû)` : '(le contrat y renonce)'}
+        — évite ${fmt(p.interets_restants)} d'intérêts et d'assurance à venir${gain > 0 ? `, soit ${fmt(gain)} de moins au total` : ''}.</span>
+      <label class="pret-ira"><span class="sr-only">IRA de ${esc(p.libelle)}</span>
+        <select class="filter-select" data-pret-ira="${p.id}">
+          <option value="legale"${(p.ira_mode || p.ira_contrat) === 'aucune' ? '' : ' selected'}>IRA au plafond légal</option>
+          <option value="aucune"${(p.ira_mode || p.ira_contrat) === 'aucune' ? ' selected' : ''}>Contrat sans IRA</option>
+        </select></label>
+    </div>`;
+}
+
+function _kpi(prets) {
+  const hote = document.getElementById('credits-kpi');
+  if (!hote) return;
+  if (!prets.length) { hote.innerHTML = ''; return; }
+  const crd = prets.reduce((t, p) => t + p.crd, 0);
+  const mois = prets.reduce((t, p) => t + (p.echeance_du_mois || 0), 0);
+  const interets = prets.reduce((t, p) => t + p.interets_restants, 0);
+  const fin = prets.map(p => p.fin).sort().pop();
+  const tuile = (lib, val, sous = '') => `<div class="kpi-card"><div class="kpi-label">${lib}</div>
+    <div class="kpi-value">${val}</div>${sous ? `<div class="kpi-sub">${sous}</div>` : ''}</div>`;
+  hote.innerHTML = `<div class="kpi-grid credits-grille">
+    ${tuile('Restant dû', fmt(crd), `${prets.length} crédit${prets.length > 1 ? 's' : ''}`)}
+    ${tuile('Échéances du mois', fmt(mois), 'assurance comprise')}
+    ${tuile('Intérêts restants', fmt(interets), 'et assurance, jusqu’au bout')}
+    ${tuile('Libre de dettes le', fmtDate(fin), '')}
+  </div>`;
+}
+
+function _prochaines(liste, prets) {
+  const hote = document.getElementById('credits-prochaines');
+  if (!hote) return;
+  if (!liste.length) { hote.innerHTML = '<p class="text-muted">Aucune échéance à venir.</p>'; return; }
+  const couleur = id => COULEURS[prets.findIndex(p => p.id === id) % COULEURS.length];
+  hote.innerHTML = `<table class="data-table credits-table"><thead><tr>
+      <th>Date</th><th>Crédit</th><th class="num">Capital</th><th class="num">Intérêts</th><th class="num">Total</th></tr></thead>
+    <tbody>${liste.map(e => `<tr><td>${fmtDate(e.date)}</td>
+      <td><i class="pastille" style="background:${couleur(e.pret_id)}"></i>${esc(e.pret || '')}</td>
+      <td class="num">${e.capital < 0 ? `<span class="text-muted">différé (+${fmt(-e.capital)})</span>` : fmt(e.capital)}</td>
+      <td class="num">${fmt(e.interets + e.assurance)}</td>
+      <td class="num"><b>${fmt(Math.max(e.capital, 0) + e.interets + e.assurance)}</b></td></tr>`).join('')}</tbody></table>`;
+}
+
+function _annees(liste) {
+  const hote = document.getElementById('credits-annees');
+  if (!hote) return;
+  if (!liste.length) { hote.innerHTML = ''; return; }
+  hote.innerHTML = `<table class="data-table credits-table"><thead><tr>
+      <th>Année</th><th class="num">Capital remboursé</th><th class="num">Intérêts et assurance</th><th class="num">Restant dû au 31/12</th></tr></thead>
+    <tbody>${liste.map(a => `<tr><td>${a.annee}</td><td class="num">${fmt(a.capital)}</td>
+      <td class="num">${fmt(a.interets + a.assurance)}</td><td class="num"><b>${fmt(a.crd_fin)}</b></td></tr>`).join('')}</tbody></table>`;
 }
 
 function _courbe(pj, prets) {
@@ -110,6 +178,11 @@ function _cabler() {
   _cable = true;
   const carte = document.getElementById('prets-carte');
   carte.addEventListener('change', async e => {
+    const ira = e.target.closest('[data-pret-ira]');
+    if (ira) {
+      try { await api('PATCH', `/api/prets/${ira.dataset.pretIra}`, { ira: ira.value }); loadPrets(); } catch {}
+      return;
+    }
     const sel = e.target.closest('[data-pret-entite]');
     if (!sel) return;
     try {
@@ -127,7 +200,27 @@ function _cabler() {
       return;
     }
     if (e.target.closest('#prets-annuler')) _fermerApercu();
+    if (e.target.closest('#prets-definir')) ouvrirFormulaireCredit();
+    if (e.target.closest('#pf-annuler')) document.getElementById('prets-formulaire').hidden = true;
     if (e.target.closest('#prets-enregistrer')) _enregistrer();
+  });
+  document.getElementById('prets-formulaire').addEventListener('submit', async e => {
+    e.preventDefault();
+    const v = id => document.getElementById(id).value.trim();
+    try {
+      await api('POST', '/api/prets', {
+        libelle: v('pf-libelle'), preteur: v('pf-preteur') || null,
+        montant: parseLocaleNumber(v('pf-montant')), taux: parseLocaleNumber(v('pf-taux')),
+        mois: parseLocaleNumber(v('pf-mois')), premiere: v('pf-premiere'),
+        assurance: v('pf-assurance') ? parseLocaleNumber(v('pf-assurance')) : 0,
+        differe: v('pf-differe') ? parseLocaleNumber(v('pf-differe')) : 0,
+        type_differe: v('pf-type-differe'), entity: v('pf-entite') || null,
+      });
+      toast('Crédit enregistré', 'success');
+      document.getElementById('prets-formulaire').hidden = true;
+      document.getElementById('prets-formulaire').reset();
+      loadPrets();
+    } catch {}
   });
   document.getElementById('prets-fichier').addEventListener('change', e => {
     const f = e.target.files?.[0];
@@ -191,4 +284,14 @@ async function _enregistrer() {
     _fermerApercu();
     loadPrets();
   } catch (e) { toast(e.message, 'error'); }
+}
+
+/** Le formulaire de credit, depuis le bouton « Ajouter » de l'en-tete. */
+export function ouvrirFormulaireCredit() {
+  const f = document.getElementById('prets-formulaire');
+  if (!f) return;
+  document.getElementById('pf-entite').innerHTML = ['<option value="">Aucune entité</option>',
+    ...(S.entities || []).map(e => `<option value="${esc(e.name)}">${esc(e.name)}</option>`)].join('');
+  f.hidden = false;
+  document.getElementById('pf-libelle').focus();
 }

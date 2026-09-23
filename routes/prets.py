@@ -30,6 +30,13 @@ def projection():
         return jsonify(svc.projection(conn))
 
 
+@prets_bp.route('/api/prets/calendrier', methods=['GET'])
+@login_required
+def calendrier():
+    with get_db() as conn:
+        return jsonify(svc.calendrier(conn))
+
+
 @prets_bp.route('/api/prets/dettes', methods=['GET'])
 @login_required
 def dettes():
@@ -88,6 +95,41 @@ def importer():
     return jsonify({'step': 'commit', 'id': pid}), 201
 
 
+@prets_bp.route('/api/prets', methods=['POST'])
+@login_required
+@csrf_protect
+def definir():
+    """Un credit sans tableau d'amortissement : l'echeancier se calcule a
+    mensualite constante a partir du montant, du taux et de la duree."""
+    from models import validate_number, parse_number
+    from services.parsers.amortissement import _verifier
+    d = request.json or {}
+    libelle = (d.get('libelle') or '').strip()
+    if not libelle or not validate_string(libelle, 120) or not validate_string(d.get('preteur'), 120):
+        return jsonify({'error': 'Libellé requis (120 car. max)'}), 400
+    for k, lib in (('montant', 'Montant'), ('taux', 'Taux'), ('mois', 'Durée')):
+        if d.get(k) is None or not validate_number(d.get(k)):
+            return jsonify({'error': f'{lib} invalide'}), 400
+    montant, taux, mois = parse_number(d['montant']), parse_number(d['taux']), int(parse_number(d['mois']))
+    assurance = parse_number(d.get('assurance'), 0) if d.get('assurance') not in (None, '') else 0.0
+    if montant <= 0 or not (0 <= taux < 30) or not (1 <= mois <= 600) or assurance < 0:
+        return jsonify({'error': 'Montant positif, taux entre 0 et 30 %, durée de 1 à 600 mois'}), 400
+    if not validate_date(d.get('premiere')):
+        return jsonify({'error': 'Date de première échéance invalide (AAAA-MM-JJ)'}), 400
+    differe = int(parse_number(d.get('differe'), 0)) if d.get('differe') not in (None, '') else 0
+    type_differe = d.get('type_differe') or 'partiel'
+    if type_differe not in ('partiel', 'total') or not (0 <= differe < mois):
+        return jsonify({'error': 'Différé : total ou partiel, plus court que la durée du prêt'}), 400
+    entity = d.get('entity') or None
+    with get_db() as conn:
+        if entity and not conn.execute('SELECT 1 FROM entities WHERE name=?', (entity,)).fetchone():
+            return jsonify({'error': f'Entité inconnue : {entity}'}), 400
+        t = _verifier(svc.echeancier_calcule(montant, taux, mois, d['premiere'], assurance, differe, type_differe))
+        t.preteur = (d.get('preteur') or '').strip() or None
+        pid = svc.enregistrer(conn, t, entity, libelle, 'saisie')
+    return jsonify({'id': pid}), 201
+
+
 @prets_bp.route('/api/prets/<int:pid>', methods=['PATCH'])
 @login_required
 @csrf_protect
@@ -100,6 +142,10 @@ def modifier(pid):
             if e and not conn.execute('SELECT 1 FROM entities WHERE name=?', (e,)).fetchone():
                 return jsonify({'error': f'Entité inconnue : {e}'}), 400
             champs.append('entity=?'); valeurs.append(e)
+        if 'ira' in d:
+            if d['ira'] not in ('legale', 'aucune'):
+                return jsonify({'error': 'IRA : legale ou aucune'}), 400
+            champs.append('ira=?'); valeurs.append(d['ira'])
         if 'libelle' in d:
             if not d['libelle'] or not validate_string(d['libelle'], 120):
                 return jsonify({'error': 'Libellé invalide'}), 400

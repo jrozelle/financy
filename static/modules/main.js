@@ -16,6 +16,7 @@ import { loadPositions, renderPositions, clearFilters, openPosModal, duplicateSn
          onEntitySelectChange, updatePosInfo, savePosition, deletePosition,
          persistPositionFilters, ensurePositionsTableScaffold } from './tabs/positions.js';
 import { openHoldingsModal, wireHoldingsEvents, confirmCloseHoldings } from './tabs/holdings.js';
+import { loadPrets, ouvrirFormulaireCredit } from './tabs/prets.js';
 import { wireIsinPopoverEvents } from './isin-popover.js';
 import { loadAdvisor, wireAdvisorEvents } from './tabs/advisor.js';
 import { loadActifs, wireActifsEvents } from './tabs/actifs.js';
@@ -193,7 +194,7 @@ function _onGlobalOwnerChange(e) {
 }
 
 const VALID_TABS = new Set([
-  'synthese', 'positions', 'actifs', 'flux', 'entites', 'performance', 'conseil',
+  'synthese', 'positions', 'actifs', 'flux', 'entites', 'credits', 'performance', 'conseil',
   'referentiel', 'tools', 'import',
 ]);
 
@@ -257,6 +258,7 @@ const AJOUTS = {
   positions: { libelle: 'Ajouter une position', ouvrir: () => openPosModal() },
   flux:      { libelle: 'Ajouter un flux',      ouvrir: () => openFluxModal() },
   entites:   { libelle: 'Ajouter une entité',   ouvrir: () => openEntityModal() },
+  credits:   { libelle: 'Ajouter un crédit',    ouvrir: () => ouvrirFormulaireCredit() },
 };
 
 /** Onglets ou « Mettre a jour » est l'action principale : ceux qui montrent
@@ -284,7 +286,7 @@ function _majBoutonAjouter(tab) {
 
 
 const LABELS_ONGLET = {
-  synthese: 'Synthèse', positions: 'Positions', actifs: 'Actifs', entites: 'Entités',
+  synthese: 'Synthèse', positions: 'Positions', actifs: 'Actifs', entites: 'Entités', credits: 'Crédits',
   performance: 'Performance', flux: 'Flux', conseil: 'Conseil',
   referentiel: 'Référentiel', import: 'Import / Export', tools: 'Outils',
 };
@@ -300,7 +302,7 @@ function majTitrePage(tab) {
   if (!h) return;
   const TITRES = {
     synthese: 'Synthèse du patrimoine', positions: 'Positions',
-    actifs: 'Actifs détenus', entites: 'Entités', performance: 'Performance',
+    actifs: 'Actifs détenus', entites: 'Entités', credits: 'Crédits', performance: 'Performance',
     flux: 'Flux et versements', conseil: 'Conseil patrimonial',
     referentiel: 'Référentiel', import: 'Import / Export', tools: 'Outils',
   };
@@ -356,6 +358,7 @@ export async function switchTab(tab, { pushHistory = true } = {}) {
     if (tab === 'positions')   await loadPositions();
     if (tab === 'flux')        await loadFlux();
     if (tab === 'entites')     await loadEntities();
+    if (tab === 'credits')     { if (!S.entities?.length) await loadEntities(); await loadPrets(); }
     if (tab === 'referentiel') await loadReferential();
     if (tab === 'actifs')      await loadActifs();
     if (tab === 'performance') await loadPerformance();

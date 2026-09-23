@@ -100,3 +100,64 @@ def test_projection_totalise_les_prets():
         c.commit()
         pj = prets.projection(c, depuis='2026-01-01')
     assert pj['total'][0] == 9000.0 and pj['total'][-1] == 0.0
+
+
+def test_calendrier_prochaines_echeances_et_cumul_annuel():
+    with get_db() as c:
+        prets.enregistrer(c, _verifier(_tableau()), entity=None)
+        c.commit()
+        cal = prets.calendrier(c, depuis='2026-01-10')
+    assert [e['rang'] for e in cal['prochaines']] == [2, 3]
+    assert cal['annees'] == [{'annee': '2026', 'capital': 2000.0, 'interets': 20.0, 'assurance': 0.0,
+                              'echeances': 2, 'crd_fin': 0.0}]
+
+
+def test_un_credit_defini_a_la_main_a_son_echeancier(client):
+    r = client.post('/api/prets', json={'libelle': 'Prêt auto', 'montant': 12000, 'taux': 3.5, 'mois': 48,
+                                       'premiere': '2026-10-05'}, headers=H)
+    assert r.status_code == 201, r.get_json()
+    p = client.get('/api/prets?date=2026-09-30').get_json()['prets'][0]
+    assert p['crd'] == 12000 and p['fin'] == '2030-09-05' and p['echeances'] == 48
+    assert p['mensualite'] == pytest.approx(268.27, abs=0.02)     # annuite a 3,5 % sur 48 mois
+
+
+def test_differe_partiel_puis_amortissement():
+    t = _verifier(prets.echeancier_calcule(12000, 3.0, 24, '2026-01-05', differe=6, type_differe='partiel'))
+    e = t.echeances
+    assert all(x.capital == 0 and x.crd == 12000 for x in e[:6])          # interets seuls
+    assert e[0].interets == 30.0 and e[6].capital > 0 and e[-1].crd == 0
+
+
+def test_differe_total_capitalise_les_interets():
+    t = _verifier(prets.echeancier_calcule(12000, 3.0, 24, '2026-01-05', differe=6, type_differe='total'))
+    e = t.echeances
+    assert e[0].crd == 12030.0 and e[5].crd > 12150                        # le capital grossit
+    assert all(x.interets == 0 for x in e[:6]) and e[-1].crd == 0
+
+
+def test_le_resume_dit_le_differe(client):
+    client.post('/api/prets', json={'libelle': 'Travaux', 'montant': 12000, 'taux': 3, 'mois': 24,
+                                    'premiere': '2026-10-05', 'differe': 6, 'type_differe': 'partiel'}, headers=H)
+    p = client.get('/api/prets?date=2026-09-30').get_json()['prets'][0]
+    assert p['differe'] == {'type': 'partiel', 'jusqu_au': '2027-03-05'}
+    assert p['echeance_du_mois'] == 30.0 and p['mensualite'] > 600
+
+
+def test_ira_plafond_legal_et_renonciation(client):
+    assert prets.ira(100000, 1.2) == 600.0          # 6 mois d'interets < 3 %
+    assert prets.ira(100000, 8.0) == 3000.0         # 3 % du restant du < 6 mois
+    assert prets.ira(100000, 1.2, 'aucune') == 0.0
+    client.post('/api/prets', json={'libelle': 'Immo', 'montant': 100000, 'taux': 1.2, 'mois': 120,
+                                    'premiere': '2026-10-05'}, headers=H)
+    pid = client.get('/api/prets').get_json()['prets'][0]['id']
+    assert client.get('/api/prets?date=2026-09-30').get_json()['prets'][0]['ira'] == 600.0
+    client.patch(f'/api/prets/{pid}', json={'ira': 'aucune'}, headers=H)
+    assert client.get('/api/prets?date=2026-09-30').get_json()['prets'][0]['ira'] == 0.0
+
+
+def test_taux_deduit_de_l_echeancier():
+    with get_db() as c:
+        pid = prets.enregistrer(c, _verifier(prets.echeancier_calcule(100000, 2.4, 120, '2026-01-05')))
+        c.execute('UPDATE prets SET taux=NULL WHERE id=?', (pid,)); c.commit()
+        p = prets.resume(c, '2025-12-01')['prets'][0]
+    assert p['taux_deduit'] and p['taux_retenu'] == pytest.approx(2.4, abs=0.02)

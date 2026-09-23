@@ -6,7 +6,6 @@ import { confirmDialog, toast, closeModal } from '../dialogs.js';
 import { switchTab } from '../main.js';
 import { openPosModal } from './positions.js';
 import { montantPanneau } from '../drilldown.js';
-import { loadPrets } from './prets.js';
 
 let _entityTimelineChart = null;
 
@@ -19,7 +18,6 @@ export async function loadEntities() {
   ]);
   renderEntities();
   refreshEntitySelect();
-  loadPrets();
 }
 
 function snapshotsByEntity() {

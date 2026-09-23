@@ -701,6 +701,15 @@ def _migration_013(conn):
     conn.execute('CREATE INDEX IF NOT EXISTS idx_pret_echeances_date ON pret_echeances(pret_id, date)')
 
 
+def _migration_014(conn):
+    """Indemnites de remboursement anticipe d'un pret : 'legale' (plafond du
+    Code de la consommation) ou 'aucune' (contrat qui y renonce)."""
+    try:
+        conn.execute("ALTER TABLE prets ADD COLUMN ira TEXT DEFAULT 'legale'")
+    except Exception:
+        pass            # colonne deja presente
+
+
 MIGRATIONS = [
     (1, _migration_001),
     (2, _migration_002),
@@ -715,6 +724,7 @@ MIGRATIONS = [
     (11, _migration_011),
     (12, _migration_012),
     (13, _migration_013),
+    (14, _migration_014),
 ]
 
 
