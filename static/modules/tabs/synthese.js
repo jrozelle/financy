@@ -1,4 +1,5 @@
 import { S } from '../state.js';
+import { natureDe } from '../categories.js';
 import { dessinerCourbe } from '../courbe.js';
 import { fmt, fmtDate, esc, kpiDelta, parseLocaleNumber, sparkline, fmtPct } from '../utils.js';
 import { api } from '../api.js';
@@ -174,7 +175,9 @@ export function renderSynthese() {
   renderEntityWarnings(syn.entity_warnings || []);
   renderHistChart();
   renderSyntheseHistory();
-  renderLiqBars(liqFiltered, kpi.net);
+  const posTitulaire = isFamily ? Object.values(S.synthese._positions_cache || {}).flat()
+                                : (S.synthese._positions_cache?.[owner] || []);
+  renderLiqBars(liqFiltered, posTitulaire);
   renderEntitiesSynthese();
   renderAllocationTargets();
   renderSnapshotDiff(owner, isFamily);
@@ -455,7 +458,7 @@ function renderEntitiesSynthese() {
  *  a les additionner de tete pour repondre a la seule question qui compte —
  *  « de combien je dispose d'ici la ? ».
  */
-function renderLiqBars(byLiq, net = 0) {
+function renderLiqBars(byLiq, positions = []) {
   // Trois delais cumules, puis ce qui ne se mobilise pas. La ligne « Au-dela »
   // repetait le cumul du mois — rien n'est classe au-dela — et n'apprenait
   // rien ; la question utile est l'inverse : combien reste immobilise.
@@ -467,8 +470,15 @@ function renderLiqBars(byLiq, net = 0) {
   if (byLiq['30J+']) DELAIS.push({ cles: ['J0–J1', 'J2–J7', 'J8–J30', '30J+'], libelle: 'Au-delà d’un mois' });
   const cumule = d => d.cles.reduce((s, k) => s + (byLiq[k] || 0), 0);
   const mobilisable = ['J0–J1', 'J2–J7', 'J8–J30', '30J+'].reduce((s, k) => s + (byLiq[k] || 0), 0);
-  const bloque = Math.max(0, (net || 0) - mobilisable);
-  const base = Math.max(net || 0, mobilisable, 1);
+  // « Bloque » = le FINANCIER qui ne se mobilise pas : PER, contrat nanti,
+  // epargne bloquee, decote de sortie. L'immobilier et les biens n'y sont pas —
+  // on ne les mobilise pas en un mois, cela va sans dire — et y compter la
+  // residence principale noyait les 30 000 € d'un PER dans 700 000 €.
+  const financier = positions.filter(p => ['liq', 'fin'].includes(natureDe(p.category, p.envelope)));
+  const bloque = financier.reduce((s, p) => s + Math.max(0, (p.net_attributed || 0) - (p.mobilizable_value || 0)), 0);
+  const horsFinancier = positions.filter(p => !financier.includes(p))
+    .reduce((s, p) => s + (p.net_attributed || 0), 0);
+  const base = Math.max(mobilisable + bloque, 1);
 
   const ligne = (libelle, valeur, couleur, cls = '') => `
     <div class="dispo-ligne ${cls}">
@@ -484,8 +494,9 @@ function renderLiqBars(byLiq, net = 0) {
       ${bloque >= 1 ? ligne('Ce qui reste bloqué', bloque, 'var(--text-muted)', 'dispo-bloque') : ''}
     </div>
     ${mobilisable || bloque ? `<p class="dispo-note">Délais cumulés : chaque ligne inclut la précédente.
-      « Bloqué » : la part du net qui ne se mobilise pas — immobilier, biens, parts de société,
-      décote de sortie${byLiq['Bloqué'] ? ', épargne bloquée' : ''}.</p>` : ''}`;
+      « Bloqué » : le patrimoine financier qui ne se mobilise pas — épargne retraite, contrat nanti,
+      décote de sortie.${Math.abs(horsFinancier) >= 1 ? ` Immobilier, biens et sociétés, hors de ce décompte :
+      ${fmt(horsFinancier)} de net.` : ''}</p>` : ''}`;
 }
 
 async function renderSnapshotDiff(owner, isFamily) {
