@@ -156,19 +156,30 @@ def constats(conn, date, owner=None):
             continue
         vus.add(cle)
         if p.get('entity'):
-            parts = [x for x in ps if x.get('entity') == p['entity']]
+            # Les comptes au nom de l'entite (sa tresorerie, saisie comme un
+            # compte courant « Holding Exemple ») lui appartiennent : sans eux, son
+            # net paraissait plus negatif qu'il n'est.
+            parts = [x for x in ps if x.get('entity') == p['entity']
+                     or (not x.get('entity') and p['entity'] in (x.get('label'), x.get('category')))]
             brut = sum(x['gross_attributed'] for x in parts)
             dette = sum(x['debt_attributed'] for x in parts)
             nom = p['entity']
         else:
             brut, dette, nom = p['gross_attributed'], p['debt_attributed'], (p.get('label') or p.get('envelope') or p.get('category'))
         if dette > brut + 100:
+            detail = ("Un net négatif n'est pas une anomalie en soi — un bien récent, "
+                      "financé à crédit — mais il pèse sur le patrimoine net tant que le "
+                      "capital restant dû dépasse la valeur retenue.")
+            if p.get('entity'):
+                snap = conn.execute('SELECT MAX(date) d FROM entity_snapshots WHERE entity_name=? AND date<=?',
+                                    (p['entity'], date)).fetchone()
+                if snap and snap['d'] and (_jours(snap['d'], date) > 90):
+                    detail += (f" Valeur et dette datent du {snap['d'][8:10]}/{snap['d'][5:7]}/{snap['d'][:4]} : "
+                               "à mettre à jour avant d'en conclure quoi que ce soit.")
             out.append({
                 'niveau': 'info', 'onglet': 'entites' if p.get('entity') else 'positions',
                 'titre': f'{nom} : la dette dépasse la valeur de {_eur(dette - brut)}',
-                'detail': ("Un net négatif n'est pas une anomalie en soi — un bien récent, "
-                           "financé à crédit — mais il pèse sur le patrimoine net tant que le "
-                           "capital restant dû dépasse la valeur retenue."),
+                'detail': detail,
                 'montant': round(dette - brut, 2),
             })
 
@@ -196,6 +207,11 @@ def constats(conn, date, owner=None):
     # son montant, que le restant du placerait sinon en tete.
     out.sort(key=lambda c: (ordre[c['niveau']], c['onglet'] == 'credits', -abs(c.get('montant') or 0)))
     return {'date': date, 'owner': owner, 'constats': out}
+
+
+def _jours(d0, d1):
+    from datetime import date as _d
+    return (_d.fromisoformat(d1[:10]) - _d.fromisoformat(d0[:10])).days
 
 
 def _pct(v):

@@ -193,3 +193,18 @@ class TestGarderOuRembourser:
         with get_db() as conn:
             self._base(conn)
         assert self._credits(owner='Claire') == []
+
+
+class TestNetDesEntites:
+    def test_la_tresorerie_saisie_au_nom_de_l_entite_compte(self):
+        from services.advisor.constats import constats
+        with get_db() as conn:
+            conn.execute("INSERT INTO entities (name, type) VALUES ('Holding H', 'Holding')")
+            conn.execute("INSERT INTO entity_snapshots (entity_name, date, gross_assets, debt) VALUES ('Holding H', '2026-04-01', 150000, 160000)")
+            conn.execute("INSERT INTO positions (date, owner, category, envelope, value, entity, ownership_pct, debt_pct) "
+                         "VALUES ('2026-09-01', 'Paul', 'Parts sociales', 'Holding', 0, 'Holding H', 1, 1)")
+            conn.execute("INSERT INTO positions (date, owner, category, envelope, label, value) "
+                         "VALUES ('2026-09-01', 'Paul', 'Cash & dépôts', 'Compte courant', 'Holding H', 7500)")
+            ks = [k for k in constats(conn, '2026-09-01')['constats'] if 'dette dépasse' in k['titre']]
+        assert len(ks) == 1 and ks[0]['montant'] == 2500
+        assert 'datent du 01/04/2026' in ks[0]['detail']
