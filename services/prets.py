@@ -108,9 +108,26 @@ def projection(conn, depuis=None):
     dates.append(fin)
     series = []
     for p in prets:
-        series.append({**p, 'points': [round(crd_a(conn, p['id'], d), 2) for d in dates]})
+        series.append({**p, 'in_fine': est_in_fine(conn, p['id']),
+                       'points': [round(crd_a(conn, p['id'], d), 2) for d in dates]})
     total = [round(sum(s['points'][i] for s in series), 2) for i in range(len(dates))]
-    return {'dates': dates, 'prets': series, 'total': total}
+    # Le restant du des seuls prets amortissables : leur capital se rembourse
+    # sur les revenus, et c'est un enrichissement. Un pret in fine se rembourse
+    # d'un bloc, sur des actifs deja comptes : sa baisse n'enrichit personne.
+    amortissable = [round(sum(s['points'][i] for s in series if not s['in_fine']), 2)
+                    for i in range(len(dates))]
+    return {'dates': dates, 'prets': series, 'total': total, 'total_amortissable': amortissable}
+
+
+def est_in_fine(conn, pret_id):
+    """Un pret dont tout le capital se rembourse a la derniere echeance."""
+    r = conn.execute('SELECT COUNT(*) n, SUM(CASE WHEN capital > 0.005 THEN 1 ELSE 0 END) k, '
+                     'MAX(rang) dernier FROM pret_echeances WHERE pret_id=?', (pret_id,)).fetchone()
+    if not r['n'] or r['k'] != 1:
+        return False
+    d = conn.execute('SELECT capital FROM pret_echeances WHERE pret_id=? AND rang=?',
+                     (pret_id, r['dernier'])).fetchone()
+    return bool(d and d['capital'] > 0.005)
 
 
 def enregistrer(conn, tableau, entity=None, libelle=None, source=None):

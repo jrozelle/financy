@@ -1,6 +1,6 @@
 """Tableaux d'amortissement de pret : une ligne par echeance.
 
-Deux gabarits reconnus :
+Trois gabarits reconnus :
 
 - Caisse d'Epargne (« PRET HABITAT », « P.H PRIMO ») : RANG | DATE |
   MONTANT A RECOUVRER | CAPITAL AMORTI | PART INTERETS | PART ACCESSOIRES |
@@ -9,6 +9,10 @@ Deux gabarits reconnus :
   lisent a la POSITION des mots, qu'on recolle par colonne.
 - Arkea Banque Privee : N | DATE | AMORTISSEMENTS | INTERETS NORMAUX |
   INTERETS DIFFERES | ASSURANCES | TOTAL | RESTANT DU, milliers a point.
+- Credit Agricole (avis de realisation) : N | DATE | CAPITAL RESTANT DU |
+  MONTANT ECHEANCE | CAPITAL AMORTI | INTERETS, milliers a espace, dates a
+  points. Un pret in fine s'y lit tel quel : capital nul jusqu'a la derniere
+  echeance, qui rembourse tout.
 
 Le tableau se verifie lui-meme : d'une echeance a la suivante, le capital
 restant du baisse exactement du capital amorti. Un tableau qui ne tombe pas
@@ -156,6 +160,38 @@ def _arkea(pdf, texte):
     return t
 
 
+_CA_MONTANT = r'\d{1,3}(?: \d{3})*,\d{2}'
+_CA_LIGNE = re.compile(r'^(\d{1,3}) (\d{2})\.(\d{2})\.(\d{4}) ((?:%s ){3}%s)$' % (_CA_MONTANT, _CA_MONTANT))
+
+
+def _credit_agricole(pdf, texte):
+    """Avis de realisation : un avis par tranche debloquee, et le dernier
+    porte l'echeancier du credit entier. Le montant est celui du credit, pas
+    celui de la tranche (« Montant realise »)."""
+    montant = re.search(r'Montant du cr[ée]dit\s*:\s*([\d\s]+,\d{2})', texte)
+    taux = re.search(r'Taux\s*:\s*([\d,]+)', texte)
+    # L'emprunteur est en fin de ligne, apres le nom du conseiller.
+    nom = None
+    for l in texte.splitlines():
+        m = re.search(r'\b(S\.A\.S\.|S\.C\.I\.|SARL)\s+([A-Z][A-Z0-9\' -]+)$', l.strip())
+        if m:
+            nom = m.group(2).strip()
+            break
+    t = Tableau(preteur='Crédit Agricole Toulouse 31', libelle='Prêt',
+                emprunteur=nom, montant=_num(montant.group(1)) if montant else None,
+                taux=_num(taux.group(1)) if taux else None)
+    for ligne in texte.split('\n'):
+        m = _CA_LIGNE.match(ligne.strip())
+        if not m:
+            continue
+        crd, _echeance, capital, interets = [_num(x) for x in re.findall(_CA_MONTANT, m.group(5))]
+        t.echeances.append(Echeance(rang=int(m.group(1)), date=f'{m.group(4)}-{m.group(3)}-{m.group(2)}',
+                                    capital=capital, interets=interets, assurance=0.0, crd=crd))
+    if t.echeances and all(e.capital == 0 for e in t.echeances[:-1]):
+        t.libelle = 'Prêt in fine'
+    return t
+
+
 def _verifier(t):
     """Le capital restant du doit baisser du capital amorti, echeance par
     echeance. Tout ecart au-dela du centime fait refuser le tableau."""
@@ -185,9 +221,12 @@ def lire_tableau(chemin_ou_flux) -> Tableau:
         texte = '\n'.join((p.extract_text() or '') for p in pdf.pages)
         if 'ARKEA' in texte.upper() and 'TABLEAU D' in texte.upper():
             t = _arkea(pdf, texte)
+        elif 'AVIS DE R' in texte.upper() and 'CREDIT AGRICOLE' in texte.upper():
+            t = _credit_agricole(pdf, texte)
         elif 'CAPITAL' in texte.upper() and ('PRET HABITAT' in texte.upper() or 'P.H PRIMO' in texte.upper()
                                               or "CAISSE D'EPARGNE" in texte.upper()):
             t = _ce(pdf, texte)
         else:
-            raise ValueError("Gabarit de tableau d'amortissement non reconnu (Caisse d'Épargne ou Arkéa attendus)")
+            raise ValueError("Gabarit de tableau d'amortissement non reconnu "
+                             "(Caisse d'Épargne, Arkéa ou Crédit Agricole attendus)")
     return _verifier(t)

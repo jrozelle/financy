@@ -34,18 +34,21 @@ function _memoriser(r) {
   try { localStorage.setItem(CLE, JSON.stringify(r)); } catch { /* session privee */ }
 }
 
-/** Restant du total a une date, interpole entre les points de l'echeancier. */
+/** Restant du des prets AMORTISSABLES a une date, interpole entre les points
+ *  de l'echeancier. Un pret in fine en est exclu : il se rembourse d'un bloc
+ *  sur des actifs deja comptes, sans enrichir. */
 function _crdA(t) {
   if (!_crd?.dates?.length) return 0;
+  const serie = _crd.total_amortissable || _crd.total;
   const ts = _crd.dates.map(d => Date.parse(d));
-  if (t <= ts[0]) return _crd.total[0];
+  if (t <= ts[0]) return serie[0];
   for (let i = 1; i < ts.length; i++) {
     if (t <= ts[i]) {
       const k = (t - ts[i - 1]) / (ts[i] - ts[i - 1]);
-      return _crd.total[i - 1] + k * (_crd.total[i] - _crd.total[i - 1]);
+      return serie[i - 1] + k * (serie[i] - serie[i - 1]);
     }
   }
-  return _crd.total[_crd.total.length - 1];
+  return serie[serie.length - 1];
 }
 
 export async function renderProjection(positions, isFamily, net, objectif) {
@@ -167,7 +170,8 @@ function _dessiner() {
       : net >= objectif ? '' : ` — objectif de ${fmt(objectif)} non atteint à cet horizon`) : ''}</p>
     <ul class="proj-moteurs">
       ${ligne('Aujourd’hui', net, 'patrimoine net actuel', false)}
-      ${ligne('Désendettement', parts.desendettement, 'capital remboursé selon les échéanciers — certain')}
+      ${ligne('Désendettement', parts.desendettement, 'capital remboursé selon les échéanciers des prêts amortissables — certain'
+        + ((_crd?.prets || []).some(p => p.in_fine) ? ' ; un prêt in fine, remboursé d’un bloc sur des actifs, n’en fait pas partie' : ''))}
       ${ligne('Épargne nouvelle', parts.epargneCum, `${fmt(epargne)} par mois — l'argent qui entre`)}
       ${ligne('Rendement', parts.rendement, `${String(taux * 100).replace('.', ',')} % par an sur le financier (${fmt(financier)} aujourd'hui)`
         + (dcaCum ? `, renforcé de ${fmt(dcaCum)} investis en DCA${finDca ? ` jusqu'en ${finDca.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}` : ''}` : '')
