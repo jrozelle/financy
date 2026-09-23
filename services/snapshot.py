@@ -152,6 +152,14 @@ def preparer_mise_a_jour(conn, source_date, target_date):
             incluse = (avant['tresorerie'] or 0.0) if avant else 0.0
             e['tresorerie'] = {**t, 'incluse_avant': round(incluse, 2)}
             e['valeur_proposee'] = round(e['gross_assets'] - incluse + t['montant'], 2)
+        # Des parts au prix de retrait remplacent la valeur precedente : c'est
+        # ce que l'entite toucherait en les revendant, frais d'entree deduits.
+        from services.tresorerie_entite import parts as parts_de
+        for e in entites:
+            detenues = parts_de(conn, e['name'])
+            if detenues and detenues['complet']:
+                e['parts'] = {'valeur_retrait': detenues['valeur_retrait'], 'lignes': len(detenues['lignes'])}
+                e['valeur_proposee'] = round(detenues['valeur_retrait'] + (e.get('tresorerie') or {}).get('montant', 0), 2)
     except Exception:
         pass                      # table absente (base non migree)
 

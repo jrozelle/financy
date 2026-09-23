@@ -5,8 +5,8 @@
  */
 import { S } from '../state.js';
 import { api } from '../api.js';
-import { fmt, fmtDate, esc, sortArr, wireSortableTable, updateSortIndicators } from '../utils.js';
-import { toast } from '../dialogs.js';
+import { fmt, fmtDate, esc, sortArr, wireSortableTable, updateSortIndicators, parseLocaleNumber } from '../utils.js';
+import { toast, promptDialog } from '../dialogs.js';
 
 S.sort.operations = S.sort.operations || { key: 'date', dir: -1 };
 
@@ -38,6 +38,14 @@ function _verdict(b) {
   if (i.effort_mensuel > 0) {
     phrases.push(`Le reste, et les frais, demandent <b>${fmt(i.effort_mensuel)} par mois</b> aux associés.`);
   }
+  // Les frais d'entree des parts : partis des l'achat, ils ne se voient qu'a
+  // la revente. Le capital rembourse doit d'abord les rattraper.
+  if (b.frais_latents > 0) {
+    const annees = c?.capital ? b.frais_latents / c.capital * (12 / b.periode.mois) : null;
+    phrases.push(`Au prix de retrait, les parts valent ${fmt(b.parts.valeur_retrait)} pour ${fmt(b.parts.montant_souscrit)}
+      payés : <b>${fmt(b.frais_latents)} de frais d'entrée</b> déjà partis${annees
+        ? `, soit ${annees.toFixed(1).replace('.', ',')} ans du capital remboursé aujourd'hui` : ''}.`);
+  }
   if (c && c.capital) {
     phrases.push(`Sur la période, le crédit a coûté ${fmt(c.interets + c.assurance)} d'intérêts et d'assurance,
       et remboursé <b>${fmt(c.capital)} de capital</b> : c'est de ce capital que la SCI s'enrichit.`);
@@ -46,7 +54,7 @@ function _verdict(b) {
       ? `Le capital remboursé dépasse l'effort de ${fmt(ecart)} : le levier enrichit déjà, avant toute revalorisation des parts.`
       : `L'effort dépasse le capital remboursé de ${fmt(-ecart)} — la part des intérêts que les loyers ne couvrent pas.
          Le montage s'enrichit dès que les parts se revalorisent de plus de
-         <b>${(-ecart / (b.valeur || 1) * 100).toFixed(2).replace('.', ',')} % par an</b>, avant impôt.`);
+         <b>${(-ecart / (b.parts?.valeur_retrait || b.valeur || 1) * 100).toFixed(2).replace('.', ',')} % par an</b>, avant impôt.`);
   }
   return phrases.join(' ');
 }
@@ -80,8 +88,7 @@ function _bloc(b, idx) {
       <span><i class="treso-pastille" style="background:var(--danger)"></i>Échéance et frais</span>
       <span><i class="treso-pastille treso-pastille--apport"></i>Apports des associés</span>
     </div>
-    ${b.valeur != null && b.tresorerie ? `<p class="treso-note">La valeur retenue pour ${esc(b.entite)} (${fmt(b.valeur)})
-      ne comprend pas sa trésorerie de ${fmt(b.tresorerie)}.</p>` : ''}
+    ${_parts(b, idx)}
     <details class="treso-ops">
       <summary>Les ${b.operations.length} opérations</summary>
       <div class="table-scroll" tabindex="0" role="region" aria-label="Opérations de ${esc(b.entite)}">
@@ -96,6 +103,38 @@ function _bloc(b, idx) {
       </div>
     </details>
   </section>`;
+}
+
+/** Les parts detenues, valorisees au prix de retrait. Les prix se mettent a
+ *  jour a chaque bulletin trimestriel ; sans prix de retrait publie, il est
+ *  estime a la souscription moins 10 % de commission. */
+function _parts(b, idx) {
+  const lignes = b.parts?.lignes || [];
+  const champ = (l, k, lib) => `<input type="text" inputmode="decimal" class="ref-input treso-prix" data-k="${k}"
+    value="${l[k] ?? ''}" aria-label="${lib} de ${esc(l.nom)}">`;
+  return `<details class="treso-parts"${lignes.length ? '' : ' open'}>
+    <summary>Parts détenues${lignes.length ? ` : ${fmt(b.parts.valeur_retrait)} au prix de retrait` : ''}</summary>
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Parts de ${esc(b.entite)}">
+      <table class="data-table" data-parts="${idx}">
+        <thead><tr><th>Part</th><th class="num">Nombre</th><th class="num">Prix payé</th>
+          <th class="num">Souscription</th><th class="num">Retrait</th><th class="num">Valeur de retrait</th><th>Prix au</th></tr></thead>
+        <tbody>${lignes.map(l => `<tr data-nom="${esc(l.nom)}">
+          <td>${esc(l.nom)}</td>
+          <td class="num">${champ(l, 'parts', 'Nombre de parts')}</td>
+          <td class="num">${champ(l, 'montant_souscrit', 'Prix payé')}</td>
+          <td class="num">${champ(l, 'prix_souscription', 'Prix de souscription')}</td>
+          <td class="num">${champ(l, 'prix_retrait', 'Prix de retrait')}${l.retrait_estime
+            ? `<span class="treso-estime">estimé à ${fmt(l.prix_retrait_retenu)}</span>` : ''}</td>
+          <td class="num">${l.valeur_retrait != null ? fmt(l.valeur_retrait) : '—'}</td>
+          <td><input type="date" class="ref-input" data-k="date_prix" value="${l.date_prix || ''}" aria-label="Date des prix de ${esc(l.nom)}"></td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+    <div class="treso-parts-actions">
+      <button type="button" class="btn btn-secondary btn-sm" data-parts-ajouter="${idx}">Ajouter une part</button>
+      <button type="button" class="btn btn-primary btn-sm" data-parts-enregistrer="${idx}">Enregistrer les prix</button>
+    </div>
+  </details>`;
 }
 
 /** Douze colonnes : les entrees au-dessus de zero, les sorties en dessous. */
@@ -156,9 +195,36 @@ function _cabler(sec, b) {
   svg.addEventListener('focusin', e => { const g = e.target.closest('.treso-col'); if (g) montrer(g); });
   svg.addEventListener('focusout', cacher);
 
+  // Parts : ajout d'une ligne, enregistrement de l'ensemble.
+  sec.querySelector('[data-parts-ajouter]')?.addEventListener('click', async () => {
+    const nom = (await promptDialog('Nom de la part', { placeholder: 'ex. : Immorente', confirmText: 'Ajouter' }))?.trim();
+    if (!nom) return;
+    const tr = document.createElement('tr');
+    tr.dataset.nom = nom;
+    tr.innerHTML = `<td>${esc(nom)}</td>` + ['parts', 'montant_souscrit', 'prix_souscription', 'prix_retrait'].map(k =>
+      `<td class="num"><input type="text" inputmode="decimal" class="ref-input treso-prix" data-k="${k}" aria-label="${k}"></td>`).join('')
+      + '<td class="num">—</td><td><input type="date" class="ref-input" data-k="date_prix" aria-label="Date des prix"></td>';
+    sec.querySelector('[data-parts] tbody').appendChild(tr);
+  });
+  sec.querySelector('[data-parts-enregistrer]')?.addEventListener('click', async () => {
+    const lignes = [...sec.querySelectorAll('[data-parts] tbody tr')].map(tr => {
+      const l = { nom: tr.dataset.nom };
+      tr.querySelectorAll('[data-k]').forEach(i => {
+        l[i.dataset.k] = i.dataset.k === 'date_prix' ? (i.value || null)
+          : (i.value.trim() === '' ? null : parseLocaleNumber(i.value, null));
+      });
+      return l;
+    });
+    try {
+      await api('PUT', `/api/entites/${encodeURIComponent(b.entite)}/parts`, { parts: lignes });
+      toast('Prix enregistrés : la prochaine mise à jour proposera la valeur au prix de retrait', 'success');
+      loadTresorerie();
+    } catch { /* toast deja affiche */ }
+  });
+
   // Operations : triables, et reclassables quand le libelle a trompe le tri.
   const idx = sec.dataset.treso;
-  const tbody = sec.querySelector('tbody');
+  const tbody = sec.querySelector('.treso-ops tbody');
   const rendre = () => {
     const { key, dir } = S.sort.operations;
     tbody.innerHTML = sortArr(b.operations, key, dir).map(o => `<tr>
@@ -180,9 +246,9 @@ function _cabler(sec, b) {
     try {
       await api('PATCH', `/api/entites/operations/${sel.dataset.op}`, { nature: sel.value });
       toast('Opération reclassée', 'success');
-      const ouvert = sec.querySelector('details').open;
+      const ouvert = sec.querySelector('.treso-ops').open;
       await loadTresorerie();
-      if (ouvert) document.querySelector(`[data-treso="${idx}"] details`)?.setAttribute('open', '');
+      if (ouvert) document.querySelector(`[data-treso="${idx}"] .treso-ops`)?.setAttribute('open', '');
     } catch { /* toast deja affiche */ }
   });
 }

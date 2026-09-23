@@ -174,3 +174,40 @@ class TestEpargneNouvelle:
             e = epargne_nouvelle(conn, '2026-09-01')
         (p,) = e['periodes']
         assert p['epargne'] == 1000 and p['versements'] == 3000
+
+
+class TestParts:
+    def _entite(self, conn):
+        conn.execute("INSERT INTO entities (name, type) VALUES ('SCI T', 'SCI')")
+
+    def test_valeur_au_prix_de_retrait_et_estimation(self, client):
+        with get_db() as conn:
+            self._entite(conn)
+        r = client.put('/api/entites/SCI T/parts', headers=H, json={'parts': [
+            {'nom': 'A', 'parts': 100, 'montant_souscrit': 34000, 'prix_souscription': 340, 'prix_retrait': 306},
+            {'nom': 'B', 'parts': 50, 'montant_souscrit': 10000, 'prix_souscription': 200}]})
+        assert r.status_code == 200
+        d = r.get_json()
+        b = next(l for l in d['lignes'] if l['nom'] == 'B')
+        assert b['retrait_estime'] and b['prix_retrait_retenu'] == 180
+        assert d['valeur_retrait'] == 30600 + 9000 and d['montant_souscrit'] == 44000
+
+    def test_refus(self, client):
+        with get_db() as conn:
+            self._entite(conn)
+        assert client.put('/api/entites/SCI T/parts', headers=H, json={'parts': [{'nom': 'A', 'parts': 0}]}).status_code == 400
+        assert client.put('/api/entites/Inconnue/parts', headers=H, json={'parts': []}).status_code == 404
+
+    def test_la_mise_a_jour_propose_parts_plus_tresorerie(self, client):
+        with get_db() as conn:
+            self._entite(conn)
+            conn.execute("INSERT INTO entity_snapshots (entity_name, date, gross_assets, debt) VALUES ('SCI T', '2026-08-31', 44000, 40000)")
+            conn.execute("INSERT INTO positions (date, owner, category, envelope, value, entity) "
+                         "VALUES ('2026-08-31', 'Paul', 'SCPI', 'SCI', 0, 'SCI T')")
+            conn.execute("INSERT INTO entite_operations (entity, date, libelle, montant, nature) "
+                         "VALUES ('SCI T', '2026-08-15', 'x', 1500, 'revenu')")
+            conn.execute("INSERT INTO entite_parts (entity, nom, parts, montant_souscrit, prix_souscription, prix_retrait) "
+                         "VALUES ('SCI T', 'A', 100, 44000, 440, 396)")
+        d = client.get('/api/snapshots/update?source=2026-08-31&cible=2026-09-30').get_json()
+        e = next(x for x in d['entites'] if x['name'] == 'SCI T')
+        assert e['valeur_proposee'] == 39600 + 1500

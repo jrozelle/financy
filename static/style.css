@@ -3932,3 +3932,8 @@ td.arbo-part > * { vertical-align: middle; }
   .proj-moteurs em { grid-column: 1 / -1; }
 }
 .proj-note { margin: .6rem 0 0; font-size: .76rem; color: var(--text-muted); max-width: 78ch; }
+.treso-parts summary { cursor: pointer; font-size: .85rem; color: var(--primary); }
+.treso-parts .table-scroll { margin-top: .6rem; }
+.treso-prix { width: 6.5rem; text-align: right; font-family: var(--mono); }
+.treso-estime { display: block; font-size: .7rem; color: var(--text-muted); }
+.treso-parts-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .6rem; }

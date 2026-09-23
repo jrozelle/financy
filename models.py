@@ -744,6 +744,27 @@ def _migration_016(conn):
         pass            # colonne deja presente
 
 
+
+def _migration_017(conn):
+    """Parts detenues par une entite (SCPI d'une SCI) : leur nombre, le prix
+    paye, et les prix publies de souscription et de retrait. La valeur de
+    l'entite se lit alors au prix de retrait — ce qu'on toucherait en sortant —
+    et non au prix d'achat, qui comprend des frais d'entree deja partis."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS entite_parts (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            entity            TEXT NOT NULL,
+            nom               TEXT NOT NULL,
+            parts             REAL NOT NULL,
+            montant_souscrit  REAL,              -- prix paye, frais compris
+            prix_souscription REAL,              -- prix de part publie
+            prix_retrait      REAL,              -- publie ; a defaut, souscription moins les frais
+            date_prix         TEXT,
+            source            TEXT,
+            UNIQUE(entity, nom)
+        )""")
+
+
 MIGRATIONS = [
     (1, _migration_001),
     (2, _migration_002),
@@ -761,6 +782,7 @@ MIGRATIONS = [
     (14, _migration_014),
     (15, _migration_015),
     (16, _migration_016),
+    (17, _migration_017),
 ]
 
 

@@ -6,7 +6,7 @@ import unicodedata
 from flask import Blueprint, jsonify, request
 
 from auth import login_required, csrf_protect
-from models import get_db, validate_string
+from models import get_db, validate_date, validate_number, validate_string
 from services import tresorerie_entite as svc
 
 logger = logging.getLogger('financy')
@@ -82,3 +82,42 @@ def reclasser(oid):
     with get_db() as conn:
         n = conn.execute('UPDATE entite_operations SET nature=? WHERE id=?', (nature, oid)).rowcount
     return (jsonify({'ok': True}), 200) if n else (jsonify({'error': 'Opération introuvable'}), 404)
+
+
+@tresorerie_bp.route('/api/entites/<path:entite>/parts', methods=['PUT'])
+@login_required
+@csrf_protect
+def enregistrer_parts(entite):
+    """Remplace les parts detenues par l'entite. Chaque ligne : nom, parts,
+    montant_souscrit, prix_souscription, prix_retrait (facultatif), date_prix."""
+    lignes = (request.get_json(silent=True) or {}).get('parts')
+    if not isinstance(lignes, list) or len(lignes) > 50:
+        return jsonify({'error': 'Liste de parts attendue'}), 400
+    propres = []
+    for l in lignes:
+        nom = (l.get('nom') or '').strip()
+        if not nom or not validate_string(nom, 120):
+            return jsonify({'error': 'Nom de part manquant ou trop long'}), 400
+        for k in ('parts', 'montant_souscrit', 'prix_souscription', 'prix_retrait'):
+            if not validate_number(l.get(k)):
+                return jsonify({'error': f'{nom} : {k} invalide'}), 400
+        if not l.get('parts') or float(l['parts']) <= 0:
+            return jsonify({'error': f'{nom} : nombre de parts invalide'}), 400
+        if l.get('date_prix') and not validate_date(l['date_prix']):
+            return jsonify({'error': f'{nom} : date invalide'}), 400
+        if not validate_string(l.get('source'), 200):
+            return jsonify({'error': f'{nom} : source trop longue'}), 400
+        propres.append(l)
+    with get_db() as conn:
+        if not conn.execute('SELECT 1 FROM entities WHERE name=?', (entite,)).fetchone():
+            return jsonify({'error': f'Entité inconnue : {entite}'}), 404
+        conn.execute('DELETE FROM entite_parts WHERE entity=?', (entite,))
+        num = lambda v: float(v) if v not in (None, '') else None
+        for l in propres:
+            conn.execute(
+                'INSERT INTO entite_parts (entity, nom, parts, montant_souscrit, prix_souscription, '
+                'prix_retrait, date_prix, source) VALUES (?,?,?,?,?,?,?,?)',
+                (entite, l['nom'].strip(), float(l['parts']), num(l.get('montant_souscrit')),
+                 num(l.get('prix_souscription')), num(l.get('prix_retrait')), l.get('date_prix') or None,
+                 l.get('source') or None))
+        return jsonify(svc.parts(conn, entite) or {'lignes': []})

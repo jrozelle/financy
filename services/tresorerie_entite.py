@@ -84,6 +84,29 @@ def tresorerie_a(conn, entite, date):
     return {'montant': round(r['s'], 2), 'au': r['d']}
 
 
+# Commission de souscription d'une SCPI, deduite du prix de souscription pour
+# donner le prix de retrait quand le bulletin ne le publie pas.
+FRAIS_RETRAIT_DEFAUT = 0.10
+
+
+def parts(conn, entite):
+    """Les parts de l'entite, valorisees au prix de retrait."""
+    out = []
+    for r in conn.execute('SELECT * FROM entite_parts WHERE entity=? ORDER BY nom', (entite,)):
+        r = dict(r)
+        retrait = r['prix_retrait']
+        r['retrait_estime'] = retrait is None and r['prix_souscription'] is not None
+        if retrait is None and r['prix_souscription'] is not None:
+            retrait = r['prix_souscription'] * (1 - FRAIS_RETRAIT_DEFAUT)
+        r['prix_retrait_retenu'] = round(retrait, 2) if retrait is not None else None
+        r['valeur_retrait'] = round(r['parts'] * retrait, 2) if retrait is not None else None
+        out.append(r)
+    valeur = sum(p['valeur_retrait'] for p in out if p['valeur_retrait'] is not None)
+    souscrit = sum(p['montant_souscrit'] or 0 for p in out)
+    return {'lignes': out, 'valeur_retrait': round(valeur, 2), 'montant_souscrit': round(souscrit, 2),
+            'complet': all(p['valeur_retrait'] is not None for p in out)} if out else None
+
+
 def _mois(d):
     return d[:7]
 
@@ -145,8 +168,16 @@ def bilan(conn, entite, mois=12):
     # Tresorerie reconstituee : tous comptes, depuis le premier releve.
     tresorerie = round(sum(o['montant'] for o in ops), 2)
 
+    detenues = parts(conn, entite)
+    base_rendement = (detenues or {}).get('montant_souscrit') or valeur
+    # Frais d'entree deja partis : ce que les parts ont coute, moins ce qu'on en
+    # tirerait en les revendant. Le capital rembourse doit d'abord les absorber.
+    frais_latents = (round(detenues['montant_souscrit'] - detenues['valeur_retrait'], 2)
+                     if detenues and detenues['complet'] and detenues['montant_souscrit'] else None)
     return {
         'entite': entite,
+        'parts': detenues,
+        'frais_latents': frais_latents,
         'periode': {'debut': fenetre[0], 'fin': fin, 'mois': mois},
         'premiere_operation': ops[0]['date'],
         'mensuel': mensuel,
@@ -158,8 +189,10 @@ def bilan(conn, entite, mois=12):
         'indicateurs': {
             # Part de l'echeance payee par les loyers recurrents.
             'couverture': round(revenus / echeances, 4) if echeances else None,
-            # Rendement distribue recurrent, sur la valeur retenue des parts.
-            'rendement': round(revenus / valeur, 4) if valeur else None,
+            # Rendement distribue recurrent, sur le prix paye des parts : c'est
+            # la convention du taux de distribution des SCPI. A defaut, sur la
+            # valeur retenue de l'entite.
+            'rendement': (round(revenus / base_rendement, 4) if base_rendement else None),
             'effort_mensuel': round(-net / mois, 2) if net < 0 else 0.0,
             'apports': round(apports, 2),
             # Pour chaque euro remis par les associes, le capital rembourse.

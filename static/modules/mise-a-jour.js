@@ -166,9 +166,11 @@ function ligneEntite(e) {
     ? `<span class="maj-echeancier">Dette selon l’échéancier au ${fmtDate(_prep.target_date)} : ${fmt(echeancier)} (précédente : ${fmt(e.debt)})</span>` : '';
   // Des releves anciens d'un mois et demi ne disent plus le solde du jour.
   const vieux = treso && (new Date(_prep.target_date) - new Date(treso.au)) / 864e5 > 45;
-  const noteTreso = treso ? `<span class="maj-echeancier${vieux ? ' maj-echeancier--vieux' : ''}">Valeur :
-      ${fmt(e.gross_assets - treso.incluse_avant)} hors trésorerie + ${fmt(treso.montant)} de trésorerie, d’après les relevés
-      jusqu’au ${fmtDate(treso.au)}${vieux ? ' — relevés anciens : importez les derniers avant de valider' : ''}</span>` : '';
+  const horsTreso = e.parts ? `${fmt(e.parts.valeur_retrait)} de parts au prix de retrait`
+    : `${fmt(e.gross_assets - (treso?.incluse_avant || 0))} hors trésorerie`;
+  const noteTreso = (treso || e.parts) ? `<span class="maj-echeancier${vieux ? ' maj-echeancier--vieux' : ''}">Valeur :
+      ${horsTreso}${treso ? ` + ${fmt(treso.montant)} de trésorerie, d’après les relevés jusqu’au ${fmtDate(treso.au)}` : ''}${
+      vieux ? ' — relevés anciens : importez les derniers avant de valider' : ''}</span>` : '';
   return `
       <div class="maj-ligne maj-ligne--entite" data-ligne="e:${esc(e.name)}">
         <span class="maj-nom">${esc(e.name)}</span>
