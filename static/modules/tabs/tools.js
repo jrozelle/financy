@@ -1,5 +1,4 @@
-import { S } from '../state.js';
-import { fmt, fmtDate, esc, getColors, chartBorderColor, destroyChart, parseLocaleNumber, fmtAxis,
+import { fmt, fmtDate, esc, getColors, gridColor, destroyChart, parseLocaleNumber, fmtAxis,
          tsJour, echelleTemps, titreDate } from '../utils.js';
 import { api } from '../api.js';
 import { toast } from '../dialogs.js';
@@ -26,13 +25,15 @@ function renderTimeline(events) {
   // Frise visuelle
   let html = '<div class="timeline-wrapper"><div class="timeline">';
   for (const ev of events) {
-    const icon = ev.type === 'snapshot' ? '&#128200;' : ev.type === 'note' ? '&#128221;' : '&#128176;';
+    // La nature de l'evenement s'ecrit en toutes lettres : la couleur du
+    // point seule ne se lit ni sans couleur ni au lecteur d'ecran.
+    const nature = ev.type === 'snapshot' ? 'Arrêté' : ev.type === 'note' ? 'Note' : 'Flux';
     const cls = `timeline-event timeline-${ev.type}`;
     const val = ev.value != null ? ` — ${fmt(ev.value)}` : '';
     html += `<div class="${cls}">
-      <div class="timeline-dot">${icon}</div>
+      <div class="timeline-dot" aria-hidden="true"></div>
       <div class="timeline-info">
-        <div class="timeline-date">${fmtDate(ev.date)}</div>
+        <div class="timeline-date">${fmtDate(ev.date)} · ${nature}</div>
         <div class="timeline-label">${esc(ev.label)}${val}</div>
       </div>
     </div>`;
@@ -58,7 +59,7 @@ function renderTimelineChart(snapshots) {
   _timelineChart = destroyChart(_timelineChart);
 
   const colors = getColors();
-  const border = chartBorderColor();
+  const border = gridColor();
 
   // Echelle de temps : des arretes irreguliers restent a leur vraie date.
   snapshots = [...snapshots].sort((a, b) => a.date.localeCompare(b.date));
@@ -150,27 +151,24 @@ function renderSimulChart(points) {
   if (!canvas) return;
   _simulChart = destroyChart(_simulChart);
 
-  // Afficher un point tous les 6 mois max pour lisibilité
+  // Une quarantaine de points au plus. L'axe x est lineaire sur le numero de
+  // mois : le dernier point, garde meme hors du pas, tombe a sa vraie place au
+  // lieu d'etre pose a egale distance de son voisin comme sur une echelle
+  // `category`.
   const step = Math.max(1, Math.floor(points.length / 40));
   const filtered = points.filter((_, i) => i === 0 || i === points.length - 1 || i % step === 0);
 
   const colors = getColors();
-  const border = chartBorderColor();
-
-  const labels = filtered.map(p => {
-    const y = Math.floor(p.month / 12);
-    const m = p.month % 12;
-    return m === 0 ? `${y} an${y > 1 ? 's' : ''}` : `${y}a${m}m`;
-  });
+  const border = gridColor();
+  const moisMax = filtered.length ? filtered[filtered.length - 1].month : 0;
 
   _simulChart = new Chart(canvas, {
     type: 'line',
     data: {
-      labels,
       datasets: [
         {
           label: 'Capital',
-          data: filtered.map(p => p.balance),
+          data: filtered.map(p => ({ x: p.month, y: p.balance })),
           borderColor: colors[0],
           backgroundColor: colors[0] + '18',
           fill: true,
@@ -180,7 +178,7 @@ function renderSimulChart(points) {
         },
         {
           label: 'Investi',
-          data: filtered.map(p => p.invested),
+          data: filtered.map(p => ({ x: p.month, y: p.invested })),
           borderColor: colors[2],
           borderDash: [5, 3],
           cubicInterpolationMode: 'monotone',
@@ -193,8 +191,16 @@ function renderSimulChart(points) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },   // series alignees sur les memes mois
       plugins: {
         legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            title: items => items.length ? _duree(items[0].parsed.x) : '',
+            // Montant formate par fmt : masque en mode discretion.
+            label: ctx => ` ${ctx.dataset.label} : ${fmt(ctx.parsed.y)}`,
+          },
+        },
       },
       scales: {
         y: {
@@ -204,10 +210,28 @@ function renderSimulChart(points) {
           },
           grid: { color: border },
         },
-        x: { ticks: { font: { size: 10 }, maxRotation: 0 }, grid: { display: false } },
+        x: {
+          type: 'linear', min: 0, max: moisMax,
+          ticks: {
+            font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 8,
+            // Graduation a l'annee quand l'horizon le permet.
+            stepSize: moisMax > 24 ? 12 * Math.max(1, Math.round(moisMax / 12 / 8)) : 3,
+            callback: v => _duree(v),
+          },
+          grid: { display: false },
+        },
       },
     },
   });
+}
+
+/** « 3 ans », « 1 an 6 mois », « 9 mois » : un numero de mois de simulation. */
+function _duree(mois) {
+  const m = Math.round(mois);
+  const a = Math.floor(m / 12), r = m % 12;
+  const ans = a ? `${a} an${a > 1 ? 's' : ''}` : '';
+  const reste = r ? `${r} mois` : '';
+  return [ans, reste].filter(Boolean).join(' ') || '0 mois';
 }
 
 // ─── Auto-snapshot ───────────────────────────────────────────────────────────
@@ -216,12 +240,12 @@ export async function triggerAutoSnapshot() {
   try {
     const result = await api('POST', '/api/auto-snapshot');
     if (result.skipped) {
-      toast('Snapshot déjà existant à cette date', 'error');
+      toast('Un arrêté existe déjà à cette date', 'error');
     } else {
-      toast(`Snapshot créé : ${result.copied} positions copiées du ${fmtDate(result.from_date)}`);
+      toast(`Arrêté créé : ${result.copied} positions copiées du ${fmtDate(result.from_date)}`);
       await refreshDates();
     }
-  } catch (err) { toast('Erreur snapshot : ' + err.message, 'error'); }
+  } catch (err) { toast('Erreur à la création de l’arrêté : ' + err.message, 'error'); }
 }
 
 // ─── Refresh des cours de marche ────────────────────────────────────────────

@@ -3,8 +3,8 @@ import { natureDe } from '../categories.js';
 import { dessinerCourbe } from '../courbe.js';
 import { fmt, fmtDate, esc, kpiDelta, parseLocaleNumber, sparkline, fmtPct } from '../utils.js';
 import { api } from '../api.js';
-import { loadTodo } from '../todo.js';
-import { loadContribution } from './contribution.js';
+import { loadTodo, renderTodo } from '../todo.js';
+import { loadContribution, redessinerContribution } from './contribution.js';
 import { renderRepartition } from './repartition.js';
 import { loadComptes } from './comptes.js';
 import { loadFiscalite } from './fiscalite.js';
@@ -18,18 +18,25 @@ function _owners() {
   return S.synthese?._owners || S.config.owners;
 }
 
+// Changer vite d'arrete ou de titulaire lance plusieurs chargements : seul le
+// dernier ecrit. Sans ce jeton, une reponse lente reaffichait l'arrete quitte.
+let _jetonSynthese = 0;
+
 export async function loadSynthese() {
   if (!S.syntheseDate && S.dates.length) S.syntheseDate = S.dates[0];
+  const jeton = ++_jetonSynthese;
   if (!S.syntheseDate) {
     _renderSyntheseEmpty();
     return;
   }
   _clearSyntheseEmpty();
+  const date = S.syntheseDate;
   const [syn, positions] = await Promise.all([
-    api('GET', `/api/synthese?date=${S.syntheseDate}`),
-    api('GET', `/api/positions?date=${S.syntheseDate}`),
+    api('GET', `/api/synthese?date=${date}`),
+    api('GET', `/api/positions?date=${date}`),
     loadWealthTarget(),
   ]);
+  if (jeton !== _jetonSynthese) return;
   // Build owner list: union of config owners + actual data owners
   const dataOwners = [...new Set(positions.map(p => p.owner))];
   const allOwners = [...S.config.owners];
@@ -54,18 +61,18 @@ function _renderSyntheseEmpty() {
   card.className = 'card empty-state empty-state-synthese';
   card.innerHTML = `
     <div style="text-align:center;padding:1.5rem .5rem">
-      <div style="font-size:32px;margin-bottom:.5rem;opacity:.5">&#128202;</div>
-      <h2 style="margin-bottom:.5rem">Aucun snapshot pour le moment</h2>
+      <h2 style="margin-bottom:.5rem">Aucun arrêté pour le moment</h2>
       <p class="text-muted" style="font-size:13.5px;margin-bottom:1.25rem;line-height:1.6">
-        Commence par ajouter une position ou importer un fichier existant
-        pour que ton patrimoine s'affiche ici.
+        Commencez par ajouter une position ou importer un fichier existant
+        pour que votre patrimoine s'affiche ici.
       </p>
       <div style="display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap">
         <button class="btn btn-primary" data-tab-switch="positions">+ Ajouter une position</button>
         <button class="btn btn-secondary" data-tab-switch="import">&#8645; Importer des données</button>
       </div>
     </div>`;
-  host.querySelector('.page-header')?.after(card);
+  // L'onglet n'a pas d'en-tete de page : la carte passe en tete de l'onglet.
+  host.prepend(card);
   // Delegue au listener global (main.js) qui appelle switchTab
 }
 
@@ -75,7 +82,9 @@ function _clearSyntheseEmpty() {
   host?.querySelectorAll('.kpi-grid, .charts-row, .card').forEach(el => el.classList.remove('hidden'));
 }
 
-export function renderSynthese() {
+/** Redessine la synthese deja chargee. `cache` : reutilise les reponses
+ *  deja recues (bascule du mode discretion) au lieu de tout redemander. */
+export function renderSynthese({ cache = false } = {}) {
   const syn = S.synthese;
   if (!syn?.date) {
     ['kpi-net','kpi-gross','kpi-debt','kpi-mobilizable'].forEach(id => {
@@ -170,20 +179,21 @@ export function renderSynthese() {
   document.getElementById('kpi-mob-label').textContent   = isFamily ? 'Mobilisable' : `Mobilisable — ${owner}`;
 
   renderRepartition();
-  loadContribution();
+  if (cache) redessinerContribution(); else loadContribution();
   loadComptes();
   loadFiscalite();
-  renderEntityWarnings(syn.entity_warnings || []);
-  renderHistChart();
-  renderSyntheseHistory();
+  renderEntityWarnings(syn.entity_warnings || [], { cache });
+  renderHistChart({ cache });
+  renderSyntheseHistory({ cache });
   const posTitulaire = isFamily ? Object.values(S.synthese._positions_cache || {}).flat()
                                 : (S.synthese._positions_cache?.[owner] || []);
   renderLiqBars(liqFiltered, posTitulaire);
   renderEntitiesSynthese();
   renderAllocationTargets();
-  renderSnapshotDiff(owner, isFamily);
+  renderSnapshotDiff(owner, isFamily, { cache });
   renderSnapshotNote(syn);
-  renderWealthTarget(kpi.net, isFamily, serie('net'), dates);
+  _argsObjectif = [kpi.net, isFamily, serie('net'), dates];
+  renderWealthTarget(..._argsObjectif);
   renderProjection(posTitulaire, isFamily, kpi.net, _wealthTarget);
 }
 
@@ -192,7 +202,11 @@ export function renderSynthese() {
  *  d'une bande qui flotte sur les autres ne se mesure pas a l'oeil, et une
  *  poche de 5 % n'y etait qu'un lisere. Ici chaque ligne a son echelle, et
  *  les chiffres se lisent sans survol. */
-export async function renderSyntheseHistory() {
+let _jetonHistoire = 0;
+let _histoireCache = null;
+
+export async function renderSyntheseHistory(opts) {
+  const cache = !!(opts && opts.cache === true);
   const card = document.getElementById('synthese-history-detail-card');
   const hote = document.getElementById('evolution-groupes');
   if (!card || !hote) return;
@@ -202,7 +216,15 @@ export async function renderSyntheseHistory() {
   const groupBy = document.getElementById('synthese-history-group').value;
   const owner   = S.syntheseOwner === 'Famille' ? null : S.syntheseOwner;
   const url     = `/api/historique?group_by=${groupBy}${owner ? `&owner=${encodeURIComponent(owner)}` : ''}`;
-  const history = await api('GET', url);
+  // Changer vite de titulaire ou de regroupement : seule la derniere ecrit.
+  const jeton = ++_jetonHistoire;
+  let history;
+  if (cache && _histoireCache?.url === url) history = _histoireCache.history;
+  else {
+    history = await api('GET', url);
+    if (jeton !== _jetonHistoire) return;
+    _histoireCache = { url, history };
+  }
   if (history.length < 2) { card.style.display = 'none'; return; }
 
   const d0 = history[0].date, d1 = history[history.length - 1].date;
@@ -259,7 +281,7 @@ export async function loadHistorique() {
  *  Le titulaire se lit dans S : appelee sans argument apres un rechargement
  *  de l'historique, l'ancienne version revenait a la famille sous un filtre
  *  nominatif. */
-function renderHistChart() {
+function renderHistChart({ cache = false } = {}) {
   const hote = document.getElementById('evolution-courbe');
   if (!hote || !S.historique.length) return;
   const owner = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : null;
@@ -279,12 +301,12 @@ function renderHistChart() {
   });
   const sous = document.getElementById('evolution-sous');
   if (sous) sous.textContent = `${points.length} arrêtés · du ${fmtDate(debut.date)} au ${fmtDate(fin.date)}`;
-  _legendeEvolution(owner, debut, fin);
+  _legendeEvolution(owner, debut, fin, { cache });
 }
 
 let _legendeJeton = 0;
 let _legendeRequete = null;
-async function _legendeEvolution(owner, debut, fin) {
+async function _legendeEvolution(owner, debut, fin, { cache = false } = {}) {
   const hote = document.getElementById('evolution-legende');
   if (!hote) return;
   // Changer vite de titulaire lance deux requetes : seule la derniere ecrit.
@@ -300,7 +322,8 @@ async function _legendeEvolution(owner, debut, fin) {
     // decomposition, demandee a quelques millisecondes d'intervalle, est
     // partagee plutot que redemandee.
     const cle = `${q}|${debut.date}|${fin.date}`;
-    if (!_legendeRequete || _legendeRequete.cle !== cle || Date.now() - _legendeRequete.t > 2000) {
+    const perimee = !cache && Date.now() - (_legendeRequete?.t || 0) > 2000;
+    if (!_legendeRequete || _legendeRequete.cle !== cle || perimee) {
       _legendeRequete = { cle, t: Date.now(), p: api('GET', `/api/contribution?${q}`, null, { silent: true }) };
     }
     const d = await _legendeRequete.p;
@@ -328,7 +351,11 @@ async function _legendeEvolution(owner, debut, fin) {
 
 const fmtSigne = v => `${v >= 0 ? '+' : '−'}${fmt(Math.abs(v))}`;
 
-function renderEntityWarnings(warnings) {
+/** Un pourcentage de controle : entier s'il l'est, une decimale sinon —
+ *  100,5 % de detention ne doit pas s'arrondir a 101 %. */
+const _pctControle = v => fmtPct(v, Number.isInteger(+v) ? 0 : 1);
+
+function renderEntityWarnings(warnings, { cache = false } = {}) {
   // Ces avertissements ne s'affichent plus dans leur propre bandeau : ils
   // rejoignent la zone « À traiter », avec les signaux calcules en base. Un
   // probleme se lit au meme endroit quelle que soit son origine.
@@ -337,8 +364,8 @@ function renderEntityWarnings(warnings) {
       cle: `entite-${w.entity}-${w.type}`,
       severite: 'warn',
       titre: w.type === 'debt'
-        ? `${w.entity} : total % dette = ${w.total_pct} %`
-        : `${w.entity} : total % détention = ${w.total_pct} %`,
+        ? `${w.entity} : dette répartie à ${_pctControle(w.total_pct)}`
+        : `${w.entity} : détention répartie à ${_pctControle(w.total_pct)}`,
       detail: w.type === 'debt'
         ? 'Double-comptage sur la dette'
         : 'Double-comptage probable de la détention',
@@ -348,7 +375,7 @@ function renderEntityWarnings(warnings) {
     ...evalUserAlerts(),
   ];
   document.getElementById('entity-warnings-bar').innerHTML = '';
-  loadTodo(S.syntheseDate, signaux);
+  if (cache) renderTodo(signaux); else loadTodo(S.syntheseDate, signaux);
 }
 
 function evalUserAlerts() {
@@ -382,7 +409,7 @@ function evalUserAlerts() {
     if (!triggered) return null;
 
     const fmtActual = a.metric.endsWith('pct') ? fmtPct(actual) : fmt(actual);
-    const fmtThresh = a.metric.endsWith('pct') ? a.threshold + ' %' : fmt(a.threshold);
+    const fmtThresh = a.metric.endsWith('pct') ? _pctControle(a.threshold) : fmt(a.threshold);
     return {
       cle: `seuil-${a.metric}-${a.category || ''}`,
       severite: 'info',
@@ -503,16 +530,26 @@ function renderLiqBars(byLiq, positions = []) {
       ${fmt(horsFinancier)} de net.` : ''}</p>` : ''}`;
 }
 
-async function renderSnapshotDiff(owner, isFamily) {
+let _jetonDiff = 0;
+let _diffCache = null;
+
+async function renderSnapshotDiff(owner, isFamily, { cache = false } = {}) {
   const el = document.getElementById('snapshot-diff');
   if (!el) return;
   const params = new URLSearchParams({ date: S.syntheseDate || '' });
   if (!isFamily && owner) params.set('owner', owner);
+  const cle = String(params);
+  const jeton = ++_jetonDiff;
   let data;
-  try { data = await api('GET', `/api/snapshot-diff?${params}`, null, { silent: true }); }
-  catch { el.innerHTML = ''; return; }
+  if (cache && _diffCache?.cle === cle) data = _diffCache.data;
+  else {
+    try { data = await api('GET', `/api/snapshot-diff?${params}`, null, { silent: true }); }
+    catch { if (jeton === _jetonDiff) el.innerHTML = ''; return; }
+    if (jeton !== _jetonDiff) return;
+    _diffCache = { cle, data };
+  }
   if (!data || !data.from_date) {
-    el.innerHTML = '<p class="text-muted" style="font-size:13px">Aucun snapshot précédent à comparer.</p>';
+    el.innerHTML = '<p class="text-muted" style="font-size:13px">Aucun arrêté précédent à comparer.</p>';
     return;
   }
   const moves = (data.movements || []).filter(m => Math.abs(m.delta) >= 1 || m.status !== 'changed');
@@ -581,39 +618,62 @@ function renderSnapshotNote(syn) {
   } else {
     bar.style.display = '';
     bar.innerHTML = `<div class="snapshot-note">
-      <span class="snapshot-note-icon">&#128221;</span>
+      <span class="snapshot-note-icon">Note</span>
       <span class="snapshot-note-text">${esc(note)}</span>
-      <button class="btn-icon" id="btn-edit-snapshot-note" title="Modifier la note">&#9998;</button>
+      <button type="button" class="btn-link" id="btn-edit-snapshot-note"
+              aria-label="Modifier la note de l’arrêté">Modifier</button>
     </div>`;
     bar.querySelector('#btn-edit-snapshot-note')?.addEventListener('click', () => openSnapshotNoteEditor(date, note));
   }
+}
 
-  let noteBtn = document.getElementById('btn-add-snapshot-note');
-  if (noteBtn) {
-    noteBtn.innerHTML = note ? '&#128221; Modifier la note' : '&#128221; Note du snapshot';
-    noteBtn.onclick = () => openSnapshotNoteEditor(date, note || '');
-  }
+/** Menu de l'arrete : « Note de l'arrete » et « Objectif de patrimoine ».
+ *  Cables une fois au demarrage — poses dans renderSynthese, ils restaient
+ *  sans effet tant que la synthese n'avait pas ete ouverte. L'arrete et la
+ *  note se lisent au moment du clic. */
+export function wireSyntheseMenu() {
+  document.getElementById('btn-add-snapshot-note')?.addEventListener('click', async () => {
+    const date = S.syntheseDate || S.dates?.[0];
+    if (!date) { toast('Aucun arrêté : créez-en un d’abord', 'error'); return; }
+    let note = S.synthese?.date === date ? (S.synthese.snapshot_note || '') : null;
+    if (note === null) {
+      try { note = (await api('GET', `/api/snapshot-notes?date=${encodeURIComponent(date)}`))?.notes || ''; }
+      catch { return; }
+    }
+    openSnapshotNoteEditor(date, note);
+  });
+  document.getElementById('btn-open-wealth-target')?.addEventListener('click', async () => {
+    if (!_wealthTargetCharge) await loadWealthTarget();
+    openWealthTargetEditor();
+  });
 }
 
 async function openSnapshotNoteEditor(date, currentNote) {
-  const note = await promptDialog(`Note pour le snapshot du ${fmtDate(date)}`, {
+  const note = await promptDialog(`Note de l’arrêté du ${fmtDate(date)}`, {
     defaultValue: currentNote || '', placeholder: 'Ex: achat RP, krach mars 2025…', confirmText: 'Enregistrer'
   });
   if (note === null) return; // cancelled
   await api('PUT', '/api/snapshot-notes', { date, notes: note });
-  if (S.synthese) S.synthese.snapshot_note = note || null;
-  renderSnapshotNote(S.synthese);
+  if (S.synthese?.date === date) {
+    S.synthese.snapshot_note = note || null;
+    renderSnapshotNote(S.synthese);
+  }
   toast(note ? 'Note enregistrée' : 'Note supprimée');
 }
 
 // ─── Wealth target gauge ─────────────────────────────────────────────────
 
 let _wealthTarget = null;
+let _wealthTargetCharge = false;
+// Derniers arguments de renderWealthTarget : l'objectif modifie se redessine
+// pour le titulaire affiche, pas pour la famille par defaut.
+let _argsObjectif = null;
 
 export async function loadWealthTarget() {
   try {
     const data = await api('GET', '/api/wealth-target');
     _wealthTarget = data?.target || null;
+    _wealthTargetCharge = true;
   } catch { _wealthTarget = null; }
 }
 
@@ -650,11 +710,6 @@ function _pastillesHeros(net, variation, valeurs, dates) {
 
 function renderWealthTarget(currentNet, isFamily = true, valeurs = [], dates = []) {
   const bar = document.getElementById('wealth-target-bar');
-  const menuBtn = document.getElementById('btn-open-wealth-target');
-  if (menuBtn) {
-    menuBtn.innerHTML = _wealthTarget ? '&#127919; Modifier objectif patrimoine' : '&#127919; Objectif patrimoine';
-    menuBtn.onclick = openWealthTargetEditor;
-  }
   if (!bar) return;
 
   const hoteBut = document.getElementById('kpi-hero-goal');
@@ -720,7 +775,6 @@ async function openWealthTargetEditor() {
   if (val.trim() && (isNaN(target) || target <= 0)) { toast('Montant invalide', 'error'); return; }
   await api('PUT', '/api/wealth-target', { target });
   _wealthTarget = target;
-  const kpiNet = S.synthese?.family?.net || 0;
-  renderWealthTarget(kpiNet);
+  if (_argsObjectif && S.synthese) renderWealthTarget(..._argsObjectif);
   toast(target ? 'Objectif enregistré' : 'Objectif supprimé');
 }

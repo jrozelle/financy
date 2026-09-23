@@ -1,24 +1,24 @@
-import { S } from './state.js';
+import { S, setTargetsCache } from './state.js';
 import { initMask, toggleMask, isMasked, onMaskChange } from './mask.js';
 import { wireTodo } from './todo.js';
 import { wireReglages, estUnReglage, ouvrir as ouvrirReglages } from './reglages.js';
-import { fmtDate, esc } from './utils.js';
+import { fmtDate, esc, applyChartTheme, refreshChartsTheme } from './utils.js';
 import { api, buildSelects } from './api.js';
-import { closeModal, trapModalFocus, installModalScrollLock } from './dialogs.js';
+import { closeModal, openModal, trapModalFocus, installModalScrollLock } from './dialogs.js';
 import { wireDrilldownEvents, drilldownHistory } from './drilldown.js';
 import { wireTargetsEvents } from './targets.js';
 import { loadUserAlertsAsync, saveUserAlerts } from './alerts.js';
 import { loadTargets, saveTargets } from './targets.js';
 import { wireSortableTable } from './utils.js';
 
-import { loadSynthese, renderSynthese, renderSyntheseHistory, loadHistorique } from './tabs/synthese.js';
+import { loadSynthese, renderSynthese, renderSyntheseHistory, loadHistorique, wireSyntheseMenu } from './tabs/synthese.js';
 import { loadPositions, renderPositions, clearFilters, openPosModal, duplicateSnapshot, renameSnapshot, deleteSnapshot,
          onEntitySelectChange, updatePosInfo, savePosition, deletePosition,
          persistPositionFilters, ensurePositionsTableScaffold } from './tabs/positions.js';
 import { openHoldingsModal, wireHoldingsEvents, confirmCloseHoldings } from './tabs/holdings.js';
 import { loadPrets, ouvrirFormulaireCredit } from './tabs/prets.js';
 import { loadTresorerie, initTresorerie } from './tabs/tresorerie.js';
-import { wireIsinPopoverEvents } from './isin-popover.js';
+import { wireIsinPopoverEvents, closeIsinPopover } from './isin-popover.js';
 import { loadAdvisor, wireAdvisorEvents } from './tabs/advisor.js';
 import { loadActifs, wireActifsEvents } from './tabs/actifs.js';
 import { loadFlux, renderFlux, openFluxModal, saveFlux, persistFluxFilters, clearFluxFilters, wireFluxImport } from './tabs/flux.js';
@@ -26,11 +26,20 @@ import { loadEntities, renderEntities, openEntityModal, saveEntity, updateEntInf
 import { importXlsx, importJson, exportJson, resetDb, initDemoToggle, createBackup, updateDemoBadge } from './tabs/import-export.js';
 import { loadReferential, saveReferential, initTemplateSelect } from './tabs/referentiel.js';
 import { loadTimeline, wireSimulation, triggerAutoSnapshot, triggerPricesRefresh, loadSchedulerStatus } from './tabs/tools.js';
-import { loadPerformance } from './tabs/performance.js';
-import { wireGlobalSearch } from './search.js';
+import { loadPerformance, renderPerformance } from './tabs/performance.js';
+import { wireGlobalSearch, resetSearchCache } from './search.js';
 import { wireMiseAJour, ouvrir as ouvrirMiseAJour } from './mise-a-jour.js';
 import { wireSettingsEvents } from './settings.js';
-import { initColumnPicker, reapplyColumns } from './column-picker.js';
+import { initColumnPicker } from './column-picker.js';
+
+// localStorage peut lever (Safari prive, stockage bloque) : lu au demarrage,
+// il faisait echouer tout le chargement.
+function _lsGet(cle) {
+  try { return localStorage.getItem(cle); } catch { return null; }
+}
+function _lsSet(cle, valeur) {
+  try { localStorage.setItem(cle, valeur); } catch { /* session privee */ }
+}
 
 // ─── Init ─────────────────────────────────────────────────────────────────
 
@@ -50,6 +59,7 @@ async function init() {
   wireMiseAJour(async cible => {
     S.syntheseDate = cible;
     S.positionsDate = cible;
+    resetSearchCache();
     await refreshDates();
     ecrireContexte();
     await loadHistorique();
@@ -65,22 +75,42 @@ async function init() {
   initDemoToggle();
 }
 
+/** Recharge tout apres un changement de base (mode demo) ou de referentiel
+ *  (titulaire renomme). L'onglet courant se recharge vraiment : switchTab
+ *  s'arretait, l'onglet etant « deja charge », et laissait les donnees de
+ *  l'ancienne base a l'ecran. */
 export async function reloadAll() {
   S.config = await api('GET', '/api/config');
   buildSelects();
+  // Les donnees de l'ancienne base ne doivent plus servir nulle part.
+  S.synthese = null;
+  S.positions = [];
+  S.flux = [];
+  setTargetsCache(null);
+  resetSearchCache();
   await Promise.all([refreshDates(), loadEntities(), loadHistorique(), loadTargets(), loadUserAlertsAsync()]);
-  await switchTab(S.currentTab || 'synthese');
+  // Arrete et titulaire absents de la nouvelle base : retour aux defauts.
+  if (!S.dates.includes(S.syntheseDate)) S.syntheseDate = S.dates[0] || null;
+  if (!S.dates.includes(S.positionsDate)) S.positionsDate = S.syntheseDate;
+  if (S.syntheseOwner !== 'Famille' && !(S.config.owners || []).includes(S.syntheseOwner)) {
+    S.syntheseOwner = 'Famille';
+  }
+  _buildGlobalOwnerFilter();
+  _refleterContexte();
+  ecrireContexte();
+  _lastLoadedTab = null;
+  await switchTab(S.currentTab || 'synthese', { pushHistory: false });
 }
 
 async function migrateLocalStorageToDB() {
-  const lsTargets = localStorage.getItem('patrimoine_targets');
+  const lsTargets = _lsGet('patrimoine_targets');
   if (lsTargets) {
     try {
       const parsed = JSON.parse(lsTargets);
       if (Object.keys(parsed).length > 0) await saveTargets(parsed);
     } catch {}
   }
-  const lsAlerts = localStorage.getItem('patrimoine_alerts');
+  const lsAlerts = _lsGet('patrimoine_alerts');
   if (lsAlerts) {
     try {
       const parsed = JSON.parse(lsAlerts);
@@ -186,9 +216,7 @@ function _buildGlobalOwnerFilter() {
 function _onGlobalOwnerChange(e) {
   S.syntheseOwner = e.target.value;
   ecrireContexte();
-  // Sync actifs filter
-  const actifsSel = document.getElementById('actifs-owner-filter');
-  if (actifsSel) actifsSel.value = S.syntheseOwner === 'Famille' ? '' : S.syntheseOwner;
+  resetSearchCache();
   // Force reload current tab
   _lastLoadedTab = null;
   switchTab(S.currentTab, { pushHistory: false });
@@ -354,6 +382,7 @@ export async function switchTab(tab, { pushHistory = true } = {}) {
   }
   _lastLoadedTab = tab;
   showLoading(tabId);
+  _effacerErreur(tabId);
   try {
     if (tab === 'synthese')    await loadSynthese();
     if (tab === 'positions')   await loadPositions();
@@ -365,9 +394,50 @@ export async function switchTab(tab, { pushHistory = true } = {}) {
     if (tab === 'performance') await loadPerformance();
     if (tab === 'conseil')     await loadAdvisor();
     if (tab === 'tools')       { await loadTimeline(); loadSchedulerStatus(); }
+  } catch (err) {
+    // Un chargement echoue ne laisse pas l'ecran precedent se faire passer
+    // pour le bon : l'onglet le dit, et propose de reessayer.
+    console.error(`Chargement de l'onglet ${tab} :`, err);
+    // L'onglet n'est pas « charge » : y revenir doit le redemander.
+    if (_lastLoadedTab === tab) _lastLoadedTab = null;
+    _afficherErreur(tabId, tab);
   } finally {
     hideLoading(tabId);
   }
+}
+
+/** Etat d'erreur d'un onglet : le contenu est masque, un message et un
+ *  bouton Reessayer le remplacent. Retire au chargement suivant. */
+function _afficherErreur(tabId, tab) {
+  const el = document.getElementById(tabId);
+  if (!el) return;
+  _effacerErreur(tabId);
+  [...el.children].forEach(c => {
+    if (c.classList.contains('tab-loading')) return;
+    if (!c.hidden) { c.hidden = true; c.dataset.masqueErreur = '1'; }
+  });
+  const box = document.createElement('div');
+  box.className = 'card tab-erreur';
+  box.setAttribute('role', 'alert');
+  box.innerHTML = `
+    <h2>Chargement impossible</h2>
+    <p class="text-muted">Les données de cet écran n'ont pas pu être chargées. Vérifiez la connexion puis réessayez.</p>
+    <button type="button" class="btn btn-primary">Réessayer</button>`;
+  box.querySelector('button').addEventListener('click', () => {
+    _lastLoadedTab = null;
+    switchTab(tab, { pushHistory: false });
+  });
+  el.prepend(box);
+}
+
+function _effacerErreur(tabId) {
+  const el = document.getElementById(tabId);
+  if (!el) return;
+  el.querySelector(':scope > .tab-erreur')?.remove();
+  el.querySelectorAll(':scope > [data-masque-erreur]').forEach(c => {
+    c.hidden = false;
+    delete c.dataset.masqueErreur;
+  });
 }
 
 // ─── Events ───────────────────────────────────────────────────────────────
@@ -388,8 +458,11 @@ function wireEvents() {
 
   // Bouton d'aide raccourcis clavier
   document.getElementById('btn-keyboard-help')?.addEventListener('click', () => {
-    document.getElementById('keyboard-help-modal')?.classList.remove('hidden');
+    openModal('keyboard-help-modal');
   });
+
+  // Menu de l'arrete : note et objectif, actifs quel que soit l'onglet ouvert.
+  wireSyntheseMenu();
 
   document.getElementById('btn-print')?.addEventListener('click', () => window.print());
 
@@ -401,37 +474,28 @@ function wireEvents() {
     const tab = e.state?.tab || _tabFromUrl() || 'synthese';
     _lireContexte();
     _refleterContexte();
+    resetSearchCache();
     _lastLoadedTab = null;
     _ouvrirDepuisAdresse(tab);
   });
 
-  // Date selects (with spinner)
-  document.getElementById('synthese-date-select').addEventListener('change', async e => {
-    S.syntheseDate = e.target.value;
-    S.positionsDate = e.target.value;
+  // Selecteurs d'arrete : l'onglet COURANT se recharge. Seuls Positions et
+  // Actifs etaient traites ; ailleurs, c'est la synthese — cachee — qui se
+  // rechargeait, et l'onglet visible gardait l'arrete precedent.
+  const changerArrete = date => {
+    S.syntheseDate = date;
+    S.positionsDate = date;
     ecrireContexte();
-    const positionsSelect = document.getElementById('positions-date-select');
-    if (positionsSelect) positionsSelect.value = e.target.value;
-    if (S.currentTab === 'positions') {
-      showLoading('tab-positions');
-      try { await loadPositions(); } finally { hideLoading('tab-positions'); }
-    } else if (S.currentTab === 'actifs') {
-      showLoading('tab-actifs');
-      try { await loadActifs(); } finally { hideLoading('tab-actifs'); }
-    } else {
-      showLoading('tab-synthese');
-      try { await loadSynthese(); } finally { hideLoading('tab-synthese'); }
-    }
-  });
-  document.getElementById('positions-date-select').addEventListener('change', async e => {
-    S.positionsDate = e.target.value;
-    S.syntheseDate = e.target.value;
-    ecrireContexte();
-    const syntheseSelect = document.getElementById('synthese-date-select');
-    if (syntheseSelect) syntheseSelect.value = e.target.value;
-    showLoading('tab-positions');
-    try { await loadPositions(); } finally { hideLoading('tab-positions'); }
-  });
+    ['synthese-date-select', 'positions-date-select'].forEach(id => {
+      const sel = document.getElementById(id);
+      if (sel && sel.value !== date) sel.value = date;
+    });
+    resetSearchCache();
+    _lastLoadedTab = null;
+    return switchTab(S.currentTab || 'synthese', { pushHistory: false });
+  };
+  document.getElementById('synthese-date-select').addEventListener('change', e => changerArrete(e.target.value));
+  document.getElementById('positions-date-select').addEventListener('change', e => changerArrete(e.target.value));
 
   // Positions buttons
   document.getElementById('pos-supprimer')?.addEventListener('click', () => {
@@ -450,6 +514,7 @@ function wireEvents() {
     S.syntheseOwner = val || 'Famille';
     ecrireContexte();
     persistPositionFilters();
+    resetSearchCache();
     const globalSel = document.getElementById('global-owner-filter');
     if (globalSel) globalSel.value = S.syntheseOwner;
     renderPositions();
@@ -733,7 +798,7 @@ function wireEvents() {
     document.getElementById(id).addEventListener('input', updatePosInfo)
   );
   document.getElementById('pos-mob-override-check').addEventListener('change', function() {
-    document.getElementById('pos-mob-override-field').style.display = this.checked ? '' : 'none';
+    document.getElementById('pos-mob-override-field').style.display = this.checked ? 'flex' : 'none';
     updatePosInfo();
   });
   ['pos-envelope','pos-category'].forEach(id =>
@@ -769,12 +834,13 @@ function wireEvents() {
   initColumnPicker('actifs', 'actifs-col-picker', 'actifs-thead', {
     isin: 'ISIN', name: 'Nom', establishments: 'Établissement',
     asset_class: 'Classe', quantity: 'Qté',
-    avg_cost: 'PRU', last_price: 'Cours', market_value: 'Valo',
+    avg_cost: 'PRU', last_price: 'Cours', market_value: 'Valeur',
     pnl: '+/-', weight_pct: 'Poids', envelopes: 'Enveloppes',
   });
 
   // Focus traps on static modals
-  ['position-modal', 'flux-modal', 'entity-modal', 'targets-modal', 'settings-modal'].forEach(id => trapModalFocus(id));
+  ['position-modal', 'flux-modal', 'entity-modal', 'targets-modal', 'settings-modal', 'keyboard-help-modal']
+    .forEach(id => trapModalFocus(id));
   // Les lignes de titres ont un brouillon : Echap demande avant de le perdre.
   trapModalFocus('holdings-modal', { onEscape: confirmCloseHoldings });
 
@@ -799,7 +865,7 @@ function wireEvents() {
       if (confirm) { confirm.querySelector('.confirm-cancel')?.click(); return; }
       const popover = document.getElementById('isin-popover');
       if (popover && !popover.classList.contains('hidden')) {
-        popover.classList.add('hidden'); return;
+        closeIsinPopover(); return;
       }
       const snapDd = document.getElementById('snapshot-dropdown');
       if (snapDd && !snapDd.classList.contains('hidden')) {
@@ -829,7 +895,7 @@ function wireEvents() {
     // Shift+? — affiche la modale d'aide raccourcis
     if (e.key === '?') {
       e.preventDefault();
-      document.getElementById('keyboard-help-modal')?.classList.remove('hidden');
+      openModal('keyboard-help-modal');
       return;
     }
 
@@ -840,8 +906,11 @@ function wireEvents() {
       return;
     }
 
-    // Arrow Left/Right — navigate between snapshots
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    // Fleches gauche/droite : arrete precedent / suivant. Seulement quand rien
+    // n'a le focus : sur une zone defilante, un bouton, ou dans une fenetre,
+    // la fleche a son sens propre et ne doit pas changer l'arrete.
+    if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (e.target !== document.body || _surcoucheOuverte()) return;
       const selectId = S.currentTab === 'positions' ? 'positions-date-select' : 'synthese-date-select';
       const sel = document.getElementById(selectId);
       if (!sel || sel.options.length < 2) return;
@@ -855,6 +924,13 @@ function wireEvents() {
   });
 }
 
+/** Une fenetre, un panneau lateral ou une surimpression est-il ouvert ? */
+function _surcoucheOuverte() {
+  if (document.querySelector('.confirm-overlay')) return true;
+  const ouverts = ['.modal', '.drilldown', '.isin-popover', '#head-recherche-pop', '#snapshot-dropdown'];
+  return ouverts.some(sel => [...document.querySelectorAll(sel)].some(el => !el.classList.contains('hidden')));
+}
+
 // ─── Dark mode ────────────────────────────────────────────────────────────
 
 function _systemTheme() {
@@ -866,24 +942,22 @@ function _resolveTheme(mode) {
 }
 
 function initTheme() {
-  const saved = localStorage.getItem('financy_theme') || 'auto';
+  const saved = _lsGet('financy_theme') || 'auto';
   applyTheme(saved);
 
   // Follow system changes in auto mode
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    if ((localStorage.getItem('financy_theme') || 'auto') === 'auto') {
+    if ((_lsGet('financy_theme') || 'auto') === 'auto') {
       applyTheme('auto');
     }
   });
 
   document.getElementById('theme-toggle')?.addEventListener('click', () => {
-    const current = localStorage.getItem('financy_theme') || 'auto';
+    const current = _lsGet('financy_theme') || 'auto';
     const next = current === 'auto' ? 'light' : current === 'light' ? 'dark' : 'auto';
-    localStorage.setItem('financy_theme', next);
+    _lsSet('financy_theme', next);
     applyTheme(next);
   });
-
-  document.getElementById('mask-toggle')?.addEventListener('click', toggleMask);
 
   // Ctrl/Cmd + M : bascule sans ouvrir le menu, pour couper court quand
   // quelqu'un arrive derriere l'ecran.
@@ -899,16 +973,34 @@ function initTheme() {
   });
 
   // Les montants sont figes dans le HTML deja rendu et dans les graphes
-  // Chart.js : il faut redessiner l'onglet courant a chaque bascule.
+  // Chart.js : il faut redessiner l'onglet courant a chaque bascule. Les
+  // donnees, elles, n'ont pas change : on redessine sans rien redemander
+  // quand l'onglet sait le faire, sinon on recharge — une seule fois pour
+  // une rafale de bascules.
+  let attente = 0;
   onMaskChange(() => {
-    const btn = document.getElementById('mask-toggle');
-    if (btn) btn.textContent = isMasked() ? 'Afficher les montants' : 'Masquer les montants';
-    switchTab(S.currentTab || 'synthese', { pushHistory: false });
+    if (_redessinerSansRecharger(S.currentTab || 'synthese')) return;
+    clearTimeout(attente);
+    attente = setTimeout(() => {
+      _lastLoadedTab = null;
+      switchTab(S.currentTab || 'synthese', { pushHistory: false });
+    }, 150);
   });
+}
+
+/** Redessine l'onglet avec les donnees deja en main. Faux si l'onglet ne sait
+ *  pas le faire (ou n'a rien en main) : il faut alors le recharger. */
+function _redessinerSansRecharger(tab) {
+  if (tab === 'synthese' && S.synthese) { renderSynthese({ cache: true }); return true; }
+  if (tab === 'positions' && S.positions?.length) { renderPositions(); return true; }
+  if (tab === 'flux' && S.flux?.length) { renderFlux(); return true; }
+  if (tab === 'performance') { renderPerformance(); return true; }
+  return false;
 }
 
 function applyTheme(mode) {
   document.documentElement.dataset.theme = _resolveTheme(mode);
+  applyChartTheme();
   const btn = document.getElementById('theme-toggle');
   if (btn) {
     const label = mode === 'auto' ? 'Thème : auto (système)' : mode === 'dark' ? 'Thème : sombre' : 'Thème : clair';
@@ -917,12 +1009,15 @@ function applyTheme(mode) {
     btn.setAttribute('aria-label', label);
     btn.dataset.themeMode = mode;
   }
-  if (S.currentTab === 'synthese' && S.synthese) renderSynthese();
+  // Seules les couleurs changent : les graphes Chart.js se repeignent, sans
+  // relancer les requetes de la synthese. Les courbes SVG suivent seules les
+  // variables CSS.
+  refreshChartsTheme();
 }
 
 // Apply immediately to prevent flash
 (function() {
-  const saved = localStorage.getItem('financy_theme') || 'auto';
+  const saved = _lsGet('financy_theme') || 'auto';
   document.documentElement.dataset.theme = _resolveTheme(saved);
 })();
 

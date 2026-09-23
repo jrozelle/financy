@@ -1,10 +1,14 @@
 import { api } from './api.js';
-import { esc, fmt, fmtDate, destroyChart, getColors, chartBorderColor, parseLocaleNumber, fmtQty, fmtPct,
+import { esc, fmt, fmtDate, destroyChart, getColors, gridColor, parseLocaleNumber, fmtQty, fmtPct,
          tsJour, echelleTemps, titreDate } from './utils.js';
 import { toast } from './dialogs.js';
 
 let _chart = null;
 let _current = { isin: null, period: '30d' };
+// Changer vite de titre ou de periode lance plusieurs requetes : seule la
+// derniere ecrit, une reponse lente ne remplace pas la plus recente.
+let _jeton = 0;
+let _opener = null;
 
 const DEFAULT_PERIOD = '30d';
 
@@ -15,7 +19,9 @@ export async function openIsinPopover(isin) {
   _chart = destroyChart(_chart);
   _current = { isin, period: DEFAULT_PERIOD };
   const popover = document.getElementById('isin-popover');
+  if (popover.classList.contains('hidden')) _opener = document.activeElement;
   popover.classList.remove('hidden');
+  document.getElementById('isin-popover-close')?.focus();
 
   // Reinit tabs to default period
   document.querySelectorAll('#isin-period-tabs .isin-period-btn').forEach(b => {
@@ -25,10 +31,21 @@ export async function openIsinPopover(isin) {
   await _loadAndRender();
 }
 
-function closePopover() {
-  document.getElementById('isin-popover').classList.add('hidden');
+/** Ferme la fenetre du titre : detruit son graphe, ignore les reponses en
+ *  vol et rend le focus a l'element qui l'avait ouverte. */
+export function closeIsinPopover() {
+  const popover = document.getElementById('isin-popover');
+  if (!popover || popover.classList.contains('hidden')) return;
+  popover.classList.add('hidden');
+  _jeton++;
   _chart = destroyChart(_chart);
+  const el = _opener;
+  _opener = null;
+  if (el && el !== document.body && el.isConnected) {
+    try { el.focus({ preventScroll: true }); } catch { /* non focalisable */ }
+  }
 }
+const closePopover = closeIsinPopover;
 
 async function _loadAndRender() {
   const { isin, period } = _current;
@@ -37,13 +54,15 @@ async function _loadAndRender() {
   document.getElementById('isin-popover-summary').innerHTML = '<span class="text-muted">Chargement…</span>';
   document.getElementById('isin-popover-holding').innerHTML = '';
 
+  const jeton = ++_jeton;
   let data;
   try {
     data = await api('GET', `/api/prices/history/${encodeURIComponent(isin)}?period=${period}`);
   } catch {
-    closePopover();
+    if (jeton === _jeton) closePopover();
     return;
   }
+  if (jeton !== _jeton) return;
 
   const subtitleBits = [data.name, data.ticker ? `(${data.ticker})` : null, data.currency]
     .filter(Boolean).join(' ');
@@ -139,7 +158,7 @@ function _holdingHtml(h) {
           <thead><tr>
             <th style="text-align:left;font-weight:600">Enveloppe</th>
             <th style="text-align:right;font-weight:600">Qty</th>
-            <th style="text-align:right;font-weight:600">Valo</th>
+            <th style="text-align:right;font-weight:600">Valeur</th>
             <th style="text-align:right;font-weight:600">Part</th>
           </tr></thead>
           <tbody>${rows}</tbody>
@@ -171,7 +190,7 @@ function _renderChart(data) {
   empty.classList.add('hidden');
 
   const colors = getColors();
-  const border = chartBorderColor();
+  const border = gridColor();
   // Les cours manquent les week-ends et jours feries : sur une echelle de
   // temps, le trou se voit au lieu de comprimer la courbe.
   const values = data.points.map(p => ({ x: tsJour(p.date), y: p.price }));

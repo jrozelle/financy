@@ -252,13 +252,51 @@ function _ensureCache() {
   _colorCache = {
     palette: Array.from({ length: 11 }, (_, i) => s.getPropertyValue(`--chart-${i + 1}`).trim()),
     border:  s.getPropertyValue('--chart-border').trim() || '#fff',
+    grid:    s.getPropertyValue('--border').trim() || 'rgba(0,0,0,.1)',
+    muted:   s.getPropertyValue('--text-muted').trim() || '#666',
   };
   _cachedTheme = theme;
 }
 
 export function getColors() { _ensureCache(); return _colorCache.palette; }
 
+/** Contour des segments (anneaux, barres) : la couleur du fond de carte, qui
+ *  les detache les uns des autres. Pas une couleur de grille. */
 export function chartBorderColor() { _ensureCache(); return _colorCache.border; }
+
+/** Lignes de grille des graphes : le trait des bordures du theme. Le contour
+ *  de segment (`chartBorderColor`) servait de grille — blanc sur blanc en
+ *  clair, invisible ; la grille disparaissait. */
+export function gridColor() { _ensureCache(); return _colorCache.grid; }
+
+/** Couleurs par defaut de Chart.js, lues sur le theme : sans elles, legendes
+ *  et graduations restent gris fonce sur le fond sombre. A rappeler a chaque
+ *  changement de theme. */
+export function applyChartTheme() {
+  const Chart = window.Chart;
+  if (!Chart?.defaults) return;
+  _ensureCache();
+  Chart.defaults.color = _colorCache.muted || Chart.defaults.color;
+  Chart.defaults.borderColor = _colorCache.grid || Chart.defaults.borderColor;
+}
+
+/** Redessine les graphes Chart.js deja affiches aux couleurs du theme courant,
+ *  sans rien redemander au serveur. Les couleurs de grille posees a la
+ *  creation sont remplacees par celles du theme. */
+export function refreshChartsTheme() {
+  const Chart = window.Chart;
+  if (!Chart?.instances) return;
+  applyChartTheme();
+  const grille = gridColor();
+  Object.values(Chart.instances).forEach(c => {
+    // La configuration brute, pas les options resolues : c'est elle que
+    // `update` relit. Graduations et legendes suivent Chart.defaults.
+    Object.values(c.config?.options?.scales || {}).forEach(sc => {
+      if (sc?.grid && sc.grid.display !== false && sc.grid.color) sc.grid.color = grille;
+    });
+    c.update('none');
+  });
+}
 
 export const liqText = l => l ? `Liq. ${l}` : '';
 

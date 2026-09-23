@@ -1,5 +1,5 @@
 import { S } from '../state.js';
-import { fmt, fmtDate, esc, sortArr, updateSortIndicators, today, getColors, chartBorderColor, destroyChart, parseLocaleNumber, fmtAxis,
+import { fmt, fmtDate, esc, sortArr, updateSortIndicators, getColors, gridColor, destroyChart, parseLocaleNumber, fmtAxis,
          tsJour, echelleTemps, titreDate } from '../utils.js';
 import { api, refreshEntitySelect } from '../api.js';
 import { confirmDialog, toast, closeModal } from '../dialogs.js';
@@ -218,7 +218,7 @@ function renderEntityTimeline(snaps) {
   const netData = sorted.map(s => ({ x: tsJour(s.date), y: (s.gross_assets || 0) - (s.debt || 0) }));
   const grossData = sorted.map(s => ({ x: tsJour(s.date), y: s.gross_assets || 0 }));
   const colors = getColors();
-  const border = chartBorderColor();
+  const border = gridColor();
 
   _entityTimelineChart = new Chart(canvas, {
     type: 'line',

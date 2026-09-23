@@ -25,16 +25,24 @@ export async function api(method, path, body = null, { silent = false, retries =
       try {
         data = await res.json();
       } catch {
-        throw new Error(`Réponse invalide du serveur (${res.status})`);
+        const e = new Error(`Réponse invalide du serveur (${res.status})`);
+        e.status = res.status;
+        throw e;
       }
 
-      if (!res.ok) throw new Error(data.error || res.statusText);
+      if (!res.ok) {
+        // Le statut voyage avec l'erreur : le message JSON (« Erreur interne »)
+        // ne contient pas le code, et le test `includes('500')` ne rejouait rien.
+        const e = new Error(data.error || res.statusText);
+        e.status = res.status;
+        throw e;
+      }
       return data;
 
     } catch (err) {
       lastError = err;
       const isNetwork = err instanceof TypeError;
-      const canRetry = attempt < maxRetries && (isNetwork || err.message.includes('500'));
+      const canRetry = attempt < maxRetries && (isNetwork || err.status >= 500);
       if (canRetry) {
         await new Promise(r => setTimeout(r, RETRY_DELAY * (attempt + 1)));
         continue;

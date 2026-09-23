@@ -17,19 +17,26 @@
  */
 import { S } from '../state.js';
 import { api } from '../api.js';
-import { fmt, esc, fmtDate } from '../utils.js';
+import { fmt, esc, fmtDate, fmtPct } from '../utils.js';
 import { isMasked } from '../mask.js';
+
+let _jeton = 0;
 
 export async function loadContribution() {
   const carte = document.getElementById('card-contribution');
   if (!carte) return;
   const owner = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : '';
+  // Changer vite de titulaire lance plusieurs requetes : seule la derniere
+  // ecrit, une reponse lente ne remet pas la decomposition d'un autre.
+  const jeton = ++_jeton;
   let d;
   try {
     const q = new URLSearchParams({ limit: '6' });
     if (owner) q.set('owner', owner);
     d = await api('GET', `/api/contribution?${q}`, null, { silent: true });
-  } catch { carte.style.display = 'none'; return; }
+  } catch { if (jeton === _jeton) carte.style.display = 'none'; return; }
+  if (jeton !== _jeton) return;
+  _sousTitre(carte);
 
   // Une periode sans mouvement ni apport n'apporte rien au graphe : elle y
   // occupe une colonne pour n'y montrer qu'un trait a zero.
@@ -40,13 +47,38 @@ export async function loadContribution() {
   if (periodes.length < 2) { carte.style.display = 'none'; return; }
   carte.style.display = '';
   _periodes = periodes;
+  _derniere = d;
   dessiner(periodes);
   legende(d);
   _suivreLargeur();
 }
 
+let _derniere = null;
+
+/** Redessine avec la derniere reponse, sans la redemander : la bascule du
+ *  mode discretion ne change que l'ecriture des montants. */
+export function redessinerContribution() {
+  const carte = document.getElementById('card-contribution');
+  if (!carte || !_periodes || !_derniere || carte.style.display === 'none') return;
+  dessiner(_periodes);
+  legende(_derniere);
+}
+
 let _periodes = null;
 let _suivi = null;
+
+/** L'API decompose toujours jusqu'au dernier arrete, quel que soit celui
+ *  consulte : le sous-titre le dit, plutot que de laisser croire que la carte
+ *  suit le selecteur de l'en-tete. */
+function _sousTitre(carte) {
+  const hint = carte.querySelector('.card-hint');
+  if (!hint) return;
+  const base = 'Épargne nouvelle, capital remboursé et effet des marchés, par trimestre';
+  const dernier = S.dates?.[0];
+  hint.textContent = S.syntheseDate && dernier && S.syntheseDate !== dernier
+    ? `${base}, jusqu'au dernier arrêté (${fmtDate(dernier)}) et non celui consulté`
+    : `${base}, jusqu'au dernier arrêté`;
+}
 
 /** Redessine a la largeur courante de la carte. Un seul observateur, pose au
  *  premier affichage ; `requestAnimationFrame` regroupe les rafales d'un
@@ -186,7 +218,7 @@ function legende(d) {
   const hote = document.getElementById('contribution-legend');
   if (!hote) return;
   const part = d.total_variation
-    ? Math.round((d.total_performance / d.total_variation) * 100) : null;
+    ? (d.total_performance / d.total_variation) * 100 : null;
   // Comptes entres ou sortis du suivi sans flux pour l'expliquer : leur valeur
   // n'est pas de la performance, et elle designe souvent un flux oublie. Le
   // detail se lit a l'ecran, compte par compte.
@@ -203,7 +235,7 @@ function legende(d) {
       <i style="background:var(--text-muted)"></i>Comptes ajoutés ou retirés <b class="num">${fmt(hors)}</b>
       <span class="contrib-hors-voir">${comptes.length} compte${comptes.length > 1 ? 's' : ''} ▾</span></button>` : ''}
     ${part !== null && d.total_variation > 0
-      ? `<span class="contrib-part">${part} % de la hausse vient des marchés</span>` : ''}
+      ? `<span class="contrib-part">${fmtPct(part, 0)} de la hausse vient des marchés</span>` : ''}
     ${comptes.length ? `<ul class="contrib-hors-liste" id="contrib-hors-liste" hidden>
       ${comptes.map(c => `<li><span>${esc(c.compte)}</span><span class="contrib-hors-date">${
         ({ entree: 'apparu', sortie: 'disparu', deplace: 'changé d’enveloppe' })[c.sens] || ''} au ${fmtDate(c.date)}</span><b class="num">${fmt(c.montant)}</b></li>`).join('')}

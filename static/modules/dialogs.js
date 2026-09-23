@@ -73,6 +73,14 @@ function _trapFocus(container) {
   return handler;
 }
 
+/** Rend le focus a l'element qui a ouvert une fenetre, s'il est encore la :
+ *  sans cela il retombait sur <body>, et le clavier repartait du haut de page. */
+function _rendreFocus(el) {
+  if (el && el !== document.body && el.isConnected && typeof el.focus === 'function') {
+    try { el.focus({ preventScroll: true }); } catch { /* element non focalisable */ }
+  }
+}
+
 export function confirmDialog(title, message, { confirmText = 'Supprimer', danger = true } = {}) {
   return new Promise(resolve => {
     const overlay = document.createElement('div');
@@ -89,10 +97,11 @@ export function confirmDialog(title, message, { confirmText = 'Supprimer', dange
           <button class="btn ${danger ? 'btn-danger' : 'btn-primary'} confirm-ok">${esc(confirmText)}</button>
         </div>
       </div>`;
+    const opener = document.activeElement;
     document.body.appendChild(overlay);
     lockBodyScroll();
     _trapFocus(overlay);
-    const cleanup = (val) => { overlay.remove(); unlockBodyScroll(); resolve(val); };
+    const cleanup = (val) => { overlay.remove(); unlockBodyScroll(); _rendreFocus(opener); resolve(val); };
     overlay.querySelector('.confirm-cancel').addEventListener('click', () => cleanup(false));
     overlay.querySelector('.confirm-ok').addEventListener('click', () => cleanup(true));
     overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(false); });
@@ -124,11 +133,12 @@ export function promptDialog(title, { defaultValue = '', placeholder = '', input
           <button class="btn btn-primary confirm-ok">${esc(confirmText)}</button>
         </div>
       </div>`;
+    const opener = document.activeElement;
     document.body.appendChild(overlay);
     lockBodyScroll();
     _trapFocus(overlay);
     const input = overlay.querySelector('.prompt-input');
-    const cleanup = (val) => { overlay.remove(); unlockBodyScroll(); resolve(val); };
+    const cleanup = (val) => { overlay.remove(); unlockBodyScroll(); _rendreFocus(opener); resolve(val); };
     overlay.querySelector('.confirm-cancel').addEventListener('click', () => cleanup(null));
     overlay.querySelector('.confirm-ok').addEventListener('click', () => cleanup(input.value));
     overlay.addEventListener('click', e => { if (e.target === overlay) cleanup(null); });
@@ -153,9 +163,29 @@ export function toast(msg, type = 'success', duration = 3000) {
   }, duration);
 }
 
+// Element qui avait le focus a l'ouverture de chaque modale statique.
+const _openers = new Map();
+
+/** Ouvre une modale statique : retient qui l'a ouverte et y place le focus.
+ *  Sans cela, Tab parcourait la page derriere la modale. */
+export function openModal(id) {
+  const modal = document.getElementById(id);
+  if (!modal) return;
+  _openers.set(id, document.activeElement);
+  modal.classList.remove('hidden');
+  const cible = modal.querySelector('.modal-close') ||
+    [...modal.querySelectorAll(FOCUSABLE)].find(el => !el.disabled);
+  cible?.focus();
+}
+
 export function closeModal(id) {
   const modal = document.getElementById(id);
+  if (!modal) return;
   modal.classList.add('hidden');
+  if (_openers.has(id)) {
+    _rendreFocus(_openers.get(id));
+    _openers.delete(id);
+  }
 }
 
 // ─── Focus trap for static HTML modals ─────────────────────────────────────

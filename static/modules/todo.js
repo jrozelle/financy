@@ -26,6 +26,7 @@ let _serveur = [];
 let _front = [];
 let _ouvert = false;
 let _switchTab = null;
+let _jeton = 0;
 
 /** Injecte la navigation : todo.js ne connait pas main.js, qui l'importe. */
 export function wireTodo(switchTab) {
@@ -33,13 +34,26 @@ export function wireTodo(switchTab) {
 }
 
 export async function loadTodo(date, signauxFront = []) {
-  _front = signauxFront;
+  // Changer vite d'arrete ou de titulaire lance plusieurs requetes : seule la
+  // derniere ecrit, une reponse lente ne remet pas les signaux d'un autre arrete.
+  const jeton = ++_jeton;
+  let serveur;
   try {
     const d = await api('GET', `/api/todo${date ? `?date=${date}` : ''}`, null, { silent: true });
-    _serveur = d.signaux || [];
+    serveur = d.signaux || [];
   } catch {
-    _serveur = [];       // un controle indisponible ne doit pas vider la page
+    serveur = [];        // un controle indisponible ne doit pas vider la page
   }
+  if (jeton !== _jeton) return;
+  _front = signauxFront;
+  _serveur = serveur;
+  render();
+}
+
+/** Reaffiche avec les signaux serveur deja recus : la bascule du mode
+ *  discretion ne change que l'ecriture des montants. */
+export function renderTodo(signauxFront = _front) {
+  _front = signauxFront;
   render();
 }
 
@@ -82,6 +96,8 @@ function render() {
   document.getElementById('todo-toggle').addEventListener('click', () => {
     _ouvert = !_ouvert;
     render();
+    // Le bouton est reconstruit : sans cela le focus tombait sur <body>.
+    document.getElementById('todo-toggle')?.focus();
   });
   hote.querySelectorAll('[data-go]').forEach(b => {
     b.addEventListener('click', () => _switchTab?.(b.dataset.go));

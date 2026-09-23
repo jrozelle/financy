@@ -1,6 +1,6 @@
 import { S } from '../state.js';
 import { api } from '../api.js';
-import { esc, fmt, destroyChart, getColors, chartBorderColor, parseLocaleNumber, fmtPct } from '../utils.js';
+import { esc, fmt, destroyChart, getColors, gridColor, parseLocaleNumber, fmtPct } from '../utils.js';
 import { confirmDialog, toast } from '../dialogs.js';
 import { updateDemoBadge } from './import-export.js';
 
@@ -265,7 +265,7 @@ async function _loadAllocation(profile) {
     adjEl.innerHTML = `
       <div class="empty-state" style="padding:1rem 0">
         <p class="text-muted" style="font-size:12.5px;margin-bottom:.75rem">
-          Enregistre un profil (horizon + tolérance au risque) pour calculer
+          Enregistrez un profil (horizon + tolérance au risque) pour calculer
           l'allocation cible et générer des propositions d'arbitrage.
         </p>
         <a href="#adv-profile" class="btn btn-secondary btn-sm advisor-sidebar-link" data-anchor="adv-profile">
@@ -329,7 +329,7 @@ function _renderAllocationChart(data) {
   if (!canvas) return;
   _allocChart = destroyChart(_allocChart);
   const colors = getColors();
-  const border = chartBorderColor();
+  const border = gridColor();
 
   const categories = data.gap.map(g => g.category);
   const target = data.gap.map(g => +(g.target_pct * 100).toFixed(1));
@@ -352,7 +352,7 @@ function _renderAllocationChart(data) {
         tooltip: { callbacks: { label: ctx => `${ctx.dataset.label} : ${fmtPct(ctx.parsed.y)}` } },
       },
       scales: {
-        y: { ticks: { callback: v => v + '%', font: { size: 11 } }, grid: { color: border }, beginAtZero: true },
+        y: { ticks: { callback: v => fmtPct(v, 0), font: { size: 11 } }, grid: { color: border }, beginAtZero: true },
         x: { ticks: { font: { size: 11 } }, grid: { display: false } },
       },
     },
@@ -545,7 +545,7 @@ async function _loadUsage() {
     if (pct >= 80 && pct < 100) {
       warning = `<div class="advisor-budget-warning" style="margin-top:.5rem;padding:.4rem .6rem;border-left:3px solid var(--warning);background:rgba(234,179,8,.1);font-size:12px;border-radius:4px">
         Budget mensuel consommé à ${fmtPct(pct, 0)}. Les prochains appels Claude
-        passeront toujours, mais envisage d'augmenter <code>ADVISOR_BUDGET_USD</code>.
+        passeront toujours, mais envisagez d'augmenter <code>ADVISOR_BUDGET_USD</code>.
       </div>`;
     } else if (pct >= 100) {
       warning = `<div class="advisor-budget-warning" style="margin-top:.5rem;padding:.4rem .6rem;border-left:3px solid var(--danger);background:rgba(239,68,68,.1);font-size:12px;border-radius:4px">

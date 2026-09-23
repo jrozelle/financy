@@ -1,7 +1,15 @@
 import { S, _targetsCache, setTargetsCache } from './state.js';
 import { api } from './api.js';
-import { esc, fmt, parseLocaleNumber, fmtPct } from './utils.js';
+import { esc, parseLocaleNumber, fmtPct } from './utils.js';
 import { closeModal } from './dialogs.js';
+
+/** Ecart en points de pourcentage, a la francaise : « +2,5 pt ». */
+const _nfPt = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+function _fmtPoints(v) {
+  const s = _nfPt.format(Math.abs(v));
+  const signe = s === '0,0' ? '' : v > 0 ? '+' : '−';
+  return `${signe}${s}\u202fpt`;
+}
 
 export async function loadTargets() {
   if (_targetsCache !== null) return _targetsCache;
@@ -130,13 +138,12 @@ export async function renderAllocationTargets() {
           <span class="cible-v">
             <span class="num">${fmtPct(r.actual)}</span>
             ${ecart === null ? '<span class="cible-none">pas de cible</span>'
-              : `<span class="cible-ecart cible-ecart--${classe}">${
-                  ecart > 0 ? '+' : '−'}${Math.abs(ecart).toFixed(1)}\u202fpt</span>`}
+              : `<span class="cible-ecart cible-ecart--${classe}">${_fmtPoints(ecart)}</span>`}
           </span>
           <span class="cible-track">
             <span class="cible-fill" style="width:${reel.toFixed(1)}%"></span>
             ${cible !== null ? `<span class="cible-marque" style="left:${cible.toFixed(1)}%"
-                 title=""></span>` : ''}
+                 aria-hidden="true"></span>` : ''}
           </span>
         </div>`;
       }).join('')}

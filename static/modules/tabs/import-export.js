@@ -71,7 +71,7 @@ export async function initDemoToggle() {
 
 export async function importXlsx() {
   const file = document.getElementById('import-file').files[0];
-  if (!file) { showImportResult('Sélectionne un fichier .xlsx.', false); return; }
+  if (!file) { showImportResult('Sélectionnez un fichier .xlsx.', false); return; }
 
   const fd = new FormData();
   fd.append('file', file);
@@ -107,7 +107,7 @@ function showImportResult(msg, ok) {
 
 export async function importJson() {
   const file = document.getElementById('import-json-file').files[0];
-  if (!file) { showJsonImportResult('Sélectionne un fichier .json.', false); return; }
+  if (!file) { showJsonImportResult('Sélectionnez un fichier .json.', false); return; }
 
   const btn = document.getElementById('btn-import-json');
   if (btn) { btn.disabled = true; btn.textContent = 'Import en cours…'; }

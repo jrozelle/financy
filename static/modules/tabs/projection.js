@@ -18,7 +18,8 @@
 import { api } from '../api.js';
 import { natureDe } from '../categories.js';
 import { dessinerCourbe } from '../courbe.js';
-import { fmt, parseLocaleNumber } from '../utils.js';
+import { fmt, fmtPct, parseLocaleNumber } from '../utils.js';
+import { isMasked, onMaskChange } from '../mask.js';
 
 // v2 : l'epargne a change de sens (nouvelle, et non plus versements) ; un
 // reglage memorise sous l'ancienne cle y reinjecterait le rythme du DCA.
@@ -79,10 +80,34 @@ const CHAMPS = {
   horizon:   { id: 'proj-horizon',   defaut: () => 10 },
 };
 
+// Champs qui portent un montant : en mode discretion, leur valeur en clair
+// dans le champ trahirait l'epargne mensuelle.
+const MONTANTS = new Set(['epargne', 'aInvestir', 'dca']);
+
+/** Remplit les champs. En mode discretion, les montants restent vides (avec
+ *  « masqué » en indication) et le calcul part des valeurs memorisees. */
 function _remplir(r = {}) {
+  const masque = isMasked();
   Object.entries(CHAMPS).forEach(([k, c]) => {
-    document.getElementById(c.id).value = String(r[k] ?? c.defaut());
+    const el = document.getElementById(c.id);
+    if (MONTANTS.has(k)) {
+      el.placeholder = masque ? 'masqué' : '';
+      if (masque) { el.value = ''; return; }
+    }
+    el.value = String(r[k] ?? c.defaut());
   });
+}
+
+/** Valeur d'un reglage : le champ s'il est rempli, sinon (montant masque) la
+ *  valeur memorisee ou mesuree. */
+function _valeur(k) {
+  const c = CHAMPS[k];
+  const el = document.getElementById(c.id);
+  if (MONTANTS.has(k) && isMasked() && el.value.trim() === '') {
+    const r = _reglages();
+    return r[k] ?? c.defaut();
+  }
+  return parseLocaleNumber(el.value, 0);
 }
 
 function _cabler() {
@@ -97,10 +122,12 @@ function _cabler() {
   }
   const maj = () => {
     const r = {};
-    Object.entries(CHAMPS).forEach(([k, c]) => { r[k] = parseLocaleNumber(document.getElementById(c.id).value, 0); });
+    Object.keys(CHAMPS).forEach(k => { r[k] = _valeur(k); });
     _memoriser(r);
     _dessiner();
   };
+  // Les champs se vident ou se remplissent avec le mode discretion.
+  onMaskChange(() => { _remplir(_reglages()); if (_ctx) _dessiner(); });
   Object.values(CHAMPS).forEach(c => {
     const el = document.getElementById(c.id);
     el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', maj);
@@ -114,11 +141,10 @@ function _cabler() {
 
 function _dessiner() {
   const { positions, net, objectif } = _ctx;
-  const val = id => parseLocaleNumber(document.getElementById(id).value, 0);
-  const epargne = val('proj-epargne');
-  let aInvestir = Math.max(0, val('proj-a-investir'));
-  const dca = Math.max(0, val('proj-dca'));
-  const taux = parseLocaleNumber(document.getElementById('proj-rendement').value, 0) / 100;
+  const epargne = _valeur('epargne');
+  let aInvestir = Math.max(0, _valeur('aInvestir'));
+  const dca = Math.max(0, _valeur('dca'));
+  const taux = _valeur('rendement') / 100;
   const annees = +document.getElementById('proj-horizon').value || 10;
   const financier = positions.filter(p => natureDe(p.category, p.envelope) === 'fin')
     .reduce((s, p) => s + (p.net_attributed || 0), 0);
@@ -173,7 +199,7 @@ function _dessiner() {
       ${ligne('Désendettement', parts.desendettement, 'capital remboursé selon les échéanciers des prêts amortissables — certain'
         + ((_crd?.prets || []).some(p => p.in_fine) ? ' ; un prêt in fine, remboursé d’un bloc sur des actifs, n’en fait pas partie' : ''))}
       ${ligne('Épargne nouvelle', parts.epargneCum, `${fmt(epargne)} par mois — l'argent qui entre`)}
-      ${ligne('Rendement', parts.rendement, `${String(taux * 100).replace('.', ',')} % par an sur le financier (${fmt(financier)} aujourd'hui)`
+      ${ligne('Rendement', parts.rendement, `${fmtPct(taux * 100, Number.isInteger(taux * 100) ? 0 : 1)} par an sur le financier (${fmt(financier)} aujourd'hui)`
         + (dcaCum ? `, renforcé de ${fmt(dcaCum)} investis en DCA${finDca ? ` jusqu'en ${finDca.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}` : ''}` : '')
         + ' — hypothèse')}
     </ul>
