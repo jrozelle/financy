@@ -4018,3 +4018,4 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .perf-excluded-row .perf-sub { display: block; font-size: .72rem; color: var(--text-muted); }
 .arbo-pv-na { color: var(--text-muted); }
 .arbo-pv-note { display: block; font-size: 10.5px; color: var(--text-muted); white-space: nowrap; }
+.credits-autres { margin: .5rem 0 0; font-size: .8rem; color: var(--text-muted); }

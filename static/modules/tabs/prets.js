@@ -43,6 +43,7 @@ export async function loadPrets() {
   } catch { return; }
   const prets = res.prets || [];
   _kpi(prets);
+  _autresDettes(res.autres_dettes || []);
   _prochaines(cal?.prochaines || [], prets);
   _annees(cal?.annees || []);
   document.getElementById('prets-liste').innerHTML = prets.length ? _liste(prets) : qui ? `
@@ -106,6 +107,22 @@ function _solder(p) {
           <option value="aucune"${(p.ira_mode || p.ira_contrat) === 'aucune' ? ' selected' : ''}>Contrat sans IRA</option>
         </select></label>
     </div>`;
+}
+
+/** Les dettes qu'aucun credit n'explique (un impot a payer sur une plus-value)
+ *  : dites ici, sans quoi la dette de la synthese depasse le restant du des
+ *  credits sans raison visible. */
+function _autresDettes(liste) {
+  const kpi = document.getElementById('credits-kpi');
+  if (!kpi) return;
+  kpi.parentElement.querySelector('.credits-autres')?.remove();
+  if (!liste.length) return;
+  const total = liste.reduce((t, x) => t + x.montant, 0);
+  const p = document.createElement('p');
+  p.className = 'credits-autres';
+  p.innerHTML = `Hors crédits, ${fmt(total)} de dettes sans échéancier, comptées dans la synthèse : `
+    + liste.map(x => `${esc(x.libelle)} (${fmt(x.montant)}${x.notes ? ` — ${esc(x.notes)}` : ''})`).join(', ') + '.';
+  kpi.after(p);
 }
 
 function _kpi(prets) {

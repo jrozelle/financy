@@ -34,7 +34,32 @@ def liste():
         if parts is not None:
             r['prets'] = [svc.a_la_part(p, parts[p['id']]) for p in r['prets'] if p['id'] in parts]
             r['titulaire'] = request.args.get('titulaire')
+        r['autres_dettes'] = _autres_dettes(conn, request.args.get('titulaire'))
         return jsonify(r)
+
+
+def _autres_dettes(conn, titulaire=None):
+    """Les dettes du dernier arrete qu'aucun credit n'explique : un impot a
+    payer sur une plus-value, un pret familial saisi a la main. Sans elles,
+    l'ecart entre la dette de la synthese et le restant du des credits
+    restait muet."""
+    d = conn.execute('SELECT MAX(date) d FROM positions').fetchone()['d']
+    if not d:
+        return []
+    avec_credit = {r['entity'] for r in conn.execute('SELECT DISTINCT entity FROM prets WHERE entity IS NOT NULL')}
+    t = (titulaire or '').strip()
+    q = ('SELECT owner, label, envelope, establishment, entity, notes, debt, COALESCE(debt_pct, 1) part '
+         'FROM positions WHERE date=? AND debt > 0')
+    out = []
+    for r in conn.execute(q, (d,)):
+        if r['entity'] and r['entity'] in avec_credit:
+            continue
+        if t and t != 'Famille' and r['owner'] != t:
+            continue
+        out.append({'libelle': ' · '.join(x for x in (r['label'] or r['envelope'], r['establishment'], r['owner']) if x),
+                    'montant': round(r['debt'] * (r['part'] if r['entity'] else 1), 2),
+                    'notes': r['notes'], 'date': d})
+    return out
 
 
 @prets_bp.route('/api/prets/projection', methods=['GET'])
