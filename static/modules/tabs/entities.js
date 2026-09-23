@@ -41,8 +41,23 @@ export function renderEntities() {
   }
   const snapMap = snapshotsByEntity();
   updateSortIndicators('entities-thead', 'entities');
-  tbody.innerHTML = sortArr(S.entities, S.sort.entities.key, S.sort.entities.dir).map(e => {
+  // Vue d'un titulaire : ses seules entites, et sa part sous chaque montant —
+  // brut a sa part de propriete, dette a sa part de dette (66 / 34 sur une
+  // residence detenue a moitie). L'entite reste montree entiere : c'est la
+  // page des entites, et la part se lit contre le tout.
+  const qui = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : null;
+  const visibles = qui ? S.entities.filter(e => (S.entityPositions || []).some(p => p.entity === e.name && p.owner === qui))
+                       : S.entities;
+  if (qui && !visibles.length) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">${esc(qui)} ne détient de parts dans aucune entité.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = sortArr(visibles, S.sort.entities.key, S.sort.entities.dir).map(e => {
     const linked   = (S.entityPositions || []).filter(p => p.entity === e.name);
+    const siennes  = qui ? linked.filter(p => p.owner === qui) : [];
+    const pPart = siennes.reduce((t, p) => t + (p.ownership_pct || 0), 0);
+    const dPart = siennes.reduce((t, p) => t + (p.debt_pct ?? p.ownership_pct ?? 0), 0);
+    const part = (v, k) => qui ? `<div class="ent-part">part de ${esc(qui)} : ${fmt(v * k)} · ${Math.round(k * 100)} %</div>` : '';
     const totalPct = linked.reduce((s, p) => s + (p.ownership_pct || 0), 0);
     const owners   = linked.map(p =>
       `<span class="badge badge-j27">${esc(p.owner)} ${Math.round((p.ownership_pct||0)*100)} %</span>`
@@ -64,9 +79,10 @@ export function renderEntities() {
       : '<span class="ent-note">—</span>';
     return `<tr>
       <td class="ent-nom"><strong>${esc(e.name)}</strong>${nature ? `<div class="ent-note">${esc(nature)}</div>` : ''}${e.comment ? `<div class="ent-note">${esc(e.comment)}</div>` : ''}</td>
-      <td class="num ent-valeur" data-lib="Valeur">${fmt(e.gross_assets)}</td>
-      <td class="num ent-dette ${e.debt > 0 ? 'neg' : ''}" data-lib="Dette">${e.debt > 0 ? fmt(e.debt) : '—'}</td>
-      <td class="num ent-net ${e.net_assets < 0 ? 'neg' : 'pos'}">${fmt(e.net_assets)}</td>
+      <td class="num ent-valeur" data-lib="Valeur">${fmt(e.gross_assets)}${part(e.gross_assets, pPart)}</td>
+      <td class="num ent-dette ${e.debt > 0 ? 'neg' : ''}" data-lib="Dette">${e.debt > 0 ? fmt(e.debt) : '—'}${e.debt > 0 ? part(e.debt, dPart) : ''}</td>
+      <td class="num ent-net ${e.net_assets < 0 ? 'neg' : 'pos'}">${fmt(e.net_assets)}${qui
+        ? `<div class="ent-part">part de ${esc(qui)} : ${fmt(e.gross_assets * pPart - (e.debt || 0) * dPart)}</div>` : ''}</td>
       <td class="ent-detenteurs">${owners}${noLink}${repartition}</td>
       <td class="ent-c-histo">${snapCell}</td>
       <td class="ent-actions">

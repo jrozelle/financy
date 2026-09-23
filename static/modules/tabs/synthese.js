@@ -431,7 +431,12 @@ function renderEntitiesSynthese() {
 
   const allPositions = Object.values(cache).flat();
 
-  const rows = S.entities.map(e => {
+  // Vue d'un titulaire : ses seules entites. Lister les autres a « 0 € 0 % »
+  // n'apprenait rien.
+  const entites = isFamily ? S.entities
+    : S.entities.filter(e => allPositions.some(p => p.entity === e.name && p.owner === owner));
+  if (!entites.length) { card.style.display = 'none'; return; }
+  const rows = entites.map(e => {
     const linked = allPositions.filter(p => p.entity === e.name);
     const familyNet  = linked.reduce((s, p) => s + (p.net_attributed || 0), 0);
     const familyGross= linked.reduce((s, p) => s + (p.gross_attributed || 0), 0);
@@ -441,11 +446,15 @@ function renderEntitiesSynthese() {
     const ownerNet   = !isFamily
       ? linked.filter(p => p.owner === owner).reduce((s, p) => s + (p.net_attributed || 0), 0)
       : null;
+    const siennes    = linked.filter(p => p.owner === owner);
     const ownerPct   = !isFamily && e.gross_assets > 0
-      ? linked.filter(p => p.owner === owner).reduce((s, p) => s + (p.ownership_pct || 0), 0)
-      : null;
+      ? siennes.reduce((s, p) => s + (p.ownership_pct || 0), 0) : null;
+    // Le net suit aussi la part de DETTE, qui peut differer de la propriete :
+    // la dire, sinon « 50 % » ne colle pas au montant.
+    const ownerDebtPct = !isFamily && e.debt > 0
+      ? siennes.reduce((s, p) => s + (p.debt_pct ?? p.ownership_pct ?? 0), 0) : null;
 
-    return { e, familyGross, familyDebt, familyNet, familyPct, ownerNet, ownerPct };
+    return { e, familyGross, familyDebt, familyNet, familyPct, ownerNet, ownerPct, ownerDebtPct };
   });
 
   const personCol = !isFamily
@@ -462,7 +471,7 @@ function renderEntitiesSynthese() {
         <th style="text-align:right">Quote-part famille</th>
         ${personCol}
       </tr></thead>
-      <tbody>${rows.map(({ e, familyGross, familyDebt, familyNet, familyPct, ownerNet, ownerPct }) => `
+      <tbody>${rows.map(({ e, familyGross, familyDebt, familyNet, familyPct, ownerNet, ownerPct, ownerDebtPct }) => `
         <tr>
           <td><strong>${esc(e.name)}</strong></td>
           <td>${esc(e.type || '—')}</td>
@@ -475,7 +484,8 @@ function renderEntitiesSynthese() {
           </td>
           ${!isFamily ? `<td style="text-align:right;font-weight:700;color:var(--primary)">
             ${fmt(ownerNet)}
-            ${ownerPct !== null ? `<span style="font-size:11px;color:var(--text-muted);margin-left:4px">${fmtPct(ownerPct * 100, 0)}</span>` : ''}
+            ${ownerPct !== null ? `<span style="font-size:11px;color:var(--text-muted);margin-left:4px">${fmtPct(ownerPct * 100, 0)}${
+              ownerDebtPct !== null && Math.abs(ownerDebtPct - ownerPct) > 0.005 ? ` du bien, ${fmtPct(ownerDebtPct * 100, 0)} de la dette` : ''}</span>` : ''}
           </td>` : ''}
         </tr>`).join('')}
       </tbody>

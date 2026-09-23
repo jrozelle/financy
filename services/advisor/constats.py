@@ -283,7 +283,7 @@ def _garder_ou_rembourser(conn, date, entites, owner):
         # Rembourser par anticipation, c'est placer l'argent au taux du credit :
         # sans risque, mais sans retour possible. Les interets epargnes sont
         # le rendement de ce placement, pas un manque a gagner.
-        detail = (f"Rembourser demanderait {_eur(crd)} tout de suite. Ce serait placer cet argent à "
+        detail = (f"Au {date[8:10]}/{date[5:7]}/{date[:4]}, date de l'arrêté, rembourser demanderait {_eur(crd)}. Ce serait placer cet argent à "
                   f"{_pct(taux)} par an, sans risque mais sans retour possible : {_eur(gain)} d'intérêts "
                   f"épargnés d'ici {annee_fin}, indemnités de {_eur(p.get('ira') or 0)} déduites. ")
         if levier:
