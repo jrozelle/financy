@@ -131,7 +131,18 @@
 - Pas d'emojis dans le code
 - Dark mode cohérent dans toutes les nouvelles modales et popovers
 - Toutes les migrations DB sont idempotentes (`CREATE IF NOT EXISTS`, `ALTER` dans try/except)
-- Jamais de `DROP` ou `ALTER` destructif
+- Jamais de `DROP` ou `ALTER` destructif. Seule exception, levee par
+  l'utilisateur pour le passage aux centimes : `_reconstruire_en_centimes`
+  (`models.py`), qui copie, verifie ligne a ligne et n'efface l'ancienne table
+  qu'une fois la copie prouvee, le tout annule au moindre ecart.
+- **Montants en centimes entiers** dans les tables converties (liste :
+  `services/montants.py`, `COLONNES`), tables `STRICT`. Le reste du code parle
+  en euros ; on convertit a la lecture et a l'ecriture (`centimes()`,
+  `euros()`, `ligne_en_euros()`), jamais ailleurs. Cours unitaires, quantites,
+  taux et parts restent en `REAL`. Un test qui ecrit en SQL brut ecrit des
+  centimes : un entier en euros passerait sans erreur, cent fois trop petit.
+  Controle d'une migration : rejouer toutes les routes GET sur une copie de la
+  base de prod, avant et apres, et comparer au centime.
 - Endpoints : `@login_required` + CSRF systématique
 - Inputs validés côté serveur (validate_date, validate_number, validate_pct, validate_string)
 

@@ -818,6 +818,138 @@ def _migration_020(conn):
         )""")
 
 
+def _reconstruire_en_centimes(conn, table, creation, colonnes):
+    """Reconstruit `table` en table STRICT, ses montants `colonnes` en centimes
+    entiers (services/montants.py).
+
+    SQLite ne change pas le type d'une colonne : nouvelle table, copie
+    convertie, verification ligne a ligne, puis DROP de l'ancienne et
+    renommage. Seule operation destructive admise sur le schema, et sous
+    controle : tout se fait dans un point de sauvegarde, et le moindre ecart
+    (nombre de lignes, colonne non montant alteree, montant deplace de plus
+    d'un demi-centime) annule l'ensemble avant le DROP. Idempotente : une table
+    deja STRICT est laissee telle quelle.
+
+    `creation` : l'ordre CREATE TABLE de la nouvelle table, nomme `{t}`.
+    """
+    from services.montants import centimes
+    sql = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+                       (table,)).fetchone()
+    if sql is None:
+        raise RuntimeError(f'{table} : table absente')
+    if re.search(r'\)\s*STRICT\s*$', sql[0], re.I):
+        return
+    if conn.execute('PRAGMA foreign_keys').fetchone()[0]:
+        raise RuntimeError('cles etrangeres actives : reconstruction refusee')
+    for (vsql,) in conn.execute("SELECT sql FROM sqlite_master WHERE type='view'"):
+        if re.search(r'\b%s\b' % table, vsql or ''):
+            raise RuntimeError(f'{table} : une vue en depend, reconstruction refusee')
+
+    neuve = f'{table}__centimes'
+    anciennes = [r[1] for r in conn.execute(f'PRAGMA table_info({table})')]
+    annexes = [r[0] for r in conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type IN ('index','trigger') AND tbl_name=? AND sql IS NOT NULL",
+        (table,))]
+    seq = conn.execute('SELECT seq FROM sqlite_sequence WHERE name=?', (table,)).fetchone() \
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE name='sqlite_sequence'").fetchone() else None
+
+    conn.execute('SAVEPOINT reconstruction')
+    try:
+        conn.execute(creation.format(t=neuve))
+        nouvelles = [r[1] for r in conn.execute(f'PRAGMA table_info({neuve})')]
+        if sorted(nouvelles) != sorted(anciennes):
+            raise RuntimeError(f'{table} : colonnes differentes ({sorted(anciennes)} / {sorted(nouvelles)})')
+        liste = ', '.join(anciennes)
+        lignes = conn.execute(f'SELECT rowid AS _r, {liste} FROM {table}').fetchall()
+        idx = {c: i + 1 for i, c in enumerate(anciennes)}
+        conn.executemany(
+            f'INSERT INTO {neuve} (rowid, {liste}) VALUES ({", ".join("?" * (len(anciennes) + 1))})',
+            [(l[0], *[centimes(l[idx[c]]) if c in colonnes else l[idx[c]] for c in anciennes])
+             for l in lignes])
+
+        # Verification, avant tout DROP.
+        n = conn.execute(f'SELECT COUNT(*) FROM {neuve}').fetchone()[0]
+        if n != len(lignes):
+            raise RuntimeError(f'{table} : {len(lignes)} lignes, {n} copiees')
+        for c in anciennes:
+            if c in colonnes:
+                cond = (f'(a.{c} IS NULL) != (b.{c} IS NULL) OR typeof(b.{c}) NOT IN (\'integer\', \'null\') '
+                        f'OR ABS(b.{c} / 100.0 - a.{c}) > 0.0050001')
+            else:
+                cond = f'a.{c} IS NOT b.{c}'
+            ecart = conn.execute(f'SELECT COUNT(*) FROM {table} a JOIN {neuve} b ON b.rowid = a.rowid '
+                                 f'WHERE {cond}').fetchone()[0]
+            if ecart:
+                raise RuntimeError(f'{table}.{c} : {ecart} ligne(s) en ecart')
+
+        conn.execute(f'DROP TABLE {table}')
+        conn.execute(f'ALTER TABLE {neuve} RENAME TO {table}')
+        for a in annexes:
+            conn.execute(a)
+        if seq:
+            conn.execute('UPDATE sqlite_sequence SET seq = MAX(seq, ?) WHERE name=?', (seq[0], table))
+        conn.execute('RELEASE reconstruction')
+    except Exception:
+        conn.execute('ROLLBACK TO reconstruction')
+        conn.execute('RELEASE reconstruction')
+        raise
+
+
+def _migration_021(conn):
+    """Tresorerie des entites en centimes entiers (tables STRICT) : operations
+    des releves, soldes d'ouverture, parts, exercices. L'unicite d'une
+    operation portait sur un montant flottant — 1234.5 et 1234.4999999
+    passaient pour deux operations."""
+    _reconstruire_en_centimes(conn, 'entite_operations', """
+        CREATE TABLE {t} (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            entity    TEXT NOT NULL,
+            date      TEXT NOT NULL,
+            libelle   TEXT NOT NULL,
+            montant   INTEGER NOT NULL,       -- centimes, signe : + entree, - sortie
+            nature    TEXT NOT NULL,
+            banque    TEXT,
+            compte    TEXT,
+            source    TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(entity, banque, compte, date, montant, libelle)
+        ) STRICT""", ('montant',))
+    _reconstruire_en_centimes(conn, 'entite_soldes_initiaux', """
+        CREATE TABLE {t} (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            entity    TEXT NOT NULL,
+            banque    TEXT NOT NULL DEFAULT '',
+            compte    TEXT NOT NULL DEFAULT '',
+            date      TEXT NOT NULL,
+            solde     INTEGER NOT NULL,       -- centimes
+            source    TEXT,
+            UNIQUE(entity, banque, compte)
+        ) STRICT""", ('solde',))
+    _reconstruire_en_centimes(conn, 'entite_parts', """
+        CREATE TABLE {t} (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            entity            TEXT NOT NULL,
+            nom               TEXT NOT NULL,
+            parts             REAL NOT NULL,
+            montant_souscrit  INTEGER,           -- centimes, frais compris
+            prix_souscription REAL,              -- prix d'une part (euros)
+            prix_retrait      REAL,
+            date_prix         TEXT,
+            source            TEXT,
+            UNIQUE(entity, nom)
+        ) STRICT""", ('montant_souscrit',))
+    _reconstruire_en_centimes(conn, 'entite_exercices', """
+        CREATE TABLE {t} (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            entity    TEXT NOT NULL,
+            debut     TEXT,
+            fin       TEXT NOT NULL,
+            resultat  INTEGER NOT NULL,       -- centimes ; negatif = deficit
+            source    TEXT,
+            UNIQUE(entity, fin)
+        ) STRICT""", ('resultat',))
+
+
 MIGRATIONS = [
     (1, _migration_001),
     (2, _migration_002),
@@ -839,6 +971,7 @@ MIGRATIONS = [
     (18, _migration_018),
     (19, _migration_019),
     (20, _migration_020),
+    (21, _migration_021),
 ]
 
 

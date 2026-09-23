@@ -5,6 +5,7 @@ from io import BytesIO
 from models import get_db, validate_date, validate_isin, parse_number, get_db_path
 from auth import login_required, csrf_protect
 from services.backups import create_db_backup
+from services.montants import ligne_en_centimes, ligne_en_euros
 from services.snapshot import ecrire_entity_snapshot
 
 MAX_IMPORT_ROWS = 10000
@@ -404,6 +405,9 @@ def _propre(v):
 
 
 def _inserer(conn, table, ligne, cols, ignorer=False):
+    # L'import parle en euros, comme l'export ; la base, en centimes pour les
+    # tables de montants.COLONNES. Ici seulement, et dans _existe.
+    ligne = ligne_en_centimes(table, ligne)
     champs = [c for c in cols if c not in _TECHNIQUES and c in ligne]
     if not champs:
         return None
@@ -421,6 +425,7 @@ def _existe(conn, table, ligne, cles, consommes=None):
     lignes : chacune ne se reconnait que dans une ligne existante distincte,
     et jamais dans une ligne que cet import vient de creer.
     """
+    ligne = ligne_en_centimes(table, ligne)
     cond = ' AND '.join(f'COALESCE({c}, \'\') = COALESCE(?, \'\')' for c in cles)
     for r in conn.execute(f'SELECT rowid FROM {table} WHERE {cond} ORDER BY rowid',
                           [_propre(ligne.get(c)) for c in cles]):
@@ -639,7 +644,7 @@ def export_data():
     with get_db() as conn:
         for t in tables:
             try:
-                out[t] = [dict(r) for r in conn.execute(f'SELECT * FROM {t}')]
+                out[t] = [ligne_en_euros(t, r) for r in conn.execute(f'SELECT * FROM {t}')]
             except Exception:
                 out[t] = []          # table non migree
         out['snapshot_notes'] = {r['date']: r['notes'] for r in conn.execute(

@@ -12,6 +12,8 @@ from __future__ import annotations
 import re
 import sqlite3
 
+from services.montants import centimes, euros, ligne_en_euros
+
 NATURES = {
     'revenu': 'Revenus',
     'revenu_exceptionnel': 'Revenus exceptionnels',
@@ -81,7 +83,7 @@ def enregistrer(conn, entite, releve, source, noms_associes=()):
         cur = conn.execute(
             'INSERT OR IGNORE INTO entite_operations '
             '(entity, date, libelle, montant, nature, banque, compte, source) VALUES (?,?,?,?,?,?,?,?)',
-            (entite, o.date, o.libelle, o.montant, classer(o.libelle, o.montant, entite, noms_associes, connus),
+            (entite, o.date, o.libelle, centimes(o.montant), classer(o.libelle, o.montant, entite, noms_associes, connus),
              releve.banque, releve.compte, source))
         ajoutees += cur.rowcount
     enregistrer_solde_initial(conn, entite, releve, source)
@@ -102,7 +104,7 @@ def enregistrer_solde_initial(conn, entite, releve, source=None):
         'INSERT INTO entite_soldes_initiaux (entity, banque, compte, date, solde, source) VALUES (?,?,?,?,?,?) '
         'ON CONFLICT(entity, banque, compte) DO UPDATE SET date=excluded.date, solde=excluded.solde, '
         'source=excluded.source WHERE excluded.date < entite_soldes_initiaux.date',
-        (entite, releve.banque or '', releve.compte or '', releve.debut, float(releve.solde_initial), source))
+        (entite, releve.banque or '', releve.compte or '', releve.debut, centimes(releve.solde_initial), source))
 
 
 def soldes_initiaux(conn, entite, date=None):
@@ -116,7 +118,7 @@ def soldes_initiaux(conn, entite, date=None):
         r = conn.execute(sql, params).fetchone()
     except sqlite3.OperationalError:
         return 0.0                # table absente (base non migree)
-    return r['s'] or 0.0
+    return euros(r['s'] or 0)
 
 
 def tresorerie_a(conn, entite, date):
@@ -127,7 +129,7 @@ def tresorerie_a(conn, entite, date):
                      'WHERE entity=? AND date<=?', (entite, date)).fetchone()
     if not r['n']:
         return None
-    return {'montant': round(r['s'] + soldes_initiaux(conn, entite, date), 2), 'au': r['d']}
+    return {'montant': round(euros(r['s']) + soldes_initiaux(conn, entite, date), 2), 'au': r['d']}
 
 
 # Commission de souscription d'une SCPI, deduite du prix de souscription pour
@@ -139,7 +141,7 @@ def parts(conn, entite):
     """Les parts de l'entite, valorisees au prix de retrait."""
     out = []
     for r in conn.execute('SELECT * FROM entite_parts WHERE entity=? ORDER BY nom', (entite,)):
-        r = dict(r)
+        r = ligne_en_euros('entite_parts', r)
         retrait = r['prix_retrait']
         r['retrait_estime'] = retrait is None and r['prix_souscription'] is not None
         if retrait is None and r['prix_souscription'] is not None:
@@ -168,7 +170,7 @@ def impot_societes(benefice):
 
 
 def exercices(conn, entite):
-    return [dict(r) for r in conn.execute(
+    return [ligne_en_euros('entite_exercices', r) for r in conn.execute(
         'SELECT * FROM entite_exercices WHERE entity=? ORDER BY fin', (entite,))]
 
 
@@ -230,7 +232,7 @@ def _mois_precedents(fin, n):
 
 def bilan(conn, entite, mois=12):
     """Le levier de l'entite sur ses `mois` derniers mois couverts par les releves."""
-    ops = [dict(r) for r in conn.execute(
+    ops = [ligne_en_euros('entite_operations', r) for r in conn.execute(
         'SELECT * FROM entite_operations WHERE entity=? ORDER BY date, id', (entite,))]
     if not ops:
         return {'entite': entite, 'operations': [], 'mensuel': [], 'periode': None}

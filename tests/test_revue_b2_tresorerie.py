@@ -35,7 +35,7 @@ class TestSoldeInitial:
                                              [('2026-03-10', 'Frais bancaires', -10.0)]), 'mars.pdf')
             assert t.bilan(conn, SCI)['tresorerie'] == 5290
             r = conn.execute('SELECT date, solde FROM entite_soldes_initiaux').fetchall()
-        assert [(x['date'], x['solde']) for x in r] == [('2026-01-01', 4800)]
+        assert [(x['date'], x['solde']) for x in r] == [('2026-01-01', 480000)]   # centimes
 
     def test_deux_comptes_s_additionnent(self):
         with get_db() as conn:

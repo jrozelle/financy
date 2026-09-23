@@ -172,7 +172,7 @@ class TestTresorerieDeLEntite:
     def _ops(self, c, *ops):
         for d, m in ops:
             c.execute("INSERT INTO entite_operations (entity, date, libelle, montant, nature) "
-                      "VALUES ('SCI A', ?, ?, ?, 'revenu')", (d, f'op {d} {m}', m))
+                      "VALUES ('SCI A', ?, ?, ?, 'revenu')", (d, f'op {d} {m}', round(m * 100)))  # centimes
         c.commit()
 
     def _entite(self, client):

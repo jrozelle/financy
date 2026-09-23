@@ -137,7 +137,7 @@ class TestRoutes:
     def test_reclasser(self, client):
         with get_db() as conn:
             conn.execute("INSERT INTO entite_operations (id, entity, date, libelle, montant, nature) "
-                         "VALUES (1, 'SCI T', '2026-01-01', 'x', -10, 'autre')")
+                         "VALUES (1, 'SCI T', '2026-01-01', 'x', -1000, 'autre')")  # centimes
         assert client.patch('/api/entites/operations/1', json={'nature': 'frais'}, headers=H).status_code == 200
         assert client.patch('/api/entites/operations/1', json={'nature': 'nimporte'}, headers=H).status_code == 400
         assert client.patch('/api/entites/operations/99', json={'nature': 'frais'}, headers=H).status_code == 404
@@ -209,9 +209,9 @@ class TestParts:
             conn.execute("INSERT INTO positions (date, owner, category, envelope, value, entity) "
                          "VALUES ('2026-08-31', 'Paul', 'SCPI', 'SCI', 0, 'SCI T')")
             conn.execute("INSERT INTO entite_operations (entity, date, libelle, montant, nature) "
-                         "VALUES ('SCI T', '2026-08-15', 'x', 1500, 'revenu')")
+                         "VALUES ('SCI T', '2026-08-15', 'x', 150000, 'revenu')")
             conn.execute("INSERT INTO entite_parts (entity, nom, parts, montant_souscrit, prix_souscription, prix_retrait) "
-                         "VALUES ('SCI T', 'A', 100, 44000, 440, 396)")
+                         "VALUES ('SCI T', 'A', 100, 4400000, 440, 396)")
         d = client.get('/api/snapshots/update?source=2026-08-31&cible=2026-09-30').get_json()
         e = next(x for x in d['entites'] if x['name'] == 'SCI T')
         assert e['valeur_proposee'] == 39600 + 1500

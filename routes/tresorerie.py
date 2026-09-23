@@ -8,6 +8,7 @@ from flask import Blueprint, jsonify, request
 from auth import login_required, csrf_protect
 from models import get_db, validate_date, validate_number, validate_string, parse_number
 from services import tresorerie_entite as svc
+from services.montants import centimes
 
 logger = logging.getLogger('financy')
 tresorerie_bp = Blueprint('tresorerie', __name__)
@@ -131,7 +132,7 @@ def enregistrer_parts(entite):
             conn.execute(
                 'INSERT INTO entite_parts (entity, nom, parts, montant_souscrit, prix_souscription, '
                 'prix_retrait, date_prix, source) VALUES (?,?,?,?,?,?,?,?)',
-                (entite, l['nom'], l['parts'], parse_number(l.get('montant_souscrit')),
+                (entite, l['nom'], l['parts'], centimes(parse_number(l.get('montant_souscrit'))),
                  parse_number(l.get('prix_souscription')), parse_number(l.get('prix_retrait')),
                  l.get('date_prix') or None, l.get('source') or None))
         return jsonify(svc.parts(conn, entite) or {'lignes': []})
@@ -165,6 +166,6 @@ def enregistrer_exercices(entite):
         conn.execute('DELETE FROM entite_exercices WHERE entity=?', (entite,))
         for l in lignes:
             conn.execute('INSERT INTO entite_exercices (entity, debut, fin, resultat, source) VALUES (?,?,?,?,?)',
-                         (entite, l.get('debut') or None, l['fin'], parse_number(l['resultat']),
+                         (entite, l.get('debut') or None, l['fin'], centimes(parse_number(l['resultat'])),
                           l.get('source') or None))
         return jsonify({'exercices': svc.exercices(conn, entite)})

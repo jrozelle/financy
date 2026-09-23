@@ -21,11 +21,11 @@ def _seed():
             conn.execute('INSERT INTO pret_echeances VALUES (7, ?, ?, 300, 290, 10, ?)',
                          (rang, f'2025-0{rang}-05', 100000 - 300 * rang))
         conn.execute("INSERT INTO entite_operations (entity, date, libelle, montant, nature, banque, compte) "
-                     "VALUES ('SCI Exemple', '2026-01-10', 'SCPI A DISTRIBUTION', 350, 'revenu', 'Qonto', '0001')")
-        conn.execute("INSERT INTO entite_parts (entity, nom, parts, montant_souscrit) VALUES ('SCI Exemple', 'SCPI A', 40, 10000)")
-        conn.execute("INSERT INTO entite_exercices (entity, fin, resultat) VALUES ('SCI Exemple', '2025-12-31', -1200)")
+                     "VALUES ('SCI Exemple', '2026-01-10', 'SCPI A DISTRIBUTION', 35000, 'revenu', 'Qonto', '0001')")
+        conn.execute("INSERT INTO entite_parts (entity, nom, parts, montant_souscrit) VALUES ('SCI Exemple', 'SCPI A', 40, 1000000)")
+        conn.execute("INSERT INTO entite_exercices (entity, fin, resultat) VALUES ('SCI Exemple', '2025-12-31', -120000)")
         conn.execute("INSERT INTO entite_soldes_initiaux (entity, banque, compte, date, solde) "
-                     "VALUES ('SCI Exemple', 'Qonto', '0001', '2026-01-01', 800)")
+                     "VALUES ('SCI Exemple', 'Qonto', '0001', '2026-01-01', 80000)")
         conn.execute("INSERT INTO contrats (owner, envelope, establishment, date_effet) "
                      "VALUES ('Paul', 'Assurance-vie', 'Assureur X', '2015-03-01')")
 
@@ -86,7 +86,7 @@ def test_lignes_invalides_ecartees(client):
     assert rapport['entite_operations'] == 1 and rapport['skipped'] == 3
     with get_db() as conn:
         r = conn.execute('SELECT montant, nature FROM entite_operations').fetchone()
-    assert (r['montant'], r['nature']) == (12.5, 'autre')
+    assert (r['montant'], r['nature']) == (1250, 'autre')        # centimes en base
 
 
 def _xlsx(holdings_entete, holdings):
