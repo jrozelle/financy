@@ -18,9 +18,11 @@ from models import compute_position, get_entity_map, get_holdings_map, load_refe
 # Plafonds des versements, en vigueur en 2026. Les interets capitalises peuvent
 # faire depasser le plafond ; les versements, non.
 PLAFONDS = {'Livret A': 22950.0, 'LDDS': 12000.0, 'LEP': 10000.0}
-# Au-dela de ce depassement, ce ne sont plus des interets capitalises : plus
-# probablement deux livrets saisis sur une seule ligne, ou une erreur.
-MARGE_INTERETS = 1.10
+# Les interets capitalises portent un livret au-dela du plafond de versements,
+# sans limite dans le temps (26 000 € sur un Livret A a 22 950 € : legal). Au-dela
+# de cette marge, ce ne sont plus des interets : deux livrets sur une ligne, ou
+# une erreur de saisie.
+MARGE_INTERETS = 1.50
 
 ENVELOPPES_DE_PLACEMENT = {'PEA', 'PEA-PME', 'Assurance-vie', 'PER', 'CTO'}
 SEUIL_ESPECES_DORMANTES = 500.0        # en deca, c'est de la poussiere
@@ -47,6 +49,7 @@ def constats(conn, date, owner=None):
     out = []
     titulaires = sorted({p['owner'] for p in ps})
 
+    au_plafond = []
     # 1. Livrets reglementes : au-dessus du plafond, ou de la place a prendre
     #    alors que de l'argent dort sur un livret fiscalise du meme titulaire.
     for qui in titulaires:
@@ -57,18 +60,26 @@ def constats(conn, date, owner=None):
             livrets = [p for p in siens if p.get('envelope') == env]
             if not livrets:
                 continue
-            total = sum(p['value'] for p in livrets)
-            if total > plafond * MARGE_INTERETS:
-                out.append({
-                    'niveau': 'alerte', 'onglet': 'positions',
-                    'titre': f'{env} de {qui} au-dessus du plafond légal',
-                    'detail': (f"{_eur(total)} pour un plafond de versements de {_eur(plafond)}. "
-                               "Les intérêts capitalisés peuvent le dépasser, pas de cet ordre : "
-                               "deux livrets saisis sur une ligne, ou une erreur de saisie ?"),
-                    'montant': round(total - plafond, 2),
-                })
-            elif total < plafond - 100:
-                place.append((env, plafond - total))
+            # Une personne n'a qu'un seul livret de chaque sorte : plusieurs
+            # lignes a son nom sont des livrets DISTINCTS — ceux des enfants,
+            # tenus par un parent qui y place son epargne. Le plafond vaut donc
+            # livret par livret, jamais sur leur somme (deux Livret A de
+            # 23 000 et 26 000 € ne depassent aucun plafond).
+            for p in livrets:
+                if plafond < p['value'] <= plafond * MARGE_INTERETS:
+                    au_plafond.append((env, qui, p['value']))
+                if p['value'] > plafond * MARGE_INTERETS:
+                    out.append({
+                        'niveau': 'alerte', 'onglet': 'positions',
+                        'titre': f'{env} de {qui} au-dessus du plafond légal',
+                        'detail': (f"{_eur(p['value'])} pour un plafond de versements de {_eur(plafond)}. "
+                                   "Les intérêts capitalisés peuvent le dépasser, pas de cet ordre : "
+                                   "deux livrets saisis sur une ligne, ou une erreur de saisie ?"),
+                        'montant': round(p['value'] - plafond, 2),
+                    })
+            libre = sum(max(0.0, plafond - p['value']) for p in livrets)
+            if libre > 100:
+                place.append((env, libre))
         if place and fiscalise >= 1000:
             libre = sum(x for _, x in place)
             deplacable = min(libre, fiscalise)
@@ -80,6 +91,18 @@ def constats(conn, date, owner=None):
                              "sont imposés. Même disponibilité, sans impôt ni prélèvements sociaux."),
                 'montant': round(deplacable, 2),
             })
+
+    # Livrets pleins : un seul constat, qui les nomme tous. Un par livret
+    # repetait cinq fois la meme information.
+    if au_plafond:
+        out.append({
+            'niveau': 'info', 'onglet': 'positions',
+            'titre': f"{len(au_plafond)} livret{'s' if len(au_plafond) > 1 else ''} réglementé{'s' if len(au_plafond) > 1 else ''} au plafond",
+            'detail': (', '.join(f"{env} de {qui} ({_eur(v)})" for env, qui, v in au_plafond)
+                       + ". Portés au-delà du plafond de versements par leurs intérêts : c'est permis, "
+                         "mais plus aucun versement n'y est possible."),
+            'montant': round(sum(v for _, _, v in au_plafond), 2),
+        })
 
     # 2. Livrets fiscalises importants : l'argent y est disponible, mais taxe.
     for p in ps:

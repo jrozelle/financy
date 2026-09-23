@@ -138,3 +138,21 @@ def test_endpoint_exige_la_session():
     app.config['TESTING'] = True
     with app.test_client() as anon:
         assert anon.get('/api/advisor/constats').status_code in (302, 401)
+
+
+class TestLivretsDistincts:
+    def test_deux_livrets_a_d_une_meme_titulaire_ne_depassent_rien(self):
+        # Les Livret A des enfants, tenus par leur mere : 23 000 et 26 000 €,
+        # chacun sous le plafond. Leur somme n'est pas un depassement.
+        with get_db() as c:
+            _pos(c, 'Livret A', 23000, owner='Claire')
+            _pos(c, 'Livret A', 26000, owner='Claire')
+            c.commit()
+            r = constats(c, D)
+        assert not [k for k in r['constats'] if k['niveau'] == 'alerte']
+
+    def test_un_livret_seul_au_dela_du_plafond_reste_signale(self):
+        with get_db() as c:
+            _pos(c, 'Livret A', 40000, owner='Claire'); c.commit()      # 1,74 fois le plafond
+            r = constats(c, D)
+        assert any('au-dessus du plafond' in k['titre'] for k in r['constats'])
