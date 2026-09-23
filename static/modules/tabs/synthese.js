@@ -12,6 +12,7 @@ import { drilldownPositions } from '../drilldown.js';
 import { loadUserAlerts } from '../alerts.js';
 import { renderAllocationTargets } from '../targets.js';
 import { renderProjection } from './projection.js';
+import { appliquerDisposition } from '../widgets.js';
 import { toast, promptDialog } from '../dialogs.js';
 
 function _owners() {
@@ -195,6 +196,7 @@ export function renderSynthese({ cache = false } = {}) {
   _argsObjectif = [kpi.net, isFamily, serie('net'), dates];
   renderWealthTarget(..._argsObjectif);
   renderProjection(posTitulaire, isFamily, kpi.net, _wealthTarget);
+  appliquerDisposition();
 }
 
 /** « Evolution par categorie » : une ligne par groupe — nom, tendance,

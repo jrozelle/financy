@@ -179,3 +179,15 @@ class TestJobPlanifie:
             models.set_demo_mode(False)
         assert os.path.realpath(vus['base']) == os.path.realpath(models.DB_PATH)
         assert isinstance(vus['provider'], prices.YahooProvider)
+
+
+class TestDispositionSynthese:
+    def test_aller_retour_et_validation(self, client):
+        H = {'X-CSRF-Token': 'test'}
+        d = {'ordre': ['evolution', 'chiffres'], 'largeurs': {'evolution': 6}, 'masquees': ['fiscalite']}
+        assert client.put('/api/synthese/disposition', headers=H, json=d).status_code == 200
+        assert client.get('/api/synthese/disposition').get_json()['largeurs'] == {'evolution': 6}
+        assert client.put('/api/synthese/disposition', headers=H, json={'ordre': ['inconnue']}).status_code == 400
+        assert client.put('/api/synthese/disposition', headers=H, json={'largeurs': {'evolution': 2}}).status_code == 400
+        assert client.put('/api/synthese/disposition', headers=H, json={}).get_json() == {}
+        assert client.get('/api/synthese/disposition').get_json() == {}

@@ -3005,8 +3005,13 @@ main > .tab-content > .page-header > h1 { display: none; }
   gap: calc(.75rem * var(--d));
   align-items: start;
 }
-#tab-synthese > .kpi-grid,
 #tab-synthese > .charts-row { display: contents; }
+/* Les chiffres cles forment un widget a part entiere (deplacable, masquable) :
+   une grille dans la grille, et non plus quatre cartes semees dans la page. */
+#tab-synthese > .kpi-grid {
+  display: grid; grid-template-columns: repeat(12, 1fr); gap: calc(.75rem * var(--d));
+  grid-column: 1 / -1; margin: 0;
+}
 /* Ce qui n'est pas une carte occupe toute la largeur et reste en tête. */
 #tab-synthese > #todo-zone,
 #tab-synthese > #entity-warnings-bar,
@@ -4019,3 +4024,48 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .arbo-pv-na { color: var(--text-muted); }
 .arbo-pv-note { display: block; font-size: 10.5px; color: var(--text-muted); white-space: nowrap; }
 .credits-autres { margin: .5rem 0 0; font-size: .8rem; color: var(--text-muted); }
+
+/* ── Synthese personnalisable (modules/widgets.js) ──────────────────────── */
+#tab-synthese [data-carte][data-rang] { order: var(--w-rang); }
+@media (min-width: 1201px) {
+  #tab-synthese [data-carte][data-largeur] { grid-column: span var(--w-largeur); }
+}
+#tab-synthese [data-carte].w-masquee { display: none !important; }
+.w-perso-bouton { grid-column: 1 / -1; order: 999; justify-self: center; }
+.w-barre {
+  grid-column: 1 / -1; order: -1; position: sticky; top: calc(var(--w-entete, 56px) + .5rem); z-index: 55;
+  display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; padding: .6rem .9rem;
+  background: var(--card); border: 1px solid var(--primary); border-radius: var(--radius); box-shadow: var(--shadow-md);
+  font-size: .82rem;
+}
+.w-barre strong { font-weight: 600; }
+.w-barre .w-masquees { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; color: var(--text-muted); }
+.w-barre .w-fin { margin-left: auto; display: flex; gap: .5rem; }
+/* En edition, chaque widget montre ses commandes ; une carte vide (sans
+   donnees pour cette vue) apparait grisee pour pouvoir etre placee. */
+#tab-synthese.w-edition [data-carte] { position: relative; outline: 1px dashed var(--border); outline-offset: 3px;
+  padding-top: calc(2.5rem + 1rem * var(--d)); }
+#tab-synthese.w-edition [data-carte].w-masquee { display: block !important; opacity: .45; }
+#tab-synthese.w-edition [data-carte][style*="display: none"] { display: block !important; opacity: .55; min-height: 90px; }
+#tab-synthese.w-edition > .kpi-grid[data-carte] { padding: 2.6rem 0 0; }
+.w-commandes {
+  position: absolute; top: .35rem; left: .45rem; right: .45rem; justify-content: flex-end; z-index: 5; display: flex; flex-wrap: wrap; gap: .25rem;
+  align-items: center; padding: .2rem .3rem; background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; box-shadow: var(--shadow); font-size: 11px;
+}
+.w-commandes button { font: inherit; font-size: 11px; background: none; border: 1px solid transparent; border-radius: 5px;
+  padding: .15rem .4rem; color: var(--text-muted); cursor: pointer; }
+.w-commandes button:hover { color: var(--text); border-color: var(--border); }
+.w-commandes button[aria-pressed="true"] { color: var(--on-accent); background: var(--primary); }
+.w-poignee { cursor: grab; touch-action: none; }
+.w-poignee svg { display: block; width: 14px; height: 14px; }
+.w-nom { font-weight: 600; color: var(--text); padding: 0 .3rem; }
+.w-vide { position: absolute; left: .8rem; bottom: .5rem; font-size: 11px; color: var(--text-muted); }
+.w-bord { position: absolute; top: 0; right: -6px; width: 12px; height: 100%; cursor: ew-resize; touch-action: none; z-index: 4; }
+.w-bord::after { content: ''; position: absolute; top: 50%; left: 4px; width: 4px; height: 32px; margin-top: -16px;
+  border-radius: 2px; background: var(--primary); opacity: .55; }
+#tab-synthese [data-carte].w-glisse { opacity: .6; outline: 2px solid var(--primary); }
+@media (max-width: 1200px) {
+  .w-bord, .w-largeurs { display: none; }
+}
+@media (max-width: 780px) { .w-barre .w-aide { display: none; } .w-barre { padding: .5rem .7rem; } }

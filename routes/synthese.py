@@ -556,6 +556,54 @@ def get_wealth_target():
     return jsonify({'target': None})
 
 
+# ─── Disposition de la synthese ──────────────────────────────────────────────
+# Ordre, largeur (en colonnes d'une grille de 12) et cartes masquees. En base,
+# et non dans le navigateur : la disposition suit l'utilisateur d'un appareil
+# a l'autre.
+
+CARTES_SYNTHESE = ('chiffres', 'contribution', 'historique', 'evolution', 'projection', 'repartition',
+                   'cible', 'mouvements', 'liquidite', 'comptes', 'entites', 'fiscalite')
+CLE_DISPOSITION = 'synthese_disposition'
+
+
+@synthese_bp.route('/api/synthese/disposition', methods=['GET'])
+@login_required
+def lire_disposition():
+    with get_db() as conn:
+        r = conn.execute('SELECT value FROM config WHERE key=?', (CLE_DISPOSITION,)).fetchone()
+    try:
+        return jsonify(json.loads(r['value']) if r else {})
+    except ValueError:
+        return jsonify({})
+
+
+@synthese_bp.route('/api/synthese/disposition', methods=['PUT'])
+@login_required
+@csrf_protect
+def ecrire_disposition():
+    d = request.get_json(silent=True)
+    if d == {} or d is None:
+        # Disposition par defaut : on efface la personnalisation.
+        with get_db() as conn:
+            conn.execute('DELETE FROM config WHERE key=?', (CLE_DISPOSITION,))
+        return jsonify({})
+    if not isinstance(d, dict):
+        return jsonify({'error': 'Disposition attendue'}), 400
+    ordre = d.get('ordre') or []
+    largeurs = d.get('largeurs') or {}
+    masquees = d.get('masquees') or []
+    if (not isinstance(ordre, list) or not isinstance(largeurs, dict) or not isinstance(masquees, list)
+            or any(c not in CARTES_SYNTHESE for c in list(ordre) + list(largeurs) + list(masquees))
+            or len(set(ordre)) != len(ordre)):
+        return jsonify({'error': 'Carte inconnue ou liste invalide'}), 400
+    if any(not isinstance(v, int) or isinstance(v, bool) or not 3 <= v <= 12 for v in largeurs.values()):
+        return jsonify({'error': 'Largeur entre 3 et 12 colonnes'}), 400
+    propre = {'ordre': ordre, 'largeurs': largeurs, 'masquees': sorted(set(masquees))}
+    with get_db() as conn:
+        conn.execute('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)', (CLE_DISPOSITION, json.dumps(propre)))
+    return jsonify(propre)
+
+
 @synthese_bp.route('/api/wealth-target', methods=['PUT'])
 @login_required
 @csrf_protect
