@@ -413,13 +413,6 @@ main {
   gap: 1rem;
 }
 
-.chart-wrap-wide { position: relative; height: 260px; min-width: 0; overflow: hidden; }
-.chart-wrap-wide canvas {
-  cursor: pointer;
-  display: block;
-  max-width: 100% !important;
-  max-height: 100% !important;
-}
 
 /* ── Tables ─────────────────────────────────────────────────────────────── */
 .data-table {
@@ -485,12 +478,6 @@ main {
   }
 }
 
-/* Owners mini-table */
-#owners-table {
-  max-width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
 #entities-synthese {
   max-width: 100%;
   overflow-x: auto;
@@ -869,7 +856,7 @@ input[type="file"] {
   width: 480px;
   max-width: 96vw;
   background: var(--card);
-  box-shadow: -4px 0 24px rgba(0,0,0,.12);
+  box-shadow: var(--shadow-md);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1306,8 +1293,7 @@ input[type="file"] {
   .kpi-delta-neg { color: #dc2626 !important; }
 
   /* Charts — fixed height, contained within card */
-  .chart-wrap-wide { position: relative; height: 220px; overflow: hidden; }
-  canvas { max-width: 100% !important; max-height: 100% !important; }
+    canvas { max-width: 100% !important; max-height: 100% !important; }
 
   /* Tables — clean borders */
   .owners-table, .data-table { font-size: 11px; border-collapse: collapse; width: 100%; }
@@ -1438,15 +1424,13 @@ input[type="file"] {
 
 /* Lignes apres import PDF/CSV : highlight selon confiance */
 .holdings-table tr.row-low-conf {
-  background: rgba(239, 68, 68, .06);
+  background: color-mix(in srgb, var(--danger) 6%, transparent);
   box-shadow: inset 3px 0 0 var(--danger);
 }
 .holdings-table tr.row-mid-conf {
-  background: rgba(234, 179, 8, .06);
+  background: color-mix(in srgb, var(--warning) 6%, transparent);
   box-shadow: inset 3px 0 0 var(--warning);
 }
-[data-theme="dark"] .holdings-table tr.row-low-conf { background: rgba(239, 68, 68, .12); }
-[data-theme="dark"] .holdings-table tr.row-mid-conf { background: rgba(234, 179, 8, .12); }
 
 .h-isin-btn {
   background: none;
@@ -1613,15 +1597,14 @@ input[type="file"] {
 }
 
 /* Badge freshness (recolor existing .h-badge) */
-.h-badge-fresh   { background: rgba(34,197,94,.15);   color: var(--success); }
-.h-badge-stale   { background: rgba(234,179,8,.18);   color: #a16207; }
-.h-badge-expired { background: rgba(239,68,68,.15);   color: var(--danger); }
-[data-theme="dark"] .h-badge-stale { color: #fbbf24; }
+.h-badge-fresh   { background: color-mix(in srgb, var(--success) 15%, transparent);   color: var(--success); }
+.h-badge-stale   { background: color-mix(in srgb, var(--warning) 18%, transparent);   color: var(--warning); }
+.h-badge-expired { background: color-mix(in srgb, var(--danger) 15%, transparent);   color: var(--danger); }
 
 /* ── Onglet Conseil (advisor) ─────────────────────────────────────────── */
 .advisor-disclaimer {
-  background: rgba(234, 179, 8, .12);
-  border: 1px solid rgba(234, 179, 8, .35);
+  background: color-mix(in srgb, var(--warning) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
   border-radius: 8px;
   padding: .75rem 1rem;
   margin-bottom: 1rem;
@@ -1630,11 +1613,10 @@ input[type="file"] {
   color: var(--text);
 }
 [data-theme="dark"] .advisor-disclaimer {
-  background: rgba(234, 179, 8, .10);
-  border-color: rgba(234, 179, 8, .28);
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+  border-color: color-mix(in srgb, var(--warning) 28%, transparent);
 }
-.advisor-disclaimer strong { color: var(--warning); }   /* #a16207 : 4,2:1 sur ce fond */
-[data-theme="dark"] .advisor-disclaimer strong { color: #fbbf24; }
+.advisor-disclaimer strong { color: var(--warning); }
 
 .advisor-adjustments {
   display: flex;
@@ -1764,10 +1746,6 @@ textarea:focus-visible {
 }
 
 @media (max-width: 640px) {
-  #owners-table {
-    margin: 0 -1rem;
-    padding: 0 1rem;
-  }
   #entities-synthese {
     margin: 0 -1rem;
     padding: 0 1rem;
@@ -1969,15 +1947,10 @@ kbd {
   font-weight: 700;
   letter-spacing: .04em;
   text-transform: uppercase;
-  background: rgba(234, 179, 8, .18);
-  color: #a16207;
-  border: 1px solid rgba(234, 179, 8, .38);
+  background: color-mix(in srgb, var(--warning) 18%, transparent);
+  color: var(--warning);
+  border: 1px solid color-mix(in srgb, var(--warning) 38%, transparent);
   border-radius: 999px;
-}
-[data-theme="dark"] .demo-badge {
-  color: #fbbf24;
-  background: rgba(234, 179, 8, .14);
-  border-color: rgba(234, 179, 8, .32);
 }
 
 /* ── B7. Spinner inline sur bouton ─────────────────────────────────────── */
@@ -2395,12 +2368,6 @@ kbd {
 #perf-kpi .kpi-value.negative { color: var(--danger); }
 
 /* Selecteur de maille */
-.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-.seg-btn { border: 0; background: var(--card); color: var(--text-muted); font: inherit;
-  font-size: .82rem; padding: .38rem .8rem; cursor: pointer; }
-.seg-btn + .seg-btn { border-left: 1px solid var(--border); }
-.seg-btn:hover { background: var(--card-hover); }
-.seg-btn.is-on { background: var(--primary); color: var(--on-accent); }
 
 /* Liste : grille a 4 colonnes, alignement garanti sans table */
 .perf-head, .perf-item {
@@ -2600,7 +2567,7 @@ html.is-masked body::before {
   z-index: 900;
   padding: .2rem .8rem;
   border-radius: 999px;
-  box-shadow: 0 2px 10px rgba(16,20,30,.25);
+  box-shadow: var(--shadow-md);
   background: var(--warning); color: var(--on-accent);
   font-size: .68rem; font-weight: 600; letter-spacing: .04em;
   pointer-events: none;
@@ -2826,7 +2793,7 @@ body { padding-left: var(--rail-w); }
   width: min(440px, calc(100vw - 2 * var(--page-gutter)));
   padding: .5rem; background: var(--card);
   border: 1px solid var(--border); border-radius: 12px;
-  box-shadow: 0 12px 32px rgba(16, 20, 30, .16);
+  box-shadow: var(--shadow-md);
 }
 .head-recherche-champ {
   width: 100%; box-sizing: border-box; padding: .55rem .7rem;
@@ -2890,9 +2857,9 @@ main > .tab-content > .page-header > h1 { display: none; }
   white-space: nowrap;
 }
 .seg-btn:hover { color: var(--text); }
-.seg-btn[aria-pressed="true"] {
+.seg-btn[aria-pressed="true"], .seg-btn.is-on {
   background: var(--card); color: var(--text); font-weight: 500;
-  box-shadow: 0 1px 2px rgba(16,20,30,.08);
+  box-shadow: var(--shadow);
 }
 .seg-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
 
@@ -3062,12 +3029,12 @@ main > .tab-content > .page-header > h1 { display: none; }
 [data-carte="historique"]   { order: 3; grid-column: span 7; }
 [data-carte="evolution"]    { order: 4; grid-column: span 12; }
 /* Ou j'en serai : juste apres « comment ca evolue », sur toute la largeur. */
-[data-carte="projection"]   { order: 4; grid-column: span 12; }
-[data-carte="repartition"]  { order: 5; grid-column: span 7; }
-[data-carte="cible"]        { order: 6; grid-column: span 5; }
-[data-carte="mouvements"]   { order: 7; grid-column: span 7; }
-[data-carte="liquidite"]    { order: 8; grid-column: span 5; }
-[data-carte="entites"]      { order: 9; grid-column: span 12; }
+[data-carte="projection"]   { order: 5; grid-column: span 12; }
+[data-carte="repartition"]  { order: 6; grid-column: span 7; }
+[data-carte="cible"]        { order: 7; grid-column: span 5; }
+[data-carte="mouvements"]   { order: 8; grid-column: span 7; }
+[data-carte="liquidite"]    { order: 9; grid-column: span 5; }
+[data-carte="entites"]      { order: 11; grid-column: span 12; }
 
 #tab-synthese .kpi-grid > .kpi-card.kpi-gross { grid-column: 6 / 9; }
 #tab-synthese .kpi-grid > .kpi-card.kpi-debt { grid-column: 9 / 11; }
@@ -3173,7 +3140,7 @@ main > .tab-content > .page-header > h1 { display: none; }
 .reglages-onglet:hover { background: var(--card); color: var(--text); }
 .reglages-onglet[aria-selected="true"] {
   background: var(--card); color: var(--text); font-weight: 500;
-  box-shadow: 0 1px 2px rgba(16,20,30,.07);
+  box-shadow: var(--shadow);
 }
 .reglages-onglet:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
 
@@ -3223,9 +3190,8 @@ a.settings-item { display: inline-flex; align-items: center; text-decoration: no
 /* ── « Vos comptes » ──────────────────────────────────────────────────── */
 /* Valeur, apports, frais et rendement cote a cote : ces quatre chiffres
    existaient separement et ne se lisaient jamais ensemble. */
-[data-carte="comptes"] { order: 9; grid-column: span 12; }
-[data-carte="entites"] { order: 10; }
-[data-carte="fiscalite"] { order: 11; grid-column: span 12; }
+[data-carte="comptes"] { order: 10; grid-column: span 12; }
+[data-carte="fiscalite"] { order: 12; grid-column: span 12; }
 
 /* ── Si vous vendiez tout : l'impot latent ────────────────────────────── */
 /* Trois chiffres, et la portee du calcul juste dessous. Celle-ci n'est pas
@@ -3653,7 +3619,7 @@ td.arbo-part > * { vertical-align: middle; }
   display: flex; flex-direction: column; gap: .15rem; min-width: 150px;
   padding: .45rem .6rem; border-radius: 8px; font-size: .74rem;
   background: var(--card); color: var(--text); border: 1px solid var(--border);
-  box-shadow: 0 6px 18px rgba(16, 20, 30, .14);
+  box-shadow: var(--shadow-md);
 }
 .courbe-bulle-d { font-weight: 600; }
 .courbe-bulle-l { display: flex; align-items: center; gap: .4rem; }
