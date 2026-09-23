@@ -158,10 +158,10 @@
   --rail-hover:    #232838;
   --rail-ink:      #9aa3b5;
   --rail-ink-on:   #ffffff;
-  --rail-group:    #616b80;
   /* Le rail restant sombre dans les deux themes, son accent et son filet ne
      varient pas non plus : une seule definition suffit. */
   --rail-actif:    #5fb3a8;
+  --nav-control-height: 38px;
   /* Natures de l'arborescence : une teinte chacune, lisible dans les deux
      themes (meme luminosite, chroma moyen). */
   --nature-liq:    #3d74b8;
@@ -179,7 +179,7 @@
   --chart-7:  #4e8a8a;  --chart-8:  #7a8b3f;  --chart-9:  #57739c;
   --chart-10: #96628c;  --chart-11: #8d8f9a;
   --chart-border: #ffffff;
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
 /* ── Dark mode ────────────────────────────────────────────────────────── */
@@ -204,7 +204,6 @@
   --rail-hover:    #1a1f2b;
   --rail-ink:      #8b94a6;
   --rail-ink-on:   #ffffff;
-  --rail-group:    #5a6478;
   --shadow:        0 1px 3px rgba(0,0,0,.3);
   --shadow-md:     0 4px 6px -1px rgba(0,0,0,.4);
   /* Catppuccin Mocha */
@@ -213,6 +212,43 @@
   --chart-7:  #7ec9c0;  --chart-8:  #b4c27a;  --chart-9:  #8fa8ce;
   --chart-10: #c58fbb;  --chart-11: #9ba2af;
   --chart-border: #313244;
+  color-scheme: dark;
+}
+
+/* Sans JavaScript (page de connexion, premier affichage avant les modules),
+   le theme suit le systeme ; un choix explicite pose data-theme et l'emporte. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+  --primary:       #5fb3a8;
+  --on-accent:     #0f1219;
+  --primary-dark:  #7fc7be;
+  --primary-light: #1c2f2e;
+  --success:       #4cb98d;
+  --success-light: #15302a;
+  --danger:        #e8796f;
+  --danger-light:  #331d1c;
+  --warning:       #dca858;
+  --warn-soft-bg:  #2e2517;
+  --text:          #e8ebf1;
+  --text-muted:    #818a99;
+  --border:        #2a3140;
+  --bg:            #0f1219;
+  --card:          #171b24;
+  --card-hover:    #1e232e;
+  --rail:          #0a0d13;
+  --rail-hover:    #1a1f2b;
+  --rail-ink:      #8b94a6;
+  --rail-ink-on:   #ffffff;
+  --shadow:        0 1px 3px rgba(0,0,0,.3);
+  --shadow-md:     0 4px 6px -1px rgba(0,0,0,.4);
+  /* Catppuccin Mocha */
+  --chart-1:  #5fb3a8;  --chart-2:  #7aa5d8;  --chart-3:  #b099cf;
+  --chart-4:  #d6a463;  --chart-5:  #8fb37a;  --chart-6:  #d68f80;
+  --chart-7:  #7ec9c0;  --chart-8:  #b4c27a;  --chart-9:  #8fa8ce;
+  --chart-10: #c58fbb;  --chart-11: #9ba2af;
+  --chart-border: #313244;
+  color-scheme: dark;
+  }
 }
 
 /* ── Reset ─────────────────────────────────────────────────────────────── */
@@ -345,8 +381,8 @@ main {
   background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow-md);
   padding: 1.5rem; max-width: 420px; width: 90%;
 }
-.confirm-dialog h3 { margin-bottom: .75rem; font-size: 15px; }
-.confirm-dialog p { font-size: 13px; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.6; }
+.confirm-dialog .confirm-title { margin-bottom: .75rem; font-size: 15px; font-weight: 600; }
+.confirm-dialog .confirm-message { font-size: 13px; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.6; }
 .confirm-actions { display: flex; gap: .75rem; justify-content: flex-end; }
 .confirm-actions .btn-danger { background: var(--danger); color: var(--on-accent); border-color: var(--danger); }
 
@@ -487,11 +523,11 @@ main {
   font-weight: 600;
   white-space: nowrap;
 }
-.badge-j01   { background: #dcfce7; color: #15803d; }
-.badge-j27   { background: #dbeafe; color: #1e40af; }
-.badge-j830  { background: #fef3c7; color: #92400e; }
-.badge-30    { background: #fee2e2; color: #991b1b; }
-.badge-blk   { background: #f3f4f6; color: #374151; }
+.badge-j01   { background: var(--success-light); color: var(--success); }
+.badge-j27   { background: var(--primary-light); color: var(--primary); }
+.badge-j830  { background: var(--warn-soft-bg); color: var(--warning); }
+.badge-30    { background: var(--danger-light); color: var(--danger); }
+.badge-blk   { background: var(--bg); color: var(--text-muted); }
 
 /* ── Numbers ─────────────────────────────────────────────────────────────── */
 .pos { color: var(--success); }
@@ -623,7 +659,7 @@ main {
 .form-group select:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent);
 }
 input[type="date"] {
   -webkit-appearance: none;
@@ -994,7 +1030,7 @@ input[type="file"] {
   background: var(--card);
   color: var(--text);
 }
-.ref-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+.ref-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent); }
 .ref-input:disabled { background: var(--bg); color: var(--text-muted); cursor: not-allowed; }
 
 
@@ -1035,8 +1071,9 @@ input[type="file"] {
   transition: opacity .2s, transform .2s;
   pointer-events: none;
 }
-.toast-msg.toast-success { background: var(--success); }
-.toast-msg.toast-error   { background: var(--danger); }
+.toast-msg.toast-success { background: var(--success); color: var(--on-accent); }
+.toast-msg.toast-error   { background: var(--danger); color: var(--on-accent); }
+.toast-msg.toast-warning { background: var(--warning); color: var(--on-accent); }
 .toast-msg.toast-show    { opacity: 1; transform: translateY(0); }
 
 /* ── Settings menu (engrenage) ─────────────────────────────────────────── */
@@ -1385,7 +1422,7 @@ input[type="file"] {
 .h-input:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 2px rgba(99,102,241,.15);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 25%, transparent);
 }
 .h-badge {
   display: inline-block;
@@ -1688,7 +1725,6 @@ input[type="file"] {
 :focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
-  border-radius: 3px;
 }
 button:focus:not(:focus-visible),
 .btn:focus:not(:focus-visible),
@@ -2360,7 +2396,7 @@ kbd {
 
 /* Selecteur de maille */
 .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-.seg-btn { border: 0; background: var(--card-bg); color: var(--text-muted); font: inherit;
+.seg-btn { border: 0; background: var(--card); color: var(--text-muted); font: inherit;
   font-size: .82rem; padding: .38rem .8rem; cursor: pointer; }
 .seg-btn + .seg-btn { border-left: 1px solid var(--border); }
 .seg-btn:hover { background: var(--card-hover); }
@@ -2427,7 +2463,7 @@ kbd {
   display: flex; flex-direction: column; align-items: center; gap: .2rem;
   padding: 1.1rem 1rem; margin-bottom: .9rem; cursor: pointer;
   border: 1.5px dashed var(--border); border-radius: var(--radius);
-  background: var(--card-bg); text-align: center; transition: border-color .15s, background .15s;
+  background: var(--card); text-align: center; transition: border-color .15s, background .15s;
 }
 .dropzone:hover, .dropzone:focus-visible { border-color: var(--primary); background: var(--card-hover); }
 .dropzone.is-over { border-color: var(--primary); background: var(--card-hover); border-style: solid; }
@@ -2436,7 +2472,7 @@ kbd {
 .dropzone-sub { font-size: .74rem; color: var(--text-muted); }
 
 .import-report { border: 1px solid var(--border); border-radius: var(--radius);
-  background: var(--card-bg); padding: .9rem 1rem; margin-bottom: .9rem; }
+  background: var(--card); padding: .9rem 1rem; margin-bottom: .9rem; }
 .import-report h3 { font-size: .92rem; margin: 0 0 .5rem; }
 .import-tally { display: flex; flex-wrap: wrap; gap: .4rem .9rem; font-size: .82rem; margin-bottom: .6rem; }
 .import-tally b { font-variant-numeric: tabular-nums; }
@@ -2544,7 +2580,6 @@ kbd {
 /* Les groupes masques passent en gris et en chasse fixe : ils se lisent comme
    un caviardage, pas comme une valeur reelle ni comme un bug d'affichage. */
 html.is-masked {
-  --mask-ink: var(--text-muted);
 }
 html.is-masked .kpi-value,
 html.is-masked .num,
@@ -2681,7 +2716,7 @@ body { padding-left: var(--rail-w); }
   padding: .2rem 0 .8rem; background: none; border: 0; cursor: pointer;
   color: #fff; font: inherit; font-weight: 600; font-size: .95rem;
 }
-.fin-rail-brand:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 8px; }
+.fin-rail-brand:focus-visible { outline: 2px solid var(--rail-actif); outline-offset: 2px; border-radius: 8px; }
 .fin-rail-mark { width: 32px; height: 32px; border-radius: 9px; flex: none; display: block; }
 .fin-rail-nom { display: none; }
 
@@ -2705,7 +2740,7 @@ body { padding-left: var(--rail-w); }
 }
 .fin-rail .fin-rail-item.active { background: var(--rail-hover); color: var(--rail-ink-on); }
 .fin-rail .fin-rail-item.active svg { color: var(--rail-actif); }
-.fin-rail .fin-rail-item:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.fin-rail .fin-rail-item:focus-visible { outline: 2px solid var(--rail-actif); outline-offset: -2px; }
 
 /* Les reglages ne sont pas une destination : ils se detachent en pied. */
 .fin-rail-foot { margin-top: auto; padding-top: .4rem; border-top: 1px solid var(--rail-border); }
@@ -3305,10 +3340,10 @@ a.settings-item { display: inline-flex; align-items: center; text-decoration: no
   padding: calc(.55rem * var(--d)) 0; align-items: baseline;
   background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer;
 }
-.mv-ligne:hover .mv-ou { color: var(--accent); }
-.mv-ligne:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.mv-ligne:hover .mv-ou { color: var(--primary); }
+.mv-ligne:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
 .mv-detail { margin: 0 0 .55rem; font-size: .76rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.mv-plus { margin-top: .5rem; padding: 0; background: none; border: 0; color: var(--accent); font: inherit; font-size: .78rem; cursor: pointer; }
+.mv-plus { margin-top: .5rem; padding: 0; background: none; border: 0; color: var(--primary); font: inherit; font-size: .78rem; cursor: pointer; }
 .mv-plus:hover { text-decoration: underline; }
 .mv-ou { font-size: .84rem; font-weight: 450; grid-column: 1; grid-row: 1; }
 .mv-qui { grid-column: 1; grid-row: 2; color: var(--text-muted); font-size: .74rem; }
@@ -3821,7 +3856,7 @@ td.arbo-part > * { vertical-align: middle; }
 .hero-puces { display: flex; flex-wrap: wrap; gap: .4rem; margin: .45rem 0 .2rem; }
 .puce { display: inline-flex; align-items: baseline; gap: .35rem; padding: .18rem .5rem; border-radius: 6px;
   font-family: var(--mono); font-size: .8rem; font-variant-numeric: tabular-nums; }
-.puce small { font-family: var(--font, inherit); font-size: .7rem; opacity: .75; }
+.puce small { font-family: var(--sans); font-size: .7rem; opacity: .75; }
 .puce--pos { background: var(--success-light); color: var(--success); }
 .puce--neg { background: var(--danger-light); color: var(--danger); }
 .dispo-bloque { margin-top: .35rem; padding-top: .45rem; border-top: 1px dashed var(--border); }
@@ -3942,3 +3977,34 @@ td.arbo-part > * { vertical-align: middle; }
 .treso-estime { display: block; font-size: .7rem; color: var(--text-muted); }
 .treso-parts-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .6rem; }
 .treso-fiscal { margin: .6rem 0; font-size: .85rem; max-width: 78ch; line-height: 1.55; }
+
+/* ── Corrections transverses (revue du 23/09/2026) ─────────────────────── */
+/* Le focus clavier reste visible sur les champs : plusieurs regles :focus
+   posaient outline:none a une specificite superieure au :focus-visible global. */
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--primary) !important;
+  outline-offset: 1px;
+}
+/* Sous 16 px, iOS zoome sur le champ a la saisie. */
+@media (pointer: coarse) {
+  input, select, textarea { font-size: 16px !important; }
+}
+/* Modales plein ecran : hauteur de la zone visible, et marges de l'encoche et
+   de l'indicateur d'accueil (viewport-fit=cover). */
+@media (max-width: 640px) {
+  .modal-content, .drilldown-content, .isin-popover-content {
+    height: 100dvh; max-height: 100dvh;
+    padding-top: calc(1.5rem + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+/* Le toast passe au-dessus de la barre d'onglets mobile, pas dessus. */
+@media (max-width: 780px) {
+  #toast { right: 1rem; left: 1rem; bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+.ent-retro-warning { background: var(--success-light); border: 1px solid color-mix(in srgb, var(--success) 35%, transparent);
+  color: var(--success); }
