@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 from datetime import datetime
-from models import get_db, validate_number, validate_string, parse_number
+from models import get_entity_map, get_db, validate_number, validate_string, parse_number
 
 MAX_COMMENT_LENGTH = 2000
 from auth import login_required, csrf_protect
@@ -134,9 +134,14 @@ def delete_entity(eid):
                 'confirm_required': True,
             }), 409
 
-        # Cascade: nullify entity reference in positions
+        # Chaque position liee devient une saisie directe, a la valeur et a la
+        # dette de l'entite A SA DATE, quotes-parts conservees. Delier sans plus
+        # la laissait a 0 € (sa valeur en base) sur tout l'historique.
         if linked > 0:
-            conn.execute('UPDATE positions SET entity=NULL WHERE entity=?', (name,))
+            for r in conn.execute('SELECT id, date FROM positions WHERE entity=?', (name,)).fetchall():
+                e = get_entity_map(conn, r['date']).get(name) or {'gross_assets': 0, 'debt': 0}
+                conn.execute('UPDATE positions SET entity=NULL, value=?, debt=? WHERE id=?',
+                             (e['gross_assets'], e['debt'], r['id']))
 
         conn.execute('DELETE FROM entity_snapshots WHERE entity_name=?', (name,))
         conn.execute('DELETE FROM entities WHERE id=?', (eid,))

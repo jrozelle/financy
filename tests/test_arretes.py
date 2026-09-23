@@ -122,3 +122,13 @@ def test_snapshot_update_ne_laisse_pas_de_lignes_orphelines(client):
     with get_db() as c:
         orph = c.execute("SELECT COUNT(*) FROM holdings WHERE position_id NOT IN (SELECT id FROM positions)").fetchone()[0]
     assert orph == 0
+
+
+def test_supprimer_une_entite_garde_la_valeur_des_positions(client):
+    with get_db() as c:
+        _sci(c, [('2026-01-01', 100000), ('2026-06-01', 120000)])
+        _pos_sci(c, '2026-01-01'); _pos_sci(c, '2026-06-01'); c.commit()
+        eid = c.execute("SELECT id FROM entities").fetchone()[0]
+    avant = (_net(client, '2026-01-01'), _net(client, '2026-06-01'))
+    assert client.delete(f'/api/entities/{eid}?force=1', headers=H).status_code == 204
+    assert (_net(client, '2026-01-01'), _net(client, '2026-06-01')) == avant == (100000, 120000)
