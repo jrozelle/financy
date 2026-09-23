@@ -3876,7 +3876,8 @@ td.arbo-part > * { vertical-align: middle; }
 /* Onglet Credits */
 .credits-kpi .credits-grille { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: calc(.75rem * var(--d)); margin-bottom: calc(.75rem * var(--d)); }
 .kpi-sub { font-size: .74rem; color: var(--text-muted); margin-top: .2rem; }
-.credits-bas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: calc(.75rem * var(--d)); margin-top: calc(.75rem * var(--d)); }
+/* Cote a cote seulement s'il y a la place pour toutes les colonnes. */
+.credits-bas { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 560px), 1fr)); gap: calc(.75rem * var(--d)); margin-top: calc(.75rem * var(--d)); }
 .credits-table td, .credits-table th { font-size: .8rem; }
 .credits-table .pastille { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: .4rem; }
 .prets-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
@@ -3974,3 +3975,12 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 }
 .ent-retro-warning { background: var(--success-light); border: 1px solid color-mix(in srgb, var(--success) 35%, transparent);
   color: var(--success); }
+/* Tableaux defilants : une ombre au bord signale les colonnes cachees
+   (ombres « locales » qui s'effacent aux extremites du defilement). */
+.table-scroll {
+  background:
+    linear-gradient(to right, var(--card) 30%, transparent) left / 32px 100% no-repeat local,
+    linear-gradient(to left, var(--card) 30%, transparent) right / 32px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, color-mix(in srgb, var(--text) 16%, transparent), transparent) left / 12px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, color-mix(in srgb, var(--text) 16%, transparent), transparent) right / 12px 100% no-repeat scroll;
+}

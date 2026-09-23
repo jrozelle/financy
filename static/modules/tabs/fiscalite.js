@@ -37,11 +37,41 @@ export async function loadFiscalite() {
   // qu'on lirait comme un total. La carte reapparait d'elle-meme des que les
   // versements ou les prix de revient sont saisis.
   const couverture = (d.brut - (d.valeur_ecartee || 0)) / d.brut;
-  if (couverture < COUVERTURE_MIN) { carte.style.display = 'none'; return; }
+  if (couverture < COUVERTURE_MIN) {
+    // La carte ne disparait pas sans explication : elle dit pourquoi elle ne
+    // chiffre rien, et ce qu'il faudrait pour qu'elle le fasse. Le detail des
+    // contrats (dates d'effet) reste accessible.
+    carte.style.display = '';
+    carte.innerHTML = renduPartiel(d, couverture);
+    cabler(carte);
+    return;
+  }
 
   carte.style.display = '';
   carte.innerHTML = rendu(d);
   cabler(carte);
+}
+
+function renduPartiel(d, couverture) {
+  return `
+    <div class="card-head">
+      <div>
+        <h2>Si vous vendiez tout</h2>
+        <p class="card-sub">Impôt latent sur les plus-values, au ${(d.date || '').split('-').reverse().join('/')}</p>
+      </div>
+    </div>
+    <p class="fisc-portee">
+      Pas d'estimation : seul ${fmtPct(couverture * 100, 0)} du patrimoine a une assiette sûre
+      (versements saisis ou prix de revient des lignes), il en faudrait au moins la moitié. Un chiffre
+      calculé sur le reste se lirait comme un total.
+    </p>
+    <button type="button" class="fisc-detail-btn" aria-expanded="false"
+            aria-controls="fisc-detail">Ce qui manque, enveloppe par enveloppe</button>
+    <div class="fisc-detail hidden" id="fisc-detail">
+      ${tableau(d)}
+      ${ecartees(d)}
+      <div id="fisc-contrats"></div>
+    </div>`;
 }
 
 function rendu(d) {
