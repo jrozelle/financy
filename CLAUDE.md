@@ -164,5 +164,4 @@
 - Pas de préprod Docker intermédiaire
 
 ## Roadmap en cours
-- État d'avancement : `TODO.md` (seule référence à jour)
-- `docs/plan-actifs-conseil.md` : plan d'origine d'avril 2026, historique
+- État d'avancement : `TODO.md` (seule référence) ; l'historique des phases est dans `git log`
