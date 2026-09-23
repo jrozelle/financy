@@ -31,7 +31,7 @@ _DATE_RE = re.compile(r'\b(\d{2})/(\d{2})/(\d{4})\b')
 # deux nombres voisins separes par une espace, ex "3 200" + "5,75" -> "5,75").
 _NUM = r'-?\d{1,3}(?: \d{3})*(?:[.,]\d+)?|-?\d+(?:[.,]\d+)?'
 # Lookbehind : le montant ne doit pas demarrer au milieu d'un autre nombre
-# (ex : la fin "744" de la quantite "46,4357" suivie de " 350,41" -> faux "744 350,41").
+# (ex : la fin "357" de la quantite "46,4357" suivie de " 350,41" -> faux "357 350,41").
 _EURO_RE = re.compile(r'(?<![\d.,])(' + _NUM + r')\s*€')
 _CODE_RE = re.compile(r'^[A-Z0-9]{5,12}$')          # ISIN ou code interne (ex: FGPERIN)
 _NO_LETTER_RE = re.compile(r'[A-Za-z]')
