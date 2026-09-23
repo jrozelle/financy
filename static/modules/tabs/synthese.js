@@ -112,8 +112,13 @@ export function renderSynthese() {
     isFamily ? h[`family_${cle}`] : h.by_owner_detail?.[owner]?.[cle]);
   const dates = (S.historique || []).map(h => h.date);
 
-  document.getElementById('kpi-net').innerHTML         = fmt(kpi.net) + varHtml('net_delta', 'net_pct')
-    + sparkline(serie('net'), { couleur: 'var(--primary)', dates });
+  // Le heros, au dessin de la maquette : le net, deux pastilles (depuis le
+  // dernier arrete, et sur un an — ou depuis le debut tant qu'un an manque),
+  // puis l'objectif s'il existe, sinon la tendance.
+  document.getElementById('kpi-net').innerHTML = fmt(kpi.net)
+    + _pastillesHeros(kpi.net, variation, serie('net'), dates);
+  document.getElementById('kpi-hero-spark').innerHTML =
+    (isFamily && _wealthTarget) ? '' : sparkline(serie('net'), { couleur: 'var(--primary)', dates });
   document.getElementById('kpi-gross').innerHTML       = fmt(kpi.gross) + varHtml('gross_delta')
     + sparkline(serie('gross'), { couleur: 'var(--primary)', dates });
   // La dette prend une couleur neutre : elle n'est ni bonne ni mauvaise en soi,
@@ -169,12 +174,12 @@ export function renderSynthese() {
   renderEntityWarnings(syn.entity_warnings || []);
   renderHistChart();
   renderSyntheseHistory();
-  renderLiqBars(liqFiltered);
+  renderLiqBars(liqFiltered, kpi.net);
   renderEntitiesSynthese();
   renderAllocationTargets();
   renderSnapshotDiff(owner, isFamily);
   renderSnapshotNote(syn);
-  renderWealthTarget(kpi.net);
+  renderWealthTarget(kpi.net, isFamily, serie('net'), dates);
 }
 
 /** « Evolution par categorie » : une ligne par groupe — nom, tendance,
@@ -448,34 +453,37 @@ function renderEntitiesSynthese() {
  *  a les additionner de tete pour repondre a la seule question qui compte —
  *  « de combien je dispose d'ici la ? ».
  */
-function renderLiqBars(byLiq) {
+function renderLiqBars(byLiq, net = 0) {
+  // Trois delais cumules, puis ce qui ne se mobilise pas. La ligne « Au-dela »
+  // repetait le cumul du mois — rien n'est classe au-dela — et n'apprenait
+  // rien ; la question utile est l'inverse : combien reste immobilise.
   const DELAIS = [
     { cles: ['J0–J1'], libelle: 'Sous 24 heures' },
     { cles: ['J0–J1', 'J2–J7'], libelle: 'Sous une semaine' },
     { cles: ['J0–J1', 'J2–J7', 'J8–J30'], libelle: 'Sous un mois' },
-    { cles: ['J0–J1', 'J2–J7', 'J8–J30', '30J+'], libelle: 'Au-delà' },
   ];
-  const total = Object.values(byLiq).reduce((s, v) => s + v, 0);
-  const bloque = byLiq['Bloqué'] || 0;
+  if (byLiq['30J+']) DELAIS.push({ cles: ['J0–J1', 'J2–J7', 'J8–J30', '30J+'], libelle: 'Au-delà d’un mois' });
   const cumule = d => d.cles.reduce((s, k) => s + (byLiq[k] || 0), 0);
-  const max = Math.max(...DELAIS.map(cumule), bloque, 1);
+  const mobilisable = ['J0–J1', 'J2–J7', 'J8–J30', '30J+'].reduce((s, k) => s + (byLiq[k] || 0), 0);
+  const bloque = Math.max(0, (net || 0) - mobilisable);
+  const base = Math.max(net || 0, mobilisable, 1);
 
-  const ligne = (libelle, valeur, couleur) => `
-    <div class="dispo-ligne">
+  const ligne = (libelle, valeur, couleur, cls = '') => `
+    <div class="dispo-ligne ${cls}">
       <span class="dispo-n">${libelle}</span>
       <span class="dispo-v">${fmt(valeur)}</span>
       <span class="dispo-track"><span class="dispo-fill"
-            style="width:${((valeur / max) * 100).toFixed(1)}%;background:${couleur}"></span></span>
+            style="width:${Math.min(100, (valeur / base) * 100).toFixed(1)}%;background:${couleur}"></span></span>
     </div>`;
 
   document.getElementById('liquidity-bars').innerHTML = `
     <div class="dispo">
-      ${DELAIS.map((d, i) => ligne(d.libelle, cumule(d),
-          `var(--chart-${i === 3 ? 2 : 1})`)).join('')}
-      ${bloque ? ligne('Bloqué', bloque, 'var(--chart-11)') : ''}
+      ${DELAIS.map(d => ligne(d.libelle, cumule(d), 'var(--chart-1)')).join('')}
+      ${bloque >= 1 ? ligne('Ce qui reste bloqué', bloque, 'var(--text-muted)', 'dispo-bloque') : ''}
     </div>
-    ${total ? `<p class="dispo-note">Les montants sont cumulés : chaque délai
-      inclut ce qui était déjà disponible avant.</p>` : ''}`;
+    ${mobilisable || bloque ? `<p class="dispo-note">Délais cumulés : chaque ligne inclut la précédente.
+      « Bloqué » : la part du net qui ne se mobilise pas — immobilier, biens, parts de société,
+      décote de sortie${byLiq['Bloqué'] ? ', épargne bloquée' : ''}.</p>` : ''}`;
 }
 
 async function renderSnapshotDiff(owner, isFamily) {
@@ -592,7 +600,38 @@ export async function loadWealthTarget() {
   } catch { _wealthTarget = null; }
 }
 
-function renderWealthTarget(currentNet) {
+/** « 12 j », « 3 mois », « 1 an » : la duree qui separe deux arretes. */
+function _duree(d0, d1) {
+  const j = Math.round((Date.parse(d1) - Date.parse(d0)) / 864e5);
+  if (j < 45) return `${j} j`;
+  if (j < 335) return `${Math.round(j / 30.44)} mois`;
+  const a = Math.round(j / 365.25);
+  return `${a} an${a > 1 ? 's' : ''}`;
+}
+
+function _pastillesHeros(net, variation, valeurs, dates) {
+  const puce = (delta, pct, duree) => {
+    if (delta == null && pct == null) return '';
+    const sens = (delta ?? pct) >= 0 ? 'pos' : 'neg';
+    const montant = delta != null ? `${delta >= 0 ? '+' : '−'}${fmt(Math.abs(delta))}` : '';
+    return `<span class="puce puce--${sens}">${montant}${pct != null ? ` ${fmtPct(pct, 1, true)}` : ''}<small>${duree}</small></span>`;
+  };
+  const courte = variation?.prev_date
+    ? puce(variation.net_delta, variation.net_pct, _duree(variation.prev_date, S.syntheseDate || dates[dates.length - 1])) : '';
+  // Sur un an si l'historique le permet ; sinon depuis le premier arrete.
+  const i = dates.findIndex(d => d === (S.syntheseDate || dates[dates.length - 1]));
+  const fin = i >= 0 ? i : dates.length - 1;
+  const cible = new Date(Date.parse(dates[fin]) - 365 * 864e5).toISOString().slice(0, 10);
+  let debut = dates.findIndex(d => d >= cible);
+  if (debut < 0 || debut >= fin) debut = 0;
+  const v0 = valeurs[debut], v1 = valeurs[fin];
+  const longue = fin > debut && v0
+    ? puce(null, (v1 - v0) / Math.abs(v0) * 100,
+           dates[debut] <= cible ? '1 an' : `depuis le ${fmtDate(dates[debut])}`) : '';
+  return (courte || longue) ? `<div class="hero-puces">${courte}${longue}</div>` : '';
+}
+
+function renderWealthTarget(currentNet, isFamily = true, valeurs = [], dates = []) {
   const bar = document.getElementById('wealth-target-bar');
   const menuBtn = document.getElementById('btn-open-wealth-target');
   if (menuBtn) {
@@ -601,9 +640,13 @@ function renderWealthTarget(currentNet) {
   }
   if (!bar) return;
 
-  if (!_wealthTarget) {
+  const hoteBut = document.getElementById('kpi-hero-goal');
+  // L'objectif vise le patrimoine de la famille : sous un titulaire, la jauge
+  // melangeait son net a la progression de la famille.
+  if (!_wealthTarget || !isFamily) {
     bar.style.display = 'none';
     bar.innerHTML = '';
+    if (hoteBut) { hoteBut.innerHTML = ''; hoteBut.className = ''; }
     return;
   }
 
@@ -623,28 +666,29 @@ function renderWealthTarget(currentNet) {
 
   // Rythme observe sur l'historique : de quoi dire QUAND l'objectif tombe, et
   // pas seulement ou l'on en est.
-  const h = S.historique || [];
   let projection = '';
-  if (h.length >= 2 && currentNet < target) {
-    const debut = h[0], fin = h[h.length - 1];
-    const jours = (new Date(fin.date) - new Date(debut.date)) / 86400000;
-    const progression = (fin.family_net || 0) - (debut.family_net || 0);
+  if (valeurs.length >= 2 && currentNet < target) {
+    const jours = (Date.parse(dates[dates.length - 1]) - Date.parse(dates[0])) / 864e5;
+    const progression = (valeurs[valeurs.length - 1] || 0) - (valeurs[0] || 0);
     if (jours > 30 && progression > 0) {
-      const parMois = progression / (jours / 30.44);
-      const mois = (target - currentNet) / parMois;
-      const quand = new Date();
-      quand.setMonth(quand.getMonth() + Math.ceil(mois));
-      projection = mois < 120
-        ? `Atteint en <b>${quand.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</b> au rythme actuel`
-        : '';
+      const restant = (target - currentNet) / (progression / jours);
+      if (restant < 3650) {
+        const quand = new Date(Date.now() + restant * 864e5);
+        const opts = quand.getFullYear() === new Date().getFullYear()
+          ? { day: 'numeric', month: 'short' } : { month: 'short', year: 'numeric' };
+        projection = `Atteint le <b>${quand.toLocaleDateString('fr-FR', opts)}</b> au rythme actuel`;
+        if (!opts.day) projection = projection.replace('Atteint le', 'Atteint en');
+      }
     }
+  } else if (currentNet >= target) {
+    projection = '<b>Objectif atteint</b>';
   }
 
   hote.className = 'hero-goal';
   hote.innerHTML = `
     <div class="g-track"><span class="g-fill" style="width:${pct.toFixed(1)}%"></span></div>
     <div class="g-foot">
-      <span>Objectif <b>${fmt(target)}</b> · ${fmtPct(pct)} atteint</span>
+      <span>Objectif <b>${fmt(target)}</b></span>
       <span>${projection || `Reste <b>${fmt(Math.max(target - currentNet, 0))}</b>`}</span>
     </div>`;
 }

@@ -5,7 +5,8 @@
  * demonstration par-dessus l'epaule, capture d'ecran, partage de bug.
  * N'altere aucune donnee — c'est une couche de formatage, reversible d'un clic.
  *
- * Forme retenue : `??? ??? 120,50 €`
+ * Forme retenue : `X XXX 120,50 €` — un montant « modeste » de forme fixe,
+ *   qui se lit comme un nombre plutot que comme un trou (23/09/2026).
  * - Les trois derniers chiffres de la partie entiere restent lisibles. Les
  *   totaux gardent ainsi de la vie (ils bougent, ils ont l'air vrais) la ou un
  *   bloc plein fige l'interface et la rend illisible a demontrer.
@@ -18,11 +19,11 @@
  */
 
 const CLE = 'financy_mask';
-const CAR = '?';                  // '*' fonctionne aussi, un seul endroit a changer
-const GROUPES = 2;                // groupes de 3 caracteres masques, largeur fixe
 const VISIBLES = 3;               // derniers chiffres laisses lisibles
 
-const MASQUE = Array(GROUPES).fill(CAR.repeat(3)).join(' ');
+// Largeur fixe, la meme pour 850 € et pour 2 millions ; l'espace fine
+// insecable est celle des montants formates.
+const MASQUE = 'X XXX';
 
 let _actif = false;
 const _abonnes = new Set();
@@ -71,13 +72,13 @@ function _refleterDansLeDom() {
  * INVARIANT : la valeur passee doit etre ecrite EN ENTIER, jamais abregee.
  * Les trois chiffres laisses lisibles ne sont surs que si ce sont les unites,
  * dizaines et centaines. Sur une valeur abregee ils changent de rang et
- * trahissent tout : masquer "500 k€" rendrait "??? ??? 500 k€", soit
+ * trahissent tout : masquer "500 k€" rendrait "X XXX 500 k€", soit
  * 500 000 € annonces en clair. Abreger et masquer ne se composent pas.
  * Pour un libelle abrege (axe de graphe), utiliser `maskAxis`, qui ne laisse
  * aucun chiffre.
  *
  * @param {string} texte  ex. "24 610,75"
- * @returns {string}      ex. "??? ??? 120,50"
+ * @returns {string}      ex. "X XXX 120,50"
  */
 export function maskFormatted(texte) {
   const s = String(texte);

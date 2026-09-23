@@ -3811,3 +3811,12 @@ td.arbo-part > * { vertical-align: middle; }
   padding: .3rem 0; border-top: 1px solid var(--border); }
 .contrib-hors-date { color: var(--text-muted); }
 .contrib-hors-liste li.contrib-hors-aide { display: block; color: var(--text-muted); font-style: italic; }
+
+/* Heros de la synthese : deux pastilles sous le net (maquette du 22/09). */
+.hero-puces { display: flex; flex-wrap: wrap; gap: .4rem; margin: .45rem 0 .2rem; }
+.puce { display: inline-flex; align-items: baseline; gap: .35rem; padding: .18rem .5rem; border-radius: 6px;
+  font-family: var(--mono); font-size: .8rem; font-variant-numeric: tabular-nums; }
+.puce small { font-family: var(--font, inherit); font-size: .7rem; opacity: .75; }
+.puce--pos { background: var(--success-light); color: var(--success); }
+.puce--neg { background: var(--danger-light); color: var(--danger); }
+.dispo-bloque { margin-top: .35rem; padding-top: .45rem; border-top: 1px dashed var(--border); }
