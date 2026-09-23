@@ -3,7 +3,7 @@ import { fmt, fmtDate, esc, sortArr, updateSortIndicators, today, parseLocaleNum
          fluxSigned as signed, fmtSigned as eurSigned } from '../utils.js';
 import { api } from '../api.js';
 import { confirmDialog, toast, closeModal } from '../dialogs.js';
-import { saveFilters, loadFilters, clearFilterKey, applyIfValid } from '../filter-persist.js';
+import { saveFilters, loadFilters, clearFilterKey } from '../filter-persist.js';
 
 export async function loadFlux() {
   S.flux = await api('GET', '/api/flux');
@@ -39,7 +39,7 @@ function populateFluxFilters() {
       `<option value="">${placeholder}</option>` +
       opts.map(o => `<option value="${esc(o)}"${o === cur ? ' selected' : ''}>${esc(o)}</option>`).join('');
   };
-  sel('flux-filter-owner',    'Toutes les personnes',  owners, 'owner');
+  sel('flux-filter-owner',    'Tous les titulaires',   owners, 'owner');
   sel('flux-filter-type',     'Tous les types',        types,  'type');
   sel('flux-filter-category', 'Toutes les catégories', cats,   'category');
   sel('flux-filter-year',     'Toutes les années',     years,  'year');
@@ -92,14 +92,19 @@ export function renderFlux() {
   const flux = sortArr(filteredFlux(), S.sort.flux.key, S.sort.flux.dir);
   updateSortIndicators('flux-thead', 'flux');
 
-  if (!flux.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">Aucun flux enregistré.</td></tr>';
-    if (tfoot) tfoot.innerHTML = '';
-    return;
-  }
   // L'explication du badge « a preciser » vivait dans une infobulle, ligne a
   // ligne. Elle se lit une fois, au-dessus du tableau, avec le decompte.
+  // Recalculee aussi quand le filtre ne laisse rien : sinon elle decomptait
+  // encore les flux de la vue precedente.
   const note = document.getElementById('flux-note-etab');
+  if (!flux.length) {
+    // Un filtre qui masque tout n'est pas un journal vide : le dire autrement.
+    const msg = S.flux.length ? 'Aucun flux pour ce filtre.' : 'Aucun flux enregistré.';
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="9">${msg}</td></tr>`;
+    if (tfoot) tfoot.innerHTML = '';
+    if (note) { note.hidden = true; note.textContent = ''; }
+    return;
+  }
   const sansEtab = flux.filter(f => !f.establishment).length;
   if (note) {
     note.hidden = !sansEtab;
@@ -141,9 +146,9 @@ export function renderFlux() {
           ${Object.entries(byType).map(([t, v]) =>
             `${esc(t)} : <strong class="${v >= 0 ? 'pos' : 'neg'}">${eurSigned(v)}</strong>`
           ).join(' &nbsp;·&nbsp; ')}
+          &nbsp;·&nbsp; solde net des flux affichés : versements et coupons, moins retraits et frais
         </td>
-        <td class="num ${total >= 0 ? 'pos' : 'neg'}" style="font-weight:700"
-            title="Solde net des flux affichés : versements et coupons moins retraits et frais.">${
+        <td class="num ${total >= 0 ? 'pos' : 'neg'}" style="font-weight:700">${
           eurSigned(total)}</td>
         <td colspan="2"></td>
       </tr>
@@ -400,7 +405,7 @@ function _renderReport(d, nfiles) {
       <span><b>${s.transactions}</b> opération${s.transactions > 1 ? 's' : ''} de titres</span>
       <span><b>${s.flux}</b> flux de trésorerie</span>
       ${s.corrections ? `<span><b>${s.corrections}</b> flux provisoire${s.corrections > 1 ? 's' : ''} attesté${s.corrections > 1 ? 's' : ''}, redaté${s.corrections > 1 ? 's' : ''}</span>` : ''}
-      ${s.duplicates ? `<span class="muted"><b>${s.duplicates}</b> déjà enregistré${s.duplicates > 1 ? 's' : ''}, ignoré${s.duplicates > 1 ? 's' : ''}</span>` : ''}
+      ${s.duplicates ? `<span class="text-muted"><b>${s.duplicates}</b> déjà enregistré${s.duplicates > 1 ? 's' : ''}, ignoré${s.duplicates > 1 ? 's' : ''}</span>` : ''}
       ${s.warnings ? `<span class="negative"><b>${s.warnings}</b> à vérifier</span>` : ''}
       ${s.unknown_isins?.length ? `<span><b>${s.unknown_isins.length}</b> valeur${s.unknown_isins.length > 1 ? 's' : ''} à créer</span>` : ''}
       ${s.rejected?.length ? `<span class="negative"><b>${s.rejected.length}</b> non reconnu${s.rejected.length > 1 ? 's' : ''}</span>` : ''}

@@ -3984,3 +3984,14 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
     radial-gradient(farthest-side at 0 50%, color-mix(in srgb, var(--text) 16%, transparent), transparent) left / 12px 100% no-repeat scroll,
     radial-gradient(farthest-side at 100% 50%, color-mix(in srgb, var(--text) 16%, transparent), transparent) right / 12px 100% no-repeat scroll;
 }
+/* Informations autrefois dans un title natif, desormais visibles. */
+.h-badge-date { display: block; font-size: 11px; color: var(--text-muted); margin-top: 2px; white-space: nowrap; }
+.pos-notes { font-size: 11px; color: var(--text-muted); margin-top: 1px; white-space: normal; }
+.pos-override { font-size: 11px; color: var(--warning); }
+.perf-maille-aide { flex-basis: 100%; margin: 0; }
+.perf-detail { padding: .1rem .6rem .6rem; font-size: .72rem; color: var(--text-muted); display: flex;
+  flex-direction: column; gap: .3rem; border-bottom: 1px solid var(--border); }
+.perf-detail-list { margin: 0; padding-left: 1rem; }
+.dd-row-clickable:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.dd-row-clickable:focus-visible .dd-row-action { opacity: 1; }
+.dd-row-action svg { display: block; }

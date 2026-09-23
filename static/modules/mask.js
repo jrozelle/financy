@@ -57,7 +57,7 @@ export function onMaskChange(fn) {
 function _refleterDansLeDom() {
   if (typeof document === 'undefined') return;
   document.documentElement.classList.toggle('is-masked', _actif);
-  document.querySelectorAll('[data-mask-toggle]').forEach(el => {
+  document.querySelectorAll('#mask-btn, #pref-mask-btn, [data-mask-toggle]').forEach(el => {
     el.setAttribute('aria-pressed', String(_actif));
   });
 }

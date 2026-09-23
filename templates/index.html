@@ -285,7 +285,7 @@
         </div>
         <div class="filters-bar" id="positions-filters">
           <select id="filter-owner" class="filter-select hidden" aria-hidden="true" tabindex="-1">
-            <option value="">Toutes les personnes</option>
+            <option value="">Tous les titulaires</option>
           </select>
           <select id="filter-establishment" class="filter-select">
             <option value="">Tous les établissements</option>
@@ -350,7 +350,7 @@
         </div>
         <div id="flux-import-report" class="hidden"></div>
         <div class="filters-bar" id="flux-filters">
-          <select id="flux-filter-owner" class="filter-select hidden" aria-hidden="true" tabindex="-1"><option value="">Toutes les personnes</option></select>
+          <select id="flux-filter-owner" class="filter-select hidden" aria-hidden="true" tabindex="-1"><option value="">Tous les titulaires</option></select>
           <select id="flux-filter-type"  class="filter-select" aria-label="Type de flux"><option value="">Tous les types</option></select>
           <select id="flux-filter-category" class="filter-select" aria-label="Catégorie"><option value="">Toutes les catégories</option></select>
           <select id="flux-filter-year"  class="filter-select" aria-label="Année"><option value="">Toutes les années</option></select>
@@ -363,7 +363,7 @@
           <thead id="flux-thead">
             <tr>
               <th data-sort="date">Date</th>
-              <th data-sort="owner">Propriétaire</th>
+              <th data-sort="owner">Titulaire</th>
               <th data-sort="envelope">Enveloppe</th>
               <th data-sort="establishment">Établissement</th>
               <th data-sort="category">Catégorie</th>
@@ -505,7 +505,7 @@
 
       <div class="two-col">
         <div class="card">
-          <h2>Propriétaires</h2>
+          <h2>Titulaires</h2>
           <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
             Personnes dont les patrimoines sont suivis. Une suppression n'efface pas les positions existantes.
           </p>
@@ -605,7 +605,7 @@
               <th class="num" data-sort="quantity">Qté</th>
               <th class="num" data-sort="avg_cost">PRU</th>
               <th class="num" data-sort="last_price">Cours</th>
-              <th class="num" data-sort="market_value">Valo</th>
+              <th class="num" data-sort="market_value">Valeur</th>
               <th class="num" data-sort="pnl">+/-</th>
               <th class="num" data-sort="weight_pct">Poids</th>
               <th data-sort="envelopes">Enveloppes</th>
@@ -616,10 +616,15 @@
         </table>
         <div id="actifs-cards" class="actifs-card-list"></div>
         <div id="actifs-empty" class="empty-state" style="padding:2rem 1rem;text-align:center;display:none">
-          <div style="font-size:28px;margin-bottom:.4rem;opacity:.5">&#128200;</div>
+          <div style="margin-bottom:.4rem;opacity:.5" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8"
+                 stroke-linecap="round" stroke-linejoin="round" focusable="false">
+              <path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-6"/>
+            </svg>
+          </div>
           <h3 style="font-size:14px;margin-bottom:.4rem">Aucune ligne d'actif</h3>
           <p class="text-muted" style="font-size:12.5px;margin-bottom:1rem">
-            Pour voir tes ETF, actions et fonds euros ici, ajoute des lignes
+            Pour voir vos ETF, actions et fonds euros ici, ajoutez des lignes
             dans une position depuis l'onglet Positions.
           </p>
           <button class="btn btn-primary btn-sm" data-tab-switch="positions">Aller aux positions</button>
@@ -631,7 +636,7 @@
     <div id="tab-performance" class="tab-content hidden">
       <div id="perf-empty" class="empty-state hidden">
         <p>Deux arrêtés au minimum sont nécessaires pour mesurer une performance.</p>
-        <p class="muted">Ajoutez des snapshots de positions, et des flux pour distinguer
+        <p class="text-muted">Ajoutez des arrêtés de positions, et des flux pour distinguer
         les versements du rendement.</p>
       </div>
       <div id="perf-body">
@@ -679,9 +684,9 @@
       </div>
 
       <div class="card" id="adv-profile">
-        <h2>Profil de la personne</h2>
+        <h2>Profil du titulaire</h2>
         <div style="margin-bottom:.75rem">
-          <label style="font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Personne</label>
+          <label style="font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Titulaire</label>
           <select id="advisor-owner-select" style="margin-left:.5rem" aria-label="Titulaire du profil"></select>
         </div>
         <form id="advisor-profile-form">
@@ -799,7 +804,7 @@
           Utilisée comme contexte pour les propositions d'arbitrage.
         </p>
         <div id="macro-empty" class="text-muted" style="font-size:13px;margin-bottom:.875rem;display:none">
-          Aucun snapshot pour le moment.
+          Aucun arrêté pour le moment.
         </div>
         <div id="macro-content" class="form-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:.875rem;display:none">
           <div class="form-group">
@@ -863,7 +868,7 @@
       <div class="card">
         <h2>Timeline patrimoniale</h2>
         <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
-          Frise chronologique des snapshots, flux et événements.
+          Frise chronologique des arrêtés, flux et événements.
         </p>
         <div id="timeline-body"></div>
       </div>
@@ -898,11 +903,11 @@
       </div>
 
       <div class="card">
-        <h2>Snapshot automatique</h2>
+        <h2>Arrêté automatique</h2>
         <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
-          Duplique le dernier snapshot à la date du jour. Utile pour garder un historique régulier sans modifier manuellement les positions.
+          Duplique le dernier arrêté à la date du jour. Utile pour garder un historique régulier sans modifier manuellement les positions.
         </p>
-        <button class="btn btn-secondary" id="btn-auto-snapshot">Créer un snapshot aujourd'hui</button>
+        <button class="btn btn-secondary" id="btn-auto-snapshot">Créer un arrêté aujourd'hui</button>
       </div>
 
       <div class="card">
@@ -927,8 +932,8 @@
         <div class="card">
           <h2>Importer depuis Excel</h2>
           <p class="text-muted" style="margin-bottom:1rem">
-            Importe les onglets <strong>Positions</strong> et <strong>Flux</strong>
-            depuis ton fichier <code>.xlsx</code>.<br>
+            Importez les onglets <strong>Positions</strong> et <strong>Flux</strong>
+            depuis votre fichier <code>.xlsx</code>.<br>
             Les données existantes ne sont pas effacées.
           </p>
           <div class="form-group">
@@ -956,7 +961,7 @@
         <div class="card">
           <h2>Exporter en JSON</h2>
           <p class="text-muted" style="margin-bottom:1rem">
-            Toutes tes données — positions et lignes de titres, flux, opérations, entités, cours,
+            Toutes vos données — positions et lignes de titres, flux, opérations, entités, cours,
             profils, référentiel — en un fichier. La clé API n'y figure pas.
           </p>
           <button class="btn btn-secondary" id="btn-export">Télécharger patrimoine.json</button>
@@ -966,7 +971,7 @@
           <h2>Mode démo</h2>
           <p class="text-muted" style="margin-bottom:1rem">
             Bascule vers une base de données fictive pour explorer l'application sans risque.<br>
-            Tes vraies données ne sont pas affectées.
+            Vos vraies données ne sont pas affectées.
           </p>
           <!-- Le libelle dit ce que la case active ; l'etat se lit a cote. « [ ]
                Donnees reelles » laissait deviner si cocher voulait dire reel ou demo. -->
@@ -992,7 +997,7 @@
             Supprime toutes les positions, flux et entités.<br>
             <strong>Irréversible</strong> — fais un export JSON avant.
           </p>
-          <button class="btn" style="background:var(--danger);color:#fff;border-color:var(--danger)" id="btn-reset">Vider la base</button>
+          <button class="btn" style="background:var(--danger);color:var(--on-accent);border-color:var(--danger)" id="btn-reset">Vider la base</button>
           <div id="reset-result" style="margin-top:.75rem"></div>
         </div>
 
@@ -1021,7 +1026,12 @@
           <input type="password" id="settings-api-key" class="form-control"
                  placeholder="sk-ant-api03-..." autocomplete="off"
                  style="flex:1;font-family:monospace;font-size:13px">
-          <button type="button" class="btn btn-secondary btn-sm" id="settings-toggle-key-visibility" title="Afficher/masquer">&#128065;</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="settings-toggle-key-visibility" aria-label="Afficher ou masquer la clé">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
         </div>
         <div id="settings-api-status" class="text-muted" style="font-size:12px;margin-top:.375rem"></div>
       </div>
@@ -1052,7 +1062,7 @@
   </div>
 
   <!-- ── SIDE PANEL DRILL-DOWN ───────────────────────────────────────────── -->
-  <div id="drilldown-panel" class="drilldown hidden">
+  <div id="drilldown-panel" class="drilldown hidden" role="dialog" aria-modal="true" aria-labelledby="dd-title">
     <div class="drilldown-overlay" id="drilldown-overlay"></div>
     <div class="drilldown-content">
       <div class="drilldown-header">
@@ -1081,7 +1091,7 @@
           <tbody>
             <tr><td><kbd>Ctrl</kbd>+<kbd>N</kbd> <span class="text-muted">/</span> <kbd>&#8984;</kbd>+<kbd>N</kbd></td><td>Nouvelle position</td></tr>
             <tr><td><kbd>/</kbd></td><td>Focus recherche globale</td></tr>
-            <tr><td><kbd>&larr;</kbd> <span class="text-muted">/</span> <kbd>&rarr;</kbd></td><td>Naviguer entre snapshots</td></tr>
+            <tr><td><kbd>&larr;</kbd> <span class="text-muted">/</span> <kbd>&rarr;</kbd></td><td>Naviguer entre arrêtés</td></tr>
             <tr><td><kbd>&uarr;</kbd> <span class="text-muted">/</span> <kbd>&darr;</kbd></td><td>Naviguer resultats recherche (quand focus dans la search)</td></tr>
             <tr><td><kbd>Enter</kbd></td><td>Ouvrir le resultat selectionne</td></tr>
             <tr><td><kbd>Esc</kbd></td><td>Fermer modale / popover / dropdown</td></tr>
@@ -1090,7 +1100,7 @@
           </tbody>
         </table>
         <p class="text-muted" style="font-size:12px;margin-top:1rem">
-          Les raccourcis ne s'activent pas quand tu tapes dans un champ (sauf <kbd>Esc</kbd>).
+          Les raccourcis ne s'activent pas quand vous tapez dans un champ (sauf <kbd>Esc</kbd>).
         </p>
       </div>
     </div>
@@ -1111,7 +1121,7 @@
             <input type="date" id="pos-date" required placeholder="AAAA-MM-JJ" title="Format : AAAA-MM-JJ">
           </div>
           <div class="form-group">
-            <label for="pos-owner">Propriétaire *</label>
+            <label for="pos-owner">Titulaire *</label>
             <select id="pos-owner" required></select>
           </div>
           <div class="form-group">
@@ -1162,7 +1172,7 @@
               <input type="checkbox" id="pos-mob-override-check">
               Surcharger la mobilisabilite pour cette ligne
             </label>
-            <div id="pos-mob-override-field" style="display:none;margin-top:.4rem;display:flex;gap:1rem;align-items:center;flex-wrap:wrap">
+            <div id="pos-mob-override-field" style="display:none;margin-top:.4rem;gap:1rem;align-items:center;flex-wrap:wrap">
               <div>
                 <input type="text" inputmode="decimal" id="pos-mob-override-pct" step="1" min="0" max="100" value="100" style="width:90px">
                 <span style="font-size:13px;color:var(--text-muted);margin-left:.25rem">% mobilisable</span>
@@ -1184,11 +1194,11 @@
         <div id="pos-snapshot-option" class="snapshot-option hidden">
           <label class="snapshot-label">
             <input type="checkbox" id="pos-snapshot-check" checked>
-            Créer un nouveau snapshot au
+            Créer un nouvel arrêté au
             <input type="date" id="pos-snapshot-date" style="border:1px solid var(--border);border-radius:4px;padding:.2rem .4rem;font-size:13px">
             en copiant toutes les autres positions
           </label>
-          <div class="snapshot-hint">Le snapshot d'origine reste intact.</div>
+          <div class="snapshot-hint">L'arrêté d'origine reste intact.</div>
         </div>
         <div class="modal-actions">
           <!-- La suppression vit ici plutot que dans une colonne du tableau :
@@ -1328,7 +1338,7 @@
             <input type="date" id="flux-date" required placeholder="AAAA-MM-JJ" title="Format : AAAA-MM-JJ">
           </div>
           <div class="form-group">
-            <label for="flux-owner">Propriétaire *</label>
+            <label for="flux-owner">Titulaire *</label>
             <select id="flux-owner" required></select>
           </div>
           <div class="form-group">
@@ -1342,9 +1352,10 @@
           <div class="form-group">
             <label for="flux-establishment">Établissement</label>
             <input type="text" id="flux-establishment" list="flux-etab-list"
-                   placeholder="ex : BoursoBank"
-                   title="Indispensable si l'enveloppe existe chez plusieurs établissements : sans lui, le flux est réparti au prorata et fausse le rendement de chaque compte.">
+                   placeholder="ex : BoursoBank" aria-describedby="flux-establishment-aide">
             <datalist id="flux-etab-list"></datalist>
+            <p class="form-aide" id="flux-establishment-aide">Indispensable si l'enveloppe existe chez plusieurs
+              établissements : sans lui, le flux est réparti au prorata et fausse le rendement de chaque compte.</p>
           </div>
           <div class="form-group">
             <label for="flux-category">Catégorie</label>
@@ -1406,8 +1417,8 @@
           </div>
         </div>
         <div class="computed-info" id="ent-computed-info"></div>
-        <div id="ent-retro-warning" style="display:none;margin-top:.75rem;padding:.625rem 1rem;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;font-size:12.5px;color:#166534">
-          ✓ La nouvelle valorisation sera enregistrée à la date d'aujourd'hui. Les snapshots passés conservent leurs valeurs d'origine — l'historique reste intact.
+        <div id="ent-retro-warning" class="ent-retro-warning" style="display:none;margin-top:.75rem;padding:.625rem 1rem;border-radius:6px;font-size:12.5px">
+          La nouvelle valorisation sera enregistrée à la date d'aujourd'hui. Les arrêtés passés conservent leurs valeurs d'origine — l'historique reste intact.
         </div>
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" data-close="entity-modal">Annuler</button>

@@ -28,7 +28,7 @@ function renderRefOwners() {
   el.innerHTML = owners.map((o, i) => `
     <span class="ref-chip">
       ${esc(o)}
-      <button class="chip-del" data-section="owners" data-index="${i}" title="Supprimer">×</button>
+      <button type="button" class="chip-del" data-section="owners" data-index="${i}" aria-label="Supprimer ${esc(o)}"><span aria-hidden="true">×</span></button>
     </span>`).join('') + `
     <div style="display:flex;gap:.5rem;align-items:center;margin-top:.25rem">
       <input type="text" id="new-owner-input" class="ref-input" placeholder="Prénom / entité">
@@ -43,8 +43,8 @@ function renderRefOwners() {
         const lines = [];
         if (posCount)  lines.push(`${posCount} position(s)`);
         if (fluxCount) lines.push(`${fluxCount} flux`);
-        if (!await confirmDialog('Supprimer la personne ?',
-          `<strong>${esc(owner)}</strong> est référencé(e) dans ${lines.join(' et ')}.<br>Ces données ne seront pas supprimées, mais la personne n'apparaîtra plus dans les filtres.`,
+        if (!await confirmDialog('Supprimer le titulaire ?',
+          `<strong>${esc(owner)}</strong> est référencé(e) dans ${lines.join(' et ')}.<br>Ces données ne seront pas supprimées, mais ce titulaire n'apparaîtra plus dans les filtres.`,
           { confirmText: 'Supprimer', danger: true })) return;
       }
       S.referential.owners.splice(parseInt(btn.dataset.index), 1);
@@ -247,7 +247,7 @@ function renderRefSimpleList(containerId, refKey, placeholder) {
   el.innerHTML = items.map((v, i) => `
     <span class="ref-chip">
       ${esc(v)}
-      <button class="chip-del" data-ref-key="${refKey}" data-index="${i}">×</button>
+      <button type="button" class="chip-del" data-ref-key="${refKey}" data-index="${i}" aria-label="Supprimer ${esc(v)}"><span aria-hidden="true">×</span></button>
     </span>`).join('') + `
     <div style="display:flex;gap:.5rem;align-items:center;margin-top:.25rem">
       <input type="text" id="new-${containerId}" class="ref-input" placeholder="${esc(placeholder)}">
@@ -375,7 +375,7 @@ export async function saveReferential() {
     updateSavedRef();
     const status = document.getElementById('ref-save-status');
     if (status) {
-      status.textContent = '✓ Référentiel enregistré.';
+      status.textContent = 'Référentiel enregistré.';
       status.className = 'alert alert-success';
       setTimeout(() => { status.textContent = ''; status.className = ''; }, 3000);
     }
@@ -439,7 +439,7 @@ async function onTemplateChange() {
     preview.style.display = '';
     preview.innerHTML = `
       <div class="template-preview">
-        <div><strong>Propriétaires :</strong> ${esc(owners)}</div>
+        <div><strong>Titulaires :</strong> ${esc(owners)}</div>
         <div><strong>Catégories :</strong> ${esc(cats)}</div>
         <div><strong>Enveloppes :</strong> ${esc(envs)}</div>
         <div style="margin-top:.5rem;display:flex;gap:.5rem">

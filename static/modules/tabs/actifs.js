@@ -1,6 +1,7 @@
 import { S } from '../state.js';
 import { api } from '../api.js';
-import { esc, fmt, fmtDate, destroyChart, getColors, chartBorderColor, sortArr, fmtQty, fmtPct } from '../utils.js';
+import { esc, fmt, fmtDate, destroyChart, getColors, chartBorderColor, sortArr, fmtQty, fmtPct,
+         wireSortableTable, updateSortIndicators } from '../utils.js';
 import { openIsinPopover } from '../isin-popover.js';
 import { triggerPricesRefresh } from './tools.js';
 import { saveFilters, loadFilters } from '../filter-persist.js';
@@ -10,8 +11,9 @@ import { loadReconcile } from './reconcile.js';
 let _classChart = null;
 let _envelopeChart = null;
 let _data = null;
-let _sortCol = 'market_value';
-let _sortDesc = true;
+// Tri du tableau : valeur decroissante par defaut. Cle locale plutot que
+// declaree dans state.js.
+S.sort.actifs = S.sort.actifs || { key: 'market_value', dir: -1 };
 let _filter = { type: null, value: null }; // {type: 'asset_class'|'envelope', value: 'ETF'}
 const ACTIFS_COLUMNS_STORAGE_KEY = 'financy_columns_actifs';
 const ACTIFS_ESTABLISHMENTS_MIGRATION_KEY = 'financy_columns_actifs_establishments_v1';
@@ -23,7 +25,7 @@ const ACTIFS_TABLE_COLUMNS = [
   { key: 'quantity', label: 'Qté', num: true },
   { key: 'avg_cost', label: 'PRU', num: true },
   { key: 'last_price', label: 'Cours', num: true },
-  { key: 'market_value', label: 'Valo', num: true },
+  { key: 'market_value', label: 'Valeur', num: true },
   { key: 'pnl', label: '+/-', num: true },
   { key: 'weight_pct', label: 'Poids', num: true },
   { key: 'envelopes', label: 'Enveloppes' },
@@ -40,6 +42,16 @@ function cellulePnl(l) {
   const v = l.pnl;
   const montant = `<span class="${v >= 0 ? 'pv-hausse' : 'pv-baisse'}">${v >= 0 ? '+' : '−'}${fmt(Math.abs(v))}</span>`;
   return montant + (l.pnl_pct != null ? `<span class="pv-pct">${fmtPct(l.pnl_pct, 1, true)}</span>` : '');
+}
+
+/** Dernier cours, dans la devise du titre. Le cours d'un titre du Nasdaq est
+ *  en dollars : l'ecrire suivi de « € » le faisait passer pour une valeur en
+ *  euros. Hors euro, le code de la devise suit le nombre, masque comme lui. */
+function celluleCours(l) {
+  if (l.last_price == null) return '—';
+  const devise = (l.currency || 'EUR').toUpperCase();
+  if (devise === 'EUR') return fmt(l.last_price, 2);
+  return `${fmtQty(l.last_price, 2)}\u00a0${esc(devise)}`;
 }
 
 /** Un pseudo-ISIN (FONDS_EUROS_FGPER2560DC) est un code interne : il
@@ -77,15 +89,15 @@ function ensureEstablishmentColumnPreference() {
 // Restore tri et filtre chart depuis localStorage au premier load
 (function _restoreActifsState() {
   const saved = loadFilters('actifs');
-  if (saved.sortCol) _sortCol = saved.sortCol;
-  if (typeof saved.sortDesc === 'boolean') _sortDesc = saved.sortDesc;
+  if (saved.sortCol) S.sort.actifs.key = saved.sortCol;
+  if (typeof saved.sortDesc === 'boolean') S.sort.actifs.dir = saved.sortDesc ? -1 : 1;
   if (saved.filter && saved.filter.type && saved.filter.value) {
     _filter = { type: saved.filter.type, value: saved.filter.value };
   }
 })();
 
 function _persist() {
-  saveFilters('actifs', { sortCol: _sortCol, sortDesc: _sortDesc, filter: _filter });
+  saveFilters('actifs', { sortCol: S.sort.actifs.key, sortDesc: S.sort.actifs.dir === -1, filter: _filter });
 }
 
 export async function loadActifs() {
@@ -142,6 +154,7 @@ function _renderTable(lines) {
     tbody.innerHTML = '';
     if (cards) cards.innerHTML = '';
     empty.style.display = '';
+    updateSortIndicators('actifs-thead', 'actifs');
     return;
   }
   empty.style.display = 'none';
@@ -154,7 +167,7 @@ function _renderTable(lines) {
       filtered = lines.filter(l => (l.envelopes || []).includes(_filter.value));
     }
   }
-  const sorted = sortArr([...filtered], _sortCol, _sortDesc ? -1 : 1);
+  const sorted = sortArr([...filtered], S.sort.actifs.key, S.sort.actifs.dir);
   tbody.innerHTML = sorted.map(l => {
     const fresh = _freshnessBadge(l);
     return `<tr>
@@ -164,7 +177,7 @@ function _renderTable(lines) {
       <td>${esc(l.asset_class || '—')}</td>
       <td class="num">${fmtQty(l.quantity)}</td>
       <td class="num">${l.avg_cost != null ? fmt(l.avg_cost) : '—'}</td>
-      <td class="num">${l.last_price != null ? fmt(l.last_price) : '—'}</td>
+      <td class="num">${celluleCours(l)}</td>
       <td class="num">${fmt(l.market_value)}</td>
       <td class="num">${cellulePnl(l)}</td>
       <td class="num">${fmtPct(l.weight_pct)}</td>
@@ -182,35 +195,29 @@ function _renderTable(lines) {
           <span>${esc((l.establishments || []).join(', ') || '—')} · ${esc((l.envelopes || []).join(', ') || '—')} · ${esc(l.asset_class || '—')}</span>
         </div>
         <dl class="actif-card-metrics">
-          <div><dt>Valo</dt><dd>${fmt(l.market_value)}</dd></div>
+          <div><dt>Valeur</dt><dd>${fmt(l.market_value)}</dd></div>
           <div><dt>PRU</dt><dd>${l.avg_cost != null ? fmt(l.avg_cost) : '—'}</dd></div>
           <div><dt>Qté</dt><dd>${fmtQty(l.quantity)}</dd></div>
           <div><dt>+/-</dt><dd>${cellulePnl(l)}</dd></div>
           <div><dt>Poids</dt><dd>${fmtPct(l.weight_pct)}</dd></div>
-          <div><dt>Cours</dt><dd>${l.last_price != null ? fmt(l.last_price) : '—'}</dd></div>
+          <div><dt>Cours</dt><dd>${celluleCours(l)}</dd></div>
         </dl>
         <div class="actif-card-freshness">${fresh}</div>
       </article>`;
     }).join('');
   }
-  const thead = document.getElementById('actifs-thead');
-  if (thead) {
-    thead.querySelectorAll('th[data-sort]').forEach(th => {
-      th.classList.remove('sort-asc', 'sort-desc');
-      if (th.dataset.sort === _sortCol) th.classList.add(_sortDesc ? 'sort-desc' : 'sort-asc');
-    });
-  }
+  updateSortIndicators('actifs-thead', 'actifs');
   reapplyColumns('actifs', 'actifs-thead');
 }
 
 function _freshnessBadge(l) {
   if (!l.is_priceable) {
-    return '<span class="h-badge h-badge-muted" title="Non coté">non coté</span>';
+    return '<span class="h-badge h-badge-muted">non coté</span>';
   }
   if (!l.ticker && !l.last_price_date) {
-    return '<span class="h-badge h-badge-expired" title="Aucun ticker configuré">ticker ?</span>';
+    return '<span class="h-badge h-badge-expired">sans ticker</span>';
   }
-  if (!l.last_price_date) return '<span class="h-badge h-badge-expired" title="Jamais rafraichi">inconnu</span>';
+  if (!l.last_price_date) return '<span class="h-badge h-badge-expired">jamais rafraîchi</span>';
   const ageMs = Date.now() - new Date(l.last_price_date + 'T23:59:59').getTime();
   if (isNaN(ageMs)) return '<span class="h-badge h-badge-expired">inconnu</span>';
   const ageHours = ageMs / (1000 * 3600);
@@ -221,7 +228,8 @@ function _freshnessBadge(l) {
   else if (ageHours < 48) { cls = 'h-badge-stale'; lbl = '1j'; }
   else if (ageHours < 168){ cls = 'h-badge-stale'; lbl = `${Math.floor(ageHours / 24)}j`; }
   else                    { cls = 'h-badge-expired'; lbl = `${Math.floor(ageHours / 24)}j`; }
-  return `<span class="h-badge ${cls}" title="${esc(l.last_price_date)}">${lbl}</span>`;
+  // La date du cours s'affiche sous l'age : c'est elle qu'on vient chercher.
+  return `<span class="h-badge ${cls}">${lbl}</span><span class="h-badge-date">cours du ${fmtDate(l.last_price_date)}</span>`;
 }
 
 // ─── Charts ─────────────────────────────────────────────────────────────────
@@ -238,7 +246,7 @@ function _pieDataset(breakdown, colors) {
   };
 }
 
-function _pieOptions(filterType, labels) {
+function _pieOptions(filterType, labels, breakdown) {
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -275,12 +283,9 @@ function _pieOptions(filterType, labels) {
       },
       tooltip: {
         callbacks: {
-          label: ctx => {
-            const b = _data?.breakdowns?.asset_class?.[ctx.dataIndex]
-                   || _data?.breakdowns?.envelope?.[ctx.dataIndex]
-                   || {};
-            return ` ${ctx.label} : ${fmt(ctx.parsed)} (${b.weight_pct ?? '—'}%)`;
-          },
+          // La repartition du graphe survole : l'enveloppe lisait jusqu'ici le
+          // poids de la classe d'actifs de meme rang.
+          label: ctx => ` ${ctx.label} : ${fmt(ctx.parsed)} (${fmtPct(breakdown[ctx.dataIndex]?.weight_pct)})`,
         },
       },
     },
@@ -296,7 +301,7 @@ function _renderClassChart(breakdown) {
   _classChart = new Chart(canvas, {
     type: 'doughnut',
     data: _pieDataset(breakdown, getColors()),
-    options: _pieOptions('asset_class', labels),
+    options: _pieOptions('asset_class', labels, breakdown),
   });
 }
 
@@ -309,7 +314,7 @@ function _renderEnvelopeChart(breakdown) {
   _envelopeChart = new Chart(canvas, {
     type: 'doughnut',
     data: _pieDataset(breakdown, getColors().slice().reverse()),
-    options: _pieOptions('envelope', labels),
+    options: _pieOptions('envelope', labels, breakdown),
   });
 }
 
@@ -334,13 +339,8 @@ export function wireActifsEvents() {
     if (btn) openIsinPopover(btn.dataset.isin);
   });
 
-  const thead = document.getElementById('actifs-thead');
-  thead?.addEventListener('click', e => {
-    const th = e.target.closest('[data-sort]');
-    if (!th) return;
-    const col = th.dataset.sort;
-    if (col === _sortCol) _sortDesc = !_sortDesc;
-    else { _sortCol = col; _sortDesc = true; }
+  // Clic et clavier (Entree, Espace), aria-sort : le helper commun.
+  wireSortableTable('actifs-thead', 'actifs', () => {
     _persist();
     if (_data) _renderTable(_data.lines);
   });

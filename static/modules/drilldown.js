@@ -1,8 +1,38 @@
 import { S } from './state.js';
-import { fmt, fmtDate, esc, liqText, getColors, chartBorderColor, destroyChart, fmtAxis, fmtPct,
-         tsJour, echelleTemps, titreDate } from './utils.js';
+import { fmt, fmtDate, esc, liqText, getColors, destroyChart, fmtAxis, fmtPct,
+         tsJour, echelleTemps, titreDate, sortArr, wireSortableTable, updateSortIndicators } from './utils.js';
 import { api } from './api.js';
-import { closeModal, confirmDialog } from './dialogs.js';
+import { closeModal } from './dialogs.js';
+
+// Tri du tableau d'historique. Cle locale plutot que declaree dans state.js.
+S.sort.dd_history = S.sort.dd_history || { key: null, dir: 1 };
+
+/** Icone « evolution » des lignes cliquables : une courbe montante, au trait
+ *  comme les autres icones de l'application. Le nom accessible est porte par
+ *  le texte masque qui l'accompagne. */
+const ICONE_EVOLUTION = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+  <path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg><span class="sr-only">Voir l'évolution</span>`;
+
+/** Couleur de grille des graphes, lue sur le theme courant. */
+const couleurGrille = () =>
+  getComputedStyle(document.documentElement).getPropertyValue('--border').trim() || 'rgba(128,128,128,.2)';
+
+// Element qui avait le focus a l'ouverture du panneau : il le recupere a la
+// fermeture, sans quoi le clavier repart du haut de la page.
+let _focusAvant = null;
+
+/** Ouvre le panneau (ou le laisse ouvert) et place le focus sur « Fermer ». */
+function _ouvrirPanneau() {
+  const panel = document.getElementById('drilldown-panel');
+  if (!panel) return;
+  if (panel.classList.contains('hidden')) {
+    _focusAvant = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    panel.classList.remove('hidden');
+  }
+  _updateBackBtn();
+  document.getElementById('dd-close')?.focus();
+}
 
 /** Montant d'en-tete du panneau. Un net negatif en vert d'accent se lisait
  *  comme un gain : la couleur suit le signe. */
@@ -14,6 +44,8 @@ export function montantPanneau(texte, valeur) {
 
 let _historyChart = null;
 const _navStack = [];
+// Lignes du tableau d'historique affiche (date, brut, net, variation).
+let _hist = null;
 
 // ─── Navigation stack ─────────────────────────────────────────────────────
 
@@ -24,6 +56,7 @@ function _snapshot() {
     amount:   document.getElementById('dd-amount').textContent,
     negatif:  document.getElementById('dd-amount').classList.contains('neg'),
     body:     document.getElementById('dd-body').innerHTML,
+    hist:     _hist,
   };
 }
 
@@ -33,6 +66,11 @@ function _restore(snap) {
   document.getElementById('dd-title').textContent    = snap.title;
   montantPanneau(snap.amount, snap.negatif ? -1 : 1);
   document.getElementById('dd-body').innerHTML        = snap.body;
+  _hist = snap.hist;
+  // Le thead restaure a perdu ses ecouteurs : on le recable.
+  if (_hist && document.getElementById('dd-history-thead')) {
+    wireSortableTable('dd-history-thead', 'dd_history', _renderHistoryRows);
+  }
   _updateBackBtn();
 }
 
@@ -55,8 +93,12 @@ function goBack() {
 export function closeDrilldown() {
   _navStack.length = 0;
   _historyChart = destroyChart(_historyChart);
-  document.getElementById('drilldown-panel').classList.add('hidden');
+  const panel = document.getElementById('drilldown-panel');
+  const etaitOuvert = panel && !panel.classList.contains('hidden');
+  panel?.classList.add('hidden');
   _updateBackBtn();
+  if (etaitOuvert && _focusAvant?.isConnected) _focusAvant.focus();
+  _focusAvant = null;
 }
 
 // ─── Drilldown positions (clickable rows) ─────────────────────────────────
@@ -84,7 +126,7 @@ export function drilldownPositions(positions, title, subtitle, { showOwner = fal
           : '';
         const pctLabel = total > 0 ? fmtPct(pct) : '';
         return `<div class="dd-row dd-row-clickable" data-pos-id="${p.id}"
-                     data-category="${esc(p.category)}">
+                     data-category="${esc(p.category)}" role="button" tabindex="0">
           <div class="dd-row-left">
             <div class="dd-row-name">${esc(p.label || p.envelope || p.category)}</div>
             <div class="dd-row-sub">${esc([showOwner ? p.owner : null, p.category, p.establishment, p.entity, liqText(p.liquidity)].filter(Boolean).join(' · '))}</div>
@@ -93,14 +135,13 @@ export function drilldownPositions(positions, title, subtitle, { showOwner = fal
           <div class="dd-row-right">
             <div class="dd-row-val ${neg || v < 0 ? 'neg' : ''}">${fmt(v)}</div>
             ${pctLabel ? `<div class="dd-row-pct">${pctLabel}</div>` : ''}
-            <div class="dd-row-action" title="Voir l'évolution">📈</div>
+            <div class="dd-row-action">${ICONE_EVOLUTION}</div>
           </div>
         </div>`;
       }).join('')}
     </div>`;
 
-  document.getElementById('drilldown-panel').classList.remove('hidden');
-  _updateBackBtn();
+  _ouvrirPanneau();
 }
 
 // ─── Drilldown mobilizable ────────────────────────────────────────────────
@@ -124,26 +165,35 @@ export function drilldownMobilizable() {
     document.getElementById('dd-title').textContent    = 'Mobilisable';
     montantPanneau(fmt(total), total);
 
-    const sectionsHtml = S.config.liquidity_order
-      .filter(l => byLiq[l]?.length)
-      .map(l => {
-        const sub = byLiq[l].sort((a, b) => (b.mobilizable_value || 0) - (a.mobilizable_value || 0));
+    // Une position sans liquidite, ou d'une liquidite absente du referentiel,
+    // compte dans le total : elle figure donc dans une derniere section plutot
+    // que de disparaitre de la liste.
+    const ordre = S.config.liquidity_order || [];
+    const autres = Object.keys(byLiq).filter(k => !ordre.includes(k)).flatMap(k => byLiq[k]);
+    const groupes = ordre.filter(l => byLiq[l]?.length).map(l => [l, byLiq[l]]);
+    if (autres.length) groupes.push(['Autre / non classé', autres]);
+    const sectionsHtml = groupes
+      .map(([l, liste]) => {
+        const sub = liste.sort((a, b) => (b.mobilizable_value || 0) - (a.mobilizable_value || 0));
         const liqTotal = sub.reduce((s, p) => s + (p.mobilizable_value || 0), 0);
         return `<div class="dd-section">
           <div class="dd-section-title">${esc(l)} — ${fmt(liqTotal)}</div>
           ${sub.map(p => {
             const v = p.mobilizable_value || 0;
             const pct = total > 0 ? (v / total) * 100 : 0;
-            return `<div class="dd-row dd-row-clickable" data-pos-id="${p.id}" data-category="${esc(p.category)}">
+            return `<div class="dd-row dd-row-clickable" data-pos-id="${p.id}" data-category="${esc(p.category)}"
+                         role="button" tabindex="0">
               <div class="dd-row-left">
                 <div class="dd-row-name">${esc(p.label || p.envelope || p.category)}</div>
-                <div class="dd-row-sub">${esc([p.owner, p.category, p.establishment].filter(Boolean).join(' · '))}</div>
+                <div class="dd-row-sub">${esc([p.owner, p.category, p.establishment,
+                  l === 'Autre / non classé' ? (p.liquidity ? liqText(p.liquidity) : 'liquidité non renseignée') : null,
+                ].filter(Boolean).join(' · '))}</div>
                 <div class="dd-bar-wrap"><div class="dd-bar" style="width:${Math.min(100, pct).toFixed(1)}%"></div></div>
               </div>
               <div class="dd-row-right">
                 <div class="dd-row-val">${fmt(v)}</div>
                 ${total > 0 ? `<div class="dd-row-pct">${fmtPct(pct)}</div>` : ''}
-                <div class="dd-row-action" title="Voir l'évolution">📈</div>
+                <div class="dd-row-action">${ICONE_EVOLUTION}</div>
               </div>
             </div>`;
           }).join('')}
@@ -151,8 +201,7 @@ export function drilldownMobilizable() {
       }).join('');
 
     document.getElementById('dd-body').innerHTML = sectionsHtml;
-    document.getElementById('drilldown-panel').classList.remove('hidden');
-    _updateBackBtn();
+    _ouvrirPanneau();
   });
 }
 
@@ -170,44 +219,39 @@ export async function drilldownHistory({ subtitle, title, filters }) {
 
   if (!history.length) {
     montantPanneau('', 0);
+    _hist = null;
     document.getElementById('dd-body').innerHTML =
       '<p style="color:var(--text-muted);padding:.75rem">Aucune donnée historique.</p>';
-    document.getElementById('drilldown-panel').classList.remove('hidden');
-    _updateBackBtn();
+    _ouvrirPanneau();
     return;
   }
 
   const last = history[history.length - 1];
   montantPanneau(fmt(last.net), last.net);
 
-  const rows = history.map(h => {
-    const prev = history[history.indexOf(h) - 1];
-    const delta = prev ? h.net - prev.net : null;
-    const deltaStr = delta != null
-      ? `<span style="color:${delta >= 0 ? 'var(--success)' : 'var(--danger)'};font-size:11px">${delta >= 0 ? '+' : ''}${fmt(delta)}</span>`
-      : '';
-    return `<tr>
-      <td>${fmtDate(h.date)}</td>
-      <td class="num">${fmt(h.gross)}</td>
-      <td class="num">${fmt(h.net)}</td>
-      <td class="num">${deltaStr}</td>
-    </tr>`;
-  }).reverse().join('');
+  // Variation calculee dans l'ordre chronologique, avant tout tri d'affichage.
+  _hist = history.map((h, i) => ({
+    date: h.date, gross: h.gross, net: h.net,
+    delta: i > 0 ? h.net - history[i - 1].net : null,
+  }));
 
   document.getElementById('dd-body').innerHTML = `
     ${history.length >= 2 ? '<div style="position:relative;height:200px;margin-bottom:1rem"><canvas id="dd-history-chart"></canvas></div>' : ''}
     <div class="table-scroll" tabindex="0" role="region" aria-label="Historique">
       <table class="data-table">
-        <thead><tr><th>Date</th><th class="num">Brut</th><th class="num">Net</th><th class="num">Δ</th></tr></thead>
-        <tbody>${rows}</tbody>
+        <thead id="dd-history-thead"><tr><th data-sort="date">Date</th><th class="num" data-sort="gross">Brut</th>
+          <th class="num" data-sort="net">Net</th><th class="num" data-sort="delta">Variation</th></tr></thead>
+        <tbody id="dd-history-tbody"></tbody>
       </table>
     </div>`;
+  wireSortableTable('dd-history-thead', 'dd_history', _renderHistoryRows);
+  _renderHistoryRows();
 
   if (history.length >= 2) {
     _historyChart = destroyChart(_historyChart);
     const canvas = document.getElementById('dd-history-chart');
     const colors = getColors();
-    const border = chartBorderColor();
+    const border = couleurGrille();
     _historyChart = new Chart(canvas, {
       type: 'line',
       data: {
@@ -235,8 +279,28 @@ export async function drilldownHistory({ subtitle, title, filters }) {
     });
   }
 
-  document.getElementById('drilldown-panel').classList.remove('hidden');
-  _updateBackBtn();
+  _ouvrirPanneau();
+}
+
+/** Corps du tableau d'historique, selon le tri choisi. Sans tri, le plus
+ *  recent en tete. */
+function _renderHistoryRows() {
+  const tbody = document.getElementById('dd-history-tbody');
+  if (!tbody || !_hist) return;
+  const { key, dir } = S.sort.dd_history;
+  const lignes = key ? sortArr(_hist, key, dir) : [..._hist].reverse();
+  tbody.innerHTML = lignes.map(h => {
+    const deltaStr = h.delta != null
+      ? `<span style="color:${h.delta >= 0 ? 'var(--success)' : 'var(--danger)'};font-size:11px">${h.delta >= 0 ? '+' : ''}${fmt(h.delta)}</span>`
+      : '';
+    return `<tr>
+      <td>${fmtDate(h.date)}</td>
+      <td class="num">${fmt(h.gross)}</td>
+      <td class="num">${fmt(h.net)}</td>
+      <td class="num">${deltaStr}</td>
+    </tr>`;
+  }).join('');
+  updateSortIndicators('dd-history-thead', 'dd_history');
 }
 
 // ─── Events ───────────────────────────────────────────────────────────────
@@ -247,9 +311,7 @@ export function wireDrilldownEvents() {
   document.getElementById('drilldown-overlay').addEventListener('click', closeDrilldown);
 
   // Delegated click on dd-body — survives innerHTML restores from nav stack
-  document.getElementById('dd-body').addEventListener('click', e => {
-    const row = e.target.closest('.dd-row-clickable');
-    if (!row) return;
+  const ouvrirLigne = row => {
     const posId = row.dataset.posId;
     const category = row.dataset.category;
     if (posId) {
@@ -259,6 +321,18 @@ export function wireDrilldownEvents() {
         filters: { position_id: posId },
       });
     }
+  };
+  document.getElementById('dd-body').addEventListener('click', e => {
+    const row = e.target.closest('.dd-row-clickable');
+    if (row) ouvrirLigne(row);
+  });
+  // Les lignes sont des boutons (role="button") : Entree et Espace les ouvrent.
+  document.getElementById('dd-body').addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const row = e.target.closest('.dd-row-clickable');
+    if (!row) return;
+    e.preventDefault();
+    ouvrirLigne(row);
   });
 
   document.addEventListener('keydown', e => {
@@ -289,7 +363,7 @@ export function wireDrilldownEvents() {
   };
   const _ownerLabel = () => {
     const owner = S.syntheseOwner;
-    return (!owner || owner === 'Famille') ? 'Toutes les personnes' : owner;
+    return (!owner || owner === 'Famille') ? 'Tous les titulaires' : owner;
   };
   const _showOwner = () => !S.syntheseOwner || S.syntheseOwner === 'Famille';
 

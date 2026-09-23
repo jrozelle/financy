@@ -1,5 +1,5 @@
 import { api } from '../api.js';
-import { esc, fmt, parseLocaleNumber, fmtPct } from '../utils.js';
+import { esc, fmt, fmtQty, fmtDate, parseLocaleNumber, fmtPct } from '../utils.js';
 import { closeModal, confirmDialog, toast } from '../dialogs.js';
 import { loadPositions } from './positions.js';
 import { openIsinPopover } from '../isin-popover.js';
@@ -68,6 +68,7 @@ function makeRow(h = {}) {
     is_priceable:    h.is_priceable ?? null,
     last_price:      h.last_price ?? null,
     last_price_date: h.last_price_date ?? null,
+    currency:        h.currency ?? null,
     confidence:      h.confidence ?? null,
     asset_class:     h.asset_class ?? null,
     as_of_date:      h.as_of_date ?? null,
@@ -176,7 +177,7 @@ function rowHtml(r) {
       </td>
       <td>
         <input type="text" inputmode="decimal" class="h-input h-mv num" value="${r.market_value ?? ''}"
-               step="0.01" min="0" placeholder="Valo">
+               step="0.01" min="0" placeholder="Valeur">
       </td>
       <td class="num">${_pnlCell(r)}</td>
       <td>
@@ -197,8 +198,12 @@ function _freshnessBadge(r) {
   const label = f === 'fresh' ? 'à jour'
               : f === 'stale' ? 'vieillissant'
               : f === 'expired' ? 'périmé' : 'coté';
-  const title = r.last_price_date ? `Dernier cours : ${r.last_price} le ${r.last_price_date}` : 'Cours connu';
-  return `<span class="h-badge ${cls}" title="${esc(title)}">${label}</span>`;
+  // Le cours et sa date s'affichent sous le badge, dans la devise du titre :
+  // un cours en dollars suivi de « € » passerait pour une valeur en euros.
+  const devise = (r.currency || 'EUR').toUpperCase();
+  const cours = devise === 'EUR' ? fmt(r.last_price, 2) : `${fmtQty(r.last_price, 2)}\u00a0${esc(devise)}`;
+  const quand = r.last_price_date ? ` le ${fmtDate(r.last_price_date)}` : '';
+  return `<span class="h-badge ${cls}">${label}</span><span class="h-badge-date">cours ${cours}${quand}</span>`;
 }
 
 /** Valeur d'une ligne en euros, ou null. Jamais `quantite x cours` : le cours

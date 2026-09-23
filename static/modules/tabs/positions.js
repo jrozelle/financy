@@ -1,6 +1,6 @@
 import { S } from '../state.js';
 import { fmt, fmtDate, esc, liqBadge, sortArr, updateSortIndicators, today, parseLocaleNumber, fmtPct } from '../utils.js';
-import { api, refreshEntitySelect } from '../api.js';
+import { api } from '../api.js';
 import { confirmDialog, promptDialog, toast, closeModal } from '../dialogs.js';
 import { loadSynthese, loadHistorique } from './synthese.js';
 import { openHoldingsModal } from './holdings.js';
@@ -102,7 +102,7 @@ function populateFilters() {
     establishment: document.getElementById('filter-establishment').value || saved.establishment || '',
   };
 
-  fillFilter('filter-owner',         'Toutes les personnes',       owners);
+  fillFilter('filter-owner',         'Tous les titulaires',        owners);
   fillFilter('filter-envelope',      'Toutes les enveloppes',      envelopes);
   fillFilter('filter-establishment', 'Tous les établissements',    estabs);
 
@@ -238,7 +238,7 @@ export function renderPositions() {
   const positions = sortArr(filteredPositions(), S.sort.positions.key, S.sort.positions.dir);
   updateSortIndicators('positions-thead', 'positions');
   if (!positions.length) {
-    renderPositionsEmpty(S.positions.length ? 'Aucune position pour ce filtre.' : 'Aucune position pour ce snapshot.');
+    renderPositionsEmpty(S.positions.length ? 'Aucune position pour ce filtre.' : 'Aucune position pour cet arrêté.');
     reapplyColumns('positions', 'positions-thead');
     _applyPositionTableContext();
     return;
@@ -248,29 +248,31 @@ export function renderPositions() {
     const ownPct  = p.ownership_pct ?? 1;
     const debtPct = p.debt_pct ?? 1;
     const pctBadge = ownPct < 0.999
-      ? `<span class="badge badge-j27" style="margin-left:4px;font-size:10px;vertical-align:middle">${Math.round(ownPct*100)}%</span>`
+      ? `<span class="badge badge-j27" style="margin-left:4px;font-size:10px;vertical-align:middle">${fmtPct(ownPct * 100, 0)}</span>`
       : '';
     const debtBadge = p.debt_attributed > 0 && debtPct < 0.999
-      ? `<span class="badge badge-30" style="margin-left:4px;font-size:10px;vertical-align:middle">${Math.round(debtPct*100)}%</span>`
+      ? `<span class="badge badge-30" style="margin-left:4px;font-size:10px;vertical-align:middle">${fmtPct(debtPct * 100, 0)}</span>`
       : '';
     const entitySub = p.entity
       ? `<div style="font-size:11px;color:var(--text-muted);margin-top:1px">↳ ${esc(p.entity)}</div>` : '';
+    // La note s'affiche sous le libelle : derriere une icone a infobulle, elle
+    // ne se lisait ni au clavier, ni sur mobile.
     const notesMark = p.notes
-      ? `<span title="${esc(p.notes)}" style="color:var(--text-muted);font-size:11px;margin-left:4px;cursor:default">📋</span>` : '';
+      ? `<div class="pos-notes">${esc(p.notes)}</div>` : '';
     const holdingsBadge = p.holdings_count
-      ? `<span class="badge badge-j27" style="margin-left:4px;font-size:10px;vertical-align:middle" title="${p.holdings_count} ligne(s)">${p.holdings_count}L</span>`
+      ? `<span class="badge badge-j27" style="margin-left:4px;font-size:10px;vertical-align:middle">${p.holdings_count} ligne${p.holdings_count > 1 ? 's' : ''}</span>`
       : '';
     return `<tr>
       <td data-pos-col="owner"><strong>${esc(p.owner)}</strong></td>
       <td data-pos-col="establishment">${esc(p.establishment || '—')}${entitySub}</td>
       <td data-pos-col="envelope">${esc(p.envelope || '—')}</td>
-      <td data-pos-col="category">${esc(p.label || p.category)}${notesMark}${holdingsBadge}</td>
+      <td data-pos-col="category">${esc(p.label || p.category)}${holdingsBadge}${notesMark}</td>
       <td data-pos-col="gross_attributed" class="num">${fmt(p.gross_attributed)}${pctBadge}</td>
       <td data-pos-col="debt_attributed" class="num ${p.debt_attributed > 0 ? 'neg' : ''}">${p.debt_attributed > 0 ? fmt(p.debt_attributed) : '—'}${debtBadge}</td>
       <td data-pos-col="net_attributed" class="num ${p.net_attributed < 0 ? 'neg' : ''}">${fmt(p.net_attributed)}</td>
       <td data-pos-col="gain_attributed" class="num">${celluleGain(p)}</td>
       <td data-pos-col="liquidity">${liqBadge(p.liquidity)}</td>
-      <td data-pos-col="mobilizable_value" class="num">${fmt(p.mobilizable_value)}${p.mobilizable_pct_override != null ? ` <span title="Mobilisabilité surchargée : ${Math.round(p.mobilizable_pct_override*100)} %" style="color:var(--warning);font-size:11px">⚠</span>` : ''}</td>
+      <td data-pos-col="mobilizable_value" class="num">${fmt(p.mobilizable_value)}${p.mobilizable_pct_override != null ? `<div class="pos-override">surchargé : ${fmtPct(p.mobilizable_pct_override * 100, 0)}</div>` : ''}</td>
       <td data-pos-col="actions" style="white-space:nowrap">
         <button class="btn-icon" data-id="${p.id}" data-action="manage-holdings" title="Gérer les lignes">Lignes</button>
         <button class="btn-icon edit" data-id="${p.id}" data-action="edit-pos">Éditer</button>
@@ -350,11 +352,11 @@ function currentSnapshotDate() {
 export async function duplicateSnapshot() {
   const sourceDate = currentSnapshotDate();
   if (!sourceDate) {
-    toast('Aucun snapshot à dupliquer', 'error');
+    toast('Aucun arrêté à dupliquer', 'error');
     return;
   }
   const newDate = await promptDialog(
-    `Nouvelle date pour la copie du snapshot du ${fmtDate(sourceDate)}`,
+    `Nouvelle date pour la copie de l'arrêté du ${fmtDate(sourceDate)}`,
     { placeholder: 'AAAA-MM-JJ', defaultValue: today(), confirmText: 'Dupliquer' }
   );
   if (!newDate) return;
@@ -363,11 +365,11 @@ export async function duplicateSnapshot() {
     return;
   }
   if (newDate === sourceDate) {
-    toast('La date de la copie doit différer de celle du snapshot source', 'error');
+    toast('La date de la copie doit différer de celle de l’arrêté source', 'error');
     return;
   }
-  if (S.dates.includes(newDate) && !await confirmDialog('Snapshot existant',
-    `Un snapshot du ${fmtDate(newDate)} existe déjà. L'écraser ?`,
+  if (S.dates.includes(newDate) && !await confirmDialog('Arrêté existant',
+    `Un arrêté du ${fmtDate(newDate)} existe déjà. L'écraser ?`,
     { confirmText: 'Écraser', danger: true })) return;
   // Duplication cote serveur : copie positions ET holdings via le helper
   // robuste, et fige holdings_snapshots. Evite de reconstruire les positions
@@ -383,17 +385,17 @@ export async function duplicateSnapshot() {
   await loadPositions();
   await loadHistorique();
   await loadSynthese();
-  toast(`Snapshot dupliqué au ${fmtDate(newDate)}`);
+  toast(`Arrêté dupliqué au ${fmtDate(newDate)}`);
 }
 
 export async function renameSnapshot() {
   const fromDate = currentSnapshotDate();
   if (!fromDate) {
-    toast('Aucun snapshot à modifier', 'error');
+    toast('Aucun arrêté à modifier', 'error');
     return;
   }
   const newDate = await promptDialog(
-    `Nouvelle date pour le snapshot du ${fmtDate(fromDate)}`,
+    `Nouvelle date pour l'arrêté du ${fmtDate(fromDate)}`,
     { placeholder: 'AAAA-MM-JJ', defaultValue: fromDate, confirmText: 'Modifier' }
   );
   if (!newDate) return;
@@ -403,7 +405,7 @@ export async function renameSnapshot() {
   }
   if (newDate === fromDate) return;
   if (S.dates.includes(newDate)) {
-    toast(`Un snapshot du ${fmtDate(newDate)} existe déjà`, 'error');
+    toast(`Un arrêté du ${fmtDate(newDate)} existe déjà`, 'error');
     return;
   }
   try {
@@ -416,18 +418,18 @@ export async function renameSnapshot() {
   await refreshDates();
   await loadPositions();
   await loadHistorique();
-  toast('Date du snapshot modifiée');
+  toast('Date de l’arrêté modifiée');
 }
 
 export async function deleteSnapshot() {
   const date = currentSnapshotDate();
   if (!date) {
-    toast('Aucun snapshot à supprimer', 'error');
+    toast('Aucun arrêté à supprimer', 'error');
     return;
   }
   const ok = await confirmDialog(
-    'Supprimer ce snapshot',
-    `Supprimer définitivement le snapshot du ${fmtDate(date)} ` +
+    'Supprimer cet arrêté',
+    `Supprimer définitivement l'arrêté du ${fmtDate(date)} ` +
     `(positions, holdings, archives, note) ? ` +
     `L'historique des autres dates est conservé.`,
     { confirmText: 'Supprimer', danger: true }
@@ -445,7 +447,7 @@ export async function deleteSnapshot() {
   await loadPositions();
   await loadHistorique();
   await loadSynthese();
-  toast('Snapshot supprimé');
+  toast('Arrêté supprimé');
 }
 
 export function openPosModal(id = null, prefill = {}) {
@@ -583,7 +585,7 @@ export function updatePosInfo() {
     ? parseLocaleNumber(document.getElementById('pos-mob-override-pct').value, 0) / 100
     : (S.config.category_mobilizable[category] ?? 0.8);
   const mob      = net > 0 ? net * mobPct : 0;
-  const overrideLabel = useOverride ? ' ⚠ surchargé' : '';
+  const overrideLabel = useOverride ? ', surchargé' : '';
 
   document.getElementById('pos-computed-info').textContent =
     `Net : ${fmt(net)}  ·  Liquidité : ${envMeta.liquidity}  ·  Mobilisable : ${fmt(mob)} (${fmtPct(mobPct * 100, 0)}${overrideLabel})`;
@@ -624,8 +626,8 @@ export async function savePosition(e) {
     if (useSnapshot && targetDate) {
       const sourceDate = S.positions.find(p => p.id === S.editPosId)?.date;
       if (targetDate !== sourceDate && S.dates.includes(targetDate) &&
-          !await confirmDialog('Snapshot existant',
-            `Le snapshot du ${fmtDate(targetDate)} sera remplacé par une copie du ${fmtDate(sourceDate)} avec cette modification.`,
+          !await confirmDialog('Arrêté existant',
+            `L'arrêté du ${fmtDate(targetDate)} sera remplacé par une copie du ${fmtDate(sourceDate)} avec cette modification.`,
             { confirmText: 'Remplacer', danger: true })) {
         return;
       }

@@ -14,9 +14,11 @@
  */
 import { S } from '../state.js';
 import { api } from '../api.js';
-import { fmt, fmtDate, esc } from '../utils.js';
+import { fmt, fmtDate, esc, fmtQty, sortArr, wireSortableTable, updateSortIndicators } from '../utils.js';
 import { toast } from '../dialogs.js';
-import { isMasked, maskFormatted } from '../mask.js';
+
+// Tri du journal des operations. Cle locale plutot que declaree dans state.js.
+S.sort.rec_journal = S.sort.rec_journal || { key: null, dir: 1 };
 
 const V = {
   data: null,
@@ -35,9 +37,10 @@ function _date() {
 function _qty(n) {
   if (n == null) return '—';
   // Les parts d'OPCVM vont a 5 decimales, les ETF sont entiers : on n'affiche
-  // des decimales que lorsqu'il y en a.
-  const brut = Number.isInteger(n) ? String(n) : n.toFixed(5).replace(/0+$/, '').replace(/\.$/, '');
-  return isMasked() ? maskFormatted(brut) : brut;
+  // des decimales que lorsqu'il y en a. Virgule decimale et masquage : fmtQty.
+  const dec = Number.isInteger(n) ? 0
+    : (Math.abs(n).toFixed(5).replace(/0+$/, '').split('.')[1] || '').length;
+  return fmtQty(n, dec);
 }
 
 function _signe(n) {
@@ -178,31 +181,46 @@ function _journalHtml() {
   if (!rows.length) {
     return `<div id="rec-journal-body" class="rec-journal">Aucune opération enregistrée.</div>`;
   }
-  // L'API trie par date croissante et applique `limit` APRES le tri : on prend
-  // donc la fin de la liste pour obtenir les plus recentes.
-  const derniers = rows.slice(-25).reverse();
+  const derniers = _derniers();
   return `
     <div id="rec-journal-body" class="rec-journal">
       <div class="rec-journal-head">${V.journal.count} opération${
         V.journal.count > 1 ? 's' : ''} enregistrée${V.journal.count > 1 ? 's' : ''} ·
         ${derniers.length} plus récentes</div>
       <table class="data-table rec-journal-table">
-        <thead><tr>
-          <th>Date</th><th>Sens</th><th>Valeur</th><th class="num">Quantité</th>
-          <th class="num">Montant</th><th>Compte</th>
+        <thead id="rec-journal-thead"><tr>
+          <th data-sort="date">Date</th><th data-sort="_sens">Sens</th><th data-sort="_valeur">Valeur</th>
+          <th class="num" data-sort="quantity">Quantité</th>
+          <th class="num" data-sort="net_eur">Montant</th><th data-sort="_compte">Compte</th>
         </tr></thead>
-        <tbody>${derniers.map(t => `
-          <tr>
-            <td>${fmtDate(t.date)}</td>
-            <td class="${t.side === 'ACHAT' ? 'rec-buy' : 'rec-sell'}">${
-              t.side === 'ACHAT' ? 'Achat' : 'Vente'}</td>
-            <td>${esc(t.name || t.isin)}</td>
-            <td class="num">${_qty(t.quantity)}</td>
-            <td class="num">${fmt(t.net_eur)}</td>
-            <td>${esc(t.owner)}${t.envelope ? ` · ${esc(t.envelope)}` : ''}</td>
-          </tr>`).join('')}</tbody>
+        <tbody id="rec-journal-tbody">${_journalRows()}</tbody>
       </table>
     </div>`;
+}
+
+/** Les 25 operations les plus recentes, avec leurs cles de tri. L'API trie
+ *  par date croissante et applique `limit` APRES le tri : on prend donc la fin
+ *  de la liste. */
+function _derniers() {
+  return (V.journal?.transactions || []).slice(-25).reverse().map(t => ({
+    ...t,
+    _sens: t.side === 'ACHAT' ? 'Achat' : 'Vente',
+    _valeur: t.name || t.isin,
+    _compte: `${t.owner || ''}${t.envelope ? ` · ${t.envelope}` : ''}`,
+  }));
+}
+
+function _journalRows() {
+  const { key, dir } = S.sort.rec_journal;
+  return sortArr(_derniers(), key, dir).map(t => `
+          <tr>
+            <td>${fmtDate(t.date)}</td>
+            <td class="${t.side === 'ACHAT' ? 'rec-buy' : 'rec-sell'}">${t._sens}</td>
+            <td>${esc(t._valeur)}</td>
+            <td class="num">${_qty(t.quantity)}</td>
+            <td class="num">${fmt(t.net_eur)}</td>
+            <td>${esc(t._compte)}</td>
+          </tr>`).join('');
 }
 
 function majCompteur() {
@@ -242,6 +260,12 @@ function wire() {
   });
 
   document.getElementById('rec-apply')?.addEventListener('click', appliquer);
+
+  wireSortableTable('rec-journal-thead', 'rec_journal', () => {
+    const tbody = document.getElementById('rec-journal-tbody');
+    if (tbody) tbody.innerHTML = _journalRows();
+    updateSortIndicators('rec-journal-thead', 'rec_journal');
+  });
 }
 
 async function appliquer() {

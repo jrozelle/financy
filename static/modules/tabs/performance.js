@@ -1,7 +1,7 @@
 import { api } from '../api.js';
 import { S } from '../state.js';
 import { dessinerCourbe } from '../courbe.js';
-import { fmt, esc, fmtDate } from '../utils.js';
+import { fmt, esc, fmtDate, fmtPct } from '../utils.js';
 
 // Etat local : donnees, groupe isole, maille, tri de la liste.
 // Le tri par defaut est celui que produit l'API — valeur decroissante — pour
@@ -9,7 +9,9 @@ import { fmt, esc, fmtDate } from '../utils.js';
 // rapport. Il survit au rechargement des donnees : reordonner puis changer de
 // maille ne doit pas ramener a l'ordre initial.
 const V = { data: null, focus: null, group: 'account',
-            sort: { col: 'value', dir: 'desc' }, showExcluded: false };
+            sort: { col: 'value', dir: 'desc' }, showExcluded: false,
+            // Lignes dont le detail des ecarts inexpliques est deplie.
+            suspectsOpen: new Set() };
 
 // Cles de tri. Le nom concatene l'enveloppe et le libelle de compte, dans
 // l'ordre ou la ligne les affiche.
@@ -50,8 +52,8 @@ function setSort(col) {
 const n = (v, dec = 0) => v == null ? '—'
   : new Intl.NumberFormat('fr-FR', { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(v);
 
-const pct = (v, dec = 2) => v == null ? '—'
-  : `${v >= 0 ? '+' : '−'}${n(Math.abs(v) * 100, dec)} %`;
+/** Rendement en fraction (0,079) ecrit en pourcent signe (+7,90 %). */
+const pct = (v, dec = 2) => v == null ? '—' : fmtPct(v * 100, dec, true);
 
 const sign = v => v == null ? '' : (v >= 0 ? 'positive' : 'negative');
 
@@ -134,13 +136,12 @@ export function renderPerformance() {
 function renderHeader(d) {
   const host = document.getElementById('perf-controls');
   if (!host) return;
-  const hidden = (d.groups || []).filter(g => HIDDEN.has(g.status)).length;
   host.innerHTML = `
     <div class="seg" role="group" aria-label="Maille d'agrégation">
       <button type="button" class="seg-btn ${V.group === 'account' ? 'is-on' : ''}" data-group="account"
-        title="Un compte = une enveloppe chez un établissement, pour une personne. Maille correcte : chaque contrat a son propre rendement.">Par compte</button>
+        aria-pressed="${V.group === 'account'}" aria-describedby="perf-maille-aide">Par compte</button>
       <button type="button" class="seg-btn ${V.group === 'envelope' ? 'is-on' : ''}" data-group="envelope"
-        title="Fusionne tous les contrats d'une même enveloppe, toutes personnes et tous établissements confondus. Un écart avec la vue par compte signale que l'enveloppe agrège des contrats sans rapport.">Par enveloppe</button>
+        aria-pressed="${V.group === 'envelope'}" aria-describedby="perf-maille-aide">Par enveloppe</button>
     </div>
     ${V.focus ? `<button type="button" class="btn btn-sm" id="perf-reset">↩ Tout afficher</button>` : ''}
     <span class="perf-meta">${d.dates.length} arrêtés · ${fmtDate(d.first_date)} → ${fmtDate(d.date)}${
@@ -148,7 +149,10 @@ function renderHeader(d) {
         class="perf-excl-toggle" id="perf-excl" aria-expanded="${V.showExcluded}">${
         d.excluded.length} hors calcul${
         alertes(d).length ? ` · ${alertes(d).length} cours à vérifier` : ''} ${
-        V.showExcluded ? '▴' : '▾'}</button>` : ''}</span>`;
+        V.showExcluded ? '▴' : '▾'}</button>` : ''}</span>
+    <p class="form-aide perf-maille-aide" id="perf-maille-aide">${V.group === 'account'
+      ? 'Un compte : une enveloppe chez un établissement, pour un titulaire. Chaque contrat a son propre rendement.'
+      : 'Tous les contrats d’une même enveloppe fusionnés, titulaires et établissements confondus. Un écart avec la vue par compte signale une enveloppe qui agrège des contrats sans rapport.'}</p>`;
   host.querySelectorAll('[data-group]').forEach(b => b.addEventListener('click', () => {
     if (V.group === b.dataset.group) return;
     V.group = b.dataset.group;
@@ -212,24 +216,37 @@ function renderList(d) {
       || (g.categories || []).join(', ');
     // Un seul badge de statut par ligne : "valeur negative" et "non mesurable"
     // cote a cote se contredisaient. Et une TWR negative est un resultat normal,
-    // pas une anomalie : rien ne la signale.
+    // pas une anomalie : rien ne la signale. Seul « historique insuffisant »
+    // reste dans la liste : les autres statuts sont dans HIDDEN, detailles dans
+    // le panneau « hors calcul ».
     const STATUS_BADGE = {
       insufficient: ['historique insuffisant',
-        'Il faut deux valorisations successives pour mesurer un rendement.'],
-      negative: ['capital négatif',
-        "Valeur nulle ou négative sur la période : un rendement n'a pas de sens sur une dette nette ou un apport en compte courant."],
+        'Il faut deux valorisations successives pour mesurer un rendement. Hors du total.'],
     };
     const st = STATUS_BADGE[g.status];
+    const suspects = g.suspect_periods || [];
     const flags = [
-      st ? `<span class="badge badge-blk" title="${esc(st[1])} Hors du total.">${st[0]}</span>` : '',
+      st ? `<span class="badge badge-blk">${st[0]}</span>` : '',
       g.price_warnings?.length
         ? `<span class="badge badge-30">cours à vérifier</span>` : '',
-      g.suspect_periods?.length ? `<span class="badge badge-30"
-        title="${esc(g.suspect_periods.map(x =>
-          `${fmtDate(x.from)} → ${fmtDate(x.to)} : ${pct(x.change)} inexpliqué (${
-            x.delta >= 0 ? '+' : '−'}${fmt(Math.abs(x.delta))} de variation, ${
-            x.flux ? fmt(x.flux) + ' de flux déclaré' : 'aucun flux déclaré'})`).join(' · '))}">écart inexpliqué</span>` : '',
+      suspects.length ? `<span class="badge badge-30">écart inexpliqué</span>` : '',
     ].join(' ');
+    // Le motif et la liste des ecarts s'affichent sous la ligne, pas dans une
+    // infobulle : ils conditionnent la lecture du rendement.
+    const ouvert = V.suspectsOpen.has(g.key);
+    const idDetail = `perf-susp-${esc(g.key).replace(/[^\w-]/g, '_')}`;
+    const detail = st || suspects.length ? `
+      <div class="perf-detail">
+        ${st ? `<span>${esc(st[1])}</span>` : ''}
+        ${suspects.length ? `<button type="button" class="perf-excl-toggle" data-suspects="${esc(g.key)}"
+            aria-expanded="${ouvert}" aria-controls="${idDetail}">${suspects.length} période${
+            suspects.length > 1 ? 's' : ''} à variation inexpliquée ${ouvert ? '▴' : '▾'}</button>
+          <ul class="perf-detail-list" id="${idDetail}"${ouvert ? '' : ' hidden'}>${suspects.map(x => `
+            <li>${fmtDate(x.from)} → ${fmtDate(x.to)} : ${pct(x.change)} inexpliqué (${
+              x.delta >= 0 ? '+' : '−'}${fmt(Math.abs(x.delta))} de variation, ${
+              x.flux ? fmt(x.flux) + ' de flux déclaré' : 'aucun flux déclaré'})</li>`).join('')}
+          </ul>` : ''}
+      </div>` : '';
     return `
       <div class="perf-item${V.focus === g.key ? ' is-focus' : ''}" data-key="${esc(g.key)}"
            tabindex="0" role="button" aria-pressed="${V.focus === g.key}">
@@ -250,7 +267,7 @@ function renderList(d) {
         <div class="perf-val">${fmt(g.value)}
           <span class="perf-num-sub">${flags || (g.flux_count ? `${g.flux_count} flux` : '')}</span>
         </div>
-      </div>`;
+      </div>${detail}`;
   };
   const g = d.global;
   // En-tetes triables. La colonne de barres n'en est pas une : elle donne a
@@ -313,6 +330,13 @@ function renderList(d) {
       if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); trier(); }
     });
   });
+  host.querySelectorAll('[data-suspects]').forEach(b => b.addEventListener('click', () => {
+    const k = b.dataset.suspects;
+    if (V.suspectsOpen.has(k)) V.suspectsOpen.delete(k); else V.suspectsOpen.add(k);
+    renderPerformance();
+    // Le rendu remplace le bouton : le focus clavier y revient.
+    document.querySelector(`#perf-list [data-suspects="${CSS.escape(k)}"]`)?.focus();
+  }));
   host.querySelectorAll('.perf-item[data-key]').forEach(el => {
     const pick = () => {
       V.focus = V.focus === el.dataset.key ? null : el.dataset.key;

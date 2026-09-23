@@ -15,8 +15,13 @@
  */
 import { S } from '../state.js';
 import { api } from '../api.js';
-import { fmt, esc, fmtPct } from '../utils.js';
+import { fmt, esc, fmtPct, fmtDate, sortArr, wireSortableTable, updateSortIndicators } from '../utils.js';
 import { estFinancier } from '../categories.js';
+
+// Tri du tableau. Cle locale plutot que declaree dans state.js.
+S.sort.comptes = S.sort.comptes || { key: null, dir: 1 };
+// Lignes affichees, gardees pour retrier sans recharger.
+let _groupes = [];
 
 export async function loadComptes() {
   const carte = document.getElementById('comptes-card');
@@ -46,7 +51,23 @@ export async function loadComptes() {
 
   if (!groupes.length) { carte.style.display = 'none'; return; }
   carte.style.display = '';
+  // Le taux affiche sert de cle de tri : un compte non mesurable n'en a pas,
+  // et reste en bas dans les deux sens.
+  _groupes = groupes.map(g => {
+    const r = g.status === 'ok' ? rendement(g) : null;
+    return { ...g, _taux: r ? r.taux : null };
+  });
   carte.innerHTML = rendu(groupes, d, clotures, hors);
+  wireSortableTable('comptes-thead', 'comptes', renderLignes);
+  renderLignes();
+}
+
+function renderLignes() {
+  const tbody = document.getElementById('comptes-tbody');
+  if (!tbody) return;
+  const { key, dir } = S.sort.comptes;
+  tbody.innerHTML = sortArr(_groupes, key, dir).map(ligne).join('');
+  updateSortIndicators('comptes-thead', 'comptes');
 }
 
 function rendu(groupes, d, clotures = 0, hors = 0) {
@@ -58,7 +79,7 @@ function rendu(groupes, d, clotures = 0, hors = 0) {
       <div>
         <h2>Vos comptes</h2>
         <p class="card-sub">Ce que votre argent a rapporté, selon la date de vos versements · frais déduits${
-          d.first_date ? ` · depuis le ${d.first_date.split('-').reverse().join('/')}` : ''}${
+          d.first_date ? ` · depuis le ${fmtDate(d.first_date)}` : ''}${
           clotures ? ` · ${clotures} compte${clotures > 1 ? 's' : ''} clôturé${
             clotures > 1 ? 's' : ''}, non listé${clotures > 1 ? 's' : ''}` : ''}${
           hors ? ` · ${hors} ligne${hors > 1 ? 's' : ''} hors placements financiers
@@ -68,18 +89,16 @@ function rendu(groupes, d, clotures = 0, hors = 0) {
     </div>
     <div class="comptes-wrap" tabindex="0" role="region" aria-label="Vos comptes">
       <table class="comptes">
-        <thead>
+        <thead id="comptes-thead">
           <tr>
-            <th scope="col">Compte</th>
-            <th scope="col">Valeur</th>
-            <th scope="col">Apports</th>
-            <th scope="col">Frais</th>
-            <th scope="col">Rendement</th>
+            <th scope="col" data-sort="label">Compte</th>
+            <th scope="col" data-sort="value">Valeur</th>
+            <th scope="col" data-sort="flux_net">Apports</th>
+            <th scope="col" data-sort="fees">Frais</th>
+            <th scope="col" data-sort="_taux">Rendement</th>
           </tr>
         </thead>
-        <tbody>
-          ${groupes.map(ligne).join('')}
-        </tbody>
+        <tbody id="comptes-tbody"></tbody>
         <tfoot>
           <tr>
             <td>${groupes.length} comptes</td>

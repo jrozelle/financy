@@ -8,12 +8,21 @@
  */
 import { S } from '../state.js';
 import { api } from '../api.js';
-import { fmt, fmtDate, esc, today, fmtPct, fmtAxis, parseLocaleNumber } from '../utils.js';
+import { fmt, fmtDate, esc, today, fmtPct, fmtAxis, parseLocaleNumber,
+         sortArr, wireSortableTable, updateSortIndicators } from '../utils.js';
 import { toast, confirmDialog } from '../dialogs.js';
 import { dessinerCourbe } from '../courbe.js';
 
 const COULEURS = ['var(--nature-immo)', 'var(--nature-liq)', 'var(--nature-biens)', 'var(--nature-fin)'];
 let _cable = false;
+
+// Tri des deux tableaux de l'echeancier. Cles locales plutot que declarees
+// dans state.js.
+S.sort.credits_prochaines = S.sort.credits_prochaines || { key: null, dir: 1 };
+S.sort.credits_annees     = S.sort.credits_annees     || { key: null, dir: 1 };
+let _lignesProchaines = [];
+let _lignesAnnees = [];
+let _couleurPret = () => '';
 
 export async function loadPrets() {
   const carte = document.getElementById('prets-carte');
@@ -58,9 +67,9 @@ function _liste(prets) {
     <div class="pret" data-id="${p.id}">
       <div class="pret-nom">
         <i style="background:${COULEURS[i % COULEURS.length]}"></i>
-        <span><b>${esc(p.libelle)}</b><small>${esc(p.preteur || '')}${p.taux ? ` · ${String(p.taux).replace('.', ',')} %` : ''}
+        <span><b>${esc(p.libelle)}</b><small>${esc(p.preteur || '')}${p.taux ? ` · ${fmtPct(p.taux, 2)}` : ''}
           · ${fmt(p.montant)} empruntés${p.part != null && p.part < 1
-            ? ` · <b class="pret-part">part de ${esc(S.syntheseOwner)} : ${Math.round(p.part * 100)} %</b>` : ''}</small></span>
+            ? ` · <b class="pret-part">part de ${esc(S.syntheseOwner)} : ${fmtPct(p.part * 100, 0)}</b>` : ''}</small></span>
       </div>
       <label class="pret-entite"><span class="sr-only">Entité de ${esc(p.libelle)}</span>
         <select class="filter-select" data-pret-entite="${p.id}">${options(p.entity)}</select></label>
@@ -85,11 +94,11 @@ function _liste(prets) {
  *  quand le tableau ne l'imprime pas, est deduit de l'echeancier — et dit. */
 function _solder(p) {
   if (!p.crd) return '';
-  const taux = p.taux_retenu ? `${String(p.taux_retenu).replace('.', ',')} %${p.taux_deduit ? ' (déduit de l’échéancier)' : ''}` : 'taux inconnu';
+  const taux = p.taux_retenu ? `${fmtPct(p.taux_retenu, 2)}${p.taux_deduit ? ' (déduit de l’échéancier)' : ''}` : 'taux inconnu';
   const gain = p.interets_restants - p.ira;
   return `<div class="pret-solder">
       <span>Solder aujourd'hui : <b>${fmt(p.crd + p.ira)}</b>, dont <b>${fmt(p.ira)}</b> d'IRA
-        ${p.ira ? `(plafond légal : 6 mois d'intérêts à ${taux}, ou 3 % du restant dû)` : '(le contrat y renonce)'}
+        ${p.ira ? `(plafond légal : 6 mois d'intérêts à ${taux}, ou 3\u202f% du restant dû)` : '(le contrat y renonce)'}
         — évite ${fmt(p.interets_restants)} d'intérêts et d'assurance à venir${gain > 0 ? `, soit ${fmt(gain)} de moins au total` : ''}.</span>
       <label class="pret-ira"><span class="sr-only">IRA de ${esc(p.libelle)}</span>
         <select class="filter-select" data-pret-ira="${p.id}">
@@ -121,24 +130,49 @@ function _prochaines(liste, prets) {
   const hote = document.getElementById('credits-prochaines');
   if (!hote) return;
   if (!liste.length) { hote.innerHTML = '<p class="text-muted">Aucune échéance à venir.</p>'; return; }
-  const couleur = id => COULEURS[prets.findIndex(p => p.id === id) % COULEURS.length];
-  hote.innerHTML = `<table class="data-table credits-table"><thead><tr>
-      <th>Date</th><th>Crédit</th><th class="num">Capital</th><th class="num">Intérêts</th><th class="num">Total</th></tr></thead>
-    <tbody>${liste.map(e => `<tr><td>${fmtDate(e.date)}</td>
-      <td><i class="pastille" style="background:${couleur(e.pret_id)}"></i>${esc(e.pret || '')}</td>
+  _couleurPret = id => COULEURS[prets.findIndex(p => p.id === id) % COULEURS.length];
+  _lignesProchaines = liste.map(e => ({ ...e, _charges: e.interets + e.assurance,
+    _total: Math.max(e.capital, 0) + e.interets + e.assurance }));
+  hote.innerHTML = `<table class="data-table credits-table"><thead id="credits-prochaines-thead"><tr>
+      <th data-sort="date">Date</th><th data-sort="pret">Crédit</th><th class="num" data-sort="capital">Capital</th>
+      <th class="num" data-sort="_charges">Intérêts</th><th class="num" data-sort="_total">Total</th></tr></thead>
+    <tbody id="credits-prochaines-tbody"></tbody></table>`;
+  wireSortableTable('credits-prochaines-thead', 'credits_prochaines', _rendreProchaines);
+  _rendreProchaines();
+}
+
+function _rendreProchaines() {
+  const tbody = document.getElementById('credits-prochaines-tbody');
+  if (!tbody) return;
+  const { key, dir } = S.sort.credits_prochaines;
+  tbody.innerHTML = sortArr(_lignesProchaines, key, dir).map(e => `<tr><td>${fmtDate(e.date)}</td>
+      <td><i class="pastille" style="background:${_couleurPret(e.pret_id)}"></i>${esc(e.pret || '')}</td>
       <td class="num">${e.capital < 0 ? `<span class="text-muted">différé (+${fmt(-e.capital)})</span>` : fmt(e.capital)}</td>
-      <td class="num">${fmt(e.interets + e.assurance)}</td>
-      <td class="num"><b>${fmt(Math.max(e.capital, 0) + e.interets + e.assurance)}</b></td></tr>`).join('')}</tbody></table>`;
+      <td class="num">${fmt(e._charges)}</td>
+      <td class="num"><b>${fmt(e._total)}</b></td></tr>`).join('');
+  updateSortIndicators('credits-prochaines-thead', 'credits_prochaines');
 }
 
 function _annees(liste) {
   const hote = document.getElementById('credits-annees');
   if (!hote) return;
   if (!liste.length) { hote.innerHTML = ''; return; }
-  hote.innerHTML = `<table class="data-table credits-table"><thead><tr>
-      <th>Année</th><th class="num">Capital remboursé</th><th class="num">Intérêts et assurance</th><th class="num">Restant dû au 31/12</th></tr></thead>
-    <tbody>${liste.map(a => `<tr><td>${a.annee}</td><td class="num">${fmt(a.capital)}</td>
-      <td class="num">${fmt(a.interets + a.assurance)}</td><td class="num"><b>${fmt(a.crd_fin)}</b></td></tr>`).join('')}</tbody></table>`;
+  _lignesAnnees = liste.map(a => ({ ...a, _charges: a.interets + a.assurance }));
+  hote.innerHTML = `<table class="data-table credits-table"><thead id="credits-annees-thead"><tr>
+      <th data-sort="annee">Année</th><th class="num" data-sort="capital">Capital remboursé</th>
+      <th class="num" data-sort="_charges">Intérêts et assurance</th><th class="num" data-sort="crd_fin">Restant dû au 31/12</th></tr></thead>
+    <tbody id="credits-annees-tbody"></tbody></table>`;
+  wireSortableTable('credits-annees-thead', 'credits_annees', _rendreAnnees);
+  _rendreAnnees();
+}
+
+function _rendreAnnees() {
+  const tbody = document.getElementById('credits-annees-tbody');
+  if (!tbody) return;
+  const { key, dir } = S.sort.credits_annees;
+  tbody.innerHTML = sortArr(_lignesAnnees, key, dir).map(a => `<tr><td>${a.annee}</td><td class="num">${fmt(a.capital)}</td>
+      <td class="num">${fmt(a._charges)}</td><td class="num"><b>${fmt(a.crd_fin)}</b></td></tr>`).join('');
+  updateSortIndicators('credits-annees-thead', 'credits_annees');
 }
 
 function _courbe(pj, prets) {
@@ -262,7 +296,7 @@ async function _apercu(fichier) {
       ...(S.entities || []).map(e => `<option value="${esc(e.name)}"${e.name === p.entite_proposee ? ' selected' : ''}>${esc(e.name)}</option>`)].join('');
     hote.innerHTML = `
       <p><b>${esc(p.libelle)}</b> · ${esc(p.preteur)}${p.emprunteur ? ` · emprunteur ${esc(p.emprunteur)}` : ''}</p>
-      <p class="text-muted">${fmt(p.montant)} empruntés${p.taux ? ` à ${String(p.taux).replace('.', ',')} %` : ''} ·
+      <p class="text-muted">${fmt(p.montant)} empruntés${p.taux ? ` à ${fmtPct(p.taux, 2)}` : ''} ·
         ${p.echeances} échéances, du ${fmtDate(p.debut)} au ${fmtDate(p.fin)}</p>
       <p class="prets-controle">${(p.controles || []).map(esc).join(' · ')}</p>
       ${p.deja ? `<p class="import-alerte">Ce prêt est déjà enregistré (« ${esc(p.deja.libelle)} »).</p>` : ''}
