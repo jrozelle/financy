@@ -640,11 +640,39 @@ def impot_latent_api():
 @synthese_bp.route('/api/projection/epargne')
 @login_required
 def projection_epargne():
-    """Epargne mensuelle mesuree (mediane des apports externes nets des six
-    derniers mois pleins), point de depart de la projection du patrimoine."""
-    from services.contribution import epargne_mensuelle
+    """Les deux rythmes de la projection, a ne pas confondre :
+
+    - l'epargne NOUVELLE, l'argent qui entre dans le patrimoine ;
+    - le DCA, qui investit l'excedent de liquidites : l'argent change de poche,
+      le net ne bouge pas, mais il se met a rapporter. Il s'arrete quand
+      l'excedent sur la cible du profil est investi.
+    """
+    from services.contribution import epargne_nouvelle, epargne_mensuelle
+    from services.advisor.allocation import allocation_financiere, load_matrix
+    from routes.advisor import _build_positions_for_owner, _entites, _normalize_profile_dict
+    aujourd_hui = datetime.now().strftime('%Y-%m-%d')
     with get_db() as conn:
-        return jsonify(epargne_mensuelle(conn, datetime.now().strftime('%Y-%m-%d')))
+        nouvelle = epargne_nouvelle(conn, aujourd_hui)
+        versements = epargne_mensuelle(conn, aujourd_hui)
+        excedents = []
+        matrix, entites = load_matrix(conn), _entites(conn)
+        for prof in conn.execute('SELECT * FROM owner_profiles').fetchall():
+            profil = _normalize_profile_dict(dict(prof))
+            positions, date = _build_positions_for_owner(conn, profil['owner'], None)
+            if not date:
+                continue
+            a = allocation_financiere(profil, positions, matrix, entites=entites)
+            cash = next((g for g in a['gap'] if g['category'] == 'Cash'), None)
+            if not cash:
+                continue
+            garde = max(cash['target_eur'], profil.get('reserve_eur') or a['reglementes_eur'])
+            excedents.append({'owner': profil['owner'],
+                              'montant': round(max(0.0, cash['actual_eur'] - garde), 2)})
+    return jsonify({
+        'nouvelle': nouvelle,
+        'dca': {'mensuel': versements['mediane'], 'mois': versements['mois'],
+                'excedent': round(sum(e['montant'] for e in excedents), 2), 'par_titulaire': excedents},
+    })
 
 
 @synthese_bp.route('/api/contribution')

@@ -198,3 +198,72 @@ def epargne_mensuelle(conn, fin, mois=6):
     n = len(v)
     mediane = (v[n // 2] if n % 2 else (v[n // 2 - 1] + v[n // 2]) / 2) if n else 0.0
     return {'mois': parmois, 'mediane': round(mediane, 2)}
+
+
+# Enveloppes dont un compte « Cash & dépôts » reste du financier (les especes
+# d'un PEA) : meme jeu que `ENVELOPPES_DE_PLACEMENT` cote navigateur.
+PLACEMENT = {'PEA', 'PEA-PME', 'Assurance-vie', 'PER', 'CTO', 'Crypto'}
+
+
+def _liquidites_par_compte(conn, date):
+    """Liquidites personnelles a un arrete, par compte (titulaire, enveloppe,
+    etablissement, libelle) : hors entites, hors especes d'enveloppe."""
+    from models import compute_position, get_entity_map, get_holdings_map, load_referential
+    rows = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
+    hm = get_holdings_map(conn, [r['id'] for r in rows])
+    em, ref = get_entity_map(conn, date), load_referential(conn)
+    out = {}
+    for r in rows:
+        if r['category'] != 'Cash & dépôts' or r['envelope'] in PLACEMENT or r['entity']:
+            continue
+        p = compute_position(dict(r), em, ref, hm)
+        cle = (r['owner'], r['envelope'] or '', r['establishment'] or '', r['label'] or '')
+        out[cle] = out.get(cle, 0.0) + (p['net_attributed'] or 0.0)
+    return out
+
+
+def epargne_nouvelle(conn, fin, jours=183):
+    """L'argent qui ENTRE dans le patrimoine, par mois : la variation des
+    liquidites plus ce qui en est parti vers les placements.
+
+    Les versements seuls ne le disent pas : un DCA qui investit l'excedent
+    d'un livret est un versement sans etre de l'epargne — l'argent change de
+    poche. Le salaire, lui, arrive sur un compte courant sans aucun flux. Sa
+    trace est la hausse des liquidites, versements vers les placements
+    rajoutes.
+
+    La variation ne porte que sur les comptes presents aux deux arretes : un
+    compte qui entre dans le suivi n'est pas de l'epargne. Le rythme retenu est
+    celui de toute la fenetre ; un versement exceptionnel s'y voit dans la
+    liste des periodes.
+    """
+    from datetime import date as _d, timedelta
+    from routes.performance import _flux_signed
+    debut = (_d.fromisoformat(fin[:10]) - timedelta(days=jours)).isoformat()
+    arretes = [r['date'] for r in conn.execute('SELECT DISTINCT date FROM positions ORDER BY date')]
+    avant = [a for a in arretes if a <= debut]
+    fenetre = ([avant[-1]] if avant else []) + [a for a in arretes if debut < a <= fin]
+    periodes = []
+    precedent = None
+    for a in fenetre:
+        courant = _liquidites_par_compte(conn, a)
+        if precedent is not None:
+            communs = set(precedent[1]) & set(courant)
+            dliq = sum(courant[k] - precedent[1][k] for k in communs)
+            vers = sum(_flux_signed(dict(r)) for r in conn.execute(
+                'SELECT type, amount FROM flux WHERE date > ? AND date <= ? AND envelope IN (%s)'
+                % ','.join('?' * len(PLACEMENT)), (precedent[0], a, *PLACEMENT)))
+            duree = (_d.fromisoformat(a) - _d.fromisoformat(precedent[0])).days
+            if duree > 0:
+                periodes.append({'debut': precedent[0], 'fin': a, 'jours': duree,
+                                 'epargne': round(dliq + vers, 2), 'versements': round(vers, 2),
+                                 'par_mois': round((dliq + vers) / duree * 30.44, 2)})
+        precedent = (a, courant)
+    # Le rythme sur toute la fenetre : les periodes sont trop courtes et trop
+    # irregulieres (un salaire tombe avant ou apres l'arrete) pour qu'une
+    # mediane de periodes ait un sens. La liste les montre, pour juger.
+    total = sum(p['jours'] for p in periodes)
+    mois = total / 30.44 if total else 0
+    return {'periodes': periodes,
+            'par_mois': round(sum(p['epargne'] for p in periodes) / mois, 2) if mois else 0.0,
+            }

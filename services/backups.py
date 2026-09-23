@@ -102,5 +102,7 @@ if __name__ == '__main__':
     cibles = purger(DB_PATH, simulation=not appliquer)
     for c in cibles:
         print(('supprime ' if appliquer else 'a supprimer ') + os.path.basename(c))
+    # En simulation, les cibles sont encore la : elles ne comptent pas parmi les gardees.
+    gardees = len(copies(DB_PATH)) - (0 if appliquer else len(cibles))
     print(f'{len(cibles)} copie(s) {"supprimee(s)" if appliquer else "a supprimer (simulation)"}, '
-          f'{len(copies(DB_PATH))} gardee(s)')
+          f'{gardees} gardee(s)')

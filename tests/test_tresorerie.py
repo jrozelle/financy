@@ -150,3 +150,27 @@ class TestEpargneMensuelle:
             e = epargne_mensuelle(conn, '2026-09-23')
         assert [m['apports'] for m in e['mois']] == [100000, 3000, 3200, 2800, 3100, 2900]
         assert e['mediane'] == pytest.approx(3050)
+
+
+class TestEpargneNouvelle:
+    """Un DCA depuis un livret n'est pas de l'epargne ; un compte qui entre
+    dans le suivi non plus ; le salaire qui gonfle un livret, si."""
+
+    def _pos(self, conn, date, envelope, value, label=None, category='Cash & dépôts'):
+        conn.execute("INSERT INTO positions (date, owner, category, envelope, establishment, label, value) "
+                     "VALUES (?, 'Paul', ?, ?, 'Banque', ?, ?)", (date, category, envelope, label, value))
+
+    def test_dca_et_compte_nouveau_ne_comptent_pas(self):
+        from services.contribution import epargne_nouvelle
+        with get_db() as conn:
+            self._pos(conn, '2026-08-01', 'Livret A', 10000)
+            self._pos(conn, '2026-08-01', 'PEA', 5000, category='Actions')
+            # Un mois plus tard : 3 000 € de DCA vers le PEA sont partis du
+            # livret, qui a aussi recu 1 000 € de salaire ; un LDDS entre dans le suivi.
+            self._pos(conn, '2026-08-31', 'Livret A', 8000)
+            self._pos(conn, '2026-08-31', 'PEA', 8000, category='Actions')
+            self._pos(conn, '2026-08-31', 'LDDS', 12000)
+            conn.execute("INSERT INTO flux (date, owner, envelope, type, amount) VALUES ('2026-08-15', 'Paul', 'PEA', 'Versement', 3000)")
+            e = epargne_nouvelle(conn, '2026-09-01')
+        (p,) = e['periodes']
+        assert p['epargne'] == 1000 and p['versements'] == 3000

@@ -3,8 +3,13 @@
  *
  * - le desendettement : le capital que les echeanciers rembourseront, connu a
  *   l'euro pres ;
- * - l'epargne : la mediane des apports mensuels mesures, modifiable ;
+ * - l'epargne NOUVELLE : l'argent qui entre dans le patrimoine, mesure sur la
+ *   hausse des liquidites plus ce qui en part vers les placements ;
  * - le rendement du patrimoine financier : une hypothese, affichee comme telle.
+ *
+ * Le DCA n'est pas de l'epargne : il investit l'excedent de liquidites, le net
+ * ne bouge pas, mais cet argent se met a rapporter — jusqu'a epuisement de
+ * l'excedent, quand la repartition atteint sa cible.
  *
  * Les liquidites, l'immobilier et les biens sont tenus a valeur constante : les
  * revaloriser serait un pari de plus, et le montrer en pointille (net sans
@@ -15,9 +20,11 @@ import { natureDe } from '../categories.js';
 import { dessinerCourbe } from '../courbe.js';
 import { fmt, parseLocaleNumber } from '../utils.js';
 
-const CLE = 'financy_projection';
+// v2 : l'epargne a change de sens (nouvelle, et non plus versements) ; un
+// reglage memorise sous l'ancienne cle y reinjecterait le rythme du DCA.
+const CLE = 'financy_projection_v2';
 let _ctx = null;
-let _epargneMesuree = null;
+let _mesure = null;
 let _crd = null;
 
 function _reglages() {
@@ -49,47 +56,65 @@ export async function renderProjection(positions, isFamily, net, objectif) {
   carte.style.display = isFamily && positions.length ? '' : 'none';
   if (!isFamily || !positions.length) return;
   _ctx = { positions, net, objectif };
-  if (_epargneMesuree == null || _crd == null) {
+  if (_mesure == null || _crd == null) {
     const [e, c] = await Promise.all([
       api('GET', '/api/projection/epargne', null, { silent: true }).catch(() => null),
       api('GET', '/api/prets/projection', null, { silent: true }).catch(() => null),
     ]);
-    _epargneMesuree = e?.mediane ?? 0;
+    _mesure = e || { nouvelle: { par_mois: 0, periodes: [] }, dca: { mensuel: 0, excedent: 0 } };
     _crd = c || { dates: [], total: [] };
-    _cabler(e);
+    _cabler();
   }
   _dessiner();
 }
 
-function _cabler(mesure) {
-  const r = _reglages();
-  const ep = document.getElementById('proj-epargne');
-  const rd = document.getElementById('proj-rendement');
-  const hz = document.getElementById('proj-horizon');
-  ep.value = r.epargne ?? Math.round(_epargneMesuree);
-  rd.value = r.rendement ?? 3;
-  hz.value = String(r.horizon ?? 10);
+const CHAMPS = {
+  epargne:   { id: 'proj-epargne',   defaut: () => Math.round(_mesure.nouvelle.par_mois) },
+  aInvestir: { id: 'proj-a-investir', defaut: () => Math.round(_mesure.dca.excedent) },
+  dca:       { id: 'proj-dca',       defaut: () => Math.round(_mesure.dca.mensuel) },
+  rendement: { id: 'proj-rendement', defaut: () => 3 },
+  horizon:   { id: 'proj-horizon',   defaut: () => 10 },
+};
+
+function _remplir(r = {}) {
+  Object.entries(CHAMPS).forEach(([k, c]) => {
+    document.getElementById(c.id).value = String(r[k] ?? c.defaut());
+  });
+}
+
+function _cabler() {
+  _remplir(_reglages());
   const aide = document.getElementById('proj-epargne-aide');
-  if (aide && mesure?.mois?.length) {
-    aide.textContent = `Mesurée : ${fmt(_epargneMesuree)} par mois, médiane des apports des six derniers mois `
-      + `(${mesure.mois.map(m => fmt(m.apports)).join(', ')}) — un versement exceptionnel n'est pas extrapolé.`;
+  if (aide) {
+    const n = _mesure.nouvelle.periodes || [];
+    aide.textContent = `Épargne nouvelle mesurée : ${fmt(_mesure.nouvelle.par_mois)} par mois sur six mois — la hausse `
+      + `des liquidités plus ce qui en est parti vers les placements (${n.length} périodes entre arrêtés). `
+      + `Le DCA, lui, investit l'excédent de liquidités sur la cible du profil (${fmt(_mesure.dca.excedent)}) `
+      + `au rythme de vos versements (${fmt(_mesure.dca.mensuel)} par mois) : il ne crée pas de patrimoine, il le fait travailler.`;
   }
   const maj = () => {
-    _memoriser({ epargne: parseLocaleNumber(ep.value, 0), rendement: parseLocaleNumber(rd.value, 0), horizon: +hz.value });
+    const r = {};
+    Object.entries(CHAMPS).forEach(([k, c]) => { r[k] = parseLocaleNumber(document.getElementById(c.id).value, 0); });
+    _memoriser(r);
     _dessiner();
   };
-  [ep, rd].forEach(x => x.addEventListener('input', maj));
-  hz.addEventListener('change', maj);
+  Object.values(CHAMPS).forEach(c => {
+    const el = document.getElementById(c.id);
+    el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', maj);
+  });
   document.getElementById('proj-reinit')?.addEventListener('click', () => {
     _memoriser({});
-    ep.value = Math.round(_epargneMesuree); rd.value = 3; hz.value = '10';
+    _remplir();
     _dessiner();
   });
 }
 
 function _dessiner() {
   const { positions, net, objectif } = _ctx;
-  const epargne = parseLocaleNumber(document.getElementById('proj-epargne').value, 0);
+  const val = id => parseLocaleNumber(document.getElementById(id).value, 0);
+  const epargne = val('proj-epargne');
+  let aInvestir = Math.max(0, val('proj-a-investir'));
+  const dca = Math.max(0, val('proj-dca'));
   const taux = parseLocaleNumber(document.getElementById('proj-rendement').value, 0) / 100;
   const annees = +document.getElementById('proj-horizon').value || 10;
   const financier = positions.filter(p => natureDe(p.category, p.envelope) === 'fin')
@@ -99,16 +124,21 @@ function _dessiner() {
   const crd0 = _crdA(t0);
   const rm = (1 + taux) ** (1 / 12) - 1;
   const points = [], sansRendement = [];
-  let F = financier, epargneCum = 0, atteint = null;
+  let F = financier, epargneCum = 0, dcaCum = 0, finDca = null, atteint = null;
   const parts = {};
   for (let m = 0; m <= annees * 12; m++) {
     if (m > 0) {
-      F = F * (1 + rm) + epargne;     // l'epargne s'investit dans le financier
+      // L'epargne nouvelle s'investit ; le DCA deplace l'excedent de
+      // liquidites vers le financier, sans changer le net.
+      const deplace = Math.min(dca, aInvestir);
+      aInvestir -= deplace; dcaCum += deplace;
+      F = F * (1 + rm) + epargne + deplace;
       epargneCum += epargne;
     }
     const t = new Date(t0); t.setMonth(t.getMonth() + m);
     const desendettement = crd0 - _crdA(+t);
-    const rendement = F - financier - epargneCum;
+    const rendement = F - financier - epargneCum - dcaCum;
+    if (!finDca && dcaCum > 0 && aInvestir <= 0) finDca = t;
     const v = net + desendettement + epargneCum + rendement;
     const date = t.toISOString().slice(0, 10);
     if (m % 3 === 0 || m === annees * 12) {
@@ -138,8 +168,10 @@ function _dessiner() {
     <ul class="proj-moteurs">
       ${ligne('Aujourd’hui', net, 'patrimoine net actuel', false)}
       ${ligne('Désendettement', parts.desendettement, 'capital remboursé selon les échéanciers — certain')}
-      ${ligne('Épargne', parts.epargneCum, `${fmt(epargne)} par mois — votre rythme`)}
-      ${ligne('Rendement', parts.rendement, `${String(taux * 100).replace('.', ',')} % par an sur ${fmt(financier)} de financier — hypothèse`)}
+      ${ligne('Épargne nouvelle', parts.epargneCum, `${fmt(epargne)} par mois — l'argent qui entre`)}
+      ${ligne('Rendement', parts.rendement, `${String(taux * 100).replace('.', ',')} % par an sur le financier (${fmt(financier)} aujourd'hui)`
+        + (dcaCum ? `, renforcé de ${fmt(dcaCum)} investis en DCA${finDca ? ` jusqu'en ${finDca.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}` : ''}` : '')
+        + ' — hypothèse')}
     </ul>
     <p class="proj-note">Liquidités, immobilier et biens restent à leur valeur d’aujourd’hui, sans revalorisation ni
       inflation ; montants avant impôt. La courbe en pointillé montre le net sans aucun rendement.</p>`;
