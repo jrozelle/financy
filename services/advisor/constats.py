@@ -16,6 +16,7 @@ from __future__ import annotations
 import sqlite3
 
 from models import compute_position, get_entity_map, get_holdings_map, load_referential
+from services.montants import lignes_en_euros
 
 # Plafonds des versements, en vigueur en 2026. Les interets capitalises peuvent
 # faire depasser le plafond ; les versements, non.
@@ -40,7 +41,7 @@ def _eur(v):
 
 
 def constats(conn, date, owner=None):
-    rows = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
+    rows = lignes_en_euros('positions', conn.execute('SELECT * FROM positions WHERE date=?', (date,)))
     hm = get_holdings_map(conn, [r['id'] for r in rows])
     em = get_entity_map(conn, date)
     ref = load_referential(conn)

@@ -1023,6 +1023,53 @@ def _migration_023(conn):
         ) STRICT""", ('gross', 'fees', 'net_eur'))
 
 
+def _migration_024(conn):
+    """Positions, entites et valorisations datees des entites en centimes
+    entiers (tables STRICT). Quotes-parts et surcharge de mobilisable restent
+    en REAL : ce sont des proportions."""
+    _reconstruire_en_centimes(conn, 'positions', """
+        CREATE TABLE {t} (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            date            TEXT    NOT NULL,
+            owner           TEXT    NOT NULL,
+            category        TEXT    NOT NULL,
+            envelope        TEXT,
+            establishment   TEXT,
+            value           INTEGER DEFAULT 0,       -- centimes
+            debt            INTEGER DEFAULT 0,       -- centimes
+            notes           TEXT,
+            entity          TEXT,
+            ownership_pct   REAL    DEFAULT 1.0,
+            debt_pct        REAL    DEFAULT 1.0,
+            created_at      TEXT    DEFAULT CURRENT_TIMESTAMP,
+            mobilizable_pct_override REAL DEFAULT NULL,
+            liquidity_override TEXT DEFAULT NULL,
+            label           TEXT    DEFAULT NULL
+        ) STRICT""", ('value', 'debt'))
+    _reconstruire_en_centimes(conn, 'entities', """
+        CREATE TABLE {t} (
+            id               INTEGER PRIMARY KEY AUTOINCREMENT,
+            name             TEXT    NOT NULL UNIQUE,
+            type             TEXT,
+            valuation_mode   TEXT,
+            gross_assets     INTEGER DEFAULT 0,      -- centimes
+            debt             INTEGER DEFAULT 0,      -- centimes
+            comment          TEXT,
+            created_at       TEXT    DEFAULT CURRENT_TIMESTAMP
+        ) STRICT""", ('gross_assets', 'debt'))
+    _reconstruire_en_centimes(conn, 'entity_snapshots', """
+        CREATE TABLE {t} (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            entity_name  TEXT NOT NULL,
+            date         TEXT NOT NULL,
+            gross_assets INTEGER DEFAULT 0,          -- centimes
+            debt         INTEGER DEFAULT 0,          -- centimes
+            created_at   TEXT DEFAULT CURRENT_TIMESTAMP,
+            tresorerie   INTEGER,                    -- centimes compris dans la valeur
+            UNIQUE(entity_name, date)
+        ) STRICT""", ('gross_assets', 'debt', 'tresorerie'))
+
+
 MIGRATIONS = [
     (1, _migration_001),
     (2, _migration_002),
@@ -1047,6 +1094,7 @@ MIGRATIONS = [
     (21, _migration_021),
     (22, _migration_022),
     (23, _migration_023),
+    (24, _migration_024),
 ]
 
 
@@ -1437,8 +1485,9 @@ def sync_position_value(conn, position_id):
         'FROM holdings WHERE position_id=?', (position_id,)
     ).fetchone()
     if row['n'] > 0:
+        from services.montants import centimes
         conn.execute('UPDATE positions SET value=? WHERE id=?',
-                     (round(row['v'] or 0, 2), position_id))
+                     (centimes(row['v'] or 0), position_id))
 
 
 def get_entity_map(conn, date=None):
@@ -1462,5 +1511,6 @@ def get_entity_map(conn, date=None):
         ''', (date,)).fetchall()
     else:
         rows = conn.execute('SELECT name, gross_assets, debt FROM entities').fetchall()
-    return {r['name']: {'gross_assets': r['gross_assets'] or 0, 'debt': r['debt'] or 0}
+    from services.montants import euros
+    return {r['name']: {'gross_assets': euros(r['gross_assets'] or 0), 'debt': euros(r['debt'] or 0)}
             for r in rows}

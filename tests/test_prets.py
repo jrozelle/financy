@@ -77,7 +77,7 @@ def test_un_tableau_qui_ne_solde_pas_est_refuse():
 
 def test_la_mise_a_jour_propose_la_dette_de_l_echeancier(client):
     with get_db() as c:
-        c.execute("INSERT INTO entities (name, type, gross_assets, debt) VALUES ('SCI', 'SCI', 5000, 3000)")
+        c.execute("INSERT INTO entities (name, type, gross_assets, debt) VALUES ('SCI', 'SCI', 500000, 300000)")  # centimes
         c.execute("INSERT INTO positions (date, owner, category, envelope, value, entity, ownership_pct) "
                   "VALUES ('2026-01-01', 'Paul', 'Immobilier', 'SCI', 0, 'SCI', 1.0)")
         prets.enregistrer(c, _verifier(_tableau()), entity='SCI')

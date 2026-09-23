@@ -106,3 +106,31 @@ class TestCredits:
         with pytest.raises(sqlite3.IntegrityError):
             c.execute("INSERT INTO pret_echeances VALUES (1, 1, '2026-02-05', 1, 1, 0, 1)")
         assert c.execute("SELECT 1 FROM sqlite_master WHERE name='idx_pret_echeances_date'").fetchone()
+
+
+class TestPositions:
+    def test_montants_convertis_quotes_parts_intactes(self):
+        c = _base_v20()
+        for f in (models._migration_021, models._migration_022, models._migration_023):
+            f(c)
+        c.execute("INSERT INTO positions (date, owner, category, value, debt, ownership_pct, debt_pct) "
+                  "VALUES ('2026-01-31', 'Paul', 'Immobilier', 5367.970895604706, 1000.004, 0.5, 0.34)")
+        c.execute("INSERT INTO entity_snapshots (entity_name, date, gross_assets, debt, tresorerie) "
+                  "VALUES ('SCI Exemple', '2026-01-31', 250000.0, 99999.995, NULL)")
+        models._migration_024(c)
+        assert tuple(c.execute('SELECT value, debt, ownership_pct, debt_pct FROM positions').fetchone()) \
+            == (536797, 100000, 0.5, 0.34)
+        assert tuple(c.execute('SELECT gross_assets, debt, tresorerie FROM entity_snapshots').fetchone()) \
+            == (25000000, 10000000, None)
+
+
+def test_la_demo_versionnee_est_au_schema_courant_et_vraisemblable():
+    """demo.db est migree au demarrage : versionnee en retard, elle se
+    modifierait a chaque lancement. Et un montant converti deux fois s'y
+    verrait a l'oeil : cent fois trop grand."""
+    import os
+    chemin = os.path.join(os.path.dirname(models.__file__), 'demo.db')
+    c = sqlite3.connect(chemin)
+    assert c.execute('SELECT version FROM schema_version').fetchone()[0] == models.MIGRATIONS[-1][0]
+    total = c.execute('SELECT SUM(value) FROM positions').fetchone()[0] / 100
+    assert 100_000 < total < 10_000_000          # patrimoine fictif, en euros

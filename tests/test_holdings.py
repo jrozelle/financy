@@ -388,13 +388,13 @@ class TestPositionValueSync:
              'cost_basis': 4000, 'market_value': 5000},
         ]}, headers=CSRF_HEADERS)
         with get_db() as conn:
-            assert conn.execute('SELECT value FROM positions WHERE id=?', (pid,)).fetchone()[0] == 5000
+            assert conn.execute('SELECT value FROM positions WHERE id=?', (pid,)).fetchone()[0] == 500000   # centimes
         client.post(f'/api/positions/{pid}/holdings', json={
             'isin': 'IE00B4L5Y983', 'name': 'IWDA', 'quantity': 5,
             'cost_basis': 2000, 'market_value': 2500,
         }, headers=CSRF_HEADERS)
         with get_db() as conn:
-            assert conn.execute('SELECT value FROM positions WHERE id=?', (pid,)).fetchone()[0] == 7500
+            assert conn.execute('SELECT value FROM positions WHERE id=?', (pid,)).fetchone()[0] == 750000   # centimes
 
     def test_manual_position_value_untouched(self, client):
         # Une position SANS holdings garde sa value saisie (source de verite)
@@ -403,7 +403,7 @@ class TestPositionValueSync:
                              value=300000, debt=0).get_json()['id']
         with get_db() as conn:
             sync_position_value(conn, pid)
-            assert conn.execute('SELECT value FROM positions WHERE id=?', (pid,)).fetchone()[0] == 300000
+            assert conn.execute('SELECT value FROM positions WHERE id=?', (pid,)).fetchone()[0] == 30000000   # centimes
 
 
 class TestDeletePositionCleansHoldings:

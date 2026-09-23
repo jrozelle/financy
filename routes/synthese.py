@@ -5,6 +5,7 @@ from models import (get_db, compute_position, get_entity_map, get_holdings_map,
                     load_referential, freeze_holdings_prices, validate_date, validate_string,
                     parse_number)
 from auth import login_required, csrf_protect
+from services.montants import lignes_en_euros
 
 synthese_bp = Blueprint('synthese', __name__)
 MAX_NOTE_LENGTH = 2000
@@ -42,7 +43,7 @@ def get_synthese():
             date = latest_date
         if not date:
             return jsonify({'date': None})
-        rows         = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
+        rows         = lignes_en_euros('positions', conn.execute('SELECT * FROM positions WHERE date=?', (date,)))
         entity_map   = get_entity_map(conn, date)
         ref          = load_referential(conn)
         # Cours du jour pour le snapshot le plus recent ; market_value figee des
@@ -155,7 +156,7 @@ def get_synthese():
     def _snapshot_totals(snap_date):
         """Retourne les totaux famille + par owner pour un snapshot donne."""
         with get_db() as c:
-            snap_rows        = c.execute('SELECT * FROM positions WHERE date=?', (snap_date,)).fetchall()
+            snap_rows        = lignes_en_euros('positions', c.execute('SELECT * FROM positions WHERE date=?', (snap_date,)))
             snap_entity_map  = get_entity_map(c, snap_date)
             snap_ref         = load_referential(c)
             snap_holdings    = get_holdings_map(c, [r['id'] for r in snap_rows])
@@ -292,7 +293,7 @@ def get_snapshot_diff():
         def _positions_at(date):
             if date is None:
                 return []
-            rows = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
+            rows = lignes_en_euros('positions', conn.execute('SELECT * FROM positions WHERE date=?', (date,)))
             emap = get_entity_map(conn, date)
             hmap = get_holdings_map(conn, [r['id'] for r in rows])
             if date != latest_date:
@@ -355,7 +356,7 @@ def get_historique():
         latest_date = dates[-1] if dates else None
         history = []
         for date in dates:
-            rows         = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
+            rows         = lignes_en_euros('positions', conn.execute('SELECT * FROM positions WHERE date=?', (date,)))
             entity_map   = get_entity_map(conn, date)
             # Cours du jour pour le dernier snapshot ; market_value figee sinon.
             holdings_map = get_holdings_map(conn, [r['id'] for r in rows])
@@ -829,7 +830,7 @@ def contribution():
         dernier = dates[-1]
         arretes = []
         for date in dates:
-            rows = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
+            rows = lignes_en_euros('positions', conn.execute('SELECT * FROM positions WHERE date=?', (date,)))
             holdings_map = get_holdings_map(conn, [r['id'] for r in rows])
             if date != dernier:
                 freeze_holdings_prices(holdings_map)

@@ -10,6 +10,8 @@ import logging
 from models import (compute_position, get_entity_map, get_holdings_map,
                     load_referential, snapshot_holdings_to_date, validate_number, parse_number)
 
+from services.montants import centimes, euros, ligne_en_euros, lignes_en_euros
+
 logger = logging.getLogger('financy.snapshot')
 
 # Colonnes de la table positions a copier (TOUTES sauf id et date).
@@ -33,8 +35,12 @@ def ecrire_entity_snapshot(conn, nom, date, gross_assets, debt, tresorerie=_ABSE
     `INSERT OR REPLACE` supprime la ligne puis la recree : une colonne absente
     de la requete — la tresorerie comprise dans la valeur — repartait a NULL
     a chaque modification de l'entite, et l'arrete suivant la recomptait.
-    La tresorerie n'est ecrite que si elle est fournie.
+    La tresorerie n'est ecrite que si elle est fournie. Montants en euros,
+    ecrits en centimes.
     """
+    gross_assets, debt = centimes(gross_assets), centimes(debt)
+    if tresorerie is not _ABSENTE:
+        tresorerie = centimes(tresorerie)
     if tresorerie is _ABSENTE:
         conn.execute('''INSERT INTO entity_snapshots (entity_name, date, gross_assets, debt)
                         VALUES (?,?,?,?)
@@ -60,10 +66,12 @@ def duplicate_position(conn, source_row, target_date, value_override=None):
 
     Args:
         conn: connexion SQLite ouverte
-        source_row: dict-like (sqlite3.Row) de la position source
+        source_row: la ligne de la position source TELLE QU'EN BASE (montants
+                    en centimes), recopiee sans conversion
         target_date: date cible (str YYYY-MM-DD)
-        value_override: dict {value, debt, ...} pour surcharger les champs
-                        (utilise par snapshot_update pour la position modifiee)
+        value_override: dict {value, debt, ...} pour surcharger les champs,
+                        montants en EUROS (utilise par snapshot_update pour la
+                        position modifiee)
 
     Returns:
         new_position_id (int)
@@ -75,7 +83,7 @@ def duplicate_position(conn, source_row, target_date, value_override=None):
     if value_override:
         for k, v in value_override.items():
             if k in _POSITION_COPY_COLS:
-                vals[k] = v
+                vals[k] = centimes(v) if k in ('value', 'debt') else v
 
     params = [target_date] + [vals.get(col) for col in _POSITION_COPY_COLS]
     cur = conn.execute(_INSERT_SQL, params)
@@ -132,8 +140,8 @@ def preparer_mise_a_jour(conn, source_date, target_date):
     une entite tient sa valeur de l'entite (editable dans la meme liste), une
     position a lignes de titres est valorisee par les cours.
     """
-    rows = conn.execute('SELECT * FROM positions WHERE date=? ORDER BY owner, establishment, envelope',
-                        (source_date,)).fetchall()
+    rows = lignes_en_euros('positions', conn.execute(
+        'SELECT * FROM positions WHERE date=? ORDER BY owner, establishment, envelope', (source_date,)))
     holdings_map = get_holdings_map(conn, [r['id'] for r in rows])
     ref = load_referential(conn)
     entity_map = get_entity_map(conn, source_date)
@@ -174,7 +182,7 @@ def preparer_mise_a_jour(conn, source_date, target_date):
                 continue
             avant = conn.execute('SELECT tresorerie FROM entity_snapshots WHERE entity_name=? AND date<=? '
                                  'ORDER BY date DESC LIMIT 1', (e['name'], source_date)).fetchone()
-            incluse = (avant['tresorerie'] or 0.0) if avant else 0.0
+            incluse = euros(avant['tresorerie'] or 0) if avant else 0.0
             e['tresorerie'] = {**t, 'incluse_avant': round(incluse, 2)}
             e['valeur_proposee'] = round(e['gross_assets'] - incluse + t['montant'], 2)
         # Des parts au prix de retrait remplacent la valeur precedente : c'est
@@ -224,13 +232,14 @@ def appliquer_mise_a_jour(conn, source_date, target_date, soldes, entites):
         if pid is None:
             refusees.append({'id': int(src_id), 'motif': 'position absente de l’arrêté source'})
             continue
-        row = dict(conn.execute('SELECT * FROM positions WHERE id=?', (pid,)).fetchone())
+        row = ligne_en_euros('positions', conn.execute('SELECT * FROM positions WHERE id=?', (pid,)).fetchone())
         mode = _mode(row, len(holdings_map.get(pid) or []))
         if mode != 'saisie':
             refusees.append({'id': int(src_id), 'motif': f'valorisée par {"l’entité" if mode == "entite" else "les cours"}'})
             continue
         conn.execute('UPDATE positions SET value=?, debt=? WHERE id=?',
-                     (vals.get('value', row['value']), vals.get('debt', row['debt']), pid))
+                     (centimes(parse_number(vals.get('value', row['value']))),
+                      centimes(parse_number(vals.get('debt', row['debt']))), pid))
         maj += 1
 
     connues = {r['name'] for r in conn.execute('SELECT name FROM entities')}
@@ -270,8 +279,8 @@ def _dupliquer_avec_correspondance(conn, source_date, target_date):
     entity_map = get_entity_map(conn, source_date)
     correspondance = {}
     for r in rows:
-        p = compute_position(dict(r), entity_map, ref, holdings_map)
-        override = {'value': p['value'], 'debt': r['debt']}
+        p = compute_position(ligne_en_euros('positions', r), entity_map, ref, holdings_map)
+        override = {'value': p['value'], 'debt': euros(r['debt'])}
         correspondance[r['id']] = duplicate_position(conn, r, target_date, value_override=override)
     snapshot_holdings_to_date(conn, target_date)
     return correspondance

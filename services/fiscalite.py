@@ -29,7 +29,7 @@ Le resultat est une estimation d'ordre de grandeur, pas une declaration.
 """
 from __future__ import annotations
 import logging
-from services.montants import ligne_en_euros
+from services.montants import ligne_en_euros, lignes_en_euros
 
 logger = logging.getLogger('financy.fiscalite')
 
@@ -117,7 +117,7 @@ def _pru_par_enveloppe(conn, date, owner=None):
     if owner:
         q += ' AND owner = ?'
         prm.append(owner)
-    rows = [dict(r) for r in conn.execute(q, prm).fetchall()]
+    rows = lignes_en_euros('positions', conn.execute(q, prm))
     em = get_entity_map(conn, date)
     hm = holdings_a_date(conn, [r['id'] for r in rows], date)
 
@@ -161,7 +161,7 @@ def _valeurs_par_enveloppe(conn, date, owner=None):
     if owner:
         q += ' AND owner = ?'
         p.append(owner)
-    rows = conn.execute(q, p).fetchall()
+    rows = lignes_en_euros('positions', conn.execute(q, p))
     em, ref = get_entity_map(conn, date), load_referential(conn)
     hm = holdings_a_date(conn, [r['id'] for r in rows], date)
     valeurs, titulaires = {}, {}

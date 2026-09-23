@@ -281,7 +281,7 @@ def bilan(conn, entite, mois=12):
 
     snap = conn.execute('SELECT gross_assets FROM entity_snapshots WHERE entity_name=? AND date<=? '
                         'ORDER BY date DESC LIMIT 1', (entite, f'{fin}-31')).fetchone()
-    valeur = snap['gross_assets'] if snap else None
+    valeur = euros(snap['gross_assets']) if snap else None
 
     revenus = tot['revenu']
     echeances = -tot['echeance']

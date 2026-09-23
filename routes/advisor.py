@@ -10,7 +10,7 @@ from services.advisor import macro as macro_svc
 from services.advisor import rebalance as rebalance_svc
 from services.advisor import llm as llm_svc
 from auth import login_required, csrf_protect
-from services.montants import euros
+from services.montants import euros, lignes_en_euros
 
 logger = logging.getLogger('financy')
 advisor_bp = Blueprint('advisor', __name__)
@@ -283,9 +283,9 @@ def get_allocation(owner):
                 'SELECT MAX(date) AS d FROM positions WHERE owner=?', (owner,)
             ).fetchone()
             date = r['d']
-        rows = conn.execute(
+        rows = lignes_en_euros('positions', conn.execute(
             'SELECT * FROM positions WHERE owner=? AND date=?', (owner, date)
-        ).fetchall() if date else []
+        ).fetchall()) if date else []
 
         entity_map   = get_entity_map(conn, date) if date else {}
         ref          = load_referential(conn)
@@ -393,9 +393,9 @@ def _build_positions_for_owner(conn, owner, date):
             'SELECT MAX(date) AS d FROM positions WHERE owner=?', (owner,)
         ).fetchone()
         date = r['d']
-    rows = conn.execute(
+    rows = lignes_en_euros('positions', conn.execute(
         'SELECT * FROM positions WHERE owner=? AND date=?', (owner, date)
-    ).fetchall() if date else []
+    ).fetchall()) if date else []
     entity_map = get_entity_map(conn, date) if date else {}
     ref = load_referential(conn)
     holdings_map = get_holdings_map(conn, [r['id'] for r in rows]) if rows else {}

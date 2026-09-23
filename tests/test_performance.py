@@ -48,7 +48,7 @@ def _seed(dates_values, flux=(), owner='Alice', envelope='PEA'):
             conn.execute(
                 """INSERT INTO positions (date, owner, category, envelope,
                    establishment, value, debt, ownership_pct, debt_pct)
-                   VALUES (?,?,'Actions',?,'Test',?,0,1.0,1.0)""", (d, owner, envelope, v))
+                   VALUES (?,?,'Actions',?,'Test',?,0,1.0,1.0)""", (d, owner, envelope, centimes(v)))
         for d, t, a in flux:
             conn.execute(
                 'INSERT INTO flux (date, owner, envelope, type, amount) VALUES (?,?,?,?,?)',
@@ -243,7 +243,7 @@ class TestMeasurable:
                 conn.execute("""INSERT INTO positions (date, owner, category, envelope,
                     establishment, value, debt, ownership_pct, debt_pct)
                     VALUES (?,?,'Cash & dépôts','Compte courant','T',?,0,1.0,1.0)""",
-                    (d, 'Alice', v))
+                    (d, 'Alice', centimes(v)))
             conn.commit()
         d = client.get('/api/performance').get_json()
         env = d['groups'][0]
@@ -277,7 +277,7 @@ class TestGrouping:
             for d, etab, v in rows:
                 conn.execute("""INSERT INTO positions (date, owner, category, envelope,
                     establishment, value, debt, ownership_pct, debt_pct)
-                    VALUES (?,'Alice','Actions','Assurance-vie',?,?,0,1.0,1.0)""", (d, etab, v))
+                    VALUES (?,'Alice','Actions','Assurance-vie',?,?,0,1.0,1.0)""", (d, etab, centimes(v)))
             conn.commit()
 
     def test_maille_compte_isole_les_contrats(self, client):
@@ -325,7 +325,7 @@ class TestStatuts:
         with get_db() as conn:
             conn.execute("""INSERT INTO positions (date, owner, category, envelope,
                 establishment, value, debt, ownership_pct, debt_pct)
-                VALUES ('2026-08-01','Alice','Actions','CTO','T',500,0,1.0,1.0)""")
+                VALUES ('2026-08-01','Alice','Actions','CTO','T',50000,0,1.0,1.0)""")  # centimes
             conn.commit()
         d = client.get('/api/performance').get_json()
         par = {g['envelope']: g for g in d['groups']}
@@ -340,7 +340,7 @@ class TestStatuts:
         with get_db() as conn:
             conn.execute("""INSERT INTO positions (date, owner, category, envelope,
                 establishment, value, debt, ownership_pct, debt_pct)
-                VALUES ('2026-08-01','Alice','Actions','CTO','T',500,0,1.0,1.0)""")
+                VALUES ('2026-08-01','Alice','Actions','CTO','T',50000,0,1.0,1.0)""")  # centimes
             conn.commit()
         d = client.get('/api/performance').get_json()
         # Le total ne peut pas integrer un compte dont le rendement est inconnu.
@@ -389,7 +389,7 @@ class TestComposition:
             for d, env, v in lignes:
                 conn.execute("""INSERT INTO positions (date, owner, category, envelope,
                     establishment, value, debt, ownership_pct, debt_pct)
-                    VALUES (?,'Alice','Actions',?,'X',?,0,1.0,1.0)""", (d, env, v))
+                    VALUES (?,'Alice','Actions',?,'X',?,0,1.0,1.0)""", (d, env, centimes(v)))
             conn.commit()
 
     def test_ensemble_ignore_l_arrivee_d_un_compte(self, client):
@@ -409,7 +409,7 @@ class TestComposition:
                               ('2026-01-01', 'CTO', 50000)):
                 conn.execute("""INSERT INTO positions (date, owner, category, envelope,
                     establishment, value, debt, ownership_pct, debt_pct)
-                    VALUES (?,'Alice','Actions',?,'X',?,0,1.0,1.0)""", (d, env, v))
+                    VALUES (?,'Alice','Actions',?,'X',?,0,1.0,1.0)""", (d, env, centimes(v)))
             conn.commit()
         g = client.get('/api/performance').get_json()['global']
         # Le CTO sort du perimetre : ce n'est pas une perte de 83 %
@@ -447,7 +447,7 @@ class TestEpargne:
             for d, v in valeurs:
                 conn.execute("""INSERT INTO positions (date, owner, category, envelope,
                     establishment, value, debt, ownership_pct, debt_pct)
-                    VALUES (?,'Alice','Cash & dépôts',?,'X',?,0,1.0,1.0)""", (d, envelope, v))
+                    VALUES (?,'Alice','Cash & dépôts',?,'X',?,0,1.0,1.0)""", (d, envelope, centimes(v)))
             conn.commit()
 
     def test_livret_mesurable(self, client):
@@ -499,8 +499,8 @@ class TestEpargne:
             for d, dette in (('2026-01-01', 184000), ('2026-08-01', 183000)):
                 conn.execute("""INSERT INTO positions (date, owner, category, envelope,
                     establishment, value, debt, ownership_pct, debt_pct)
-                    VALUES (?,'Alice','Immobilier','Immobilier',NULL,610000,?,0.5,0.5)""",
-                    (d, dette))
+                    VALUES (?,'Alice','Immobilier','Immobilier',NULL,61000000,?,0.5,0.5)""",  # centimes
+                    (d, centimes(dette)))
             conn.commit()
         d = client.get('/api/performance').get_json()
         g = d['groups'][0]
@@ -516,7 +516,7 @@ class TestEpargne:
             for d in ('2026-01-01', '2026-08-01'):
                 conn.execute("""INSERT INTO positions (date, owner, category, envelope,
                     establishment, value, debt, ownership_pct, debt_pct)
-                    VALUES (?,'Alice','Objets de valeur','Autre',NULL,22000,0,1.0,1.0)""", (d,))
+                    VALUES (?,'Alice','Objets de valeur','Autre',NULL,2200000,0,1.0,1.0)""", (d,))  # centimes
             conn.commit()
         par = {g['envelope']: g['reason'] for g in
                client.get('/api/performance').get_json()['groups']}
@@ -530,7 +530,7 @@ class TestEpargne:
             for d, v in (('2026-01-01', 100000), ('2026-08-01', 104000)):
                 conn.execute("""INSERT INTO positions (date, owner, category, envelope,
                     establishment, value, debt, ownership_pct, debt_pct)
-                    VALUES (?,'Alice','SCPI','SCI',NULL,?,0,1.0,1.0)""", (d, v))
+                    VALUES (?,'Alice','SCPI','SCI',NULL,?,0,1.0,1.0)""", (d, centimes(v)))
             conn.commit()
         g = client.get('/api/performance').get_json()['groups'][0]
         assert g['status'] == 'ok'
@@ -541,7 +541,7 @@ class TestEpargne:
             for d, v in (('2026-01-01', 22000), ('2026-08-01', 47000)):
                 conn.execute("""INSERT INTO positions (date, owner, category, envelope,
                     establishment, value, debt, ownership_pct, debt_pct)
-                    VALUES (?,'Alice','Objets de valeur','Autre',NULL,?,0,1.0,1.0)""", (d, v))
+                    VALUES (?,'Alice','Objets de valeur','Autre',NULL,?,0,1.0,1.0)""", (d, centimes(v)))
             conn.commit()
         g = client.get('/api/performance').get_json()['groups'][0]
         assert g['status'] == 'non_measurable'
@@ -566,7 +566,7 @@ class TestComptesHomonymes:
                 conn.execute("""INSERT INTO positions (date, owner, category, envelope,
                     establishment, label, value, debt, ownership_pct, debt_pct)
                     VALUES (?,'Alice','Actions','CTO','Ma Banque',?,?,0,1.0,1.0)""",
-                    (d, label, v))
+                    (d, label, centimes(v)))
             conn.commit()
 
     def test_comptes_separes_par_leur_libelle(self, client):
@@ -725,7 +725,7 @@ class TestAlerteValorisation:
             for d, v in (('2026-01-01', 2000), ('2026-08-01', 1894.15)):
                 cur = conn.execute("""INSERT INTO positions (date, owner, category,
                     envelope, establishment, value, debt, ownership_pct, debt_pct)
-                    VALUES (?,'Alice','Actions','CTO','X',?,0,1.0,1.0)""", (d, v))
+                    VALUES (?,'Alice','Actions','CTO','X',?,0,1.0,1.0)""", (d, centimes(v)))
                 conn.execute("""INSERT INTO holdings (position_id, isin, quantity,
                     market_value, as_of_date) VALUES (?,'US0000000001',7,?,?)""",
                     (cur.lastrowid, v, d))
@@ -742,13 +742,13 @@ class TestAlerteValorisation:
                 VALUES ('US0000000001','ADOBE','USD',1,312.40,'2026-08-01','yahoo')""")
             cur = conn.execute("""INSERT INTO positions (date, owner, category, envelope,
                 establishment, value, debt, ownership_pct, debt_pct)
-                VALUES ('2026-08-01','Alice','Actions','CTO','X',1894.15,0,1.0,1.0)""")
+                VALUES ('2026-08-01','Alice','Actions','CTO','X',189415,0,1.0,1.0)""")  # centimes
             conn.execute("""INSERT INTO holdings (position_id, isin, quantity,
                 market_value, as_of_date) VALUES (?,'US0000000001',7,1894.15,'2026-08-01')""",
                 (cur.lastrowid,))
             conn.execute("""INSERT INTO positions (date, owner, category, envelope,
                 establishment, value, debt, ownership_pct, debt_pct)
-                VALUES ('2026-01-01','Alice','Actions','CTO','X',2000,0,1.0,1.0)""")
+                VALUES ('2026-01-01','Alice','Actions','CTO','X',200000,0,1.0,1.0)""")  # centimes
             conn.commit()
         d = client.get('/api/performance').get_json()
         # 7 x 312,40 = 2 186,80 si le dollar passait pour de l euro

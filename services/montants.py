@@ -23,6 +23,9 @@ COLONNES = {
     'pret_echeances':         ('capital', 'interets', 'assurance', 'crd'),
     'flux':                   ('amount',),
     'transactions':           ('gross', 'fees', 'net_eur'),
+    'positions':              ('value', 'debt'),
+    'entities':               ('gross_assets', 'debt'),
+    'entity_snapshots':       ('gross_assets', 'debt', 'tresorerie'),
 }
 
 
@@ -50,6 +53,11 @@ def ligne_en_euros(table, ligne):
         if col in d:
             d[col] = euros(d[col])
     return d
+
+
+def lignes_en_euros(table, lignes):
+    """Toutes les lignes d'une requete, montants en euros."""
+    return [ligne_en_euros(table, l) for l in lignes]
 
 
 def ligne_en_centimes(table, ligne):

@@ -50,8 +50,8 @@ def _ref(client, renommer):
 
 def test_renommer_une_categorie_propage_positions_flux_et_cibles(client):
     with get_db() as c:
-        c.execute("INSERT INTO positions (date, owner, category, envelope, value) VALUES ('2026-01-01','Paul','Actions','PEA',1000)")
-        c.execute("INSERT INTO positions (date, owner, category, envelope, value) VALUES ('2025-01-01','Paul','Actions','PEA',900)")
+        c.execute("INSERT INTO positions (date, owner, category, envelope, value) VALUES ('2026-01-01','Paul','Actions','PEA',100000)")  # centimes
+        c.execute("INSERT INTO positions (date, owner, category, envelope, value) VALUES ('2025-01-01','Paul','Actions','PEA',90000)")  # centimes
         c.execute("INSERT INTO flux (date, owner, envelope, type, amount, category) VALUES ('2026-01-02','Paul','PEA','Versement',1000,'Actions')")  # centimes
         c.execute("INSERT INTO config (key, value) VALUES ('allocation_targets', '{\"Actions\": 60}')")
         c.commit()
@@ -71,7 +71,7 @@ def test_renommer_une_categorie_propage_positions_flux_et_cibles(client):
 
 def test_renommer_une_enveloppe_propage(client):
     with get_db() as c:
-        c.execute("INSERT INTO positions (date, owner, category, envelope, value) VALUES ('2026-01-01','Paul','Actions','PEA',1000)")
+        c.execute("INSERT INTO positions (date, owner, category, envelope, value) VALUES ('2026-01-01','Paul','Actions','PEA',100000)")  # centimes
         c.execute("INSERT INTO flux (date, owner, envelope, type, amount) VALUES ('2026-01-02','Paul','PEA','Versement',1000)")  # centimes
         c.commit()
     def f(ref):
@@ -94,6 +94,6 @@ def test_renommer_vers_un_nom_existant_est_refuse(client):
 def test_le_decompte_couvre_toutes_les_dates(client):
     with get_db() as c:
         for d in ('2025-01-01', '2026-01-01'):
-            c.execute("INSERT INTO positions (date, owner, category, envelope, value) VALUES (?, 'Paul','Actions','PEA',1)", (d,))
+            c.execute("INSERT INTO positions (date, owner, category, envelope, value) VALUES (?, 'Paul','Actions','PEA',100)", (d,))  # centimes
         c.commit()
     assert client.get('/api/referential/usage?champ=category&valeur=Actions').get_json()['positions'] == 2

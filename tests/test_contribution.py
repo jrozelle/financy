@@ -192,7 +192,7 @@ class TestGroupementTrimestriel:
 class TestEndpoint:
     def _snapshot(self, conn, date, valeur, owner='Paul'):
         conn.execute('INSERT INTO positions (date, owner, category, envelope, value) '
-                     "VALUES (?,?,'Financier','PEA',?)", (date, owner, valeur))
+                     "VALUES (?,?,'Financier','PEA',?)", (date, owner, centimes(valeur)))
 
     def test_deux_arretes_minimum(self, client):
         with get_db() as conn:

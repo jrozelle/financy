@@ -4,6 +4,7 @@ import sqlite3
 from models import get_entity_map, get_db, validate_number, validate_string, parse_number
 from auth import login_required, csrf_protect
 from services.snapshot import ecrire_entity_snapshot
+from services.montants import centimes, ligne_en_euros, lignes_en_euros
 
 MAX_COMMENT_LENGTH = 2000
 MAX_NAME_LENGTH = 200
@@ -52,7 +53,7 @@ def get_entities():
         rows = conn.execute(query, params).fetchall()
     result = []
     for r in rows:
-        e = dict(r)
+        e = ligne_en_euros('entities', r)
         e['net_assets'] = (e['gross_assets'] or 0) - (e['debt'] or 0)
         result.append(e)
     return jsonify(result)
@@ -80,11 +81,11 @@ def add_entity():
         cur = conn.execute(
             '''INSERT INTO entities (name, type, valuation_mode, gross_assets, debt, comment)
                VALUES (?,?,?,?,?,?)''',
-            (d['name'], d.get('type'), d.get('valuation_mode'), gross, debt, d.get('comment'))
+            (d['name'], d.get('type'), d.get('valuation_mode'), centimes(gross), centimes(debt), d.get('comment'))
         )
         ecrire_entity_snapshot(conn, d['name'], today, gross, debt)
         row = conn.execute('SELECT * FROM entities WHERE id=?', (cur.lastrowid,)).fetchone()
-    e = dict(row)
+    e = ligne_en_euros('entities', row)
     e['net_assets'] = (e['gross_assets'] or 0) - (e['debt'] or 0)
     e['snapshot_date'] = today
     return jsonify(e), 201
@@ -120,7 +121,7 @@ def update_entity(eid):
         conn.execute(
             '''UPDATE entities SET name=?, type=?, valuation_mode=?,
                gross_assets=?, debt=?, comment=? WHERE id=?''',
-            (new_name, d.get('type'), d.get('valuation_mode'), gross, debt, d.get('comment'), eid)
+            (new_name, d.get('type'), d.get('valuation_mode'), centimes(gross), centimes(debt), d.get('comment'), eid)
         )
 
         # Le nouveau nom suit dans toutes les tables qui designent l'entite.
@@ -133,7 +134,7 @@ def update_entity(eid):
 
         ecrire_entity_snapshot(conn, new_name, today, gross, debt)
         row = conn.execute('SELECT * FROM entities WHERE id=?', (eid,)).fetchone()
-    e = dict(row)
+    e = ligne_en_euros('entities', row)
     e['net_assets'] = (e['gross_assets'] or 0) - (e['debt'] or 0)
     e['snapshot_date'] = today
     return jsonify(e)
@@ -181,7 +182,7 @@ def delete_entity(eid):
             for r in conn.execute('SELECT id, date FROM positions WHERE entity=?', (name,)).fetchall():
                 e = get_entity_map(conn, r['date']).get(name) or {'gross_assets': 0, 'debt': 0}
                 conn.execute('UPDATE positions SET entity=NULL, value=?, debt=? WHERE id=?',
-                             (e['gross_assets'], e['debt'], r['id']))
+                             (centimes(e['gross_assets']), centimes(e['debt']), r['id']))
 
         conn.execute('DELETE FROM entity_snapshots WHERE entity_name=?', (name,))
         conn.execute('DELETE FROM entities WHERE id=?', (eid,))
@@ -202,7 +203,7 @@ def get_entity_snapshots():
             rows = conn.execute(
                 'SELECT * FROM entity_snapshots ORDER BY entity_name, date DESC'
             ).fetchall()
-    return jsonify([dict(r) for r in rows])
+    return jsonify(lignes_en_euros('entity_snapshots', rows))
 
 
 @entities_bp.route('/api/entity-snapshots/<int:sid>', methods=['DELETE'])

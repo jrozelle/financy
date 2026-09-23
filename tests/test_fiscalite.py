@@ -49,7 +49,7 @@ def client():
 def _position(conn, envelope, valeur, owner='Paul', category='Actions', date=DATE):
     cur = conn.execute(
         'INSERT INTO positions (date, owner, category, envelope, value) VALUES (?,?,?,?,?)',
-        (date, owner, category, envelope, valeur))
+        (date, owner, category, envelope, centimes(valeur)))
     return cur.lastrowid
 
 
@@ -313,7 +313,7 @@ class TestValorisation:
         # Sommer positions.value oubliait les entites (valeur 0 en base) :
         # l'immobilier en SCI disparaissait, meme des enveloppes ecartees.
         with get_db() as conn:
-            conn.execute("INSERT INTO entities (name, type, gross_assets, debt) VALUES ('SCI', 'SCI', 200000, 0)")
+            conn.execute("INSERT INTO entities (name, type, gross_assets, debt) VALUES ('SCI', 'SCI', 20000000, 0)")  # centimes
             conn.execute("INSERT INTO positions (date, owner, category, envelope, value, entity, ownership_pct) "
                          "VALUES (?, 'Paul', 'Immobilier', 'SCI', 0, 'SCI', 0.5)", (DATE,))
             conn.commit()

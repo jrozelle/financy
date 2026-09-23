@@ -14,6 +14,7 @@ os.environ['FINANCY_PASSWORD'] = 'testpass'
 
 from models import init_db, get_db  # noqa: E402
 from app import app  # noqa: E402
+from services.montants import centimes  # noqa: E402
 from services.advisor.constats import constats, PLAFONDS  # noqa: E402
 
 D = '2026-09-02'
@@ -31,7 +32,7 @@ def fresh_db():
 
 def _pos(c, envelope, value, owner='Paul', category='Cash & dépôts', debt=0, establishment='Bourso'):
     c.execute('INSERT INTO positions (date, owner, category, envelope, establishment, value, debt) '
-              'VALUES (?,?,?,?,?,?,?)', (D, owner, category, envelope, establishment, value, debt))
+              'VALUES (?,?,?,?,?,?,?)', (D, owner, category, envelope, establishment, centimes(value), centimes(debt)))
 
 
 def _titres(r, niveau=None):
@@ -103,7 +104,7 @@ class TestAutres:
         with get_db() as c:
             c.execute("INSERT INTO entities (name, type, gross_assets, debt) VALUES ('Holding Exemple','Holding',0,0)")
             c.execute("INSERT INTO positions (date, owner, category, envelope, value, label) "
-                      "VALUES (?, 'Paul', 'Cash & dépôts', 'Compte courant', 20000, 'Holding Exemple')", (D,))
+                      "VALUES (?, 'Paul', 'Cash & dépôts', 'Compte courant', 2000000, 'Holding Exemple')", (D,))  # centimes
             c.commit()
             assert not constats(c, D)['constats']
 
@@ -200,11 +201,11 @@ class TestNetDesEntites:
         from services.advisor.constats import constats
         with get_db() as conn:
             conn.execute("INSERT INTO entities (name, type) VALUES ('Holding H', 'Holding')")
-            conn.execute("INSERT INTO entity_snapshots (entity_name, date, gross_assets, debt) VALUES ('Holding H', '2026-04-01', 150000, 160000)")
+            conn.execute("INSERT INTO entity_snapshots (entity_name, date, gross_assets, debt) VALUES ('Holding H', '2026-04-01', 15000000, 16000000)")  # centimes
             conn.execute("INSERT INTO positions (date, owner, category, envelope, value, entity, ownership_pct, debt_pct) "
                          "VALUES ('2026-09-01', 'Paul', 'Parts sociales', 'Holding', 0, 'Holding H', 1, 1)")
             conn.execute("INSERT INTO positions (date, owner, category, envelope, label, value) "
-                         "VALUES ('2026-09-01', 'Paul', 'Cash & dépôts', 'Compte courant', 'Holding H', 7500)")
+                         "VALUES ('2026-09-01', 'Paul', 'Cash & dépôts', 'Compte courant', 'Holding H', 750000)")  # centimes
             ks = [k for k in constats(conn, '2026-09-01')['constats'] if 'dette dépasse' in k['titre']]
         assert len(ks) == 1 and ks[0]['montant'] == 2500
         assert 'datent du 01/04/2026' in ks[0]['detail']

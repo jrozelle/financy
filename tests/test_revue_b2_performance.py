@@ -2,11 +2,12 @@
 from tests.test_api import client, fresh_db  # noqa: F401
 
 from models import get_db
+from services.montants import centimes
 
 
 def _pos(conn, date, etab, value):
     conn.execute("INSERT INTO positions (date, owner, category, envelope, establishment, value) "
-                 "VALUES (?, 'Paul', 'Actions', 'Assurance-vie', ?, ?)", (date, etab, value))
+                 "VALUES (?, 'Paul', 'Actions', 'Assurance-vie', ?, ?)", (date, etab, centimes(value)))
 
 
 def test_le_versement_d_un_compte_clos_n_entre_pas_dans_l_ensemble(client):

@@ -247,7 +247,7 @@ class TestEndpoints:
         assert len(r.json['appliquees']) == 1
         with get_db() as conn:
             pos = conn.execute('SELECT value FROM positions WHERE id=?', (pid,)).fetchone()
-        assert pos['value'] == 21182.00               # positions.value suit les holdings
+        assert pos['value'] == 2118200                # positions.value suit les holdings (centimes)
 
     def test_apply_ligne_sans_ecart_est_ignoree(self, client):
         _, hid = _seed({**PHOTO, 'quantity': 2975, 'as_of_date': '2026-09-01'}, AVIS)

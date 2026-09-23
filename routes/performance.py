@@ -31,7 +31,7 @@ from models import (get_db, load_referential, compute_position, get_entity_map,
                     holding_price_warning, holdings_a_date)
 from models import validate_date
 from auth import login_required
-from services.montants import ligne_en_euros
+from services.montants import ligne_en_euros, lignes_en_euros
 
 performance_bp = Blueprint('performance', __name__)
 
@@ -156,7 +156,7 @@ def _values_by_group(conn, dates, grouping, owner=None):
     ref = load_referential(conn)
     by_date, cats, meta, alertes = {}, {}, {}, {}
     for d in dates:
-        rows = conn.execute('SELECT * FROM positions WHERE date=?', (d,)).fetchall()
+        rows = lignes_en_euros('positions', conn.execute('SELECT * FROM positions WHERE date=?', (d,)))
         emap = get_entity_map(conn, d)
         # Arrete historique : market_value enregistree, pas le cours du jour.
         # Le dernier arrete REEL garde le cours du jour, comme la synthese —

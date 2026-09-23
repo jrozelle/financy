@@ -302,7 +302,7 @@ class TestImportEndpoint:
         with get_db() as conn:
             conn.execute("""INSERT INTO positions (date, owner, category, envelope,
                 establishment, value, debt, ownership_pct, debt_pct)
-                VALUES ('2026-01-01','Alice','Actions','PEA','Ma Banque',1,0,1.0,1.0)""")
+                VALUES ('2026-01-01','Alice','Actions','PEA','Ma Banque',100,0,1.0,1.0)""")  # centimes
             conn.commit()
         r = self._post(client, 'preview', [('avis', AVIS_ACHAT)])
         assert 'Ma Banque' in r.get_json()['summary']['known_establishments']
@@ -320,7 +320,7 @@ class TestImportEndpoint:
         with get_db() as conn:
             conn.execute("""INSERT INTO positions (date, owner, category, envelope,
                 establishment, value, debt, ownership_pct, debt_pct)
-                VALUES ('2026-01-01','Alice','Actions','CTO','X',1,0,1.0,1.0)""")
+                VALUES ('2026-01-01','Alice','Actions','CTO','X',100,0,1.0,1.0)""")  # centimes
             conn.commit()
         r = self._post(client, 'commit', [('avis', AVIS_DEVISE)])
         assert r.status_code == 200
@@ -632,7 +632,7 @@ class TestFluxProvisoires:
             conn.execute("""INSERT INTO positions (date, owner, category, envelope,
                 establishment, value, debt, ownership_pct, debt_pct)
                 VALUES ('2025-01-01','Camille','Actions','Assurance-vie','BoursoBank',
-                        1,0,1.0,1.0)""")
+                        100,0,1.0,1.0)""")  # centimes
             conn.execute("""INSERT INTO flux (date, owner, envelope, establishment,
                 type, amount, notes) VALUES (?,'Camille','Assurance-vie','BoursoBank',
                 'Versement',?,?)""", (date, centimes(montant), notes))

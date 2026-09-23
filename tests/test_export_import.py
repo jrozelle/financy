@@ -19,6 +19,7 @@ os.environ['FINANCY_PASSWORD'] = 'testpass'
 
 from models import init_db, get_db  # noqa: E402
 from app import app  # noqa: E402
+from services.montants import centimes  # noqa: E402
 
 H = {'X-CSRF-Token': 'test'}
 D = '2026-06-30'
@@ -55,7 +56,7 @@ def _base():
         # Deux livrets identiques : deux lignes, pas un doublon.
         for v in (23000, 23000):
             c.execute("INSERT INTO positions (date, owner, category, envelope, establishment, value) "
-                      "VALUES (?, 'Claire', 'Cash & dépôts', 'Livret A', 'CEMP', ?)", (D, v))
+                      "VALUES (?, 'Claire', 'Cash & dépôts', 'Livret A', 'CEMP', ?)", (D, centimes(v)))
         for _ in range(2):   # deux versements egaux le meme jour
             c.execute("INSERT INTO flux (date, owner, envelope, establishment, type, amount) "
                       "VALUES ('2026-06-01', 'Paul', 'Assurance-vie', 'CA31', 'Versement', 50000)")  # centimes

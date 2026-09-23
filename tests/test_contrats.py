@@ -15,6 +15,7 @@ os.environ['FINANCY_PASSWORD'] = 'testpass'
 
 from models import init_db, get_db  # noqa: E402
 from app import app  # noqa: E402
+from services.montants import centimes  # noqa: E402
 from services.contrats import contrats, enregistrer  # noqa: E402
 
 H = {'X-CSRF-Token': 'test'}
@@ -29,7 +30,7 @@ def fresh_db():
     with get_db() as conn:
         for owner, etab, v in (('Paul', 'Bourso', 50000), ('Paul', 'Generali', 30000)):
             conn.execute("INSERT INTO positions (date, owner, category, envelope, establishment, value) "
-                         "VALUES (?, ?, 'Fond Euro', 'Assurance-vie', ?, ?)", (D, owner, etab, v))
+                         "VALUES (?, ?, 'Fond Euro', 'Assurance-vie', ?, ?)", (D, owner, etab, centimes(v)))
         conn.execute("INSERT INTO flux (date, owner, envelope, type, amount) VALUES ('2025-01-01', 'Paul', 'Assurance-vie', 'Versement', 7000000)")  # centimes
     yield
     if os.path.exists(models.DB_PATH):

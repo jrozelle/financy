@@ -70,7 +70,7 @@ class TestEndpoint:
         models.init_db()
         from app import app
         with models.get_db() as c:
-            for d, v in (('2025-01-01', 100000), ('2026-01-01', 110000)):
+            for d, v in (('2025-01-01', 10000000), ('2026-01-01', 11000000)):  # centimes
                 c.execute("INSERT INTO positions (date, owner, category, envelope, establishment, value) "
                           "VALUES (?,'Paul','Actions','PEA','Bourso',?)", (d, v))
             c.commit()

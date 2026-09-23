@@ -21,7 +21,7 @@ preleves a l'interieur du contrat ; tous deux appartiennent au rendement.
 """
 from __future__ import annotations
 import logging
-from services.montants import ligne_en_euros
+from services.montants import ligne_en_euros, lignes_en_euros
 
 logger = logging.getLogger('financy.contribution')
 
@@ -253,7 +253,7 @@ def _liquidites_par_compte(conn, date):
     """Liquidites personnelles a un arrete, par compte (titulaire, enveloppe,
     etablissement, libelle) : hors entites, hors especes d'enveloppe."""
     from models import compute_position, get_entity_map, get_holdings_map, load_referential
-    rows = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
+    rows = lignes_en_euros('positions', conn.execute('SELECT * FROM positions WHERE date=?', (date,)))
     hm = get_holdings_map(conn, [r['id'] for r in rows])
     em, ref = get_entity_map(conn, date), load_referential(conn)
     out = {}

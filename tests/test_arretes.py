@@ -17,6 +17,7 @@ os.environ['PRICE_PROVIDER'] = 'mock'
 
 from models import init_db, get_db  # noqa: E402
 from app import app  # noqa: E402
+from services.montants import centimes  # noqa: E402
 
 H = {'X-CSRF-Token': 'test'}
 
@@ -42,9 +43,9 @@ def client():
 
 
 def _sci(c, dates_valeurs):
-    c.execute("INSERT INTO entities (name, type, gross_assets, debt) VALUES ('SCI', 'SCI', 300000, 0)")
+    c.execute("INSERT INTO entities (name, type, gross_assets, debt) VALUES ('SCI', 'SCI', 30000000, 0)")  # centimes
     for d, v in dates_valeurs:
-        c.execute("INSERT INTO entity_snapshots (entity_name, date, gross_assets, debt) VALUES ('SCI', ?, ?, 0)", (d, v))
+        c.execute("INSERT INTO entity_snapshots (entity_name, date, gross_assets, debt) VALUES ('SCI', ?, ?, 0)", (d, centimes(v)))
 
 
 def _pos_sci(c, date):
@@ -96,21 +97,21 @@ def test_auto_snapshot_refuse_une_date_invalide(client):
 
 def test_mise_a_jour_sans_dette_garde_la_dette_connue(client):
     with get_db() as c:
-        c.execute("INSERT INTO entities (name, type, gross_assets, debt) VALUES ('SCI', 'SCI', 300000, 80000)")
+        c.execute("INSERT INTO entities (name, type, gross_assets, debt) VALUES ('SCI', 'SCI', 30000000, 8000000)")  # centimes
         _pos_sci(c, '2026-01-01'); c.commit()
     r = client.post('/api/snapshots/update', json={'source_date': '2026-01-01', 'target_date': '2026-02-01',
                                                    'entites': {'SCI': {'gross_assets': 310000}}}, headers=H)
     assert r.status_code == 200, r.get_json()
     with get_db() as c:
         dette = c.execute("SELECT debt FROM entity_snapshots WHERE entity_name='SCI' AND date='2026-02-01'").fetchone()[0]
-    assert dette == 80000
+    assert dette == 8000000  # centimes
 
 
 def test_snapshot_update_ne_laisse_pas_de_lignes_orphelines(client):
     with get_db() as c:
-        c.execute("INSERT INTO positions (date, owner, category, envelope, value) VALUES ('2026-01-01','Paul','Actions','PEA',100)")
+        c.execute("INSERT INTO positions (date, owner, category, envelope, value) VALUES ('2026-01-01','Paul','Actions','PEA',10000)")  # centimes
         pid = c.execute("SELECT id FROM positions").fetchone()[0]
-        c.execute("INSERT INTO positions (date, owner, category, envelope, value) VALUES ('2026-02-01','Paul','Actions','PEA',100)")
+        c.execute("INSERT INTO positions (date, owner, category, envelope, value) VALUES ('2026-02-01','Paul','Actions','PEA',10000)")  # centimes
         cible = c.execute("SELECT id FROM positions WHERE date='2026-02-01'").fetchone()[0]
         c.execute("INSERT INTO securities (isin, name) VALUES ('FR0000120271','T')")
         c.execute("INSERT INTO holdings (position_id, isin, quantity) VALUES (?, 'FR0000120271', 1)", (cible,))

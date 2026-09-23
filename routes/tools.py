@@ -6,7 +6,7 @@ from models import (get_db, compute_position, get_entity_map, holdings_a_date,
                     validate_string, parse_number)
 from auth import login_required, csrf_protect
 from routes.performance import _flux_signed
-from services.montants import ligne_en_euros
+from services.montants import ligne_en_euros, lignes_en_euros
 
 logger = logging.getLogger('financy')
 tools_bp = Blueprint('tools', __name__)
@@ -31,7 +31,7 @@ def get_timeline():
         ).fetchall()
         for row in dates:
             d = row['date']
-            pos_rows     = conn.execute('SELECT * FROM positions WHERE date=?', (d,)).fetchall()
+            pos_rows     = lignes_en_euros('positions', conn.execute('SELECT * FROM positions WHERE date=?', (d,)))
             entity_map   = get_entity_map(conn, d)
             holdings_map = holdings_a_date(conn, [r['id'] for r in pos_rows], d)
             positions    = [compute_position(dict(r), entity_map, ref, holdings_map) for r in pos_rows]
@@ -96,7 +96,7 @@ def get_position_history():
         history = []
 
         for date in dates:
-            rows         = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
+            rows         = lignes_en_euros('positions', conn.execute('SELECT * FROM positions WHERE date=?', (date,)))
             entity_map   = get_entity_map(conn, date)
             holdings_map = holdings_a_date(conn, [r['id'] for r in rows], date)
             positions    = [compute_position(dict(r), entity_map, ref, holdings_map) for r in rows]

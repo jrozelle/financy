@@ -25,6 +25,7 @@ os.environ['PRICE_PROVIDER'] = 'mock'
 
 from models import init_db, get_db  # noqa: E402
 from app import app  # noqa: E402
+from services.montants import centimes  # noqa: E402
 
 DATE = '2026-06-30'
 
@@ -54,9 +55,9 @@ def deux_titulaires():
     """Paul : 100 000 d'actions en PEA. Claire : 300 000 d'immobilier."""
     with get_db() as conn:
         conn.execute('INSERT INTO positions (date, owner, category, envelope, value, debt) '
-                     "VALUES (?,'Paul','Actions','PEA',100000,0)", (DATE,))
+                     "VALUES (?,'Paul','Actions','PEA',10000000,0)", (DATE,))  # centimes
         conn.execute('INSERT INTO positions (date, owner, category, envelope, value, debt) '
-                     "VALUES (?,'Claire','Immobilier','Immobilier',300000,120000)", (DATE,))
+                     "VALUES (?,'Claire','Immobilier','Immobilier',30000000,12000000)", (DATE,))  # centimes
         conn.commit()
 
 
@@ -139,9 +140,9 @@ class TestPerformanceFiltree:
         with get_db() as conn:
             for d, vj, vp in (('2026-01-31', 100000, 50000), (DATE, 110000, 100000)):
                 conn.execute('INSERT INTO positions (date, owner, category, envelope, value) '
-                             "VALUES (?,'Paul','Actions','PEA',?)", (d, vj))
+                             "VALUES (?,'Paul','Actions','PEA',?)", (d, centimes(vj)))
                 conn.execute('INSERT INTO positions (date, owner, category, envelope, value) '
-                             "VALUES (?,'Claire','Actions','PEA',?)", (d, vp))
+                             "VALUES (?,'Claire','Actions','PEA',?)", (d, centimes(vp)))
             conn.commit()
         r = client.get('/api/performance?owner=Paul').get_json()
         assert r['global'] is not None

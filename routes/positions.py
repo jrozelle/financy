@@ -4,6 +4,7 @@ from models import (get_db, compute_position, get_entity_map, get_holdings_map, 
                     validate_date, validate_number, validate_string,
                     validate_pct, parse_number, LIQUIDITY_ORDER)
 from auth import login_required, csrf_protect
+from services.montants import centimes, ligne_en_euros, lignes_en_euros
 
 positions_bp = Blueprint('positions', __name__)
 
@@ -75,11 +76,11 @@ def get_positions():
         if limit is not None:
             query += ' LIMIT ? OFFSET ?'
             params += [limit, offset]
-        rows = conn.execute(query, params).fetchall()
+        rows = lignes_en_euros('positions', conn.execute(query, params))
         entity_map   = get_entity_map(conn, date)
         ref          = load_referential(conn)
         holdings_map = holdings_a_date(conn, [r['id'] for r in rows], date)
-    return jsonify([compute_position(dict(r), entity_map, ref, holdings_map) for r in rows])
+    return jsonify([compute_position(r, entity_map, ref, holdings_map) for r in rows])
 
 
 @positions_bp.route('/api/positions', methods=['POST'])
@@ -94,8 +95,8 @@ def add_position():
         if err:
             return jsonify({'error': err}), 400
         entity = d.get('entity')
-        stored_value = 0 if entity else parse_number(d.get('value'), 0)
-        stored_debt  = 0 if entity else parse_number(d.get('debt'), 0)
+        stored_value = 0 if entity else centimes(parse_number(d.get('value'), 0))
+        stored_debt  = 0 if entity else centimes(parse_number(d.get('debt'), 0))
         mob_override = _pct_stocke(d.get('mobilizable_pct_override'))
         liq_override = d.get('liquidity_override') or None
         cur = conn.execute(
@@ -114,7 +115,7 @@ def add_position():
         entity_map   = get_entity_map(conn)
         ref          = load_referential(conn)
         holdings_map = get_holdings_map(conn, [row['id']])
-    return jsonify(compute_position(dict(row), entity_map, ref, holdings_map)), 201
+    return jsonify(compute_position(ligne_en_euros('positions', row), entity_map, ref, holdings_map)), 201
 
 
 @positions_bp.route('/api/positions/<int:pid>', methods=['PUT'])
@@ -131,8 +132,8 @@ def update_position(pid):
         if err:
             return jsonify({'error': err}), 400
         entity = d.get('entity')
-        stored_value = 0 if entity else parse_number(d.get('value'), 0)
-        stored_debt  = 0 if entity else parse_number(d.get('debt'), 0)
+        stored_value = 0 if entity else centimes(parse_number(d.get('value'), 0))
+        stored_debt  = 0 if entity else centimes(parse_number(d.get('debt'), 0))
         mob_override = _pct_stocke(d.get('mobilizable_pct_override'))
         liq_override = d.get('liquidity_override') or None
         conn.execute(
@@ -152,7 +153,7 @@ def update_position(pid):
         entity_map   = get_entity_map(conn)
         ref          = load_referential(conn)
         holdings_map = get_holdings_map(conn, [row['id']])
-    return jsonify(compute_position(dict(row), entity_map, ref, holdings_map))
+    return jsonify(compute_position(ligne_en_euros('positions', row), entity_map, ref, holdings_map))
 
 
 @positions_bp.route('/api/positions/<int:pid>', methods=['DELETE'])
@@ -236,7 +237,7 @@ def snapshot_update(pid):
                 new_id = duplicate_position(conn, row, target_date)
             new_row = conn.execute('SELECT * FROM positions WHERE id=?', (new_id,)).fetchone()
             holdings_map = get_holdings_map(conn, [new_id])
-            created.append(compute_position(dict(new_row), entity_map, ref, holdings_map))
+            created.append(compute_position(ligne_en_euros('positions', new_row), entity_map, ref, holdings_map))
 
         snapshot_holdings_to_date(conn, target_date)
 

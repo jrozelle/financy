@@ -103,7 +103,7 @@ def _releve(ops):
 class TestBilan:
     def _base(self, conn):
         conn.execute("INSERT INTO entities (name, type) VALUES ('SCI T', 'SCI')")
-        conn.execute("INSERT INTO entity_snapshots (entity_name, date, gross_assets, debt) VALUES ('SCI T', '2026-01-01', 100000, 100000)")
+        conn.execute("INSERT INTO entity_snapshots (entity_name, date, gross_assets, debt) VALUES ('SCI T', '2026-01-01', 10000000, 10000000)")  # centimes
         conn.execute("INSERT INTO prets (id, libelle, entity, montant, taux) VALUES (1, 'P', 'SCI T', 10000000, 5)")  # centimes
         for mois in ('01', '02'):
             conn.execute('INSERT INTO pret_echeances VALUES (1, ?, ?, 30000, 40000, 0, 9900000)', (int(mois), f'2026-{mois}-05'))
@@ -163,7 +163,7 @@ class TestEpargneNouvelle:
 
     def _pos(self, conn, date, envelope, value, label=None, category='Cash & dépôts'):
         conn.execute("INSERT INTO positions (date, owner, category, envelope, establishment, label, value) "
-                     "VALUES (?, 'Paul', ?, ?, 'Banque', ?, ?)", (date, category, envelope, label, value))
+                     "VALUES (?, 'Paul', ?, ?, 'Banque', ?, ?)", (date, category, envelope, label, centimes(value)))
 
     def test_dca_et_compte_nouveau_ne_comptent_pas(self):
         from services.contribution import epargne_nouvelle
@@ -206,7 +206,7 @@ class TestParts:
     def test_la_mise_a_jour_propose_parts_plus_tresorerie(self, client):
         with get_db() as conn:
             self._entite(conn)
-            conn.execute("INSERT INTO entity_snapshots (entity_name, date, gross_assets, debt) VALUES ('SCI T', '2026-08-31', 44000, 40000)")
+            conn.execute("INSERT INTO entity_snapshots (entity_name, date, gross_assets, debt) VALUES ('SCI T', '2026-08-31', 4400000, 4000000)")  # centimes
             conn.execute("INSERT INTO positions (date, owner, category, envelope, value, entity) "
                          "VALUES ('2026-08-31', 'Paul', 'SCPI', 'SCI', 0, 'SCI T')")
             conn.execute("INSERT INTO entite_operations (entity, date, libelle, montant, nature) "

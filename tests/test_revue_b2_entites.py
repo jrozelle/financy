@@ -28,48 +28,48 @@ class TestTresoreriePreservee:
     def test_modifier_l_entite_garde_la_tresorerie_du_jour(self, client):
         e = _entite(client)
         with get_db() as conn:
-            conn.execute('UPDATE entity_snapshots SET tresorerie=5000 WHERE entity_name=?', (e['name'],))
+            conn.execute('UPDATE entity_snapshots SET tresorerie=500000 WHERE entity_name=?', (e['name'],))  # centimes
         r = client.put(f"/api/entities/{e['id']}", json={'name': e['name'], 'gross_assets': 110000,
                                                          'debt': 40000}, headers=H)
         assert r.status_code == 200
-        assert _treso(e['name']) == 5000
+        assert _treso(e['name']) == 500000  # centimes
         with get_db() as conn:
             assert conn.execute('SELECT gross_assets FROM entity_snapshots WHERE entity_name=?',
-                                (e['name'],)).fetchone()[0] == 110000
+                                (e['name'],)).fetchone()[0] == 11000000  # centimes
 
     def test_mise_a_jour_sans_tresorerie_ne_l_efface_pas(self):
         from services.snapshot import appliquer_mise_a_jour
         with get_db() as conn:
             conn.execute("INSERT INTO entities (name) VALUES ('SCI Exemple')")
             conn.execute("INSERT INTO entity_snapshots (entity_name, date, gross_assets, debt, tresorerie) "
-                         "VALUES ('SCI Exemple', '2026-06-30', 90000, 30000, 4000)")
-            conn.execute("INSERT INTO positions (date, owner, category, value) VALUES ('2026-06-30', 'Paul', 'Actions', 10)")
+                         "VALUES ('SCI Exemple', '2026-06-30', 9000000, 3000000, 400000)")  # centimes
+            conn.execute("INSERT INTO positions (date, owner, category, value) VALUES ('2026-06-30', 'Paul', 'Actions', 1000)")  # centimes
             appliquer_mise_a_jour(conn, '2026-06-30', '2026-06-30', {},
                                   {'SCI Exemple': {'gross_assets': 95000, 'debt': 30000}})
             r = conn.execute("SELECT gross_assets, tresorerie FROM entity_snapshots "
                              "WHERE entity_name='SCI Exemple' AND date='2026-06-30'").fetchone()
-        assert (r['gross_assets'], r['tresorerie']) == (95000, 4000)
+        assert (r['gross_assets'], r['tresorerie']) == (9500000, 400000)  # centimes
 
     def test_mise_a_jour_avec_tresorerie_l_ecrit(self):
         from services.snapshot import appliquer_mise_a_jour
         with get_db() as conn:
             conn.execute("INSERT INTO entities (name) VALUES ('SCI Exemple')")
-            conn.execute("INSERT INTO positions (date, owner, category, value) VALUES ('2026-06-30', 'Paul', 'Actions', 10)")
+            conn.execute("INSERT INTO positions (date, owner, category, value) VALUES ('2026-06-30', 'Paul', 'Actions', 1000)")  # centimes
             appliquer_mise_a_jour(conn, '2026-06-30', '2026-06-30', {},
                                   {'SCI Exemple': {'gross_assets': 95000, 'debt': 0, 'tresorerie': '1 234,5'}})
             t = conn.execute("SELECT tresorerie FROM entity_snapshots WHERE entity_name='SCI Exemple'").fetchone()[0]
-        assert t == 1234.5
+        assert t == 123450  # centimes
 
     def test_deplacer_un_arrete_recopie_la_tresorerie(self, client):
         with get_db() as conn:
             conn.execute("INSERT INTO entities (name) VALUES ('SCI Exemple')")
             conn.execute("INSERT INTO entity_snapshots (entity_name, date, gross_assets, debt, tresorerie) "
-                         "VALUES ('SCI Exemple', '2026-06-30', 90000, 30000, 4000)")
-            conn.execute("INSERT INTO positions (date, owner, category, value) VALUES ('2026-06-30', 'Paul', 'Actions', 10)")
+                         "VALUES ('SCI Exemple', '2026-06-30', 9000000, 3000000, 400000)")  # centimes
+            conn.execute("INSERT INTO positions (date, owner, category, value) VALUES ('2026-06-30', 'Paul', 'Actions', 1000)")  # centimes
         r = client.post('/api/snapshots/rename', json={'from_date': '2026-06-30', 'to_date': '2026-07-01'},
                         headers=H)
         assert r.status_code == 200
-        assert _treso('SCI Exemple', '2026-07-01') == 4000
+        assert _treso('SCI Exemple', '2026-07-01') == 400000  # centimes
 
 
 class TestRenommage:

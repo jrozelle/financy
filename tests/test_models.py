@@ -189,7 +189,7 @@ class TestGetEntityMap:
         with get_db() as conn:
             conn.execute(
                 "INSERT INTO entities (name, gross_assets, debt) VALUES (?, ?, ?)",
-                ('SCI Test', 300000, 100000)
+                ('SCI Test', 30000000, 10000000)  # centimes
             )
         with get_db() as conn:
             result = get_entity_map(conn)
@@ -201,15 +201,15 @@ class TestGetEntityMap:
         with get_db() as conn:
             conn.execute(
                 "INSERT INTO entities (name, gross_assets, debt) VALUES (?, ?, ?)",
-                ('SCI A', 300000, 100000)
+                ('SCI A', 30000000, 10000000)  # centimes
             )
             conn.execute(
                 "INSERT INTO entity_snapshots (entity_name, date, gross_assets, debt) VALUES (?, ?, ?, ?)",
-                ('SCI A', '2024-01-01', 250000, 120000)
+                ('SCI A', '2024-01-01', 25000000, 12000000)  # centimes
             )
             conn.execute(
                 "INSERT INTO entity_snapshots (entity_name, date, gross_assets, debt) VALUES (?, ?, ?, ?)",
-                ('SCI A', '2024-06-01', 280000, 110000)
+                ('SCI A', '2024-06-01', 28000000, 11000000)  # centimes
             )
 
         # Date avant tous les snapshots → la plus ancienne valorisation datee.
@@ -233,7 +233,7 @@ class TestGetEntityMap:
         with get_db() as conn:
             conn.execute(
                 "INSERT INTO entities (name, gross_assets, debt) VALUES (?, ?, ?)",
-                ('SCI B', 500000, 200000)
+                ('SCI B', 50000000, 20000000)  # centimes
             )
         with get_db() as conn:
             result = get_entity_map(conn, '2024-06-01')

@@ -5,7 +5,7 @@ from io import BytesIO
 from models import get_db, validate_date, validate_isin, parse_number, get_db_path
 from auth import login_required, csrf_protect
 from services.backups import create_db_backup
-from services.montants import ligne_en_centimes, ligne_en_euros
+from services.montants import centimes, ligne_en_centimes, ligne_en_euros
 from services.snapshot import ecrire_entity_snapshot
 
 MAX_IMPORT_ROWS = 10000
@@ -130,7 +130,7 @@ def import_xlsx():
                        VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
                     (date_str, owner, category,
                      envelope, establishment,
-                     value, debt,
+                     centimes(value), centimes(debt),
                      notes, entity,
                      ownership_pct, debt_pct)
                 )
@@ -189,13 +189,13 @@ def import_xlsx():
                         conn.execute(
                             '''UPDATE entities SET type=?, valuation_mode=?,
                                gross_assets=?, debt=?, comment=? WHERE name=?''',
-                            (etype, valuation_mode, gross_assets, debt, comment, name)
+                            (etype, valuation_mode, centimes(gross_assets), centimes(debt), comment, name)
                         )
                     else:
                         conn.execute(
                             '''INSERT INTO entities (name, type, valuation_mode, gross_assets, debt, comment)
                                VALUES (?,?,?,?,?,?)''',
-                            (name, etype, valuation_mode, gross_assets, debt, comment)
+                            (name, etype, valuation_mode, centimes(gross_assets), centimes(debt), comment)
                         )
                     today = datetime.now().strftime('%Y-%m-%d')
                     ecrire_entity_snapshot(conn, name, today, gross_assets, debt)

@@ -55,10 +55,10 @@ class TestTresorerieDeSociete:
         with get_db() as conn:
             conn.execute("INSERT INTO entities (name, type) VALUES ('Holding Exemple', 'Holding')")
             conn.execute("INSERT INTO positions (date, owner, category, envelope, value, label) "
-                         "VALUES (?, 'Paul', 'Cash & dépôts', 'Compte courant', 20000, 'Holding Exemple')", (D,))
+                         "VALUES (?, 'Paul', 'Cash & dépôts', 'Compte courant', 2000000, 'Holding Exemple')", (D,))  # centimes
             assert not [k for k in constats(conn, D)['constats'] if 'comptes courants' in k['titre']]
             conn.execute("INSERT INTO positions (date, owner, category, envelope, value) "
-                         "VALUES (?, 'Paul', 'Holding Exemple', 'Compte courant', 16000)", (D,))
+                         "VALUES (?, 'Paul', 'Holding Exemple', 'Compte courant', 1600000)", (D,))  # centimes
             ks = [k for k in constats(conn, D)['constats'] if 'comptes courants' in k['titre']]
         assert len(ks) == 1 and ks[0]['montant'] == 16000
 

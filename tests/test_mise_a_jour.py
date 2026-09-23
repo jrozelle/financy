@@ -20,6 +20,7 @@ os.environ['PRICE_PROVIDER'] = 'mock'
 
 from models import init_db, get_db  # noqa: E402
 from app import app  # noqa: E402
+from services.montants import centimes  # noqa: E402
 from services.snapshot import duplicate_snapshot  # noqa: E402
 
 SRC, CIBLE = '2026-08-31', '2026-09-22'
@@ -49,7 +50,7 @@ def client():
 def _pos(conn, envelope, value, debt=0, entity=None, date=SRC, debt_pct=1.0, category='Cash & dépôts'):
     return conn.execute(
         'INSERT INTO positions (date, owner, category, envelope, value, debt, entity, debt_pct) '
-        "VALUES (?,'Paul',?,?,?,?,?,?)", (date, category, envelope, value, debt, entity, debt_pct)).lastrowid
+        "VALUES (?,'Paul',?,?,?,?,?,?)", (date, category, envelope, centimes(value), centimes(debt), entity, debt_pct)).lastrowid
 
 
 @pytest.fixture
@@ -60,9 +61,9 @@ def arrete():
         pea = _pos(c, 'PEA', 0, category='Actions')
         c.execute("INSERT INTO holdings (position_id, isin, quantity, cost_basis, market_value) "
                   "VALUES (?, 'FR0000000001', 10, 900, 1000)", (pea,))
-        c.execute("INSERT INTO entities (name, type, gross_assets, debt) VALUES ('SCI A', 'SCI', 300000, 200000)")
+        c.execute("INSERT INTO entities (name, type, gross_assets, debt) VALUES ('SCI A', 'SCI', 30000000, 20000000)")  # centimes
         c.execute("INSERT INTO entity_snapshots (entity_name, date, gross_assets, debt) "
-                  "VALUES ('SCI A', ?, 300000, 200000)", (SRC,))
+                  "VALUES ('SCI A', ?, 30000000, 20000000)", (SRC,))  # centimes
         sci = _pos(c, 'SCI', 0, entity='SCI A', category='Immobilier')
         c.commit()
     return {'livret': livret, 'pea': pea, 'sci': sci}
@@ -96,8 +97,8 @@ class TestApplication:
         with get_db() as c:
             v = c.execute("SELECT value FROM positions WHERE date=? AND envelope='Livret A'", (CIBLE,)).fetchone()
             s = c.execute("SELECT value FROM positions WHERE date=? AND envelope='Livret A'", (SRC,)).fetchone()
-        assert v['value'] == 21500
-        assert s['value'] == 20000                        # la source est intacte
+        assert v['value'] == 2150000                      # centimes
+        assert s['value'] == 2000000                      # la source est intacte (centimes)
 
     def test_toutes_les_positions_sont_recopiees(self, client, arrete):
         self._post(client, soldes={})
@@ -118,7 +119,7 @@ class TestApplication:
         self._post(client, entites={'SCI A': {'gross_assets': 305000, 'debt': 198500}})
         with get_db() as c:
             rows = c.execute("SELECT date, debt FROM entity_snapshots WHERE entity_name='SCI A' ORDER BY date").fetchall()
-        assert [(r['date'], r['debt']) for r in rows] == [(SRC, 200000), (CIBLE, 198500)]
+        assert [(r['date'], r['debt']) for r in rows] == [(SRC, 20000000), (CIBLE, 19850000)]  # centimes
 
     def test_entite_inconnue_refusee(self, client, arrete):
         r = self._post(client, entites={'Fantome': {'gross_assets': 1, 'debt': 0}}).get_json()
@@ -139,7 +140,7 @@ class TestApplication:
         assert r.get_json()['cree'] is False
         with get_db() as c:
             assert c.execute('SELECT COUNT(DISTINCT date) n FROM positions').fetchone()['n'] == 1
-            assert c.execute("SELECT value FROM positions WHERE envelope='Livret A'").fetchone()['value'] == 20100
+            assert c.execute("SELECT value FROM positions WHERE envelope='Livret A'").fetchone()['value'] == 2010000  # centimes
 
     def test_montant_negatif_refuse(self, client, arrete):
         assert self._post(client, soldes={str(arrete['livret']): {'value': -5}}).status_code == 400
@@ -162,7 +163,7 @@ class TestDetteDupliquee:
             for cible in ('2026-02-28', '2026-03-31', '2026-04-30'):
                 duplicate_snapshot(c, d, cible); c.commit(); d = cible
             dettes = [r['debt'] for r in c.execute('SELECT debt FROM positions ORDER BY date')]
-        assert dettes == [100000] * 4
+        assert dettes == [10000000] * 4  # centimes
 
 
 class TestTresorerieDeLEntite:
@@ -193,7 +194,7 @@ class TestTresorerieDeLEntite:
 
     def test_la_tresorerie_incluse_n_est_pas_recomptee(self, client, arrete):
         with get_db() as c:
-            c.execute("UPDATE entity_snapshots SET gross_assets=301500, tresorerie=1500 WHERE entity_name='SCI A'")
+            c.execute("UPDATE entity_snapshots SET gross_assets=30150000, tresorerie=150000 WHERE entity_name='SCI A'")  # centimes
             self._ops(c, ('2026-08-01', 1500.0), ('2026-09-20', 500.0))
         assert self._entite(client)['valeur_proposee'] == 302000.0
 
@@ -204,4 +205,4 @@ class TestTresorerieDeLEntite:
         with get_db() as c:
             r = c.execute("SELECT tresorerie FROM entity_snapshots WHERE entity_name='SCI A' AND date=?",
                           (CIBLE,)).fetchone()
-        assert r['tresorerie'] == 2000
+        assert r['tresorerie'] == 200000  # centimes

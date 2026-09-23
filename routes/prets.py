@@ -7,7 +7,7 @@ from flask import Blueprint, jsonify, request
 from auth import login_required, csrf_protect
 from models import get_db, validate_date, validate_string
 from services import prets as svc
-from services.montants import centimes
+from services.montants import centimes, euros
 
 logger = logging.getLogger('financy')
 prets_bp = Blueprint('prets', __name__)
@@ -58,7 +58,7 @@ def _autres_dettes(conn, titulaire=None):
         if t and t != 'Famille' and r['owner'] != t:
             continue
         out.append({'libelle': ' · '.join(x for x in (r['label'] or r['envelope'], r['establishment'], r['owner']) if x),
-                    'montant': round(r['debt'] * (r['part'] if r['entity'] else 1), 2),
+                    'montant': round(euros(r['debt']) * (r['part'] if r['entity'] else 1), 2),
                     'notes': r['notes'], 'date': d})
     return out
 
