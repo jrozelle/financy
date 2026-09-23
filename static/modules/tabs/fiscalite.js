@@ -77,9 +77,8 @@ function rendu(d) {
       Calculé sur <strong>${fmt(couvert)}</strong> du patrimoine, soit
       ${fmtPct(part * 100, 0)}.${nb ? ` ${nb} enveloppe${nb > 1 ? 's' : ''} sans assiette
       sûre ${nb > 1 ? 'restent' : 'reste'} hors du calcul.` : ''}
-      Les contrats sont supposés matures — PEA de plus de 5 ans, assurance-vie de
-      plus de 8 ans —, c'est-à-dire au régime le plus favorable : l'impôt réel ne
-      peut qu'être supérieur.
+      L'ancienneté des assurances-vie et des PEA vient de leur date d'effet ; un
+      contrat sans date est supposé mature, au régime le plus favorable.
     </p>
 
     <button type="button" class="fisc-detail-btn" aria-expanded="false"
@@ -87,6 +86,7 @@ function rendu(d) {
     <div class="fisc-detail hidden" id="fisc-detail">
       ${tableau(d)}
       ${ecartees(d)}
+      <div id="fisc-contrats"></div>
     </div>`;
 }
 
@@ -114,7 +114,7 @@ function tableau(d) {
               ${esc(l.motif || '')}
               ${l.reserve ? `<span class="fisc-reserve">${esc(l.reserve)}</span>` : ''}
               ${l.abattement ? `<span class="fisc-reserve">Abattement de ${
-                fmt(l.abattement)} applique</span>` : ''}
+                fmt(l.abattement)} appliqué</span>` : ''}
             </td>
           </tr>`).join('')}
       </tbody>
@@ -142,5 +142,40 @@ function cabler(carte) {
   btn?.addEventListener('click', () => {
     const ouvert = zone.classList.toggle('hidden');
     btn.setAttribute('aria-expanded', String(!ouvert));
+    if (!ouvert) contrats(carte);
+  });
+}
+
+/** Les dates d'effet des contrats, qui fixent leur anciennete fiscale. */
+async function contrats(carte) {
+  const hote = carte.querySelector('#fisc-contrats');
+  if (!hote || hote.dataset.charge) return;
+  let d;
+  try { d = await api('GET', '/api/contrats', null, { silent: true }); } catch { return; }
+  hote.dataset.charge = '1';
+  if (!d.contrats?.length) return;
+  const date = v => v ? v.split('-').reverse().join('/') : '';
+  hote.innerHTML = `
+    <h3 class="fisc-h3">Ancienneté des contrats</h3>
+    <table class="fisc-table fisc-contrats">
+      <thead><tr><th scope="col">Contrat</th><th scope="col">Date d'effet</th><th scope="col">Échéance fiscale</th></tr></thead>
+      <tbody>${d.contrats.map((c, i) => `<tr data-i="${i}">
+        <td>${esc(c.envelope)} · ${esc(c.owner)}${c.establishment ? ` · ${esc(c.establishment)}` : ''}</td>
+        <td><input type="date" class="ref-input" value="${c.date_effet || ''}" aria-label="Date d'effet du contrat ${esc(c.envelope)} de ${esc(c.owner)}"></td>
+        <td>${c.maturite ? `${c.seuil_ans} ans le ${date(c.maturite)}${c.mature ? ' — atteint' : ''}`
+          : `<span class="fisc-reserve">Sans date : supposé de plus de ${c.seuil_ans} ans</span>`}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+    <button type="button" class="btn btn-secondary btn-sm" id="fisc-contrats-ok">Enregistrer les dates</button>`;
+  hote.querySelector('#fisc-contrats-ok').addEventListener('click', async () => {
+    const lignes = [...hote.querySelectorAll('tbody tr')].map(tr => {
+      const c = d.contrats[+tr.dataset.i];
+      return { owner: c.owner, envelope: c.envelope, establishment: c.establishment,
+               date_effet: tr.querySelector('input').value || null, numero: c.numero, source: c.source };
+    });
+    try {
+      await api('PUT', '/api/contrats', { contrats: lignes });
+      loadFiscalite();
+    } catch { /* toast deja affiche */ }
   });
 }

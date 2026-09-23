@@ -2,7 +2,7 @@ import json
 from flask import Blueprint, jsonify, request
 from datetime import datetime
 from models import (get_db, compute_position, get_entity_map, get_holdings_map,
-                    load_referential, freeze_holdings_prices)
+                    load_referential, freeze_holdings_prices, validate_date, validate_string)
 from auth import login_required, csrf_protect
 
 synthese_bp = Blueprint('synthese', __name__)
@@ -635,6 +635,37 @@ def impot_latent_api():
                             'net_apres_impot': 0, 'enveloppes': [],
                             'non_calculees': [], 'valeur_ecartee': 0})
         return jsonify(impot_latent(conn, date, owner))
+
+
+@synthese_bp.route('/api/contrats', methods=['GET'])
+@login_required
+def liste_contrats():
+    """Contrats detenus au dernier arrete (assurances-vie, PEA) et leur date d'effet."""
+    from services.contrats import contrats
+    with get_db() as conn:
+        date = request.args.get('date') or conn.execute('SELECT MAX(date) d FROM positions').fetchone()['d']
+        return jsonify({'date': date, 'contrats': contrats(conn, date) if date else []})
+
+
+@synthese_bp.route('/api/contrats', methods=['PUT'])
+@login_required
+@csrf_protect
+def enregistrer_contrats():
+    from services.contrats import enregistrer, SEUILS_ANS
+    lignes = (request.get_json(silent=True) or {}).get('contrats')
+    if not isinstance(lignes, list) or len(lignes) > 100:
+        return jsonify({'error': 'Liste de contrats attendue'}), 400
+    for l in lignes:
+        if not l.get('owner') or l.get('envelope') not in SEUILS_ANS:
+            return jsonify({'error': 'Titulaire ou enveloppe invalide'}), 400
+        if l.get('date_effet') and not validate_date(l['date_effet']):
+            return jsonify({'error': f'Date d’effet invalide : {l["date_effet"]}'}), 400
+        for k in ('owner', 'establishment', 'numero', 'source'):
+            if not validate_string(l.get(k), 200):
+                return jsonify({'error': f'{k} trop long'}), 400
+    with get_db() as conn:
+        enregistrer(conn, lignes)
+    return jsonify({'ok': True, 'n': len(lignes)})
 
 
 @synthese_bp.route('/api/projection/epargne')

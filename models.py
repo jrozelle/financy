@@ -782,6 +782,25 @@ def _migration_018(conn):
         )""")
 
 
+
+def _migration_019(conn):
+    """Date d'effet d'un contrat (assurance-vie, PEA...) : c'est elle, et non
+    le premier arrete ou il apparait, qui fixe l'anciennete fiscale — 8 ans
+    pour l'abattement d'une assurance-vie, 5 ans pour un PEA. Un contrat se
+    designe comme ses positions : titulaire, enveloppe, etablissement."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS contrats (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner         TEXT NOT NULL,
+            envelope      TEXT NOT NULL,
+            establishment TEXT NOT NULL DEFAULT '',
+            date_effet    TEXT,
+            numero        TEXT,
+            source        TEXT,
+            UNIQUE(owner, envelope, establishment)
+        )""")
+
+
 MIGRATIONS = [
     (1, _migration_001),
     (2, _migration_002),
@@ -801,6 +820,7 @@ MIGRATIONS = [
     (16, _migration_016),
     (17, _migration_017),
     (18, _migration_018),
+    (19, _migration_019),
 ]
 
 

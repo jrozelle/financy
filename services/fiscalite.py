@@ -18,11 +18,12 @@ Trois principes tiennent ce module :
    de plus-value. Une enveloppe dont les apports ne sont pas credibles sort du
    total et figure dans `non_calculees`, avec son motif.
 
-3. **L'anciennete est une hypothese, pas une donnee.** Aucune date d'ouverture
-   n'est stockee. Le regime retenu suppose les contrats matures — PEA de plus de
-   5 ans, assurance-vie de plus de 8 ans —, c'est-a-dire le regime le plus
-   FAVORABLE. L'impot rendu est donc un plancher, et chaque enveloppe dit quelle
-   hypothese la porte.
+3. **L'anciennete vient des dates d'effet saisies** (`services/contrats.py`).
+   Quand tous les contrats d'une enveloppe sont dates et jeunes — assurance-vie
+   de moins de 8 ans, PEA de moins de 5 —, c'est le prelevement forfaitaire. A
+   defaut de date, le regime retenu suppose les contrats matures, c'est-a-dire
+   le plus FAVORABLE : l'impot rendu est alors un plancher, et l'enveloppe dit
+   combien de contrats portent l'hypothese.
 
 Le resultat est une estimation d'ordre de grandeur, pas une declaration.
 """
@@ -192,6 +193,36 @@ def _assiette(env, valeur, apports, verses, pru):
     return None, None, 'Ni versement saisi ni prix de revient : la part de gain est inconnue'
 
 
+def _selon_anciennete(conn, date, owner, env, regime, motif):
+    """Le regime d'une assurance-vie ou d'un PEA selon l'anciennete REELLE des
+    contrats, quand elle est connue."""
+    from services.contrats import SEUILS_ANS, contrats
+    if env not in SEUILS_ANS:
+        return regime, motif
+    try:
+        cs = [c for c in contrats(conn, date, (env,)) if not owner or c['owner'] == owner]
+    except Exception:
+        return regime, motif              # table absente (base non migree)
+    if not cs:
+        return regime, motif
+    ans = SEUILS_ANS[env]
+    jeunes = [c for c in cs if c['mature'] is False]
+    inconnus = [c for c in cs if c['mature'] is None]
+    if len(jeunes) == len(cs):
+        prochaine = min(c['maturite'] for c in jeunes)
+        return 'pfu', (f'Contrats de moins de {ans} ans (dates d\'effet saisies) : prelevement forfaitaire '
+                       f'de 30 %, sans abattement ; premier contrat a {ans} ans le '
+                       f'{prochaine[8:10]}/{prochaine[5:7]}/{prochaine[:4]}')
+    if jeunes or inconnus:
+        parts = []
+        if jeunes:
+            parts.append(f'{len(jeunes)} de moins de {ans} ans')
+        if inconnus:
+            parts.append(f'{len(inconnus)} sans date d\'effet')
+        return regime, motif + f' — mais {" et ".join(parts)} sur {len(cs)} : impot sous-estime'
+    return regime, motif.replace(' (hypothese)', ' (dates d\'effet saisies)')
+
+
 def _impot(regime, assiette, nb_titulaires):
     """Impot du sur une plus-value latente, selon le regime de l'enveloppe."""
     if assiette <= 0:
@@ -227,6 +258,7 @@ def impot_latent(conn, date, owner=None):
         valeur = valeurs[env]
         brut += valeur
         regime, motif = REGIMES.get(env, REGIME_INCONNU)
+        regime, motif = _selon_anciennete(conn, date, owner, env, regime, motif)
 
         # Un regime hors de portee du calcul : la valeur reste au brut, mais
         # ni la plus-value ni l'impot ne sont inventes.

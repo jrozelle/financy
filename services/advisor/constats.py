@@ -190,6 +190,9 @@ def constats(conn, date, owner=None):
     # duquel une epargne sure fait mieux, sans parier sur les taux du marche.
     out += _garder_ou_rembourser(conn, date, {p.get('entity') for p in ps if p.get('entity')}, owner)
 
+    # 8. Anciennete des assurances-vie : la date des 8 ans, contrat par contrat.
+    out += _anciennete_av(conn, date, owner)
+
     # 6. Concentration immobiliere.
     brut_total = sum(p['gross_attributed'] for p in ps)
     immo = sum(p['gross_attributed'] for p in ps if p.get('category') in ('Immobilier', 'SCPI'))
@@ -212,6 +215,40 @@ def constats(conn, date, owner=None):
 def _jours(d0, d1):
     from datetime import date as _d
     return (_d.fromisoformat(d1[:10]) - _d.fromisoformat(d0[:10])).days
+
+
+def _anciennete_av(conn, date, owner):
+    try:
+        from services.contrats import contrats
+        cs = [c for c in contrats(conn, date, ('Assurance-vie',)) if not owner or c['owner'] == owner]
+    except Exception:
+        return []
+    if not cs:
+        return []
+    fr = lambda d: f"{d[8:10]}/{d[5:7]}/{d[:4]}"
+    matures = [c for c in cs if c['mature']]
+    jeunes = sorted((c for c in cs if c['mature'] is False), key=lambda c: c['maturite'])
+    inconnus = [c for c in cs if c['mature'] is None]
+    nom = lambda c: f"{c['owner']}{' · ' + c['establishment'] if c['establishment'] else ''}"
+    morceaux = []
+    if matures:
+        morceaux.append('plus de 8 ans : ' + ', '.join(nom(c) for c in matures)
+                        + " — l'abattement annuel sur les gains retirés s'applique")
+    if jeunes:
+        morceaux.append('8 ans le ' + ', '.join(f"{fr(c['maturite'])} ({nom(c)})" for c in jeunes))
+    if inconnus:
+        morceaux.append('sans date d’effet : ' + ', '.join(nom(c) for c in inconnus)
+                        + ' — à saisir dans « Si vous vendiez tout », détail par enveloppe')
+    titre = (f"{len(matures)} assurance{'s' if len(matures) > 1 else ''}-vie sur {len(cs)} a 8 ans" if matures
+             else f"Aucune assurance-vie n'a encore 8 ans" if not inconnus
+             else f"Ancienneté des assurances-vie : {len(inconnus)} contrat{'s' if len(inconnus) > 1 else ''} sans date")
+    return [{
+        'niveau': 'info', 'onglet': 'synthese',
+        'titre': titre,
+        'detail': ('Avant 8 ans, un rachat paie le prélèvement forfaitaire sur ses gains, sans abattement. '
+                   + (lambda t: t[:1].upper() + t[1:])(' ; '.join(morceaux)) + '.'),
+        'montant': 0,
+    }]
 
 
 def _pct(v):
