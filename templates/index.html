@@ -362,6 +362,24 @@
           <tbody id="entities-tbody"></tbody>
         </table>
       </div>
+      <div class="card" id="prets-carte">
+        <div class="prets-tete">
+          <div>
+            <h2>Crédits</h2>
+            <p class="card-sub" id="prets-sous">Tableaux d'amortissement : capital restant dû, et sa projection jusqu'au dernier remboursement.</p>
+          </div>
+          <label class="btn btn-secondary btn-sm prets-import-btn">
+            Importer un tableau d'amortissement
+            <input type="file" id="prets-fichier" accept="application/pdf" hidden>
+          </label>
+        </div>
+        <div id="prets-apercu" class="prets-apercu" hidden></div>
+        <div id="prets-courbe" class="courbe-hote"></div>
+        <div id="prets-legende" class="courbe-legende"></div>
+        <div id="prets-liste"></div>
+        <div id="prets-ecarts"></div>
+      </div>
+
       <details class="card ent-aide" id="ent-aide">
         <summary>Comment fonctionnent les entités ?</summary>
         <p class="text-muted">

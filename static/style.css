@@ -3826,3 +3826,38 @@ td.arbo-part > * { vertical-align: middle; }
 .contrib-zone { cursor: default; outline: none; }
 .contrib-zone.is-actif, .contrib-zone:focus-visible { fill: color-mix(in srgb, var(--text) 5%, transparent); }
 .contrib-bulle-total { border-top: 1px solid var(--border); padding-top: .25rem; margin-top: .1rem; font-weight: 600; }
+
+/* Mise a jour : dette proposee d'apres l'echeancier du pret. */
+.maj-echeancier { grid-column: 1 / -1; font-size: .74rem; color: var(--text-muted); }
+
+/* ── Credits (onglet Entites) ─────────────────────────────────────────── */
+.prets-tete { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
+.prets-import-btn { cursor: pointer; }
+.prets-vide { font-size: .84rem; }
+.prets-apercu { margin: .8rem 0; padding: .8rem 1rem; border: 1px solid var(--border); border-radius: 10px; font-size: .84rem;
+  display: grid; gap: .35rem; }
+.prets-apercu p { margin: 0; }
+.prets-controle { color: var(--success); font-size: .78rem; }
+.prets-apercu-champs { display: flex; flex-wrap: wrap; gap: .6rem; align-items: end; margin-top: .3rem; }
+.prets-apercu-champs label { display: grid; gap: .2rem; font-size: .74rem; color: var(--text-muted); }
+.prets-liste { display: flex; flex-direction: column; margin-top: .6rem; }
+.pret { display: grid; align-items: center; gap: .4rem 1.1rem; padding: .7rem 0; border-bottom: 1px solid var(--border);
+  grid-template-columns: minmax(14rem, 1.6fr) 11rem repeat(4, minmax(6.5rem, 1fr)) minmax(8rem, 1fr) auto; }
+.pret:last-child { border-bottom: 0; }
+.pret-nom { display: flex; gap: .55rem; align-items: flex-start; min-width: 0; }
+.pret-nom i { width: 10px; height: 10px; border-radius: 3px; margin-top: .35rem; flex: none; }
+.pret-nom span { display: grid; font-size: .86rem; min-width: 0; }
+.pret-nom small, .pret-chiffre small, .pret-avancement small { color: var(--text-muted); font-size: .72rem; }
+.pret-chiffre { display: grid; text-align: right; }
+.pret-chiffre b { font-family: var(--mono); font-weight: 600; font-size: .86rem; font-variant-numeric: tabular-nums; }
+.pret-avancement { display: grid; gap: .2rem; }
+.pret-barre { display: block; height: 6px; border-radius: 3px; background: var(--bg); overflow: hidden; }
+.pret-barre span { display: block; height: 100%; background: var(--primary); border-radius: 3px; }
+.prets-ecarts { list-style: none; margin: .6rem 0 0; padding: 0; font-size: .8rem; color: var(--text-muted); display: grid; gap: .2rem; }
+.prets-ecarts .pret-ecart { color: var(--warning); }
+@media (max-width: 1100px) {
+  .pret { grid-template-columns: 1fr 1fr; }
+  .pret-nom, .pret-entite, .pret-avancement { grid-column: 1 / -1; }
+  .pret-chiffre { text-align: left; }
+}
+.prets-apercu[hidden] { display: none; }

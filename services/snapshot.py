@@ -128,6 +128,16 @@ def preparer_mise_a_jour(conn, source_date, target_date):
     utilisees = {p['entity'] for p in positions if p['entity']}
     entites = [{'name': nom, 'gross_assets': round(v['gross_assets'], 2), 'debt': round(v['debt'], 2)}
                for nom, v in sorted(entity_map.items()) if nom in utilisees]
+    # La dette d'une entite dont les prets ont un echeancier : celle du
+    # tableau d'amortissement a la date de l'arrete, proposee a la saisie.
+    try:
+        from services.prets import dettes_par_entite
+        echeancier = dettes_par_entite(conn, target_date)
+    except Exception:
+        echeancier = {}           # table absente (base non migree)
+    for e in entites:
+        if e['name'] in echeancier:
+            e['dette_echeancier'] = echeancier[e['name']]
 
     existe = conn.execute('SELECT 1 FROM positions WHERE date=? LIMIT 1', (target_date,)).fetchone()
     return {

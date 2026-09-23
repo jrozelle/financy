@@ -113,7 +113,9 @@ function _dessiner(hote) {
     el('line', { class: 'courbe-grille', x1: MARGE_G, x2: L - MARGE_D, y1: Y(v), y2: Y(v) });
     el('text', { class: 'courbe-axe', x: MARGE_G - 8, y: Y(v) + 3.5, 'text-anchor': 'end' }, formatY(v, i, graduees));
   });
-  moisAffiches(t0, t1).forEach((t, i, arr) => {
+  // Un libelle de mois tous les 90 px au plus : sur un telephone, quatre
+  // libelles se chevauchaient (« sept. 26juil. 32 »).
+  moisAffiches(t0, t1, Math.max(2, Math.min(6, Math.floor((L - MARGE_G - MARGE_D) / 90)))).forEach((t, i, arr) => {
     const dernier = i === arr.length - 1 && X(t) > L - 60;
     el('text', { class: 'courbe-axe', x: X(t), y: HAUT - 8, 'text-anchor': dernier ? 'end' : (i === 0 && X(t) < MARGE_G + 20 ? 'start' : 'middle') }, libMois(t));
   });

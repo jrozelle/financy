@@ -12,6 +12,7 @@ from .advisor import advisor_bp
 from .performance import performance_bp
 from .transactions import transactions_bp
 from .movements_import import movements_bp
+from .prets import prets_bp
 
 all_blueprints = [
     positions_bp,
@@ -28,4 +29,5 @@ all_blueprints = [
     performance_bp,
     transactions_bp,
     movements_bp,
+    prets_bp,
 ]

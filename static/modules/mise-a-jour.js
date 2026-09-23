@@ -101,6 +101,9 @@ function rendu() {
     </section>` : '';
 
   document.getElementById('maj-corps').innerHTML = sections + entites;
+  // Une dette pre-remplie d'apres l'echeancier est deja une modification :
+  // son ecart et le resume se calculent des l'ouverture.
+  document.querySelectorAll('#maj-corps [data-maj="debt"][data-entite]').forEach(majLigne);
   majResume();
 }
 
@@ -145,18 +148,25 @@ function ligne(x, precis = false) {
 }
 
 function ligneEntite(e) {
+  // La dette d'une entite a echeancier est pre-remplie d'apres le tableau
+  // d'amortissement a la date de l'arrete ; l'ancienne valeur reste lisible.
+  const echeancier = e.dette_echeancier;
+  const propose = cle => (cle === 'debt' && echeancier != null) ? echeancier : e[cle];
   const champ = (cle, lib) => `
         <label class="maj-champ">
           <span class="maj-unite">${lib}</span>
           <input type="text" inputmode="decimal" data-maj="${cle}" data-entite="${esc(e.name)}"
-                 data-avant="${e[cle]}" value="${e[cle]}" aria-label="${lib} de ${esc(e.name)}">
+                 data-avant="${e[cle]}" value="${propose(cle)}" aria-label="${lib} de ${esc(e.name)}">
         </label>`;
+  const note = echeancier != null && Math.abs(echeancier - e.debt) >= 0.01
+    ? `<span class="maj-echeancier">Dette selon l’échéancier au ${fmtDate(_prep.target_date)} : ${fmt(echeancier)} (précédente : ${fmt(e.debt)})</span>` : '';
   return `
       <div class="maj-ligne maj-ligne--entite" data-ligne="e:${esc(e.name)}">
         <span class="maj-nom">${esc(e.name)}</span>
         ${champ('gross_assets', 'valeur')}
         ${champ('debt', 'dette')}
         <span class="maj-delta" aria-live="polite"></span>
+        ${note}
       </div>`;
 }
 

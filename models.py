@@ -665,6 +665,42 @@ def _migration_012(conn):
         pass            # colonne deja presente
 
 
+def _migration_013(conn):
+    """Prets et leurs echeanciers.
+
+    Un tableau d'amortissement donne le capital restant du a chaque echeance :
+    de quoi prevoir la dette a toute date, pre-remplir la mise a jour des
+    soldes, et signaler une dette saisie qui s'en ecarte. Un pret se rattache
+    a une entite (SCI, residence) ou reste libre.
+    """
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS prets (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            libelle     TEXT NOT NULL,
+            preteur     TEXT,
+            emprunteur  TEXT,
+            entity      TEXT,               -- entite dont il porte la dette
+            montant     REAL,
+            taux        REAL,
+            debut       TEXT,
+            fin         TEXT,
+            source      TEXT,               -- nom du document importe
+            created_at  TEXT DEFAULT CURRENT_TIMESTAMP
+        )''')
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS pret_echeances (
+            pret_id    INTEGER NOT NULL,
+            rang       INTEGER NOT NULL,
+            date       TEXT NOT NULL,
+            capital    REAL NOT NULL,       -- baisse du restant du a cette echeance
+            interets   REAL NOT NULL DEFAULT 0,
+            assurance  REAL NOT NULL DEFAULT 0,
+            crd        REAL NOT NULL,       -- capital restant du APRES l'echeance
+            PRIMARY KEY (pret_id, rang)
+        )''')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_pret_echeances_date ON pret_echeances(pret_id, date)')
+
+
 MIGRATIONS = [
     (1, _migration_001),
     (2, _migration_002),
@@ -678,6 +714,7 @@ MIGRATIONS = [
     (10, _migration_010),
     (11, _migration_011),
     (12, _migration_012),
+    (13, _migration_013),
 ]
 
 
