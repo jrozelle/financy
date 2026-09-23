@@ -9,7 +9,7 @@
  *
  * Aucune bibliotheque : le deplacement et le redimensionnement se font aux
  * evenements de pointeur, et tout reste possible au clavier (boutons « plus
- * tot / plus tard », largeurs, masquer).
+ * tot / plus tard » par les fleches sur la poignee, largeurs, masquer).
  */
 import { api } from './api.js';
 import { esc } from './utils.js';
@@ -198,15 +198,17 @@ function _commandes() {
     const boite = document.createElement('div');
     boite.className = 'w-commandes';
     boite.innerHTML = `
-      <button type="button" class="w-poignee" data-w="glisser" aria-label="Déplacer « ${nom} » (glisser)">${POIGNEE}</button>
+      <button type="button" class="w-poignee" data-w="glisser"
+              aria-label="Déplacer « ${nom} », position ${i + 1} sur ${ordre.length} : glisser, ou flèches du clavier">${POIGNEE}</button>
       <span class="w-nom">${nom}</span>
-      <button type="button" data-w="avant" ${i === 0 ? 'disabled' : ''} aria-label="Placer « ${nom} » plus tôt">‹ Avant</button>
-      <button type="button" data-w="apres" ${i === ordre.length - 1 ? 'disabled' : ''} aria-label="Placer « ${nom} » plus tard">Après ›</button>
       <span class="w-largeurs" role="group" aria-label="Largeur de « ${nom} »">${LARGEURS.map(([n, lib]) =>
         `<button type="button" data-w="largeur" data-n="${n}" aria-pressed="${l === n}">${lib}</button>`).join('')}</span>
       <button type="button" data-w="masquer" aria-pressed="${_masquee(id)}">${_masquee(id) ? 'Afficher' : 'Masquer'}</button>`;
     boite.addEventListener('click', e => _clic(e, id));
-    boite.querySelector('.w-poignee').addEventListener('pointerdown', e => _glisser(e, id));
+    const poignee = boite.querySelector('.w-poignee');
+    poignee.addEventListener('pointerdown', e => _glisser(e, id));
+    // Au clavier, la poignee deplace : fleches d'un cran, Debut / Fin aux bouts.
+    poignee.addEventListener('keydown', e => _clavier(e, id));
     el.prepend(boite);
     const bord = document.createElement('div');
     bord.className = 'w-bord';
@@ -222,17 +224,25 @@ function _commandes() {
   });
 }
 
+function _clavier(e, id) {
+  const pas = { ArrowUp: -1, ArrowLeft: -1, ArrowDown: 1, ArrowRight: 1 }[e.key];
+  const bout = { Home: -Infinity, End: Infinity }[e.key];
+  if (pas === undefined && bout === undefined) return;
+  e.preventDefault();
+  _changer(d => {
+    const i = d.ordre.indexOf(id);
+    const j = Math.max(0, Math.min(d.ordre.length - 1, bout !== undefined ? (bout < 0 ? 0 : d.ordre.length - 1) : i + pas));
+    d.ordre.splice(i, 1);
+    d.ordre.splice(j, 0, id);
+  });
+  carte(id)?.querySelector('.w-poignee')?.focus();
+}
+
 function _clic(e, id) {
   const b = e.target.closest('button[data-w]');
   if (!b || b.disabled) return;
   const w = b.dataset.w;
-  if (w === 'avant' || w === 'apres') {
-    _changer(d => {
-      const i = d.ordre.indexOf(id), j = w === 'avant' ? i - 1 : i + 1;
-      [d.ordre[i], d.ordre[j]] = [d.ordre[j], d.ordre[i]];
-    });
-    carte(id)?.querySelector(`.w-commandes [data-w="${w}"]:not([disabled])`)?.focus();
-  } else if (w === 'largeur') {
+  if (w === 'largeur') {
     _changer(d => { d.largeurs[id] = +b.dataset.n; });
     carte(id)?.querySelector(`.w-commandes [data-w="largeur"][data-n="${b.dataset.n}"]`)?.focus();
   } else if (w === 'masquer') {
@@ -252,16 +262,25 @@ function _glisser(e, id) {
   const poignee = e.currentTarget;
   poignee.setPointerCapture(e.pointerId);
   const bouger = ev => {
-    const sous = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('#tab-synthese [data-carte]');
-    const autre = sous?.dataset.carte;
-    if (!autre || autre === id) return;
-    const r = sous.getBoundingClientRect();
-    // Avant la carte survolee si l'on est dans sa moitie haute (ou gauche,
-    // sur une meme rangee), apres sinon.
-    const avant = ev.clientY < r.top + r.height / 2 && (ev.clientX < r.left + r.width / 2 || ev.clientY < r.top + r.height / 3);
+    // La carte la plus proche du pointeur, et le cote ou il se trouve : avant
+    // si le pointeur est au-dessus de son centre (ou a sa gauche, sur une meme
+    // rangee), apres sinon. Plus sur que la carte « sous » le pointeur, qui
+    // change a chaque reflux de la grille.
+    let meilleure = null, dmin = Infinity;
+    onglet().querySelectorAll('[data-carte]').forEach(c => {
+      if (c.dataset.carte === id || getComputedStyle(c).display === 'none') return;
+      const r = c.getBoundingClientRect();
+      const dx = Math.max(r.left - ev.clientX, 0, ev.clientX - r.right);
+      const dy = Math.max(r.top - ev.clientY, 0, ev.clientY - r.bottom);
+      const d = dx * dx + dy * dy;
+      if (d < dmin) { dmin = d; meilleure = { c, r }; }
+    });
+    if (!meilleure) return;
+    const { c, r } = meilleure;
+    const memeRangee = ev.clientY >= r.top && ev.clientY <= r.bottom;
+    const avant = memeRangee ? ev.clientX < r.left + r.width / 2 : ev.clientY < r.top + r.height / 2;
     const ordre = _ordre().filter(x => x !== id);
-    const k = ordre.indexOf(autre) + (avant ? 0 : 1);
-    ordre.splice(k, 0, id);
+    ordre.splice(ordre.indexOf(c.dataset.carte) + (avant ? 0 : 1), 0, id);
     if (ordre.join() !== _ordre().join()) {
       _disp = { ..._disp, ordre };
       _appliquer();

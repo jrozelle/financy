@@ -2728,8 +2728,14 @@ body { padding-left: var(--rail-w); }
     border-top: 1px solid var(--rail-border); overflow: visible; z-index: 80;
   }
   .fin-rail-brand,
-  .fin-rail .fin-rail-sub,
+  .fin-rail:not(.m-perso) .fin-rail-sub,
+  .fin-rail.m-perso .fin-rail-item.m-cache,
   .fin-rail-foot { display: none; }
+  /* Ordre choisi dans les preferences (modules/barre-mobile.js). */
+  .fin-rail.m-perso .fin-rail-item[data-tab] { order: var(--m-rang, 50); }
+  .fin-rail .fin-rail-plus { order: 90; }
+  .fin-rail.is-open .fin-rail-brand { order: -1; }
+  .fin-rail.is-open .fin-rail-foot { order: 100; }
   .fin-rail .fin-rail-plus { display: flex; }
   .fin-rail .fin-rail-item {
     flex: 1 1 0; min-width: 0; min-height: 0;
@@ -2749,7 +2755,8 @@ body { padding-left: var(--rail-w); }
   }
   .fin-rail.is-open .fin-rail-brand { display: flex; justify-content: flex-start; padding: .25rem .5rem 1rem; }
   .fin-rail.is-open .fin-rail-nom { display: inline; }
-  .fin-rail.is-open .fin-rail-sub { display: flex; }
+  .fin-rail.is-open .fin-rail-sub,
+  .fin-rail.is-open .fin-rail-item.m-cache { display: flex; }
   .fin-rail.is-open .fin-rail-foot { display: block; }
   .fin-rail.is-open .fin-rail-item {
     flex: 0 0 auto; flex-direction: row; justify-content: flex-start;
@@ -4069,3 +4076,15 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   .w-bord, .w-largeurs { display: none; }
 }
 @media (max-width: 780px) { .w-barre .w-aide { display: none; } .w-barre { padding: .5rem .7rem; } }
+/* Editeur de la barre du bas (preferences). */
+.pref-ligne--haute { align-items: flex-start; flex-wrap: wrap; }
+.pref-ligne--haute > div:last-child { flex: 1 1 280px; }
+.barre-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; }
+.barre-ligne { display: flex; align-items: center; gap: .5rem; padding: .35rem .5rem; border: 1px solid var(--border);
+  border-radius: 8px; background: var(--card); font-size: .85rem; }
+.barre-ligne.dans-barre { border-color: color-mix(in srgb, var(--primary) 45%, var(--border)); }
+.barre-ligne.w-glisse { opacity: .6; outline: 2px solid var(--primary); }
+.barre-ligne .w-poignee { background: none; border: 0; padding: .35rem; color: var(--text-muted); border-radius: 6px; }
+.barre-nom { flex: 1; }
+.barre-case { display: flex; align-items: center; gap: .35rem; font-size: .78rem; color: var(--text-muted); }
+.btn-link { background: none; border: 0; padding: 0; color: var(--primary); cursor: pointer; font: inherit; text-decoration: underline; }

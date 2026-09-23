@@ -191,3 +191,15 @@ class TestDispositionSynthese:
         assert client.put('/api/synthese/disposition', headers=H, json={'largeurs': {'evolution': 2}}).status_code == 400
         assert client.put('/api/synthese/disposition', headers=H, json={}).get_json() == {}
         assert client.get('/api/synthese/disposition').get_json() == {}
+
+
+class TestBarreMobile:
+    def test_aller_retour_et_limites(self, client):
+        H = {'X-CSRF-Token': 'test'}
+        d = {'ordre': ['credits', 'synthese', 'positions', 'conseil'], 'visibles': ['synthese', 'credits']}
+        r = client.put('/api/preferences/barre-mobile', headers=H, json=d)
+        assert r.status_code == 200 and r.get_json()['visibles'] == ['credits', 'synthese']
+        trop = {'ordre': [], 'visibles': ['synthese', 'positions', 'actifs', 'entites', 'credits']}
+        assert client.put('/api/preferences/barre-mobile', headers=H, json=trop).status_code == 400
+        assert client.put('/api/preferences/barre-mobile', headers=H, json={'visibles': ['inconnu']}).status_code == 400
+        assert client.put('/api/preferences/barre-mobile', headers=H, json={}).get_json() == {}

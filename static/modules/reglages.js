@@ -16,6 +16,8 @@
  * l'ecran visible derriere la fenetre et lui volait son titre de page.
  */
 
+import { rendreEditeurBarre } from './barre-mobile.js';
+
 const ECRANS = ['referentiel', 'import', 'tools'];
 
 let _ouvert = false;
@@ -58,6 +60,7 @@ export function ouvrir(quoi = 'preferences') {
   const prefs = document.getElementById('reglages-preferences');
   const accueil = document.getElementById('reglages-accueil');
   const surPrefs = quoi === 'preferences';
+  if (surPrefs) rendreEditeurBarre();
   prefs?.classList.toggle('hidden', !surPrefs);
   accueil?.classList.toggle('hidden', surPrefs);
 

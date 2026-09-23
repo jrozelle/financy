@@ -604,6 +604,47 @@ def ecrire_disposition():
     return jsonify(propre)
 
 
+# ─── Barre du bas sur telephone ──────────────────────────────────────────────
+# Quels onglets y figurent (quatre au plus, la cinquieme case est « Plus »), et
+# dans quel ordre ; les autres passent sous « Plus ».
+
+ONGLETS_BARRE = ('synthese', 'positions', 'actifs', 'entites', 'credits', 'performance', 'flux', 'conseil')
+CLE_BARRE = 'barre_mobile'
+MAX_BARRE = 4
+
+
+@synthese_bp.route('/api/preferences/barre-mobile', methods=['GET'])
+@login_required
+def lire_barre_mobile():
+    with get_db() as conn:
+        r = conn.execute('SELECT value FROM config WHERE key=?', (CLE_BARRE,)).fetchone()
+    try:
+        return jsonify(json.loads(r['value']) if r else {})
+    except ValueError:
+        return jsonify({})
+
+
+@synthese_bp.route('/api/preferences/barre-mobile', methods=['PUT'])
+@login_required
+@csrf_protect
+def ecrire_barre_mobile():
+    d = request.get_json(silent=True)
+    if d == {} or d is None:
+        with get_db() as conn:
+            conn.execute('DELETE FROM config WHERE key=?', (CLE_BARRE,))
+        return jsonify({})
+    ordre, visibles = (d or {}).get('ordre') or [], (d or {}).get('visibles') or []
+    if (not isinstance(ordre, list) or not isinstance(visibles, list)
+            or any(o not in ONGLETS_BARRE for o in ordre + visibles) or len(set(ordre)) != len(ordre)):
+        return jsonify({'error': 'Onglet inconnu ou liste invalide'}), 400
+    if not 1 <= len(set(visibles)) <= MAX_BARRE:
+        return jsonify({'error': f'Entre 1 et {MAX_BARRE} onglets dans la barre'}), 400
+    propre = {'ordre': ordre, 'visibles': [o for o in ordre if o in visibles] + [o for o in visibles if o not in ordre]}
+    with get_db() as conn:
+        conn.execute('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)', (CLE_BARRE, json.dumps(propre)))
+    return jsonify(propre)
+
+
 @synthese_bp.route('/api/wealth-target', methods=['PUT'])
 @login_required
 @csrf_protect

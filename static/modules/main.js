@@ -2,6 +2,7 @@ import { S, setTargetsCache } from './state.js';
 import { initMask, toggleMask, isMasked, onMaskChange } from './mask.js';
 import { wireTodo } from './todo.js';
 import { wireReglages, estUnReglage, ouvrir as ouvrirReglages } from './reglages.js';
+import { initBarreMobile } from './barre-mobile.js';
 import { fmtDate, esc, applyChartTheme, refreshChartsTheme } from './utils.js';
 import { api, buildSelects } from './api.js';
 import { closeModal, openModal, trapModalFocus, installModalScrollLock } from './dialogs.js';
@@ -47,6 +48,7 @@ async function init() {
   initMask();
   wireTodo(switchTab);   // la zone « À traiter » renvoie vers l'onglet concerne
   wireReglages(chargerEcranReglage);
+  initBarreMobile();
   S.config = await api('GET', '/api/config');
   buildSelects();
   _lireContexte({ avecArrete: false });
