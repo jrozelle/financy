@@ -1,10 +1,46 @@
 import json
 import os
 from flask import Blueprint, jsonify, request
-from models import get_db, load_referential, REFERENTIAL_TEMPLATES
+from models import get_db, load_referential, REFERENTIAL_TEMPLATES, parse_number, get_db_path
 from auth import login_required, csrf_protect
 
 referential_bp = Blueprint('referential', __name__)
+
+MAX_ALERTES = 100
+MAX_LIBELLE = 200
+_OPERATEURS = ('<', '>', '<=', '>=')
+
+
+def _erreur_cibles(data):
+    """Allocation cible : {categorie: pourcentage de 0 a 100}."""
+    if len(data) > 200:
+        return 'Trop de catégories'
+    for cat, v in data.items():
+        if not cat or len(cat) > MAX_LIBELLE:
+            return 'Nom de catégorie invalide'
+        n = parse_number(v) if not isinstance(v, bool) else None
+        if n is None or n < 0 or n > 100:
+            return f'{cat} : pourcentage entre 0 et 100 attendu'
+    return None
+
+
+def _erreur_alertes(data):
+    """Alertes : [{label, metric, category, op, threshold}]."""
+    if len(data) > MAX_ALERTES:
+        return f'{MAX_ALERTES} alertes au plus'
+    for a in data:
+        if not isinstance(a, dict):
+            return 'Chaque alerte doit être un objet'
+        for champ in ('label', 'metric', 'category'):
+            v = a.get(champ)
+            if v is not None and (not isinstance(v, str) or len(v) > MAX_LIBELLE):
+                return f'Alerte : {champ} invalide'
+        if a.get('op') is not None and a['op'] not in _OPERATEURS:
+            return f'Alerte : opérateur attendu parmi {" ".join(_OPERATEURS)}'
+        t = a.get('threshold')
+        if t is not None and (isinstance(t, bool) or parse_number(t) is None):
+            return 'Alerte : seuil numérique attendu'
+    return None
 
 
 @referential_bp.route('/api/config')
@@ -47,9 +83,13 @@ def get_targets():
 @login_required
 @csrf_protect
 def save_targets():
-    data = request.json
+    data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return jsonify({'error': 'Objet JSON attendu'}), 400
+    err = _erreur_cibles(data)
+    if err:
+        return jsonify({'error': err}), 400
+    data = {cat: parse_number(v) for cat, v in data.items()}
     with get_db() as conn:
         conn.execute(
             "INSERT OR REPLACE INTO config (key, value) VALUES ('allocation_targets', ?)",
@@ -77,9 +117,12 @@ def get_alerts():
 @login_required
 @csrf_protect
 def save_alerts_api():
-    data = request.json
+    data = request.get_json(silent=True)
     if not isinstance(data, list):
         return jsonify({'error': 'Tableau JSON attendu'}), 400
+    err = _erreur_alertes(data)
+    if err:
+        return jsonify({'error': err}), 400
     with get_db() as conn:
         conn.execute(
             "INSERT OR REPLACE INTO config (key, value) VALUES ('user_alerts', ?)",
@@ -108,13 +151,23 @@ def get_referential_api():
 @login_required
 @csrf_protect
 def save_referential():
-    data = request.json
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'error': 'Objet JSON attendu'}), 400
     required = ['owners', 'categories', 'category_mobilizable', 'envelope_meta']
     for k in required:
         if k not in data:
             return jsonify({'error': f'Champ manquant : {k}'}), 400
     if not data['owners']:
         return jsonify({'error': 'La liste des propriétaires ne peut pas être vide'}), 400
+    for k in ('owners', 'categories'):
+        v = data[k]
+        if (not isinstance(v, list) or len(v) > 500
+                or any(not isinstance(x, str) or not x.strip() or len(x) > MAX_LIBELLE for x in v)):
+            return jsonify({'error': f'{k} : liste de noms attendue ({MAX_LIBELLE} car. max)'}), 400
+    for k in ('category_mobilizable', 'envelope_meta'):
+        if not isinstance(data[k], dict):
+            return jsonify({'error': f'{k} : objet attendu'}), 400
     data.pop('liquidity_order', None)
     renommages = data.pop('renommages', None) or []
     err = _valider_renommages(renommages, data)
@@ -122,9 +175,8 @@ def save_referential():
         return jsonify({'error': err}), 400
     if renommages:
         # Un renommage reecrit des positions et des flux : copie datee d'abord.
-        from models import DB_PATH
         from services.backups import create_db_backup
-        create_db_backup(DB_PATH)
+        create_db_backup(get_db_path())
     with get_db() as conn:
         conn.execute('BEGIN IMMEDIATE')
         propages = _appliquer_renommages(conn, renommages)

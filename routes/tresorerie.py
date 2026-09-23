@@ -6,12 +6,18 @@ import unicodedata
 from flask import Blueprint, jsonify, request
 
 from auth import login_required, csrf_protect
-from models import get_db, validate_date, validate_number, validate_string
+from models import get_db, validate_date, validate_number, validate_string, parse_number
 from services import tresorerie_entite as svc
 
 logger = logging.getLogger('financy')
 tresorerie_bp = Blueprint('tresorerie', __name__)
 MAX_BYTES = 5 * 1024 * 1024
+
+
+def _corps():
+    """Le corps JSON s'il est un objet, sinon un objet vide."""
+    d = request.get_json(silent=True)
+    return d if isinstance(d, dict) else {}
 
 
 def _norm(s):
@@ -76,8 +82,8 @@ def importer():
 @csrf_protect
 def reclasser(oid):
     """Corrige la nature d'une operation mal classee."""
-    nature = (request.get_json(silent=True) or {}).get('nature')
-    if nature not in svc.NATURES:
+    nature = _corps().get('nature')
+    if not isinstance(nature, str) or nature not in svc.NATURES:
         return jsonify({'error': 'Nature inconnue'}), 400
     with get_db() as conn:
         n = conn.execute('UPDATE entite_operations SET nature=? WHERE id=?', (nature, oid)).rowcount
@@ -90,36 +96,44 @@ def reclasser(oid):
 def enregistrer_parts(entite):
     """Remplace les parts detenues par l'entite. Chaque ligne : nom, parts,
     montant_souscrit, prix_souscription, prix_retrait (facultatif), date_prix."""
-    lignes = (request.get_json(silent=True) or {}).get('parts')
+    lignes = _corps().get('parts')
     if not isinstance(lignes, list) or len(lignes) > 50:
         return jsonify({'error': 'Liste de parts attendue'}), 400
     propres = []
+    vus = set()
     for l in lignes:
-        nom = (l.get('nom') or '').strip()
+        if not isinstance(l, dict):
+            return jsonify({'error': 'Chaque part doit être un objet'}), 400
+        nom = l.get('nom')
+        nom = nom.strip() if isinstance(nom, str) else ''
         if not nom or not validate_string(nom, 120):
             return jsonify({'error': 'Nom de part manquant ou trop long'}), 400
+        if nom in vus:
+            return jsonify({'error': f'{nom} : part en double'}), 400
+        vus.add(nom)
+        # validate_number accepte « 1 234,5 » ; float() le refusait ensuite.
         for k in ('parts', 'montant_souscrit', 'prix_souscription', 'prix_retrait'):
             if not validate_number(l.get(k)):
                 return jsonify({'error': f'{nom} : {k} invalide'}), 400
-        if not l.get('parts') or float(l['parts']) <= 0:
+        parts = parse_number(l.get('parts'))
+        if not parts or parts <= 0:
             return jsonify({'error': f'{nom} : nombre de parts invalide'}), 400
         if l.get('date_prix') and not validate_date(l['date_prix']):
             return jsonify({'error': f'{nom} : date invalide'}), 400
         if not validate_string(l.get('source'), 200):
             return jsonify({'error': f'{nom} : source trop longue'}), 400
-        propres.append(l)
+        propres.append(dict(l, nom=nom, parts=parts))
     with get_db() as conn:
         if not conn.execute('SELECT 1 FROM entities WHERE name=?', (entite,)).fetchone():
             return jsonify({'error': f'Entité inconnue : {entite}'}), 404
         conn.execute('DELETE FROM entite_parts WHERE entity=?', (entite,))
-        num = lambda v: float(v) if v not in (None, '') else None
         for l in propres:
             conn.execute(
                 'INSERT INTO entite_parts (entity, nom, parts, montant_souscrit, prix_souscription, '
                 'prix_retrait, date_prix, source) VALUES (?,?,?,?,?,?,?,?)',
-                (entite, l['nom'].strip(), float(l['parts']), num(l.get('montant_souscrit')),
-                 num(l.get('prix_souscription')), num(l.get('prix_retrait')), l.get('date_prix') or None,
-                 l.get('source') or None))
+                (entite, l['nom'], l['parts'], parse_number(l.get('montant_souscrit')),
+                 parse_number(l.get('prix_souscription')), parse_number(l.get('prix_retrait')),
+                 l.get('date_prix') or None, l.get('source') or None))
         return jsonify(svc.parts(conn, entite) or {'lignes': []})
 
 
@@ -129,12 +143,18 @@ def enregistrer_parts(entite):
 def enregistrer_exercices(entite):
     """Remplace les exercices clos de l'entite : fin, resultat fiscal, debut et
     source facultatifs. Un resultat negatif est un deficit reportable."""
-    lignes = (request.get_json(silent=True) or {}).get('exercices')
+    lignes = _corps().get('exercices')
     if not isinstance(lignes, list) or len(lignes) > 50:
         return jsonify({'error': 'Liste d’exercices attendue'}), 400
+    fins = set()
     for l in lignes:
+        if not isinstance(l, dict):
+            return jsonify({'error': 'Chaque exercice doit être un objet'}), 400
         if not l.get('fin') or not validate_date(l['fin']) or (l.get('debut') and not validate_date(l['debut'])):
             return jsonify({'error': 'Date d’exercice invalide'}), 400
+        if l['fin'] in fins:
+            return jsonify({'error': f'Exercice clos le {l["fin"]} saisi deux fois'}), 400
+        fins.add(l['fin'])
         if l.get('resultat') is None or not validate_number(l['resultat'], allow_negative=True):
             return jsonify({'error': f'Résultat invalide pour l’exercice clos le {l["fin"]}'}), 400
         if not validate_string(l.get('source'), 200):
@@ -145,5 +165,6 @@ def enregistrer_exercices(entite):
         conn.execute('DELETE FROM entite_exercices WHERE entity=?', (entite,))
         for l in lignes:
             conn.execute('INSERT INTO entite_exercices (entity, debut, fin, resultat, source) VALUES (?,?,?,?,?)',
-                         (entite, l.get('debut') or None, l['fin'], float(l['resultat']), l.get('source') or None))
+                         (entite, l.get('debut') or None, l['fin'], parse_number(l['resultat']),
+                          l.get('source') or None))
         return jsonify({'exercices': svc.exercices(conn, entite)})

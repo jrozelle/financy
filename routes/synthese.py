@@ -2,10 +2,13 @@ import json
 from flask import Blueprint, jsonify, request
 from datetime import datetime
 from models import (get_db, compute_position, get_entity_map, get_holdings_map,
-                    load_referential, freeze_holdings_prices, validate_date, validate_string)
+                    load_referential, freeze_holdings_prices, validate_date, validate_string,
+                    parse_number)
 from auth import login_required, csrf_protect
 
 synthese_bp = Blueprint('synthese', __name__)
+MAX_NOTE_LENGTH = 2000
+MAX_WEALTH_TARGET = 1e12
 
 # Regroupement des categories de positions en 3 poches patrimoniales pour la
 # synthese brut/net. Toute categorie non listee tombe dans "Patrimoine autre".
@@ -29,11 +32,6 @@ def _macro_bucket(category):
     return 'Patrimoine autre'
 
 
-def _freeze_holdings(holdings_map):
-    """Alias historique de models.freeze_holdings_prices (voir ce helper)."""
-    return freeze_holdings_prices(holdings_map)
-
-
 @synthese_bp.route('/api/synthese')
 @login_required
 def get_synthese():
@@ -52,7 +50,7 @@ def get_synthese():
         # (et non positions.value qui peut etre perimee sur une ligne a holdings).
         holdings_map = get_holdings_map(conn, [r['id'] for r in rows])
         if date != latest_date:
-            _freeze_holdings(holdings_map)
+            freeze_holdings_prices(holdings_map)
         linked       = conn.execute(
             '''SELECT entity,
                       SUM(ownership_pct) as total_own,
@@ -162,7 +160,7 @@ def get_synthese():
             snap_ref         = load_referential(c)
             snap_holdings    = get_holdings_map(c, [r['id'] for r in snap_rows])
             if snap_date != latest_date:
-                _freeze_holdings(snap_holdings)
+                freeze_holdings_prices(snap_holdings)
         snap_positions = [compute_position(dict(r), snap_entity_map, snap_ref, snap_holdings) for r in snap_rows]
         fam = {
             'net':   sum(p['net_attributed'] for p in snap_positions),
@@ -298,7 +296,7 @@ def get_snapshot_diff():
             emap = get_entity_map(conn, date)
             hmap = get_holdings_map(conn, [r['id'] for r in rows])
             if date != latest_date:
-                _freeze_holdings(hmap)
+                freeze_holdings_prices(hmap)
             ps = [compute_position(dict(r), emap, ref, hmap) for r in rows]
             return [p for p in ps if not owner or p['owner'] == owner]
 
@@ -362,7 +360,7 @@ def get_historique():
             # Cours du jour pour le dernier snapshot ; market_value figee sinon.
             holdings_map = get_holdings_map(conn, [r['id'] for r in rows])
             if date != latest_date:
-                _freeze_holdings(holdings_map)
+                freeze_holdings_prices(holdings_map)
             positions    = [compute_position(dict(r), entity_map, ref, holdings_map) for r in rows]
             if owner:
                 positions = [p for p in positions if p['owner'] == owner]
@@ -500,25 +498,6 @@ def _period_return(cashflows):
             'final': round(final, 2), 'return': round(final / invested - 1, 6)}
 
 
-def _flux_to_cashflow(f):
-    """Convertit un flux en cashflow signé pour le XIRR.
-
-    Les frais de gestion ne sont pas un cashflow : preleves a l'interieur du
-    contrat, ils reduisent sa valeur finale, et c'est ainsi qu'ils doivent
-    peser sur le rendement. Les compter en plus comme un decaissement les
-    facturait deux fois.
-    """
-    ftype = f.get('type', '')
-    amount = f.get('amount', 0)
-    if ftype == 'Versement':
-        return (f['date'], -abs(amount))
-    elif ftype in ('Retrait', 'Dividende/Intérêt'):
-        return (f['date'], abs(amount))
-    elif ftype == 'Frais':
-        return (f['date'], 0.0)
-    return (f['date'], amount)
-
-
 # ─── Notes de snapshot ────────────────────────────────────────────────────
 
 @synthese_bp.route('/api/snapshot-notes', methods=['GET'])
@@ -537,11 +516,20 @@ def get_snapshot_notes():
 @login_required
 @csrf_protect
 def save_snapshot_note():
-    d = request.json
+    d = request.get_json(silent=True)
+    if not isinstance(d, dict):
+        return jsonify({'error': 'Objet JSON attendu'}), 400
     date = d.get('date')
-    notes = (d.get('notes') or '').strip()
     if not date:
         return jsonify({'error': 'Date requise'}), 400
+    if not validate_date(date):
+        return jsonify({'error': 'Date invalide (format AAAA-MM-JJ attendu)'}), 400
+    notes = d.get('notes')
+    if notes is not None and not isinstance(notes, str):
+        return jsonify({'error': 'Note : texte attendu'}), 400
+    notes = (notes or '').strip()
+    if not validate_string(notes, MAX_NOTE_LENGTH):
+        return jsonify({'error': f'Note trop longue ({MAX_NOTE_LENGTH} car. max)'}), 400
     with get_db() as conn:
         if notes:
             conn.execute(
@@ -572,13 +560,24 @@ def get_wealth_target():
 @login_required
 @csrf_protect
 def save_wealth_target():
-    d = request.json
+    d = request.get_json(silent=True)
     if not isinstance(d, dict):
         return jsonify({'error': 'Objet JSON attendu'}), 400
+    # Seul l'objectif s'enregistre : un montant positif, ou rien pour le retirer.
+    target = d.get('target')
+    if target is not None:
+        target = parse_number(target) if not isinstance(target, bool) else None
+        if target is None or target <= 0 or target > MAX_WEALTH_TARGET:
+            return jsonify({'error': 'Objectif invalide : montant positif attendu'}), 400
+    valeur = {'target': target}
+    if d.get('deadline') not in (None, ''):
+        if not validate_date(d['deadline']):
+            return jsonify({'error': 'Échéance invalide (format AAAA-MM-JJ attendu)'}), 400
+        valeur['deadline'] = d['deadline']
     with get_db() as conn:
         conn.execute(
             "INSERT OR REPLACE INTO config (key, value) VALUES ('wealth_target', ?)",
-            (json.dumps(d),)
+            (json.dumps(valeur),)
         )
     return jsonify({'ok': True})
 
@@ -744,7 +743,7 @@ def contribution():
             rows = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
             holdings_map = get_holdings_map(conn, [r['id'] for r in rows])
             if date != dernier:
-                _freeze_holdings(holdings_map)
+                freeze_holdings_prices(holdings_map)
             positions = [compute_position(dict(r), get_entity_map(conn, date), ref, holdings_map)
                          for r in rows]
             # Par compte, pour reperer ceux qui entrent ou sortent du suivi.

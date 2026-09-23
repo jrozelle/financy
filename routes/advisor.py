@@ -1,13 +1,11 @@
 """Routes du module de conseil patrimonial (phases 6 + 7)."""
 import logging
-from datetime import datetime
 from flask import Blueprint, jsonify, request
 from models import (get_db, compute_position, get_entity_map, get_holdings_map,
                     load_referential,
-                    validate_string, validate_number, validate_pct, validate_date,
+                    validate_string, validate_number, validate_date,
                     parse_number)
-from services.advisor.allocation import (allocation_financiere, target_allocation, compute_actual_allocation,
-                                         compute_gap, load_matrix)
+from services.advisor.allocation import allocation_financiere, load_matrix
 from services.advisor import macro as macro_svc
 from services.advisor import rebalance as rebalance_svc
 from services.advisor import llm as llm_svc
@@ -214,15 +212,20 @@ def add_objective(owner):
 @login_required
 @csrf_protect
 def update_objective(oid):
-    d = request.json or {}
-    err = _validate_objective(d) if ('label' in d or 'target_amount' in d
-                                     or 'horizon_years' in d or 'priority' in d) else None
+    d = request.get_json(silent=True)
+    if not isinstance(d, dict):
+        return jsonify({'error': 'Objet JSON attendu'}), 400
     if 'label' in d and (not d.get('label') or not validate_string(d['label'], 200)):
         return jsonify({'error': 'Libelle requis'}), 400
     with get_db() as conn:
         row = conn.execute('SELECT * FROM owner_objectives WHERE id=?', (oid,)).fetchone()
         if not row:
             return jsonify({'error': 'Objectif introuvable'}), 404
+        # Une mise a jour partielle se valide sur l'objectif qu'elle produit :
+        # l'erreur etait calculee puis ignoree (priorite 9 acceptee).
+        err = _validate_objective({**dict(row), **d})
+        if err:
+            return jsonify({'error': err}), 400
         fields, params = [], []
         for key, cast in (('label', str), ('target_amount', parse_number),
                           ('horizon_years', int), ('priority', int)):
@@ -332,8 +335,12 @@ def refresh_macro():
     with get_db() as conn:
         try:
             snap, meta = macro_svc.generate_snapshot(conn)
-        except Exception as e:
-            return jsonify({'error': str(e)}), 503
+        except Exception:
+            # Le message d'une exception (cle, URL, reponse du fournisseur)
+            # reste dans les journaux, pas dans la reponse.
+            logger.exception('Generation du contexte macro impossible')
+            return jsonify({'error': 'Génération du contexte macro impossible pour le moment. '
+                                     'Réessayez plus tard.'}), 503
         snap_id = macro_svc.save_snapshot(conn, snap)
         snap = conn.execute(
             'SELECT * FROM macro_snapshots WHERE id=?', (snap_id,)

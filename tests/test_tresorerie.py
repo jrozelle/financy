@@ -230,12 +230,13 @@ class TestImpotSocietes:
                        json={'exercices': [{'fin': '2025-12-31', 'resultat': -5264.28, 'source': 'liasse'}]})
         assert r.status_code == 200
         with get_db() as conn:
-            ops = [('2026-01-10', 'SCPI X DISTRIBUTION', 1000.0), ('2026-02-10', 'SCPI X DISTRIBUTION', 1000.0)]
+            ops = [('2026-01-10', 'SCPI X DISTRIBUTION', 250.0), ('2026-02-10', 'SCPI X DISTRIBUTION', 250.0)]
             t.enregistrer(conn, 'SCI T', _releve(ops), 'r.pdf')
             f = t.bilan(conn, 'SCI T', mois=2)['fiscal']
         assert f['annee'] == '2026' and f['deficit_reportable'] == 5264.28
-        assert f['projection']['resultat'] == 2000 and f['impot'] == 0
-        assert f['deficit_apres'] == pytest.approx(3264.28)
+        # Deux mois couverts, projetes sur l'annee : 500 € x 6.
+        assert f['projection']['resultat'] == 3000 and f['impot'] == 0
+        assert f['deficit_apres'] == pytest.approx(2264.28)
 
     def test_exercice_invalide(self, client):
         with get_db() as conn:

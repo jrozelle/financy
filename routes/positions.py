@@ -2,10 +2,51 @@ from flask import Blueprint, jsonify, request
 from models import (get_db, compute_position, get_entity_map, get_holdings_map, holdings_a_date,
                     load_referential, snapshot_holdings_to_date,
                     validate_date, validate_number, validate_string,
-                    validate_pct, parse_number)
+                    validate_pct, parse_number, LIQUIDITY_ORDER)
 from auth import login_required, csrf_protect
 
 positions_bp = Blueprint('positions', __name__)
+
+# Longueurs maximales des champs texte d'une position.
+_LONGUEURS = (('owner', 100, 'Propriétaire'), ('category', 100, 'Catégorie'),
+              ('envelope', 100, 'Enveloppe'), ('establishment', 200, 'Établissement'),
+              ('label', 200, 'Libellé'), ('entity', 200, 'Entité'), ('notes', 2000, 'Notes'))
+
+
+def _erreur_position(conn, d):
+    """Message d'erreur (400) d'une position saisie, ou None.
+
+    La date se verifie a part : snapshot_update ne la porte pas dans la
+    position. Une valeur hors format levait une 500 a l'ecriture ; une
+    liquidite inconnue s'enregistrait et faussait les echeances de
+    disponibilite.
+    """
+    if not isinstance(d.get('owner'), str) or not d['owner'].strip():
+        return 'Propriétaire requis'
+    if not isinstance(d.get('category'), str) or not d['category'].strip():
+        return 'Catégorie requise'
+    for champ, n, nom in _LONGUEURS:
+        if not validate_string(d.get(champ), n):
+            return f'{nom} invalide ou trop long ({n} car. max)'
+    if not validate_number(d.get('value')) or not validate_number(d.get('debt')):
+        return 'Valeur / dette invalide'
+    if not validate_pct(d.get('ownership_pct')) or not validate_pct(d.get('debt_pct')):
+        return '% propriété ou dette invalide (0-100)'
+    # Stockee comme les autres parts : une fraction de 0 a 1 (le front divise par 100).
+    if not validate_pct(d.get('mobilizable_pct_override')):
+        return 'Part mobilisable invalide (0-100 %)'
+    liq = d.get('liquidity_override')
+    if liq not in (None, ''):
+        permises = set(LIQUIDITY_ORDER) | set(load_referential(conn).get('liquidity_order') or [])
+        if liq not in permises:
+            return f'Liquidité inconnue (attendu : {", ".join(LIQUIDITY_ORDER)})'
+    return None
+
+
+def _pct_stocke(v):
+    """Une part validee par validate_pct, bornee a [0, 1] (marge d'arrondi)."""
+    n = parse_number(v)
+    return None if n is None else max(0.0, min(n, 1.0))
 
 
 @positions_bp.route('/api/dates')
@@ -45,26 +86,17 @@ def get_positions():
 @login_required
 @csrf_protect
 def add_position():
-    d = request.json
-    if not d or not validate_date(d.get('date')):
+    d = request.get_json(silent=True)
+    if not isinstance(d, dict) or not validate_date(d.get('date')):
         return jsonify({'error': 'Date invalide (format AAAA-MM-JJ attendu)'}), 400
-    if not validate_string(d.get('owner'), 100) or not d.get('owner'):
-        return jsonify({'error': 'Propriétaire requis'}), 400
-    if not validate_string(d.get('category'), 100) or not d.get('category'):
-        return jsonify({'error': 'Catégorie requise'}), 400
-    if not validate_number(d.get('value')) or not validate_number(d.get('debt')):
-        return jsonify({'error': 'Valeur / dette invalide'}), 400
-    if not validate_pct(d.get('ownership_pct')) or not validate_pct(d.get('debt_pct')):
-        return jsonify({'error': '% propriété ou dette invalide (0-100)'}), 400
-    if not validate_string(d.get('notes'), 2000):
-        return jsonify({'error': 'Notes trop longues (2000 car. max)'}), 400
     with get_db() as conn:
+        err = _erreur_position(conn, d)
+        if err:
+            return jsonify({'error': err}), 400
         entity = d.get('entity')
         stored_value = 0 if entity else parse_number(d.get('value'), 0)
         stored_debt  = 0 if entity else parse_number(d.get('debt'), 0)
-        mob_override = d.get('mobilizable_pct_override')
-        if mob_override is not None:
-            mob_override = parse_number(mob_override)
+        mob_override = _pct_stocke(d.get('mobilizable_pct_override'))
         liq_override = d.get('liquidity_override') or None
         cur = conn.execute(
             '''INSERT INTO positions
@@ -89,22 +121,19 @@ def add_position():
 @login_required
 @csrf_protect
 def update_position(pid):
-    d = request.json
-    if not d or not validate_date(d.get('date')):
+    d = request.get_json(silent=True)
+    if not isinstance(d, dict) or not validate_date(d.get('date')):
         return jsonify({'error': 'Date invalide'}), 400
-    if not validate_number(d.get('value')) or not validate_number(d.get('debt')):
-        return jsonify({'error': 'Valeur / dette invalide'}), 400
-    if not validate_pct(d.get('ownership_pct')) or not validate_pct(d.get('debt_pct')):
-        return jsonify({'error': '% invalide'}), 400
-    if not validate_string(d.get('notes'), 2000):
-        return jsonify({'error': 'Notes trop longues (2000 car. max)'}), 400
     with get_db() as conn:
+        if not conn.execute('SELECT 1 FROM positions WHERE id=?', (pid,)).fetchone():
+            return jsonify({'error': 'Position introuvable'}), 404
+        err = _erreur_position(conn, d)
+        if err:
+            return jsonify({'error': err}), 400
         entity = d.get('entity')
         stored_value = 0 if entity else parse_number(d.get('value'), 0)
         stored_debt  = 0 if entity else parse_number(d.get('debt'), 0)
-        mob_override = d.get('mobilizable_pct_override')
-        if mob_override is not None:
-            mob_override = parse_number(mob_override)
+        mob_override = _pct_stocke(d.get('mobilizable_pct_override'))
         liq_override = d.get('liquidity_override') or None
         conn.execute(
             '''UPDATE positions SET
@@ -142,29 +171,26 @@ def delete_position(pid):
 @login_required
 @csrf_protect
 def snapshot_update(pid):
-    d           = request.json
+    d           = request.get_json(silent=True)
+    if not isinstance(d, dict):
+        return jsonify({'error': 'source_date, target_date et position requis'}), 400
     source_date = d.get('source_date')
     target_date = d.get('target_date')
     new_values  = d.get('position')
 
-    if not source_date or not target_date or not new_values:
+    if not source_date or not target_date or not isinstance(new_values, dict) or not new_values:
         return jsonify({'error': 'source_date, target_date et position requis'}), 400
     if not validate_date(source_date) or not validate_date(target_date):
         return jsonify({'error': 'Dates invalides'}), 400
     if source_date == target_date:
         return jsonify({'error': 'Les dates source et cible doivent être différentes'}), 400
-    if not new_values.get('owner') or not new_values.get('category'):
-        return jsonify({'error': 'Propriétaire et catégorie requis'}), 400
-    if not validate_pct(new_values.get('ownership_pct')) or not validate_pct(new_values.get('debt_pct')):
-        return jsonify({'error': '% propriété ou dette invalide'}), 400
-    if not validate_string(new_values.get('notes'), 2000):
-        return jsonify({'error': 'Notes trop longues'}), 400
-    if not validate_number(new_values.get('value')) or not validate_number(new_values.get('debt')):
-        return jsonify({'error': 'Montant invalide'}), 400
 
     from services.snapshot import duplicate_position
 
     with get_db() as conn:
+        err = _erreur_position(conn, new_values)
+        if err:
+            return jsonify({'error': err}), 400
         entity_map = get_entity_map(conn, target_date)
         ref        = load_referential(conn)
 
@@ -202,8 +228,8 @@ def snapshot_update(pid):
                     'entity': entity,
                     'ownership_pct': parse_number(new_values.get('ownership_pct'), 1.0),
                     'debt_pct': parse_number(new_values.get('debt_pct'), 1.0),
-                    'mobilizable_pct_override': parse_number(new_values.get('mobilizable_pct_override')) if new_values.get('mobilizable_pct_override') is not None else None,
-                    'liquidity_override': new_values.get('liquidity_override'),
+                    'mobilizable_pct_override': _pct_stocke(new_values.get('mobilizable_pct_override')),
+                    'liquidity_override': new_values.get('liquidity_override') or None,
                 }
                 new_id = duplicate_position(conn, row, target_date, value_override=override)
             else:

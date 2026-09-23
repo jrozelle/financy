@@ -2,10 +2,10 @@ import logging
 from flask import Blueprint, jsonify, request
 from datetime import datetime
 from io import BytesIO
-from models import (get_db, validate_date, validate_number, validate_pct,
-                    validate_string, validate_isin, parse_number, get_db_path)
+from models import get_db, validate_date, validate_isin, parse_number, get_db_path
 from auth import login_required, csrf_protect
 from services.backups import create_db_backup
+from services.snapshot import ecrire_entity_snapshot
 
 MAX_IMPORT_ROWS = 10000
 MAX_NOTE_LENGTH = 2000
@@ -14,6 +14,15 @@ RESET_CONFIRMATION = 'VIDER'
 logger = logging.getLogger('financy')
 
 import_export_bp = Blueprint('import_export', __name__)
+
+
+_ENTETES_ETABLISSEMENT = {'establishment', 'etablissement', 'pos_establishment'}
+
+
+def _normaliser_entete(v):
+    import unicodedata
+    t = unicodedata.normalize('NFD', str(v or '')).strip().lower()
+    return ''.join(c for c in t if unicodedata.category(c) != 'Mn')
 
 
 @import_export_bp.route('/api/import', methods=['POST'])
@@ -188,11 +197,7 @@ def import_xlsx():
                             (name, etype, valuation_mode, gross_assets, debt, comment)
                         )
                     today = datetime.now().strftime('%Y-%m-%d')
-                    conn.execute(
-                        '''INSERT OR REPLACE INTO entity_snapshots (entity_name, date, gross_assets, debt)
-                           VALUES (?,?,?,?)''',
-                        (name, today, gross_assets, debt)
-                    )
+                    ecrire_entity_snapshot(conn, name, today, gross_assets, debt)
                     entities_imported += 1
 
             # Securities (optionnel, avant Holdings pour que les FK existent)
@@ -234,10 +239,16 @@ def import_xlsx():
                         )
                     securities_imported += 1
 
-            # Holdings : rattachement par clef (date, owner, category, envelope, entity)
+            # Holdings : rattachement par clef (date, owner, category, envelope,
+            # entity) et, si la feuille a une colonne d'etablissement, par
+            # l'etablissement aussi : sans lui, les titres de deux contrats d'un
+            # titulaire chez deux assureurs allaient tous au premier.
             holdings_imported = 0
             if 'Holdings' in wb.sheetnames:
                 ws_h = wb['Holdings']
+                entete = next(ws_h.iter_rows(min_row=1, max_row=1, values_only=True), ()) or ()
+                col_etab = next((k for k, v in enumerate(entete)
+                                 if _normaliser_entete(v) in _ENTETES_ETABLISSEMENT), None)
                 for i, row in enumerate(ws_h.iter_rows(min_row=2, values_only=True)):
                     if i >= MAX_IMPORT_ROWS:
                         break
@@ -259,12 +270,14 @@ def import_xlsx():
                     if not validate_isin(raw_isin):
                         continue
 
-                    pos = conn.execute(
-                        '''SELECT id FROM positions
-                           WHERE date=? AND owner=? AND category=?
-                             AND COALESCE(envelope,'')=? AND COALESCE(entity,'')=?''',
-                        (pos_date, pos_owner, pos_category, pos_envelope, pos_entity)
-                    ).fetchone()
+                    sql = '''SELECT id FROM positions
+                             WHERE date=? AND owner=? AND category=?
+                               AND COALESCE(envelope,'')=? AND COALESCE(entity,'')=?'''
+                    params = [pos_date, pos_owner, pos_category, pos_envelope, pos_entity]
+                    if col_etab is not None:
+                        sql += " AND COALESCE(establishment,'')=?"
+                        params.append(_safe_str(row[col_etab] if len(row) > col_etab else None, 200) or '')
+                    pos = conn.execute(sql + ' ORDER BY id', params).fetchone()
                     if not pos or pos['id'] not in creees:
                         continue  # parente introuvable, ou deja presente : ses titres y sont
 
@@ -328,6 +341,23 @@ _TABLES_SIMPLES = {
     'securities':       ('isin',),
     'entities':         ('name',),
 }
+# Prets, releves, parts et exercices des entites, dates d'effet des contrats :
+# (cle d'unicite, champs requis). Une cle peut comprendre une colonne vide
+# (banque, etablissement), d'ou la liste des champs requis a part.
+_TABLES_CLE_NATURELLE = {
+    'entite_operations':      (('entity', 'banque', 'compte', 'date', 'montant', 'libelle'),
+                               ('entity', 'date', 'libelle', 'montant')),
+    'entite_parts':           (('entity', 'nom'), ('entity', 'nom', 'parts')),
+    'entite_exercices':       (('entity', 'fin'), ('entity', 'fin', 'resultat')),
+    'entite_soldes_initiaux': (('entity', 'banque', 'compte'), ('entity', 'date', 'solde')),
+    'contrats':               (('owner', 'envelope', 'establishment'), ('owner', 'envelope')),
+}
+# Colonnes numeriques de ces tables : un texte y fausserait les sommes.
+_NUMERIQUES = {'montant', 'parts', 'montant_souscrit', 'prix_souscription', 'prix_retrait',
+               'resultat', 'solde', 'taux', 'capital', 'interets', 'assurance', 'crd'}
+# Un pret se reconnait a son libelle, son entite, ses dates et son montant ;
+# son echeancier le suit, et seulement s'il est cree par cet import.
+_CLE_PRET = ('libelle', 'entity', 'debut', 'fin', 'montant')
 # Tables sans cle naturelle : un doublon se reconnait a toutes ses colonnes metier.
 _TABLES_DEDOUBLONNEES = ('flux', 'transactions', 'owner_objectives')
 _TECHNIQUES = {'id', 'created_at', 'updated_at'}
@@ -337,6 +367,24 @@ _CLE_POSITION = ('date', 'owner', 'category', 'envelope', 'establishment', 'enti
 # Configuration exportable ; les reglages (cle API) n'en sont pas.
 _CONFIG_EXPORTEE = ('referential', 'allocation_targets', 'user_alerts', 'wealth_target',
                     'benchmark_isin')
+
+
+def _vide(v):
+    return v is None or (isinstance(v, str) and not v.strip())
+
+
+def _nombres(ligne):
+    """Copie de la ligne, colonnes numeriques converties ; None si l'une
+    d'elles n'est pas un nombre."""
+    out = dict(ligne)
+    for c in _NUMERIQUES & set(ligne):
+        if ligne[c] is None:
+            continue
+        n = parse_number(ligne[c])
+        if n is None:
+            return None
+        out[c] = n
+    return out
 
 
 def _colonnes(conn, table):
@@ -491,6 +539,57 @@ def import_json():
             _inserer(conn, 'holdings_snapshots', dict(s, position_id=cible), scols)
             rapport['holdings_snapshots'] += 1
 
+        # Releves, parts, exercices des entites et contrats : ce qui existe
+        # l'emporte, sur leur cle naturelle.
+        from services.tresorerie_entite import NATURES
+        for table, (cles, requis) in _TABLES_CLE_NATURELLE.items():
+            cols = _colonnes(conn, table)
+            n = 0
+            for ligne in _liste(table):
+                ligne = _nombres(ligne) if isinstance(ligne, dict) else None
+                if (ligne is None or any(_vide(ligne.get(c)) for c in requis)
+                        or any(c in ligne and not _vide(ligne[c]) and not validate_date(ligne[c])
+                               for c in ('date', 'fin', 'debut', 'date_prix', 'date_effet'))):
+                    rapport['skipped'] += 1
+                    continue
+                if table == 'entite_operations' and ligne.get('nature') not in NATURES:
+                    ligne['nature'] = 'autre'
+                if not cols or _existe(conn, table, ligne, cles):
+                    continue
+                if _inserer(conn, table, ligne, cols, ignorer=True):
+                    n += 1
+            rapport[table] = n
+
+        # Prets : correspondance des identifiants, echeancier sous les seuls
+        # prets crees ici — sous un pret existant, il le doublerait.
+        prcols = _colonnes(conn, 'prets')
+        prets_source, prets_nouveaux = {}, set()
+        rapport['prets'] = rapport['pret_echeances'] = 0
+        for p in _liste('prets'):
+            p = _nombres(p) if isinstance(p, dict) else None
+            if p is None or _vide(p.get('libelle')) or not prcols:
+                rapport['skipped'] += 1
+                continue
+            deja = _existe(conn, 'prets', p, _CLE_PRET)
+            if deja:
+                nid = deja[0]
+            else:
+                nid = _inserer(conn, 'prets', p, prcols)
+                prets_nouveaux.add(nid)
+                rapport['prets'] += 1
+            if p.get('id') is not None:
+                prets_source[p['id']] = nid
+        ecols = _colonnes(conn, 'pret_echeances')
+        for e in _liste('pret_echeances'):
+            e = _nombres(e) if isinstance(e, dict) else None
+            cible = prets_source.get(e.get('pret_id')) if e else None
+            if (cible is None or cible not in prets_nouveaux or not validate_date(e.get('date'))
+                    or any(e.get(c) is None for c in ('rang', 'capital', 'crd'))):
+                rapport['skipped'] += 1
+                continue
+            if _inserer(conn, 'pret_echeances', dict(e, pret_id=cible), ecols, ignorer=True):
+                rapport['pret_echeances'] += 1
+
         # Flux, transactions, objectifs : un doublon a toutes ses colonnes metier.
         for table in _TABLES_DEDOUBLONNEES:
             cols = _colonnes(conn, table)
@@ -533,7 +632,9 @@ def import_json():
 def export_data():
     tables = ('positions', 'flux', 'entities', 'entity_snapshots', 'securities', 'holdings',
               'holdings_snapshots', 'transactions', 'fx_rates', 'price_history',
-              'owner_profiles', 'owner_objectives')
+              'owner_profiles', 'owner_objectives', 'prets', 'pret_echeances',
+              'entite_operations', 'entite_parts', 'entite_exercices', 'entite_soldes_initiaux',
+              'contrats')
     out = {'format': FORMAT_EXPORT, 'exporte_le': datetime.now().isoformat(timespec='seconds')}
     with get_db() as conn:
         for t in tables:
@@ -576,6 +677,10 @@ def reset_db():
         'holdings', 'holdings_snapshots', 'price_history', 'securities',
         'transactions', 'fx_rates', 'owner_profiles', 'owner_objectives',
         'rebalance_proposals', 'allocation_targets', 'macro_snapshots',
+        # Prets et donnees des entites : restes en base, ils se rattachaient
+        # aux entites du meme nom importees ensuite.
+        'pret_echeances', 'prets', 'entite_operations', 'entite_parts', 'entite_exercices',
+        'entite_soldes_initiaux', 'contrats',
     ]
     deleted = {}
     with get_db() as conn:

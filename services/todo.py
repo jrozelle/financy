@@ -25,9 +25,6 @@ logger = logging.getLogger('financy.todo')
 # marche. En deca on ne dit rien : signaler tous les jours use le signal.
 COURS_PERIMES_JOURS = 5
 
-# En dessous, le nombre de parts est du bruit d'arrondi, pas un oubli de saisie.
-TOLERANCE_QTY = 1e-4
-
 
 def _signal(cle, severite, titre, detail, action, onglet, montant=None, nombre=None):
     return {
@@ -64,11 +61,16 @@ def _cours_perimes(conn, aujourdhui):
     Les melanger gonfle le decompte et fait douter du signal entier.
     """
     limite = (aujourdhui - timedelta(days=COURS_PERIMES_JOURS)).strftime('%Y-%m-%d')
+    # Seuls comptent les titres encore detenus, c'est-a-dire presents au
+    # dernier arrete : un titre vendu depuis garde ses lignes dans les
+    # arretes anciens, et son cours fige y restait signale pour toujours.
     rows = conn.execute(
         """SELECT s.isin, s.name, s.ticker, s.last_price_date
            FROM securities s
            WHERE s.is_priceable = 1
-             AND EXISTS (SELECT 1 FROM holdings h WHERE h.isin = s.isin)
+             AND EXISTS (SELECT 1 FROM holdings h JOIN positions p ON p.id = h.position_id
+                         WHERE h.isin = s.isin
+                           AND p.date = (SELECT MAX(date) FROM positions))
              AND (s.last_price_date IS NULL OR s.last_price_date < ?)""",
         (limite,)
     ).fetchall()

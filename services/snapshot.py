@@ -7,9 +7,8 @@ Utilise par :
 - snapshot_update route (routes/positions.py)
 """
 import logging
-from datetime import datetime
-from models import (get_db, compute_position, get_entity_map, get_holdings_map,
-                    load_referential, snapshot_holdings_to_date, validate_number)
+from models import (compute_position, get_entity_map, get_holdings_map,
+                    load_referential, snapshot_holdings_to_date, validate_number, parse_number)
 
 logger = logging.getLogger('financy.snapshot')
 
@@ -25,7 +24,33 @@ _POSITION_COPY_COLS = [
 _INSERT_SQL = f'''INSERT INTO positions (date, {', '.join(_POSITION_COPY_COLS)})
                   VALUES (?{', ?' * len(_POSITION_COPY_COLS)})'''
 
-_HOLDINGS_INSERT_SQL = '''INSERT INTO holdings
+_ABSENTE = object()
+
+
+def ecrire_entity_snapshot(conn, nom, date, gross_assets, debt, tresorerie=_ABSENTE):
+    """Ecrit la valorisation d'une entite a une date, sans effacer le reste.
+
+    `INSERT OR REPLACE` supprime la ligne puis la recree : une colonne absente
+    de la requete — la tresorerie comprise dans la valeur — repartait a NULL
+    a chaque modification de l'entite, et l'arrete suivant la recomptait.
+    La tresorerie n'est ecrite que si elle est fournie.
+    """
+    if tresorerie is _ABSENTE:
+        conn.execute('''INSERT INTO entity_snapshots (entity_name, date, gross_assets, debt)
+                        VALUES (?,?,?,?)
+                        ON CONFLICT(entity_name, date) DO UPDATE SET
+                            gross_assets=excluded.gross_assets, debt=excluded.debt''',
+                     (nom, date, gross_assets, debt))
+    else:
+        conn.execute('''INSERT INTO entity_snapshots (entity_name, date, gross_assets, debt, tresorerie)
+                        VALUES (?,?,?,?,?)
+                        ON CONFLICT(entity_name, date) DO UPDATE SET
+                            gross_assets=excluded.gross_assets, debt=excluded.debt,
+                            tresorerie=excluded.tresorerie''',
+                     (nom, date, gross_assets, debt, tresorerie))
+
+
+_HOLDINGS_INSERT_SQL ='''INSERT INTO holdings
     (position_id, isin, quantity, cost_basis, market_value, as_of_date)
     VALUES (?,?,?,?,?,?)'''
 
@@ -218,8 +243,12 @@ def appliquer_mise_a_jour(conn, source_date, target_date, soldes, entites):
         if treso is not None and not validate_number(treso, allow_negative=True):
             refusees.append({'entite': nom, 'motif': 'trésorerie invalide'})
             continue
-        conn.execute('''INSERT OR REPLACE INTO entity_snapshots (entity_name, date, gross_assets, debt, tresorerie)
-                        VALUES (?,?,?,?,?)''', (nom, target_date, vals['gross_assets'], vals['debt'], treso))
+        # Sans tresorerie fournie, celle deja enregistree a cette date reste.
+        if treso is None:
+            ecrire_entity_snapshot(conn, nom, target_date, vals['gross_assets'], vals['debt'])
+        else:
+            ecrire_entity_snapshot(conn, nom, target_date, vals['gross_assets'], vals['debt'],
+                                   parse_number(treso))
         ent_maj += 1
 
     return {'target_date': target_date, 'cree': source_date != target_date,

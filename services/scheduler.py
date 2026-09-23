@@ -14,6 +14,7 @@ en cas de redemarrage a l'heure pile).
 import logging
 import os
 import time
+from contextlib import contextmanager
 
 logger = logging.getLogger('financy.scheduler')
 
@@ -24,15 +25,43 @@ def is_enabled():
     return os.environ.get('SCHEDULER_ENABLED', '').lower() in ('1', 'true', 'yes')
 
 
+@contextmanager
+def _base_reelle():
+    """Connexion a la base REELLE, quel que soit le mode demo.
+
+    Hors requete, `is_demo_mode()` lit le drapeau global, que chaque requete
+    ecrit : le job de 21 h rafraichissait la base de demo, avec le provider
+    simule, des lors que la derniere requete du jour venait du mode demo.
+    """
+    import sqlite3
+    import models
+    conn = sqlite3.connect(models.DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _provider_reel():
+    """Le provider reel, sauf override explicite PRICE_PROVIDER=mock (tests,
+    dev) — jamais le provider de demo par heritage d'une requete."""
+    from services.prices import get_provider
+    if os.environ.get('PRICE_PROVIDER', '').lower() == 'mock':
+        return get_provider(force='mock')
+    return get_provider(force='yahoo')
+
+
 def _job_refresh_prices():
-    """Job APScheduler : refresh de tous les cours priceables."""
-    from models import get_db
-    from services.prices import refresh_securities, refresh_fx_rates, get_provider
+    """Job APScheduler : refresh de tous les cours priceables, sur la base
+    reelle et avec le provider reel."""
+    from services.prices import refresh_securities, refresh_fx_rates
 
     start = time.monotonic()
-    provider = get_provider()
+    provider = _provider_reel()
     try:
-        with get_db() as conn:
+        with _base_reelle() as conn:
             stats = refresh_securities(conn, provider=provider)
             refresh_fx_rates(conn, provider=provider)
     except Exception:

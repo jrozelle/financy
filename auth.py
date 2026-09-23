@@ -1,7 +1,7 @@
+import hmac
 import os
-import secrets
 from functools import wraps
-from flask import session, request, jsonify, redirect, url_for, render_template
+from flask import session, request, jsonify, redirect, url_for
 
 AUTH_PASSWORD = os.environ.get('FINANCY_PASSWORD')  # None = pas d'auth
 CSRF_PROTECTED_METHODS = {'POST', 'PUT', 'PATCH', 'DELETE'}
@@ -23,7 +23,11 @@ def csrf_protect(f):
     def decorated(*args, **kwargs):
         if request.method in CSRF_PROTECTED_METHODS:
             token = request.headers.get('X-CSRF-Token', '')
-            if not token or token != session.get('csrf_token'):
+            attendu = session.get('csrf_token')
+            # Comparaison a temps constant : `!=` s'arrete au premier
+            # caractere different et laisse deviner le jeton par la duree.
+            if (not token or not isinstance(attendu, str)
+                    or not hmac.compare_digest(token.encode(), attendu.encode())):
                 return jsonify({'error': 'CSRF token invalide'}), 403
         return f(*args, **kwargs)
     return decorated

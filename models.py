@@ -801,6 +801,23 @@ def _migration_019(conn):
         )""")
 
 
+def _migration_020(conn):
+    """Solde d'ouverture du premier releve importe de chaque compte d'une
+    entite. La tresorerie se reconstituait des seules operations, comme si
+    chaque compte avait ete ouvert a zero le jour de son premier releve."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS entite_soldes_initiaux (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            entity    TEXT NOT NULL,
+            banque    TEXT NOT NULL DEFAULT '',
+            compte    TEXT NOT NULL DEFAULT '',
+            date      TEXT NOT NULL,          -- debut du premier releve
+            solde     REAL NOT NULL,          -- solde a l'ouverture de ce releve
+            source    TEXT,
+            UNIQUE(entity, banque, compte)
+        )""")
+
+
 MIGRATIONS = [
     (1, _migration_001),
     (2, _migration_002),
@@ -821,6 +838,7 @@ MIGRATIONS = [
     (17, _migration_017),
     (18, _migration_018),
     (19, _migration_019),
+    (20, _migration_020),
 ]
 
 
@@ -1136,8 +1154,15 @@ def get_holdings_map(conn, position_ids=None):
     """Retourne un dict {position_id: [holdings]} joint avec securities.
 
     Si position_ids est fourni, limite la requête à ces positions (plus rapide
-    pour les grosses bases). Sinon retourne toutes les holdings.
+    pour les grosses bases). Sinon (None) retourne toutes les holdings.
+
+    Une liste VIDE ne veut pas dire « tout » : un arrete sans position rendait
+    les lignes de toute la base, que l'appelant additionnait ensuite.
     """
+    if position_ids is not None:
+        position_ids = list(position_ids)
+        if not position_ids:
+            return {}
     try:
         base_query = '''
             SELECT h.id, h.position_id, h.isin, h.quantity, h.cost_basis,
@@ -1152,11 +1177,11 @@ def get_holdings_map(conn, position_ids=None):
             JOIN positions p ON p.id = h.position_id
             LEFT JOIN securities s ON s.isin = h.isin
         '''
-        if position_ids:
+        if position_ids is not None:
             placeholders = ','.join('?' * len(position_ids))
             rows = conn.execute(
                 base_query + f' WHERE h.position_id IN ({placeholders})',
-                list(position_ids)
+                position_ids
             ).fetchall()
         else:
             rows = conn.execute(base_query).fetchall()

@@ -13,6 +13,8 @@ ci-dessous.
 """
 from __future__ import annotations
 
+import sqlite3
+
 from models import compute_position, get_entity_map, get_holdings_map, load_referential
 
 # Plafonds des versements, en vigueur en 2026. Les interets capitalises peuvent
@@ -131,11 +133,13 @@ def constats(conn, date, owner=None):
             })
 
     # 4. Comptes courants : au-dela du matelas, l'argent ne rapporte rien.
-    # Seulement l'argent personnel : un compte dont le libelle ou la categorie
-    # porte le nom d'une entite declaree (« Holding Exemple ») est la tresorerie de
-    # cette societe, pas une epargne qui dort.
+    # Seulement l'argent personnel : un compte dont le libelle porte le nom
+    # d'une entite declaree (« Holding Exemple »), ou qui lui est lie, est la
+    # tresorerie de cette societe, pas une epargne qui dort. Memes champs que
+    # l'allocation (`allocation_financiere`) : les deux ecrans ne doivent pas
+    # classer le meme compte differemment.
     entites = {r['name'] for r in conn.execute('SELECT name FROM entities')}
-    perso = lambda p: not ({p.get('label'), p.get('category'), p.get('entity')} & entites)
+    perso = lambda p: not (_champs_societe(p) & entites)
     for qui in titulaires:
         cc = sum(p['value'] for p in ps if p['owner'] == qui and p.get('envelope') == 'Compte courant'
                  and perso(p))
@@ -160,7 +164,7 @@ def constats(conn, date, owner=None):
             # compte courant « Holding Exemple ») lui appartiennent : sans eux, son
             # net paraissait plus negatif qu'il n'est.
             parts = [x for x in ps if x.get('entity') == p['entity']
-                     or (not x.get('entity') and p['entity'] in (x.get('label'), x.get('category')))]
+                     or (not x.get('entity') and p['entity'] in _champs_societe(x))]
             brut = sum(x['gross_attributed'] for x in parts)
             dette = sum(x['debt_attributed'] for x in parts)
             nom = p['entity']
@@ -221,8 +225,8 @@ def _anciennete_av(conn, date, owner):
     try:
         from services.contrats import contrats
         cs = [c for c in contrats(conn, date, ('Assurance-vie',)) if not owner or c['owner'] == owner]
-    except Exception:
-        return []
+    except sqlite3.OperationalError:
+        return []                 # table absente (base non migree)
     if not cs:
         return []
     fr = lambda d: f"{d[8:10]}/{d[5:7]}/{d[:4]}"
@@ -240,7 +244,7 @@ def _anciennete_av(conn, date, owner):
         morceaux.append('sans date d’effet : ' + ', '.join(nom(c) for c in inconnus)
                         + ' — à saisir dans « Si vous vendiez tout », détail par enveloppe')
     titre = (f"{len(matures)} assurance{'s' if len(matures) > 1 else ''}-vie sur {len(cs)} a 8 ans" if matures
-             else f"Aucune assurance-vie n'a encore 8 ans" if not inconnus
+             else "Aucune assurance-vie n'a encore 8 ans" if not inconnus
              else f"Ancienneté des assurances-vie : {len(inconnus)} contrat{'s' if len(inconnus) > 1 else ''} sans date")
     return [{
         'niveau': 'info', 'onglet': 'synthese',
@@ -256,18 +260,21 @@ def _pct(v):
 
 
 def _garder_ou_rembourser(conn, date, entites, owner):
+    from services.prets import resume, parts_titulaire, a_la_part
     try:
-        from services.prets import resume
         prets = resume(conn, date)['prets']
-    except Exception:
+        # Vu par une personne, seuls les credits dont elle porte une part de
+        # la dette la concernent, et chaque montant a sa part : un credit
+        # porte a 34 % ne se rembourse pas avec 100 % de son restant du.
+        parts = parts_titulaire(conn, owner, date) if owner else None
+    except sqlite3.OperationalError:
         return []                 # table absente (base non migree)
+    if parts is not None:
+        prets = [a_la_part(p, parts[p['id']]) for p in prets if parts.get(p['id'], 0) > 0]
     out = []
     for p in prets:
         crd, taux = p.get('crd') or 0, p.get('taux_retenu')
         if crd < 1000 or not taux:
-            continue
-        # Vu par une personne, seuls les credits de ses entites la concernent.
-        if owner and p.get('entity') not in entites:
             continue
         gain = (p.get('interets_restants') or 0) - (p.get('ira') or 0)
         annee_fin = (p.get('fin') or '')[:4]
@@ -292,6 +299,12 @@ def _garder_ou_rembourser(conn, date, entites, owner):
             'montant': round(crd, 2),
         })
     return out
+
+
+def _champs_societe(p):
+    """Les champs d'une position qui la designent comme tresorerie d'une
+    entite : son libelle, ou l'entite a laquelle elle est liee."""
+    return {p.get('label'), p.get('entity')} - {None, ''}
 
 
 def _livret_fiscalise(p):

@@ -1,9 +1,39 @@
 from flask import Blueprint, jsonify, request
 from datetime import datetime
+import sqlite3
 from models import get_entity_map, get_db, validate_number, validate_string, parse_number
+from auth import login_required, csrf_protect
+from services.snapshot import ecrire_entity_snapshot
 
 MAX_COMMENT_LENGTH = 2000
-from auth import login_required, csrf_protect
+MAX_NAME_LENGTH = 200
+
+# Tables qui designent une entite par son nom. Renommer l'entite les suit
+# toutes ; en oublier une detachait prets, releves et parts de leur entite.
+_TABLES_ENTITE = (
+    ('entity_snapshots', 'entity_name'),
+    ('positions', 'entity'),
+    ('prets', 'entity'),
+    ('entite_operations', 'entity'),
+    ('entite_parts', 'entity'),
+    ('entite_exercices', 'entity'),
+    ('entite_soldes_initiaux', 'entity'),
+)
+# Donnees propres a l'entite qu'une suppression effacerait : on la refuse
+# tant qu'il en reste, en disant lesquelles.
+_DEPENDANCES = (
+    ('prets', 'prêt(s) — rattachez-les à une autre entité ou supprimez-les'),
+    ('entite_operations', 'opération(s) bancaire(s) importée(s)'),
+    ('entite_parts', 'ligne(s) de parts détenues'),
+    ('entite_exercices', 'exercice(s) clos'),
+)
+
+
+def _compter(conn, table, nom):
+    try:
+        return conn.execute(f'SELECT COUNT(*) AS c FROM {table} WHERE entity=?', (nom,)).fetchone()['c']
+    except sqlite3.OperationalError:
+        return 0                  # table absente (base non migree)
 
 entities_bp = Blueprint('entities', __name__)
 
@@ -32,9 +62,11 @@ def get_entities():
 @login_required
 @csrf_protect
 def add_entity():
-    d = request.json
-    if not d or not d.get('name') or not validate_string(d.get('name'), 200):
+    d = request.get_json(silent=True)
+    if not isinstance(d, dict) or not d.get('name') or not isinstance(d.get('name'), str):
         return jsonify({'error': 'Nom requis'}), 400
+    if not validate_string(d['name'], MAX_NAME_LENGTH):
+        return jsonify({'error': f'Nom trop long ({MAX_NAME_LENGTH} car. max)'}), 400
     if not validate_number(d.get('gross_assets')) or not validate_number(d.get('debt')):
         return jsonify({'error': 'Valeurs numériques invalides'}), 400
     if not validate_string(d.get('comment'), MAX_COMMENT_LENGTH):
@@ -43,16 +75,14 @@ def add_entity():
     gross = parse_number(d.get('gross_assets'), 0)
     debt  = parse_number(d.get('debt'), 0)
     with get_db() as conn:
+        if conn.execute('SELECT 1 FROM entities WHERE name=?', (d['name'],)).fetchone():
+            return jsonify({'error': f'Une entité « {d["name"]} » existe déjà'}), 409
         cur = conn.execute(
             '''INSERT INTO entities (name, type, valuation_mode, gross_assets, debt, comment)
                VALUES (?,?,?,?,?,?)''',
             (d['name'], d.get('type'), d.get('valuation_mode'), gross, debt, d.get('comment'))
         )
-        conn.execute(
-            '''INSERT OR REPLACE INTO entity_snapshots (entity_name, date, gross_assets, debt)
-               VALUES (?,?,?,?)''',
-            (d['name'], today, gross, debt)
-        )
+        ecrire_entity_snapshot(conn, d['name'], today, gross, debt)
         row = conn.execute('SELECT * FROM entities WHERE id=?', (cur.lastrowid,)).fetchone()
     e = dict(row)
     e['net_assets'] = (e['gross_assets'] or 0) - (e['debt'] or 0)
@@ -64,9 +94,11 @@ def add_entity():
 @login_required
 @csrf_protect
 def update_entity(eid):
-    d = request.json
-    if not d or not d.get('name'):
+    d = request.get_json(silent=True)
+    if not isinstance(d, dict) or not d.get('name') or not isinstance(d.get('name'), str):
         return jsonify({'error': 'Nom requis'}), 400
+    if not validate_string(d['name'], MAX_NAME_LENGTH):
+        return jsonify({'error': f'Nom trop long ({MAX_NAME_LENGTH} car. max)'}), 400
     if not validate_number(d.get('gross_assets')) or not validate_number(d.get('debt')):
         return jsonify({'error': 'Valeurs numériques invalides'}), 400
     if not validate_string(d.get('comment'), MAX_COMMENT_LENGTH):
@@ -81,6 +113,9 @@ def update_entity(eid):
         if not old_row:
             return jsonify({'error': 'Entité introuvable'}), 404
         old_name = old_row['name']
+        if new_name != old_name and conn.execute(
+                'SELECT 1 FROM entities WHERE name=? AND id<>?', (new_name, eid)).fetchone():
+            return jsonify({'error': f'Une entité « {new_name} » existe déjà'}), 409
 
         conn.execute(
             '''UPDATE entities SET name=?, type=?, valuation_mode=?,
@@ -88,22 +123,15 @@ def update_entity(eid):
             (new_name, d.get('type'), d.get('valuation_mode'), gross, debt, d.get('comment'), eid)
         )
 
-        # Cascade rename to snapshots and positions
+        # Le nouveau nom suit dans toutes les tables qui designent l'entite.
         if new_name != old_name:
-            conn.execute(
-                'UPDATE entity_snapshots SET entity_name=? WHERE entity_name=?',
-                (new_name, old_name)
-            )
-            conn.execute(
-                'UPDATE positions SET entity=? WHERE entity=?',
-                (new_name, old_name)
-            )
+            for table, col in _TABLES_ENTITE:
+                try:
+                    conn.execute(f'UPDATE {table} SET {col}=? WHERE {col}=?', (new_name, old_name))
+                except sqlite3.OperationalError:
+                    pass          # table absente (base non migree)
 
-        conn.execute(
-            '''INSERT OR REPLACE INTO entity_snapshots (entity_name, date, gross_assets, debt)
-               VALUES (?,?,?,?)''',
-            (new_name, today, gross, debt)
-        )
+        ecrire_entity_snapshot(conn, new_name, today, gross, debt)
         row = conn.execute('SELECT * FROM entities WHERE id=?', (eid,)).fetchone()
     e = dict(row)
     e['net_assets'] = (e['gross_assets'] or 0) - (e['debt'] or 0)
@@ -121,6 +149,18 @@ def delete_entity(eid):
         if not row:
             return jsonify({'error': 'Entité introuvable'}), 404
         name = row['name']
+
+        # Prets, releves, parts, exercices : les effacer avec l'entite serait
+        # une perte muette. La suppression attend qu'ils soient traites.
+        restants = [(n, libelle) for table, libelle in _DEPENDANCES
+                    if (n := _compter(conn, table, name))]
+        if restants:
+            detail = ', '.join(f'{n} {libelle}' for n, libelle in restants)
+            return jsonify({
+                'error': f'Suppression impossible : {detail} rattaché(s) à « {name} ».',
+                'dependances': {table: _compter(conn, table, name) for table, _ in _DEPENDANCES},
+                'confirm_required': False,
+            }), 409
 
         # Check for linked positions
         linked = conn.execute(

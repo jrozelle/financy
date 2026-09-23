@@ -10,7 +10,7 @@ interets.
 from __future__ import annotations
 
 import re
-from datetime import date as _date
+import sqlite3
 
 NATURES = {
     'revenu': 'Revenus',
@@ -84,17 +84,50 @@ def enregistrer(conn, entite, releve, source, noms_associes=()):
             (entite, o.date, o.libelle, o.montant, classer(o.libelle, o.montant, entite, noms_associes, connus),
              releve.banque, releve.compte, source))
         ajoutees += cur.rowcount
+    enregistrer_solde_initial(conn, entite, releve, source)
     return ajoutees, len(releve.operations) - ajoutees
 
 
+def enregistrer_solde_initial(conn, entite, releve, source=None):
+    """Retient le solde d'ouverture du plus ancien releve de chaque compte.
+
+    Les operations seules reconstituaient la tresorerie comme si le compte
+    avait ete ouvert a zero le jour du premier releve importe. Un releve plus
+    ancien, importe apres coup, remplace le solde retenu ; un plus recent n'y
+    touche pas : son solde d'ouverture est deja la somme des precedents.
+    """
+    if releve.solde_initial is None or not releve.debut:
+        return
+    conn.execute(
+        'INSERT INTO entite_soldes_initiaux (entity, banque, compte, date, solde, source) VALUES (?,?,?,?,?,?) '
+        'ON CONFLICT(entity, banque, compte) DO UPDATE SET date=excluded.date, solde=excluded.solde, '
+        'source=excluded.source WHERE excluded.date < entite_soldes_initiaux.date',
+        (entite, releve.banque or '', releve.compte or '', releve.debut, float(releve.solde_initial), source))
+
+
+def soldes_initiaux(conn, entite, date=None):
+    """Somme des soldes d'ouverture des comptes de l'entite ouverts a `date`
+    (tous si `date` est None)."""
+    try:
+        sql, params = 'SELECT SUM(solde) s FROM entite_soldes_initiaux WHERE entity=?', [entite]
+        if date is not None:
+            sql += ' AND date<=?'
+            params.append(date)
+        r = conn.execute(sql, params).fetchone()
+    except sqlite3.OperationalError:
+        return 0.0                # table absente (base non migree)
+    return r['s'] or 0.0
+
+
 def tresorerie_a(conn, entite, date):
-    """Solde de tous les comptes de l'entite a `date`, reconstitue depuis le
-    premier releve, et date de la derniere operation connue. None sans releve."""
+    """Solde de tous les comptes de l'entite a `date` : solde d'ouverture du
+    premier releve de chaque compte, plus les operations depuis. Rend aussi la
+    date de la derniere operation connue. None sans releve."""
     r = conn.execute('SELECT COUNT(*) n, SUM(montant) s, MAX(date) d FROM entite_operations '
                      'WHERE entity=? AND date<=?', (entite, date)).fetchone()
     if not r['n']:
         return None
-    return {'montant': round(r['s'], 2), 'au': r['d']}
+    return {'montant': round(r['s'] + soldes_initiaux(conn, entite, date), 2), 'au': r['d']}
 
 
 # Commission de souscription d'une SCPI, deduite du prix de souscription pour
@@ -139,13 +172,15 @@ def exercices(conn, entite):
         'SELECT * FROM entite_exercices WHERE entity=? ORDER BY fin', (entite,))]
 
 
-def fiscal(conn, entite, ops, mensuel, credit_pret_id):
+def fiscal(conn, entite, ops, mensuel, pret_ids):
     """Estimation de l'IS de l'exercice en cours, deficits anterieurs imputes.
 
     En tresorerie, la ou le cabinet travaille en droits constates : une
     distribution de decembre versee en janvier change d'exercice. D'ou une
     projection sur l'annee a partir des douze derniers mois, plutot que le
-    seul cumul a date.
+    seul cumul a date. Revenus et frais s'annualisent sur les mois REELLEMENT
+    couverts par des operations : la fenetre compte toujours ses douze mois,
+    et trois mois de releves passaient pour une annee.
     """
     clos = exercices(conn, entite)
     if not clos:
@@ -155,12 +190,18 @@ def fiscal(conn, entite, ops, mensuel, credit_pret_id):
         report = report - e['resultat'] if e['resultat'] < 0 else max(0.0, report - e['resultat'])
     annee = str(int(clos[-1]['fin'][:4]) + 1)
     interets = 0.0
-    if credit_pret_id:
-        r = conn.execute("SELECT SUM(interets) i, SUM(assurance) a FROM pret_echeances "
-                         "WHERE pret_id=? AND substr(date,1,4)=?", (credit_pret_id, annee)).fetchone()
+    if isinstance(pret_ids, int):
+        pret_ids = [pret_ids]
+    pret_ids = list(pret_ids or [])
+    if pret_ids:
+        r = conn.execute(f"SELECT SUM(interets) i, SUM(assurance) a FROM pret_echeances "
+                         f"WHERE pret_id IN ({','.join('?' * len(pret_ids))}) AND substr(date,1,4)=?",
+                         (*pret_ids, annee)).fetchone()
         interets = (r['i'] or 0) + (r['a'] or 0)
-    revenus = sum(m['revenu'] for m in mensuel)
-    frais = -sum(m['frais'] for m in mensuel) * 12 / max(1, len(mensuel))
+    fenetre = {m['mois'] for m in mensuel}
+    couverts = len({_mois(o['date']) for o in ops} & fenetre) or 1
+    revenus = sum(m['revenu'] for m in mensuel) * 12 / couverts
+    frais = -sum(m['frais'] for m in mensuel) * 12 / couverts
     resultat = round(revenus - interets - frais, 2)
     base = resultat - report if resultat > 0 else 0.0
     return {
@@ -206,20 +247,35 @@ def bilan(conn, entite, mois=12):
     # Le credit de l'entite, echeance par echeance sur la meme fenetre : le
     # releve ne montre qu'un prelevement, le tableau d'amortissement dit ce
     # qu'il contient de capital.
-    pret = conn.execute('SELECT * FROM prets WHERE entity=? ORDER BY id LIMIT 1', (entite,)).fetchone()
+    # Tous les prets de l'entite : n'en retenir que le premier taisait
+    # l'echeance, le capital et les interets des suivants.
+    prets = conn.execute('SELECT * FROM prets WHERE entity=? ORDER BY id', (entite,)).fetchall()
     credit = None
-    if pret:
-        ech = conn.execute(
-            "SELECT * FROM pret_echeances WHERE pret_id=? AND substr(date,1,7) BETWEEN ? AND ?",
-            (pret['id'], fenetre[0], fenetre[-1])).fetchall()
-        capital = sum(e['capital'] for e in ech if e['capital'] > 0)
-        interets = sum(e['interets'] for e in ech)
-        assurance = sum(e['assurance'] for e in ech)
-        crd = conn.execute('SELECT crd FROM pret_echeances WHERE pret_id=? AND substr(date,1,7)<=? '
-                           'ORDER BY date DESC LIMIT 1', (pret['id'], fin)).fetchone()
-        credit = {'libelle': pret['libelle'], 'taux': pret['taux'], 'capital': round(capital, 2),
+    if prets:
+        capital = interets = assurance = crd_total = 0.0
+        ponderation = taux_pondere = 0.0
+        for pret in prets:
+            ech = conn.execute(
+                "SELECT * FROM pret_echeances WHERE pret_id=? AND substr(date,1,7) BETWEEN ? AND ?",
+                (pret['id'], fenetre[0], fenetre[-1])).fetchall()
+            capital += sum(e['capital'] for e in ech if e['capital'] > 0)
+            interets += sum(e['interets'] for e in ech)
+            assurance += sum(e['assurance'] for e in ech)
+            r = conn.execute('SELECT crd FROM pret_echeances WHERE pret_id=? AND substr(date,1,7)<=? '
+                             'ORDER BY date DESC LIMIT 1', (pret['id'], fin)).fetchone()
+            crd = r['crd'] if r else (pret['montant'] or 0.0)
+            crd_total += crd
+            if pret['taux'] is not None:
+                # Taux moyen pondere par le restant du (a defaut, le montant).
+                poids = crd or pret['montant'] or 0.0
+                ponderation += poids
+                taux_pondere += poids * pret['taux']
+        taux = (round(taux_pondere / ponderation, 4) if ponderation
+                else next((p['taux'] for p in prets if p['taux'] is not None), None))
+        credit = {'libelle': ', '.join(p['libelle'] for p in prets), 'taux': taux,
+                  'prets': len(prets), 'capital': round(capital, 2),
                   'interets': round(interets, 2), 'assurance': round(assurance, 2),
-                  'crd': round(crd['crd'], 2) if crd else pret['montant']}
+                  'crd': round(crd_total, 2)}
 
     snap = conn.execute('SELECT gross_assets FROM entity_snapshots WHERE entity_name=? AND date<=? '
                         'ORDER BY date DESC LIMIT 1', (entite, f'{fin}-31')).fetchone()
@@ -230,10 +286,11 @@ def bilan(conn, entite, mois=12):
     frais = -tot['frais']
     apports = tot['apport']
     net = revenus + tot['revenu_exceptionnel'] - echeances - frais
-    # Tresorerie reconstituee : tous comptes, depuis le premier releve.
-    tresorerie = round(sum(o['montant'] for o in ops), 2)
+    # Tresorerie reconstituee : tous comptes, solde d'ouverture du premier
+    # releve de chacun plus les operations depuis.
+    tresorerie = round(sum(o['montant'] for o in ops) + soldes_initiaux(conn, entite), 2)
 
-    fisc = fiscal(conn, entite, ops, mensuel, pret['id'] if pret else None)
+    fisc = fiscal(conn, entite, ops, mensuel, [p['id'] for p in prets])
     detenues = parts(conn, entite)
     base_rendement = (detenues or {}).get('montant_souscrit') or valeur
     # Frais d'entree deja partis : ce que les parts ont coute, moins ce qu'on en

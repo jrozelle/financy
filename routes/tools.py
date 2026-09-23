@@ -1,10 +1,11 @@
 import logging
 from flask import Blueprint, jsonify, request
 from datetime import datetime
-from models import (get_db, compute_position, get_entity_map, get_holdings_map, holdings_a_date,
-                    load_referential, snapshot_holdings_to_date, validate_date, validate_number,
+from models import (get_db, compute_position, get_entity_map, holdings_a_date,
+                    load_referential, validate_date, validate_number,
                     validate_string, parse_number)
 from auth import login_required, csrf_protect
+from routes.performance import _flux_signed
 
 logger = logging.getLogger('financy')
 tools_bp = Blueprint('tools', __name__)
@@ -50,17 +51,20 @@ def get_timeline():
                 'label': n['notes'],
             })
 
-        # Flux (regroupés par mois)
-        flux_rows = conn.execute(
-            '''SELECT SUBSTR(date, 1, 7) as month, SUM(amount) as total, COUNT(*) as cnt
-               FROM flux GROUP BY SUBSTR(date, 1, 7) ORDER BY month'''
-        ).fetchall()
-        for f in flux_rows:
+        # Flux (regroupés par mois), signes comme partout ailleurs : un
+        # retrait saisi en positif s'additionnait aux versements, et dividendes
+        # et frais — ni apports ni retraits — gonflaient le total.
+        par_mois = {}
+        for f in conn.execute('SELECT date, type, amount FROM flux ORDER BY date'):
+            m = par_mois.setdefault(f['date'][:7], {'total': 0.0, 'cnt': 0})
+            m['total'] += _flux_signed(dict(f))
+            m['cnt'] += 1
+        for month, m in sorted(par_mois.items()):
             events.append({
-                'date': f['month'] + '-15',
+                'date': month + '-15',
                 'type': 'flux',
-                'label': f'{f["cnt"]} flux',
-                'value': round(f['total'], 2),
+                'label': f'{m["cnt"]} flux',
+                'value': round(m['total'], 2),
             })
 
     events.sort(key=lambda e: e['date'])
@@ -158,14 +162,18 @@ def simulate():
     Projection simple : montant initial + versement mensuel, rendement annuel, sur N années.
     Retourne la courbe mois par mois.
     """
-    d = request.json or {}
-    try:
-        initial = float(d.get('initial', 0))
-        monthly = float(d.get('monthly', 0))
-        annual_rate_pct = float(d.get('annual_rate', 5))
-        years = int(d.get('years', 10))
-    except (ValueError, TypeError):
+    d = request.get_json(silent=True)
+    if not isinstance(d, dict):
+        d = {}
+    # parse_number refuse nan et inf, que float() acceptait : une simulation
+    # a « nan » passait toutes les bornes (toute comparaison a nan est fausse).
+    initial = parse_number(d.get('initial', 0))
+    monthly = parse_number(d.get('monthly', 0))
+    annual_rate_pct = parse_number(d.get('annual_rate', 5))
+    years = parse_number(d.get('years', 10))
+    if None in (initial, monthly, annual_rate_pct, years) or years != int(years):
         return jsonify({'error': 'Paramètres numériques invalides'}), 400
+    years = int(years)
     if years < 1 or years > 50:
         return jsonify({'error': 'Durée entre 1 et 50 ans'}), 400
     if annual_rate_pct < -50 or annual_rate_pct > 100:
@@ -404,8 +412,10 @@ def rename_snapshot():
         # Une valorisation d'entite datee sert a tous les arretes suivants qui
         # n'en ont pas : la deplacer changeait leur valeur. Elle est RECOPIEE a
         # la nouvelle date (celle qui y existait deja l'emporte), jamais retiree.
-        conn.execute('''INSERT OR IGNORE INTO entity_snapshots (entity_name, date, gross_assets, debt)
-                        SELECT entity_name, ?, gross_assets, debt
+        # La tresorerie comprise dans la valeur suit : sans elle, l'arrete
+        # suivant l'ajouterait une seconde fois.
+        conn.execute('''INSERT OR IGNORE INTO entity_snapshots (entity_name, date, gross_assets, debt, tresorerie)
+                        SELECT entity_name, ?, gross_assets, debt, tresorerie
                         FROM entity_snapshots WHERE date=?''', (to_date, from_date))
         conn.execute('UPDATE holdings_snapshots SET snapshot_date=? WHERE snapshot_date=?',
                      (to_date, from_date))

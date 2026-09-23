@@ -28,8 +28,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 
 from models import (get_db, load_referential, compute_position, get_entity_map,
-                    get_holdings_map, freeze_holdings_prices, holding_price_warning,
-                    holdings_a_date)
+                    holding_price_warning, holdings_a_date)
 from models import validate_date
 from auth import login_required
 
@@ -433,13 +432,14 @@ def get_performance():
     for a in accounts:
         groups.setdefault(group_key(a), []).append(a)
 
-    out = []
-    for gk, members in groups.items():
-        mvals = {a: acct_values[a] for a in members}
-        g_dates = sorted({d for v in mvals.values() for d in v})
-        g_values = {d: sum(v[d] for v in mvals.values() if d in v) for d in g_dates}
+    def flux_des_comptes(members, g_dates, par_enveloppe=False):
+        """Flux reels d'un ensemble de comptes : [(date, montant)], nombre
+        de flux repartis au prorata.
 
-        # Flux reels : rattachement exact par etablissement quand il est connu.
+        Rattachement exact par etablissement quand il est connu ; a defaut,
+        au prorata des comptes freres (meme enveloppe, meme titulaire). Un
+        flux d'un compte ecarte ne se rattache donc jamais a un compte garde.
+        """
         approx = 0
         g_flux = []
         for f in flux:
@@ -450,10 +450,10 @@ def get_performance():
             f_own = f.get('owner')
             f_etab = f.get('establishment') or None
             cand = [a for a in members if a[0] == f_env
-                    and (grouping == 'envelope' or a[2] == f_own)]
+                    and (par_enveloppe or a[2] == f_own)]
             if not cand:
                 continue
-            if grouping == 'envelope':
+            if par_enveloppe:
                 g_flux.append((f['date'], amt))
                 continue
             # maille compte : un flux appartient a un etablissement precis
@@ -472,6 +472,15 @@ def get_performance():
             if share:
                 g_flux.append((f['date'], amt * share))
                 approx += 1
+        return g_flux, approx
+
+    out = []
+    for gk, members in groups.items():
+        mvals = {a: acct_values[a] for a in members}
+        g_dates = sorted({d for v in mvals.values() for d in v})
+        g_values = {d: sum(v[d] for v in mvals.values() if d in v) for d in g_dates}
+
+        g_flux, approx = flux_des_comptes(members, g_dates, par_enveloppe=grouping == 'envelope')
 
         # Frais du groupe. Ils ne sont pas des flux EXTERNES — ils amputent le
         # rendement au lieu d'en sortir — donc `_flux_signed` les rend a zero et
@@ -557,10 +566,11 @@ def get_performance():
         mvals = {a: acct_values[a] for a in comptes}
         g_dates = sorted({d for v in mvals.values() for d in v})
         g_values = {d: sum(v[d] for v in mvals.values() if d in v) for d in g_dates}
-        pairs = {(a[0], a[2]) for a in comptes}
-        g_flux = [(f['date'], _flux_signed(f)) for f in flux
-                  if ((f.get('envelope') or 'Autre'), f.get('owner')) in pairs
-                  and _flux_signed(f)]
+        # Les flux des SEULS comptes gardes, a la maille compte : filtrer sur
+        # (enveloppe, titulaire) y faisait entrer les versements d'un compte
+        # ecarte chez un autre etablissement — une assurance-vie close ou non
+        # mesurable gonflait les apports de l'ensemble.
+        g_flux, _ = flux_des_comptes(comptes, g_dates)
         comp = _composition_flux(g_dates, mvals, _flux_par_compte(flux))
         serie, cumul, days, gaps, suspects = _chain(g_dates, g_values, g_flux + comp)
         tri, tri_periode, tri_jours = _tri(g_dates, g_values, g_flux + comp)
