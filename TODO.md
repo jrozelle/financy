@@ -343,10 +343,32 @@ Phase 8 — Conseil : constats et réserve (22-23/09/2026) :
 - [x] Montants des propositions marqués ⟦v⟧ : masqués en mode discrétion
 - [x] Lignes à alléger valorisées comme les positions (devise convertie)
 - [ ] Constats : versements PER vs plafond de déduction (revenus à saisir)
-- [ ] Constats : ancienneté réelle des assurances-vie (date d'ouverture à saisir)
+- [x] Constats : ancienneté réelle des assurances-vie (table contrats, 23/09/2026)
 
-Déploiement prod nas (après validation locale complète) :
-- [ ] Backup DB prod
-- [ ] Variables d'env (ANTHROPIC_API_KEY, SCHEDULER_ENABLED=true)
-- [ ] Vérif migrations au démarrage
-- [ ] Tests post-déploiement (refresh cours, positions existantes)
+Phase 9 — Patrimoine complet (septembre 2026) :
+- [x] Crédits : tableaux d'amortissement importés (Caisse d'Épargne, Arkéa,
+      avis de réalisation Crédit Agricole) ou saisis, différé total / partiel,
+      prêts in fine, IRA, vue par titulaire à sa part de dette, dettes sans
+      échéancier signalées
+- [x] Entités : trésorerie et levier lus sur les relevés bancaires (Qonto,
+      Crédit Agricole), parts de SCPI au prix de retrait, IS d'une SCI à l'IS,
+      soldes d'ouverture ; vue par titulaire
+- [x] « D'où vient la hausse » en quatre parts (épargne nouvelle, capital
+      remboursé, comptes ajoutés, performance) ; projection du patrimoine
+- [x] Fiscalité : ancienneté des contrats (8 ans AV, 5 ans PEA)
+- [x] Conseil : propositions sur la part libre du financier, garder ou
+      rembourser un crédit
+- [x] Synthèse personnalisable (widgets déplaçables, redimensionnables,
+      masquables) ; barre du bas du téléphone au choix ; application installable
+- [x] Revue complète du 23/09/2026 (calculs, cohérence, interface, CSS) ;
+      dépôt public purgé des données réelles, clé d'API hors de la base
+
+Ouvert :
+- [ ] Libellés du « patrimoine financier » : cinq valeurs selon l'onglet, chacune
+      juste dans son périmètre, que le libellé doit dire
+- [ ] Limitation des connexions derrière le reverse proxy (adresse transmise)
+- [ ] Suppression des opérations bancaires d'une entité (aucun écran aujourd'hui)
+- [ ] Soldes d'ouverture des comptes d'entité déjà importés : réimporter le premier relevé
+      de chaque compte
+- [ ] CSS : échelle de tailles de police et d'espacements, sélecteurs d'en-tête
+      sans surenchère de !important

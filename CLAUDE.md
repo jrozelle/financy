@@ -7,6 +7,11 @@
 - Ne push jamais sans feu vert explicite de l'utilisateur
 - Ne crée jamais de PR sans demande explicite
 - Après chaque phase : rappeler la checklist de test local et attendre le feedback
+- La documentation fait partie de chaque phase et de chaque revue : `TODO.md`
+  (état d'avancement), `README.md` (ce que fait l'application), `README.dev.md`
+  (mise en route) et `CLAUDE.md` se mettent à jour dans le même commit que la
+  fonctionnalité. Une revue « complète » les relit aussi, pour la justesse et
+  pas seulement pour les données personnelles.
 - Déploiement prod : `git pull` dans le dépôt déployé, puis
   `docker compose up -d --build financy` depuis le projet compose parent (le
   conteneur n'appartient pas au compose de `app/`). `static/` et `templates/`
