@@ -890,13 +890,14 @@
     <div class="modal-overlay" id="settings-modal-overlay"></div>
     <div class="modal-content" style="max-width:520px">
       <div class="modal-header">
-        <h2 id="settings-modal-heading">Parametres</h2>
+        <h2 id="settings-modal-heading">Paramètres</h2>
         <button class="modal-close" data-close="settings-modal" aria-label="Fermer">&#10005;</button>
       </div>
       <div style="margin-bottom:1.25rem">
-        <label for="settings-api-key" style="display:block;font-size:13px;font-weight:600;margin-bottom:.375rem">Cle API Anthropic</label>
+        <label for="settings-api-key" style="display:block;font-size:13px;font-weight:600;margin-bottom:.375rem">Clé API Anthropic</label>
         <p class="text-muted" style="font-size:12px;margin-bottom:.5rem">
-          Necessaire pour l'onglet Conseil (analyse LLM). La cle est stockee localement dans la base SQLite.
+          Nécessaire pour l'analyse de l'onglet Conseil. La clé est stockée dans la base, sur ce serveur.
+          Laisser le champ vide garde la clé actuelle.
         </p>
         <div style="display:flex;gap:.5rem;align-items:center">
           <input type="password" id="settings-api-key" class="form-control"
@@ -907,6 +908,7 @@
         <div id="settings-api-status" class="text-muted" style="font-size:12px;margin-top:.375rem"></div>
       </div>
       <div class="modal-actions">
+        <button type="button" class="btn btn-danger-quiet hidden" id="btn-delete-api-key" style="margin-right:auto">Supprimer la clé</button>
         <button type="button" class="btn btn-secondary" data-close="settings-modal">Annuler</button>
         <button type="button" class="btn btn-primary" id="btn-save-settings">Enregistrer</button>
       </div>
