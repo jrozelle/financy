@@ -103,8 +103,11 @@ class YahooProvider(PriceProvider):
         """
         try:
             s = self._get_session()
-            url = f'https://query1.finance.yahoo.com/v1/finance/search?q={query}&quotesCount=10&newsCount=0'
-            resp = s.get(url, timeout=HTTP_TIMEOUT)
+            # Parametres encodes par requests : un nom de titre porte espaces,
+            # '&' ou '+' (« S&P 500 ») qui cassaient la requete interpolee.
+            resp = s.get('https://query1.finance.yahoo.com/v1/finance/search',
+                         params={'q': query, 'quotesCount': 10, 'newsCount': 0},
+                         timeout=HTTP_TIMEOUT)
             resp.raise_for_status()
             data = resp.json()
             quotes = data.get('quotes', [])

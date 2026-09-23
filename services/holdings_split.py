@@ -38,26 +38,38 @@ def infer_category(name, asset_class=None, isin=None):
     return ASSET_CLASS_TO_CATEGORY.get(ac, 'Actions')
 
 
+# Champs propres a la position (et non a sa categorie) que la compagnon herite.
+# Une compagnon creee sans eux comptait a 100 % une position indivise a 50 %.
+# `entity` n'en fait pas partie : une position liee a une entite prend la
+# valeur de l'entite, et la recopier la compterait deux fois.
+# `mobilizable_pct_override` non plus : il depend de la categorie, qui change.
+_CHAMPS_HERITES = ('ownership_pct', 'debt_pct', 'label', 'liquidity_override')
+
+
 def find_or_create_position(conn, base_pos, category):
     """Trouve une position compagnon (meme date/owner/envelope/etablissement)
     avec la bonne categorie, ou en cree une."""
     row = conn.execute(
         '''SELECT id FROM positions
-           WHERE date=? AND owner=? AND envelope=? AND category=?
+           WHERE date=? AND owner=? AND COALESCE(envelope,'')=? AND category=?
                  AND COALESCE(establishment,'')=?''',
-        (base_pos['date'], base_pos['owner'], base_pos['envelope'],
-         category, base_pos['establishment'] or '')
+        (base_pos['date'], base_pos['owner'], base_pos.get('envelope') or '',
+         category, base_pos.get('establishment') or '')
     ).fetchone()
     if row:
         return row['id']
+    herites = [c for c in _CHAMPS_HERITES if c in base_pos]
+    cols = ['date', 'owner', 'category', 'envelope', 'establishment',
+            'value', 'debt'] + herites
+    vals = [base_pos['date'], base_pos['owner'], category,
+            base_pos.get('envelope'), base_pos.get('establishment'), 0, 0] + \
+           [base_pos[c] for c in herites]
     cur = conn.execute(
-        '''INSERT INTO positions (date, owner, category, envelope, establishment, value, debt)
-           VALUES (?,?,?,?,?,0,0)''',
-        (base_pos['date'], base_pos['owner'], category,
-         base_pos['envelope'], base_pos['establishment'])
+        f'INSERT INTO positions ({", ".join(cols)}) '
+        f'VALUES ({",".join("?" * len(cols))})', vals
     )
     logger.info('Auto-split: created position %s/%s/%s (id=%d)',
-                base_pos['owner'], base_pos['envelope'], category, cur.lastrowid)
+                base_pos['owner'], base_pos.get('envelope'), category, cur.lastrowid)
     return cur.lastrowid
 
 

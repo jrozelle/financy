@@ -51,10 +51,14 @@ def realized():
         names = {r['isin']: r['name'] for r in conn.execute('SELECT isin, name FROM securities')}
     state, events = compute_realized(rows)
     lines = []
-    for isin, s in state.items():
+    for s in state.values():
         if abs(s['realized']) < 0.005 and s['untracked_qty'] < 1e-9:
             continue
-        lines.append({'isin': isin, 'name': names.get(isin), 'realized': s['realized'],
+        isin = s['isin']
+        lines.append({'isin': isin, 'name': names.get(isin),
+                      'owner': s['owner'], 'envelope': s['envelope'],
+                      'establishment': s['establishment'],
+                      'realized': s['realized'],
                       'sold_qty': s['sold_qty'], 'still_held': s['quantity'],
                       'pru': s['pru'], 'untracked_qty': s['untracked_qty'],
                       'untracked_proceeds': s['untracked_proceeds']})

@@ -184,6 +184,29 @@ def reconcile_snapshot(conn, snapshot_date):
     }
 
 
+def _cout_apres(quantite, cout, operations):
+    """Prix de revient apres les operations, au prix moyen pondere.
+
+    Un achat ajoute son montant regle ; une vente retire les titres cedes a
+    leur PRU, pas le produit de cession — sans quoi une vente en plus-value
+    faisait baisser le cout de plus que ce qu'avaient coute les titres, et le
+    gain encaisse disparaissait de la plus-value latente comme de la realisee.
+    Meme methode que `services.realized`.
+    """
+    qte, cout = quantite or 0.0, cout or 0.0
+    for op in sorted(operations, key=lambda o: (o['date'], o['id'])):
+        q = op['quantity'] or 0
+        if op['side'] == 'ACHAT':
+            qte += q
+            cout += op['net_eur'] or 0
+            continue
+        cedes = min(q, qte)
+        if cedes > 1e-9:
+            cout -= cedes * (cout / qte)
+            qte -= cedes
+    return max(0.0, cout)
+
+
 def apply_ecart(conn, snapshot_date, holding_id):
     """Applique a UNE ligne le delta calcule par `reconcile_snapshot`.
 
@@ -205,16 +228,23 @@ def apply_ecart(conn, snapshot_date, holding_id):
 
     h = conn.execute(
         '''SELECT h.quantity, h.cost_basis, h.market_value, h.position_id,
-                  s.last_price, s.last_price_date
+                  s.last_price, s.last_price_date, s.currency
            FROM holdings h LEFT JOIN securities s ON s.isin = h.isin
            WHERE h.id = ?''', (holding_id,)
     ).fetchone()
 
     new_qty = round((h['quantity'] or 0) + cible['delta_quantity'], 6)
-    new_cost = round((h['cost_basis'] or 0) + cible['cost_delta'], 2)
+    new_cost = round(_cout_apres(h['quantity'], h['cost_basis'],
+                                 cible['operations']), 2)
 
-    # Prix unitaire : le cours si on en a un, sinon celui qu'implique la photo.
+    # Prix unitaire en euros : le cours converti si on en a un, sinon celui
+    # qu'implique la photo. Un cours hors euro sans taux ne vaut rien : la
+    # quantite en dollars comptee pour des euros surevaluait la ligne.
     unit = h['last_price']
+    if unit is not None:
+        from services.prices import _fx_rate_for
+        taux = _fx_rate_for(conn, h['currency'])
+        unit = unit / taux if taux else None
     if unit is None and h['quantity']:
         unit = (h['market_value'] or 0) / h['quantity']
     new_mv = round(new_qty * unit, 2) if unit else h['market_value']
@@ -230,7 +260,7 @@ def apply_ecart(conn, snapshot_date, holding_id):
     )
     logger.info('Reconcile %s: holding %s %s -> %s parts (%+.6f), cout %+.2f',
                 snapshot_date, holding_id, h['quantity'], new_qty,
-                cible['delta_quantity'], cible['cost_delta'])
+                cible['delta_quantity'], new_cost - (h['cost_basis'] or 0))
 
     return {
         'holding_id':  holding_id,

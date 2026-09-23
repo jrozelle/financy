@@ -102,25 +102,47 @@ def _pru_par_enveloppe(conn, date, owner=None):
     defaut — mais elle couvre le PEA et l'assurance-vie, ou les versements sont
     rarement saisis un par un. Le nombre de lignes sans PRU distinct est rendu
     avec le total : c'est lui qui dit ce que l'estimation vaut.
+
+    Chaque ligne mesuree est valorisee comme le brut (`_valeurs_par_enveloppe`) :
+    cours converti par fx_rates, figes pour un arrete passe, a la quote-part
+    detenue. Une ligne sans prix de revient n'entre ni dans le cout ni dans la
+    valeur : comptee a cout nul, elle passait tout entiere pour du gain. Idem
+    d'une ligne que rien ne valorise (devise sans taux) : son cout serait une
+    perte inventee. Toutes deux restent comptees dans `sans_pru`.
     """
-    q = ('SELECT p.envelope, h.cost_basis cb, h.market_value mv '
-         'FROM holdings h JOIN positions p ON p.id = h.position_id '
-         'WHERE p.date = ?')
-    prm = [date]
+    from models import (_holding_value_or_none, get_entity_map,
+                        holdings_a_date)
+    q, prm = 'SELECT * FROM positions WHERE date = ?', [date]
     if owner:
-        q += ' AND p.owner = ?'
+        q += ' AND owner = ?'
         prm.append(owner)
+    rows = [dict(r) for r in conn.execute(q, prm).fetchall()]
+    em = get_entity_map(conn, date)
+    hm = holdings_a_date(conn, [r['id'] for r in rows], date)
 
     pru = {}
-    for r in conn.execute(q, prm):
-        env = r['envelope'] or 'Autre'
+    for pos in rows:
+        # Une position liee a une entite vaut l'entite, pas ses lignes.
+        if pos.get('entity') and pos['entity'] in em:
+            continue
+        holdings = hm.get(pos['id']) or []
+        if not holdings:
+            continue
+        part = pos['ownership_pct'] if pos.get('ownership_pct') is not None else 1.0
+        env = pos.get('envelope') or pos.get('entity') and 'Entité' or 'Autre'
         e = pru.setdefault(env, {'cout': 0.0, 'valeur': 0.0, 'lignes': 0, 'sans_pru': 0})
-        cb, mv = r['cb'] or 0, r['mv'] or 0
-        e['cout'] += cb
-        e['valeur'] += mv
-        e['lignes'] += 1
-        if not cb or abs(cb - mv) < 0.01:
-            e['sans_pru'] += 1
+        for h in holdings:
+            e['lignes'] += 1
+            cb, mv = h.get('cost_basis'), h.get('market_value')
+            if not cb or (mv is not None and abs(cb - mv) < 0.01):
+                e['sans_pru'] += 1
+                continue
+            valeur = _holding_value_or_none(h)
+            if valeur is None:
+                e['sans_pru'] += 1
+                continue
+            e['cout'] += cb * part
+            e['valeur'] += valeur * part
     return pru
 
 

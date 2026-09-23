@@ -4,7 +4,8 @@ from flask import Blueprint, jsonify, request
 from models import (get_db, validate_isin, validate_number, validate_string,
                     validate_date, snapshot_holdings_to_date,
                     _holding_effective_value, parse_number, sync_position_value,
-                    get_holdings_map)
+                    get_holdings_map, holdings_a_date, _holding_decision,
+                    _holding_value_or_none)
 from services.securities import upsert_security as _upsert_security
 from auth import login_required, csrf_protect
 
@@ -327,6 +328,8 @@ def get_consolidated():
     """
     owner = request.args.get('owner')
     date  = request.args.get('date')  # optionnel : date specifique du snapshot
+    if date and not validate_date(date):
+        return jsonify({'error': 'Date invalide (format AAAA-MM-JJ attendu)'}), 400
 
     with get_db() as conn:
         # Si pas de date, on prend les positions de la derniere date disponible
@@ -344,91 +347,94 @@ def get_consolidated():
             return jsonify({
                 'snapshot_date': None, 'owner': owner, 'lines': [], 'totals': {},
                 'breakdowns': {'asset_class': [], 'currency': [], 'envelope': []},
+                'price_warnings': [],
             })
 
         params = [date]
-        where  = 'WHERE p.date=?'
+        where  = 'WHERE date=?'
         if owner:
-            where += ' AND p.owner=?'
+            where += ' AND owner=?'
             params.append(owner)
-
-        rows = conn.execute(
-            f'''SELECT h.isin, h.quantity, h.cost_basis, h.market_value, h.as_of_date,
-                       p.date     AS position_date,
-                       p.owner    AS pos_owner,
-                       p.establishment AS pos_establishment,
-                       p.envelope AS pos_envelope,
-                       p.category AS pos_category,
-                       s.name, s.ticker, s.currency, s.asset_class, s.is_priceable,
-                       s.last_price, s.last_price_date, s.data_source
-                FROM holdings h
-                JOIN positions p ON p.id = h.position_id
-                LEFT JOIN securities s ON s.isin = h.isin
-                {where}
-                ORDER BY h.isin''',
-            params
+        positions = conn.execute(
+            f'SELECT id, owner, establishment, envelope, ownership_pct '
+            f'FROM positions {where}', params
         ).fetchall()
+        # Memes lignes que la synthese : devise convertie par fx_rates, et
+        # cours figes pour un arrete passe. L'ancienne requete additionnait des
+        # dollars a des euros et revalorisait l'historique au cours du jour.
+        hmap = holdings_a_date(conn, [p['id'] for p in positions], date)
 
-    # Agregation par ISIN
+    # Agregation par ISIN, a la quote-part detenue de chaque position : une
+    # position indivise a 50 % n'apporte que la moitie de ses lignes.
     by_isin = {}
-    for r in rows:
-        isin = r['isin']
-        q  = r['quantity'] or 0
-        mv = r['market_value'] if r['market_value'] is not None else None
-        is_priceable = r['is_priceable']
-        if is_priceable is None:
-            is_priceable = 1
-        effective_mv = _holding_effective_value({
-            'is_priceable':    bool(is_priceable),
-            'last_price':      r['last_price'],
-            'last_price_date': r['last_price_date'],
-            'data_source':      r['data_source'],
-            'quantity':        q,
-            'market_value':    mv,
-            'as_of_date':      r['as_of_date'],
-            'position_date':   r['position_date'],
-        })
+    alertes = []
+    for p in positions:
+        part = p['ownership_pct'] if p['ownership_pct'] is not None else 1.0
+        for h in hmap.get(p['id'], []):
+            isin = h['isin']
+            q = h['quantity'] or 0
+            is_priceable = h.get('is_priceable')
+            if is_priceable is None:
+                is_priceable = True
+            valeur, alerte = _holding_decision(h)
+            if alerte:
+                alertes.append({**alerte, 'owner': p['owner'],
+                                'envelope': p['envelope'],
+                                'establishment': p['establishment']})
 
-        rec = by_isin.setdefault(isin, {
-            'isin':            isin,
-            'name':            r['name'],
-            'ticker':          r['ticker'],
-            'currency':        r['currency'] or 'EUR',
-            'asset_class':     _asset_class_label(r['asset_class']),
-            'is_priceable':    bool(is_priceable),
-            'last_price':      r['last_price'],
-            'last_price_date': r['last_price_date'],
-            'quantity':        0,
-            'cost_basis':      0,
-            'market_value':    0,
-            'positions_count': 0,
-            'owners':          set(),
-            'establishments':  set(),
-            'envelopes':       set(),
-        })
-        rec['quantity']         += q
-        rec['cost_basis']       += r['cost_basis'] or 0
-        rec['market_value']     += effective_mv
-        rec['positions_count']  += 1
-        if r['pos_owner']:         rec['owners'].add(r['pos_owner'])
-        if r['pos_establishment']: rec['establishments'].add(r['pos_establishment'])
-        if r['pos_envelope']:      rec['envelopes'].add(r['pos_envelope'])
+            rec = by_isin.setdefault(isin, {
+                'isin':            isin,
+                'name':            h.get('name'),
+                'ticker':          h.get('ticker'),
+                'currency':        h.get('currency') or 'EUR',
+                'asset_class':     _asset_class_label(h.get('asset_class')),
+                'is_priceable':    bool(is_priceable),
+                'last_price':      h.get('last_price'),
+                'last_price_date': h.get('last_price_date'),
+                'quantity':        0,
+                'cost_basis':      0,
+                'market_value':    0,
+                'positions_count': 0,
+                'owners':          set(),
+                'establishments':  set(),
+                'envelopes':       set(),
+                '_mv_with_cost':   0,
+                '_by_envelope':    {},
+            })
+            rec['quantity']        += q * part
+            rec['market_value']    += valeur * part
+            rec['positions_count'] += 1
+            # Plus-value : seules les lignes a prix de revient ET valorisables.
+            # Une ligne en devise sans taux ne vaut rien : son cout compte
+            # sinon comme une perte.
+            cb = h.get('cost_basis')
+            if cb:
+                v_pv = _holding_value_or_none(h)
+                if v_pv is not None:
+                    rec['cost_basis']    += cb * part
+                    rec['_mv_with_cost'] += v_pv * part
+            env = p['envelope'] or 'Autre'
+            rec['_by_envelope'][env] = rec['_by_envelope'].get(env, 0) + valeur * part
+            if p['owner']:         rec['owners'].add(p['owner'])
+            if p['establishment']: rec['establishments'].add(p['establishment'])
+            if p['envelope']:      rec['envelopes'].add(p['envelope'])
 
     total_mv   = sum(v['market_value'] for v in by_isin.values())
     # P&L : ne compter que les lignes avec un vrai cost_basis
     has_cost_lines = [v for v in by_isin.values() if v['cost_basis']]
     total_cost = sum(v['cost_basis'] for v in has_cost_lines)
-    total_mv_with_cost = sum(v['market_value'] for v in has_cost_lines)
+    total_mv_with_cost = sum(v['_mv_with_cost'] for v in has_cost_lines)
 
     lines = []
     for v in by_isin.values():
         has_cost = v['cost_basis'] is not None and v['cost_basis'] > 0
-        pnl = (v['market_value'] - v['cost_basis']) if has_cost else None
+        pnl = (v['_mv_with_cost'] - v['cost_basis']) if has_cost else None
         pnl_pct = (pnl / v['cost_basis'] * 100) if (pnl is not None and v['cost_basis']) else None
         weight = (v['market_value'] / total_mv * 100) if total_mv > 0 else 0
         avg_cost = (v['cost_basis'] / v['quantity']) if v['quantity'] else None
         lines.append({
-            **v,
+            **{k: val for k, val in v.items() if not k.startswith('_')},
+            'quantity':        round(v['quantity'], 6),
             'owners':          sorted(v['owners']),
             'establishments':  sorted(v['establishments']),
             'envelopes':       sorted(v['envelopes']),
@@ -451,12 +457,11 @@ def get_consolidated():
                  'weight_pct': round(v / total_mv * 100, 2) if total_mv else 0}
                 for k, v in sorted(agg.items(), key=lambda x: -x[1])]
 
+    # Repartition exacte : chaque position apporte sa valeur a son enveloppe.
     by_envelope_agg = {}
-    for l in lines:
-        for env in (l['envelopes'] or ['Autre']):
-            # Pour une ligne presente sur N enveloppes, on divise equitablement (approximation)
-            share = l['market_value'] / max(1, len(l['envelopes'] or ['Autre']))
-            by_envelope_agg[env] = by_envelope_agg.get(env, 0) + share
+    for v in by_isin.values():
+        for env, mv in v['_by_envelope'].items():
+            by_envelope_agg[env] = by_envelope_agg.get(env, 0) + mv
     envelope_breakdown = [
         {'label': k, 'market_value': round(v, 2),
          'weight_pct': round(v / total_mv * 100, 2) if total_mv else 0}
@@ -479,6 +484,9 @@ def get_consolidated():
             'currency':    _group('currency'),
             'envelope':    envelope_breakdown,
         },
+        # Arbitrages de valorisation (devise sans taux, divergence) : jamais
+        # en silence, meme forme que /api/performance.
+        'price_warnings': alertes,
     })
 
 

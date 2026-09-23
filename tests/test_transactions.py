@@ -43,6 +43,11 @@ def _tx(date, isin, side, qty, net, **kw):
                 envelope=kw.get('envelope', 'PEA'), source_doc=kw.get('source_doc'))
 
 
+def _ligne(state, isin):
+    """Etat d'une ligne : la cle est (personne, enveloppe, etablissement, ISIN)."""
+    return next(v for v in state.values() if v['isin'] == isin)
+
+
 def _seed_tx(rows):
     with get_db() as conn:
         for r in rows:
@@ -110,7 +115,7 @@ class TestRealized:
             _tx('2024-01-01', 'A', 'ACHAT', 10, 1000),
             _tx('2024-02-01', 'A', 'ACHAT', 10, 1200),
         ])
-        assert state['A']['pru'] == pytest.approx(110.0)
+        assert _ligne(state, 'A')['pru'] == pytest.approx(110.0)
 
     def test_vente_ne_change_pas_le_pru(self):
         state, _ = compute_realized([
@@ -118,10 +123,10 @@ class TestRealized:
             _tx('2024-02-01', 'A', 'ACHAT', 10, 1200),
             _tx('2024-03-01', 'A', 'VENTE', 5, 700),
         ])
-        assert state['A']['pru'] == pytest.approx(110.0)
-        assert state['A']['quantity'] == pytest.approx(15.0)
+        assert _ligne(state, 'A')['pru'] == pytest.approx(110.0)
+        assert _ligne(state, 'A')['quantity'] == pytest.approx(15.0)
         # 700 encaisses - 5*110 = 150
-        assert state['A']['realized'] == pytest.approx(150.0)
+        assert _ligne(state, 'A')['realized'] == pytest.approx(150.0)
 
     def test_frais_inclus_des_deux_cotes(self):
         # net_eur porte deja les frais : achat 1005 pour 1000 de titres,
@@ -130,7 +135,7 @@ class TestRealized:
             _tx('2024-01-01', 'A', 'ACHAT', 10, 1005),
             _tx('2024-02-01', 'A', 'VENTE', 10, 995),
         ])
-        assert state['A']['realized'] == pytest.approx(-10.0)
+        assert _ligne(state, 'A')['realized'] == pytest.approx(-10.0)
 
     def test_ligne_soldee_puis_rouverte(self):
         state, events = compute_realized([
@@ -138,8 +143,8 @@ class TestRealized:
             _tx('2024-02-01', 'A', 'VENTE', 10, 1100),
             _tx('2024-03-01', 'A', 'ACHAT', 5, 400),
         ])
-        assert state['A']['realized'] == pytest.approx(100.0)
-        assert state['A']['pru'] == pytest.approx(80.0)
+        assert _ligne(state, 'A')['realized'] == pytest.approx(100.0)
+        assert _ligne(state, 'A')['pru'] == pytest.approx(80.0)
         assert len(events) == 1
 
     def test_vente_sans_achat_trace_isolee(self):
@@ -148,10 +153,10 @@ class TestRealized:
             _tx('2024-01-01', 'A', 'ACHAT', 2, 200),
             _tx('2024-02-01', 'A', 'VENTE', 5, 600),
         ])
-        assert state['A']['untracked_qty'] == pytest.approx(3.0)
-        assert state['A']['untracked_proceeds'] == pytest.approx(360.0)
+        assert _ligne(state, 'A')['untracked_qty'] == pytest.approx(3.0)
+        assert _ligne(state, 'A')['untracked_proceeds'] == pytest.approx(360.0)
         # Seuls les 2 titres traces produisent une plus-value : 240 - 200
-        assert state['A']['realized'] == pytest.approx(40.0)
+        assert _ligne(state, 'A')['realized'] == pytest.approx(40.0)
 
     def test_registre_vide(self):
         state, events = compute_realized([])

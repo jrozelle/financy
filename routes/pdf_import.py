@@ -45,34 +45,61 @@ def download_csv_template():
 
 
 def _enrich_with_prices(result):
-    """Lookup live prices for lines missing market_value."""
+    """Lookup live prices for lines missing market_value.
+
+    Le cours arrive dans la devise de cotation : il se convertit en euros par
+    fx_rates. A defaut de taux (ou de devise connue), la ligne reste sans
+    valorisation et un avertissement le dit — des dollars comptes pour des
+    euros surevaluaient la ligne du change.
+    """
     try:
-        from services.prices import get_provider
+        from services.prices import get_provider, _fx_rate_for
         provider = get_provider()
     except Exception:
         result.warnings.append('Impossible de charger le provider de cours.')
         return
 
     enriched = 0
-    for line in result.lines:
-        if line.market_value is not None or not line.quantity:
-            continue
-        try:
-            ticker, _ = provider.resolve_ticker(line.isin, name=line.name)
-            if not ticker:
-                result.warnings.append(f'{line.isin} : ticker non trouve.')
+    with get_db() as conn:
+        for line in result.lines:
+            if line.market_value is not None or not line.quantity:
                 continue
-            price_data = provider.fetch_last_price(ticker)
-            if not price_data:
-                result.warnings.append(f'{line.isin} : cours indisponible.')
-                continue
-            price, price_date = price_data
-            line.unit_price = round(price, 4)
-            line.market_value = round(line.quantity * price, 2)
-            line.confidence = min(line.confidence + 0.1, 1.0)
-            enriched += 1
-        except Exception as e:
-            logger.debug('Price lookup failed for %s: %s', line.isin, e)
+            try:
+                ticker, _ = provider.resolve_ticker(line.isin, name=line.name)
+                if not ticker:
+                    result.warnings.append(f'{line.isin} : ticker non trouve.')
+                    continue
+                price_data = provider.fetch_last_price(ticker)
+                if not price_data:
+                    result.warnings.append(f'{line.isin} : cours indisponible.')
+                    continue
+                price, price_date = price_data
+                devise = provider.fetch_currency(ticker)
+                if not devise and provider.name == 'mock':
+                    devise = 'EUR'           # cours fictifs, libelles en euros
+                if not devise:
+                    result.warnings.append(
+                        f'{line.isin} : devise du cours inconnue, valorisation '
+                        'non calculee.')
+                    continue
+                devise = devise.upper()
+                taux = _fx_rate_for(conn, devise)
+                if not taux or taux <= 0:
+                    result.warnings.append(
+                        f'{line.isin} : cours en {devise} et taux de change '
+                        'inconnu, valorisation non calculee.')
+                    continue
+                prix_eur = price / taux
+                if devise != 'EUR':
+                    result.warnings.append(
+                        f'{line.isin} : cours de {price:.2f} {devise} converti '
+                        f'au taux EUR{devise} {taux:.4f}.')
+                line.unit_price = round(prix_eur, 4)
+                line.market_value = round(line.quantity * prix_eur, 2)
+                line.confidence = min(line.confidence + 0.1, 1.0)
+                enriched += 1
+            except Exception as e:
+                logger.debug('Price lookup failed for %s: %s', line.isin, e)
 
     result.total_market_value = sum(l.market_value or 0 for l in result.lines)
     if enriched:
@@ -164,7 +191,7 @@ def _preview(position_id):
     })
 
 
-from services.holdings_split import infer_category, find_or_create_position
+from services.holdings_split import split_holdings_by_category
 
 
 def _commit(position_id):
@@ -226,52 +253,12 @@ def _commit(position_id):
                 data_source='pdf-import',
             )
 
-        # Lire la position de base
-        base_pos = conn.execute(
-            'SELECT * FROM positions WHERE id=?', (position_id,)
-        ).fetchone()
-        base_pos = dict(base_pos)
-
-        # Grouper les holdings par categorie inferee
-        by_category = {}
-        for item in validated:
-            cat = infer_category(item['name'],
-                                 asset_class=item.get('asset_class'),
-                                 isin=item['isin'])
-            by_category.setdefault(cat, []).append(item)
-
-        categories = list(by_category.keys())
-        touched_positions = []
-
-        if len(categories) == 1:
-            # Pas de split — import simple dans la position d'origine
-            conn.execute('DELETE FROM holdings WHERE position_id=?', (position_id,))
-            for item in validated:
-                conn.execute(
-                    '''INSERT INTO holdings
-                       (position_id, isin, quantity, cost_basis, market_value, as_of_date)
-                       VALUES (?,?,?,?,?,?)''',
-                    (position_id, item['isin'], item['quantity'],
-                     item['cost_basis'], item['market_value'], item['as_of_date'])
-                )
-            touched_positions.append(position_id)
-        else:
-            # Auto-split : repartir dans des positions par categorie
-            for cat, cat_items in by_category.items():
-                if cat == base_pos['category']:
-                    pid = position_id
-                else:
-                    pid = find_or_create_position(conn, base_pos, cat)
-                conn.execute('DELETE FROM holdings WHERE position_id=?', (pid,))
-                for item in cat_items:
-                    conn.execute(
-                        '''INSERT INTO holdings
-                           (position_id, isin, quantity, cost_basis, market_value, as_of_date)
-                           VALUES (?,?,?,?,?,?)''',
-                        (pid, item['isin'], item['quantity'],
-                         item['cost_basis'], item['market_value'], item['as_of_date'])
-                    )
-                touched_positions.append(pid)
+        # Meme repartition que PUT /holdings : un prix de revient deja connu
+        # survit a un re-import qui n'en porte pas. La copie locale de cette
+        # logique l'effacait a chaque attestation.
+        touched_positions, split_cats = split_holdings_by_category(
+            conn, position_id, validated)
+        categories = split_cats or []
 
         for pid in touched_positions:
             sync_position_value(conn, pid)
