@@ -24,7 +24,10 @@ export async function loadComptes() {
   const owner = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : '';
   let d;
   try {
-    d = await api('GET', `/api/performance${owner ? `?owner=${encodeURIComponent(owner)}` : ''}`,
+    const q = new URLSearchParams();
+    if (owner) q.set('owner', owner);
+    if (S.syntheseDate) q.set('fin', S.syntheseDate);   // la carte suit l'arrete affiche
+    d = await api('GET', `/api/performance?${q}`,
                   null, { silent: true });
   } catch { carte.style.display = 'none'; return; }
 

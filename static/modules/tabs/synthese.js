@@ -358,13 +358,15 @@ function evalUserAlerts() {
   const net   = isFamily ? (family.net   || 0) : (byOwner[owner]?.net   || 0);
   const gross = isFamily ? (family.gross || 0) : (byOwner[owner]?.gross || 0);
 
+  // Le montant d'une categorie suit le titulaire, comme le net qui le divise :
+  // sous un filtre, le pourcentage melangeait la famille et la personne.
+  const netCat = cat => isFamily ? (byCat[cat]?.net || 0) : (byCat[cat]?.by_owner?.[owner] || 0);
   return alerts.map(a => {
     let actual = null;
     if (a.metric === 'cat_pct' && a.category) {
-      const catNet = byCat[a.category]?.net || 0;
-      actual = net > 0 ? (catNet / net) * 100 : 0;
+      actual = net > 0 ? (netCat(a.category) / net) * 100 : 0;
     } else if (a.metric === 'cat_abs' && a.category) {
-      actual = byCat[a.category]?.net || 0;
+      actual = netCat(a.category);
     } else if (a.metric === 'net')   actual = net;
     else if (a.metric === 'gross')   actual = gross;
 

@@ -116,12 +116,89 @@ def save_referential():
     if not data['owners']:
         return jsonify({'error': 'La liste des propriétaires ne peut pas être vide'}), 400
     data.pop('liquidity_order', None)
+    renommages = data.pop('renommages', None) or []
+    err = _valider_renommages(renommages, data)
+    if err:
+        return jsonify({'error': err}), 400
+    if renommages:
+        # Un renommage reecrit des positions et des flux : copie datee d'abord.
+        from models import DB_PATH
+        from services.backups import create_db_backup
+        create_db_backup(DB_PATH)
     with get_db() as conn:
+        conn.execute('BEGIN IMMEDIATE')
+        propages = _appliquer_renommages(conn, renommages)
         conn.execute(
             "INSERT OR REPLACE INTO config (key, value) VALUES ('referential', ?)",
             (json.dumps(data),)
         )
-    return jsonify({'ok': True})
+    return jsonify({'ok': True, 'renommages': propages})
+
+
+# Renommer une categorie ou une enveloppe changeait la seule cle du
+# referentiel : positions et flux gardaient l'ancien nom. Sur la base de prod,
+# renommer « Actions » faisait disparaitre 110 000 € de la repartition et
+# retomber leur taux de mobilisation au defaut. Le renommage se propage
+# desormais, dans la meme transaction que le referentiel.
+_CHAMPS = {'category': ('categories', 'la catégorie'), 'envelope': ('envelope_meta', "l'enveloppe")}
+
+
+def _valider_renommages(renommages, ref):
+    if not isinstance(renommages, list):
+        return 'renommages : liste attendue'
+    for r in renommages:
+        if not isinstance(r, dict) or r.get('champ') not in _CHAMPS:
+            return 'Renommage invalide'
+        a, n = (r.get('ancien') or '').strip(), (r.get('nouveau') or '').strip()
+        if not a or not n or len(n) > 80:
+            return 'Renommage invalide : nom vide ou trop long'
+        liste = ref.get(_CHAMPS[r['champ']][0]) or []
+        if list(liste).count(n) > 1:
+            return (f'« {n} » existe deja dans le referentiel : renommer {_CHAMPS[r["champ"]][1]} '
+                    f'« {a} » en « {n} » fusionnerait les deux sans le dire')
+    return None
+
+
+def _appliquer_renommages(conn, renommages):
+    out = []
+    for r in renommages:
+        champ, a, n = r['champ'], r['ancien'].strip(), r['nouveau'].strip()
+        if a == n:
+            continue
+        nb_pos = conn.execute(f'UPDATE positions SET {champ}=? WHERE {champ}=?', (n, a)).rowcount
+        nb_flux = conn.execute(f'UPDATE flux SET {champ}=? WHERE {champ}=?', (n, a)).rowcount
+        if champ == 'category':
+            conn.execute("UPDATE allocation_targets SET bucket_name=? WHERE bucket_type='category' AND bucket_name=?", (n, a))
+            for cle in ('allocation_targets', 'user_alerts'):
+                row = conn.execute('SELECT value FROM config WHERE key=?', (cle,)).fetchone()
+                if not row:
+                    continue
+                try:
+                    v = json.loads(row['value'])
+                except Exception:
+                    continue
+                if isinstance(v, dict) and a in v:
+                    v[n] = v.pop(a)
+                elif isinstance(v, list):
+                    for x in v:
+                        if isinstance(x, dict) and x.get('category') == a:
+                            x['category'] = n
+                conn.execute('UPDATE config SET value=? WHERE key=?', (json.dumps(v), cle))
+        out.append({'champ': champ, 'ancien': a, 'nouveau': n, 'positions': nb_pos, 'flux': nb_flux})
+    return out
+
+
+@referential_bp.route('/api/referential/usage', methods=['GET'])
+@login_required
+def referential_usage():
+    """Nombre de positions et de flux, toutes dates, qui portent une valeur."""
+    champ, valeur = request.args.get('champ'), request.args.get('valeur')
+    if champ not in ('owner', 'category', 'envelope') or not valeur:
+        return jsonify({'error': 'champ (owner|category|envelope) et valeur requis'}), 400
+    with get_db() as conn:
+        n_pos = conn.execute(f'SELECT COUNT(*) FROM positions WHERE {champ}=?', (valeur,)).fetchone()[0]
+        n_flux = conn.execute(f'SELECT COUNT(*) FROM flux WHERE {champ}=?', (valeur,)).fetchone()[0]
+    return jsonify({'positions': n_pos, 'flux': n_flux})
 
 
 @referential_bp.route('/api/referential/orphans', methods=['GET'])

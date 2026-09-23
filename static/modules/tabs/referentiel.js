@@ -1,7 +1,9 @@
 import { S } from '../state.js';
 import { esc, parseLocaleNumber } from '../utils.js';
 import { api, buildSelects, refreshEntitySelect } from '../api.js';
-import { confirmDialog } from '../dialogs.js';
+import { confirmDialog, toast } from '../dialogs.js';
+import { reloadAll } from '../main.js';
+import { isMasked } from '../mask.js';
 import { loadUserAlerts, saveUserAlerts } from '../alerts.js';
 import { fmt } from '../utils.js';
 
@@ -36,8 +38,7 @@ function renderRefOwners() {
   el.querySelectorAll('.chip-del[data-section="owners"]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const owner = S.referential.owners[parseInt(btn.dataset.index)];
-      const posCount = S.positions.filter(p => p.owner === owner).length;
-      const fluxCount = S.flux.filter(f => f.owner === owner).length;
+      const { positions: posCount, flux: fluxCount } = await _usage('owner', owner);
       if (posCount || fluxCount) {
         const lines = [];
         if (posCount)  lines.push(`${posCount} position(s)`);
@@ -91,14 +92,20 @@ function renderRefCategories() {
   el.querySelectorAll('.ref-cat-name').forEach(inp => {
     inp.addEventListener('change', () => {
       const i = parseInt(inp.dataset.index);
-      const oldCat = cats[i];
+      const oldCat = S.referential.categories[i];
       const newCat = inp.value.trim();
-      if (!newCat) return;
-      S.referential.categories[i] = newCat;
-      if (oldCat !== newCat) {
-        S.referential.category_mobilizable[newCat] = S.referential.category_mobilizable[oldCat] ?? 0.8;
-        delete S.referential.category_mobilizable[oldCat];
+      if (!newCat || oldCat === newCat) return;
+      if (S.referential.categories.includes(newCat)) {
+        toast(`« ${newCat} » existe déjà : deux catégories ne fusionnent pas par renommage`, 'error');
+        inp.value = oldCat;
+        return;
       }
+      S.referential.categories[i] = newCat;
+      S.referential.category_mobilizable[newCat] = S.referential.category_mobilizable[oldCat] ?? 0.8;
+      delete S.referential.category_mobilizable[oldCat];
+      _noterRenommage('category', oldCat, newCat);
+      // Le champ % suit le nouveau nom : il gardait l'ancien et recreait la cle.
+      inp.closest('tr')?.querySelectorAll('[data-cat]').forEach(x => { x.dataset.cat = newCat; });
     });
   });
   el.querySelectorAll('.ref-cat-mob').forEach(inp => {
@@ -110,8 +117,7 @@ function renderRefCategories() {
     btn.addEventListener('click', async () => {
       const i = parseInt(btn.dataset.index);
       const cat = S.referential.categories[i];
-      const posCount = S.positions.filter(p => p.category === cat).length;
-      const fluxCount = S.flux.filter(f => f.category === cat).length;
+      const { positions: posCount, flux: fluxCount } = await _usage('category', cat);
       if (posCount || fluxCount) {
         const lines = [];
         if (posCount)  lines.push(`${posCount} position(s)`);
@@ -175,6 +181,12 @@ function renderRefEnvelopes() {
       const orig   = inp.dataset.orig;
       const newName = inp.value.trim();
       if (!newName || newName === orig) return;
+      if (S.referential.envelope_meta[newName]) {
+        toast(`« ${newName} » existe déjà : deux enveloppes ne fusionnent pas par renommage`, 'error');
+        inp.value = orig;
+        return;
+      }
+      _noterRenommage('envelope', orig, newName);
       const existing = meta[orig];
       delete S.referential.envelope_meta[orig];
       S.referential.envelope_meta[newName] = existing;
@@ -197,8 +209,7 @@ function renderRefEnvelopes() {
   el.querySelectorAll('.btn-icon.del[data-section="envelopes"]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const env = btn.dataset.env;
-      const posCount = S.positions.filter(p => p.envelope === env).length;
-      const fluxCount = S.flux.filter(f => f.envelope === env).length;
+      const { positions: posCount, flux: fluxCount } = await _usage('envelope', env);
       if (posCount || fluxCount) {
         const lines = [];
         if (posCount)  lines.push(`${posCount} position(s)`);
@@ -286,7 +297,8 @@ function renderRefAlerts() {
           <option value="<" ${a.op === '<' ? 'selected' : ''}>&lt;</option>
           <option value=">" ${a.op === '>' ? 'selected' : ''}>&gt;</option>
         </select>
-        <input class="ref-input alert-threshold" data-i="${i}" type="text" inputmode="decimal" value="${a.threshold || 0}" style="width:80px">
+        <input class="ref-input alert-threshold" data-i="${i}" type="text" inputmode="decimal"
+          ${isMasked() && a.metric !== 'cat_pct' ? `value="" placeholder="masqué"` : `value="${a.threshold || 0}"`} style="width:80px">
         <button class="btn-icon del alert-del" data-i="${i}">Supprimer</button>
       </div>`;
     }).join('');
@@ -299,7 +311,10 @@ function renderRefAlerts() {
       if (inp.classList.contains('alert-metric'))    { alerts[i].metric  = inp.value; renderRefAlerts(); return; }
       if (inp.classList.contains('alert-cat'))       alerts[i].category  = inp.value;
       if (inp.classList.contains('alert-op'))        alerts[i].op        = inp.value;
-      if (inp.classList.contains('alert-threshold')) alerts[i].threshold = parseLocaleNumber(inp.value, 0);
+      if (inp.classList.contains('alert-threshold')) {
+        if (!inp.value.trim()) return;       // champ masque laisse vide : seuil inchange
+        alerts[i].threshold = parseLocaleNumber(inp.value, 0);
+      }
       saveUserAlerts(alerts);
     });
   });
@@ -321,11 +336,39 @@ function renderRefAlerts() {
   }
 }
 
+/** Positions et flux qui portent cette valeur, TOUTES dates confondues. Le
+ *  decompte local ne voyait que l'arrete charge — ou rien si l'onglet
+ *  Positions n'avait pas ete ouvert : on supprimait une categorie utilisee
+ *  sans avertissement. */
+async function _usage(champ, valeur) {
+  try {
+    return await api('GET', `/api/referential/usage?champ=${champ}&valeur=${encodeURIComponent(valeur)}`, null, { silent: true });
+  } catch { return { positions: 0, flux: 0 }; }
+}
+
+// Renommages en attente : envoyes avec le referentiel, que le serveur
+// propage aux positions et aux flux dans la meme transaction.
+let _renommages = [];
+function _noterRenommage(champ, ancien, nouveau) {
+  // a → b puis b → c : un seul renommage a → c.
+  const deja = _renommages.find(r => r.champ === champ && r.nouveau === ancien);
+  if (deja) deja.nouveau = nouveau;
+  else _renommages.push({ champ, ancien, nouveau });
+  _renommages = _renommages.filter(r => r.ancien !== r.nouveau);
+}
+
 export async function saveReferential() {
   const btn = document.getElementById('btn-save-referential');
   if (btn) { btn.disabled = true; btn.textContent = 'Enregistrement…'; }
   try {
-    await api('PUT', '/api/referential', S.referential);
+    const res = await api('PUT', '/api/referential', { ...S.referential, renommages: _renommages });
+    const faits = (res?.renommages || []).filter(r => r.positions || r.flux);
+    if (faits.length) {
+      toast(faits.map(r => `« ${r.ancien} » → « ${r.nouveau} » : ${r.positions} position${r.positions > 1 ? 's' : ''}, ${r.flux} flux`).join(' · '), 'success');
+    }
+    _renommages = [];
+    // Positions et flux charges portent l'ancien nom : on relit tout.
+    if (faits.length) reloadAll();
     S.config = await api('GET', '/api/config');
     buildSelects();
     refreshEntitySelect();

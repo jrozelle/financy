@@ -80,7 +80,12 @@ def get_synthese():
         }
 
     totals_by_category = {}
-    for cat in ref['categories']:
+    # Les categories du referentiel dans son ordre, puis celles que portent
+    # des positions sans y figurer : une position « Parts » de 150 000 €,
+    # categorie retiree du referentiel, disparaissait de la repartition.
+    cats = list(ref['categories']) + sorted({p['category'] for p in positions
+                                              if p['category'] and p['category'] not in ref['categories']})
+    for cat in cats:
         ops = [p for p in positions if p['category'] == cat]
         if ops:
             totals_by_category[cat] = {

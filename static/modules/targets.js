@@ -84,14 +84,18 @@ export async function renderAllocationTargets() {
     ? (isFamily ? (cd.gross || 0) : (cd.by_owner_gross?.[owner] || 0))
     : (isFamily ? (cd.net   || 0) : (cd.by_owner?.[owner]       || 0));
 
-  const rows = S.config.categories
+  // Toutes les categories presentes, referentiel ou non ; une categorie a net
+  // negatif (SCI endettee) reste listee : filtree, elle laissait les autres
+  // totaliser plus de 100 % sans explication.
+  const toutes = [...new Set([...S.config.categories, ...Object.keys(syn.totals_by_category || {})])];
+  const rows = toutes
     .map(cat => {
       const val = valOf(syn.totals_by_category[cat] || {});
       const actual = totalBase > 0 ? (val / totalBase) * 100 : 0;
       const target = targets[cat] || 0;
       return { cat, val, actual, target, delta: actual - target };
     })
-    .filter(r => r.val > 0 || r.target > 0)
+    .filter(r => Math.abs(r.val) >= 1 || r.target > 0)
     .sort((a, b) => b.val - a.val);
 
   // Switch Net/Brut dans l'en-tete de la carte (a cote de "Modifier cibles")
@@ -116,7 +120,7 @@ export async function renderAllocationTargets() {
   host.innerHTML = `
     <div class="cible-liste">
       ${rows.map(r => {
-        const reel = Math.min(100, r.actual);
+        const reel = Math.max(0, Math.min(100, r.actual));   // un net negatif : barre vide, pourcentage signe
         const cible = r.target ? Math.min(100, r.target) : null;
         const ecart = r.target === 0 ? null : r.delta;
         const classe = ecart === null ? '' : ecart > 2 ? 'trop' : ecart < -2 ? 'pas-assez' : 'ok';

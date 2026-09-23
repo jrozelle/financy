@@ -28,7 +28,8 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 
 from models import (get_db, load_referential, compute_position, get_entity_map,
-                    get_holdings_map, freeze_holdings_prices, holding_price_warning)
+                    get_holdings_map, freeze_holdings_prices, holding_price_warning,
+                    holdings_a_date)
 from models import validate_date
 from auth import login_required
 
@@ -157,11 +158,10 @@ def _values_by_group(conn, dates, grouping, owner=None):
     for d in dates:
         rows = conn.execute('SELECT * FROM positions WHERE date=?', (d,)).fetchall()
         emap = get_entity_map(conn, d)
-        hmap = get_holdings_map(conn, [r['id'] for r in rows])
         # Arrete historique : market_value enregistree, pas le cours du jour.
-        # Le dernier arrete garde le cours du jour, comme la synthese.
-        if d != dates[-1]:
-            freeze_holdings_prices(hmap)
+        # Le dernier arrete REEL garde le cours du jour, comme la synthese —
+        # pas le dernier de la liste, qu'une borne `fin` peut raccourcir.
+        hmap = holdings_a_date(conn, [r['id'] for r in rows], d)
         positions = [compute_position(dict(r), emap, ref, hmap) for r in rows]
         if owner:
             positions = [p for p in positions if p['owner'] == owner]
@@ -370,9 +370,16 @@ def get_performance():
     if grouping not in GROUPINGS:
         return jsonify({'error': f'Maille inconnue (attendu : {", ".join(GROUPINGS)})'}), 400
 
+    # `fin` : dernier arrete pris en compte. Sans lui, une page datee d'un
+    # arrete passe montrait les comptes du dernier.
+    fin = request.args.get('fin')
+    if fin and not validate_date(fin):
+        return jsonify({'error': 'Date de fin invalide (AAAA-MM-JJ)'}), 400
     with get_db() as conn:
         dates = [r['date'] for r in conn.execute(
             'SELECT DISTINCT date FROM positions ORDER BY date').fetchall()]
+        if fin:
+            dates = [d for d in dates if d <= fin]
         if len(dates) < 2:
             return jsonify({'dates': dates, 'groups': [], 'global': None,
                             'grouping': grouping, 'insufficient': True})
