@@ -710,6 +710,29 @@ def _migration_014(conn):
         pass            # colonne deja presente
 
 
+
+def _migration_015(conn):
+    """Operations bancaires d'une entite (SCI, holding), lues sur ses releves.
+    Elles mesurent ce que l'entite recoit, rembourse et coute — et ce que
+    ses associes y remettent. Unicite sur l'operation elle-meme : reimporter
+    un releve n'ajoute rien."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS entite_operations (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            entity    TEXT NOT NULL,
+            date      TEXT NOT NULL,
+            libelle   TEXT NOT NULL,
+            montant   REAL NOT NULL,          -- signe : + entree, - sortie
+            nature    TEXT NOT NULL,          -- revenu, revenu_exceptionnel, echeance, apport, frais, interne, autre
+            banque    TEXT,
+            compte    TEXT,
+            source    TEXT,                   -- nom du releve importe
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(entity, banque, compte, date, montant, libelle)
+        )""")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_entite_op ON entite_operations(entity, date)")
+
+
 MIGRATIONS = [
     (1, _migration_001),
     (2, _migration_002),
@@ -725,6 +748,7 @@ MIGRATIONS = [
     (12, _migration_012),
     (13, _migration_013),
     (14, _migration_014),
+    (15, _migration_015),
 ]
 
 

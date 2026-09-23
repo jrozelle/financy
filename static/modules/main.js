@@ -17,6 +17,7 @@ import { loadPositions, renderPositions, clearFilters, openPosModal, duplicateSn
          persistPositionFilters, ensurePositionsTableScaffold } from './tabs/positions.js';
 import { openHoldingsModal, wireHoldingsEvents, confirmCloseHoldings } from './tabs/holdings.js';
 import { loadPrets, ouvrirFormulaireCredit } from './tabs/prets.js';
+import { loadTresorerie, initTresorerie } from './tabs/tresorerie.js';
 import { wireIsinPopoverEvents } from './isin-popover.js';
 import { loadAdvisor, wireAdvisorEvents } from './tabs/advisor.js';
 import { loadActifs, wireActifsEvents } from './tabs/actifs.js';
@@ -357,7 +358,7 @@ export async function switchTab(tab, { pushHistory = true } = {}) {
     if (tab === 'synthese')    await loadSynthese();
     if (tab === 'positions')   await loadPositions();
     if (tab === 'flux')        await loadFlux();
-    if (tab === 'entites')     await loadEntities();
+    if (tab === 'entites')     { await loadEntities(); initTresorerie(); loadTresorerie(); }
     if (tab === 'credits')     { if (!S.entities?.length) await loadEntities(); await loadPrets(); }
     if (tab === 'referentiel') await loadReferential();
     if (tab === 'actifs')      await loadActifs();

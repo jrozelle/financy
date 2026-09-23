@@ -3883,3 +3883,32 @@ td.arbo-part > * { vertical-align: middle; }
 .pret-solder span { flex: 1 1 28rem; }
 @media (max-width: 1100px) { .credits-kpi .credits-grille { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 780px) { .credits-bas { grid-template-columns: 1fr; } }
+
+/* ── Tresorerie des entites (modules/tabs/tresorerie.js) ──────────────── */
+.treso { display: grid; gap: .9rem; padding-top: .4rem; }
+.treso + .treso { border-top: 1px solid var(--border); padding-top: 1.2rem; margin-top: .6rem; }
+.treso-tete { display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem .8rem; }
+.treso-tete h3 { margin: 0; font-size: 1rem; }
+.treso-tete .text-muted { font-size: .8rem; }
+.treso-verdict { margin: 0; max-width: 78ch; font-size: .9rem; line-height: 1.55; }
+.treso-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .6rem; }
+.treso-kpi { display: grid; gap: .1rem; padding: .6rem .75rem; border: 1px solid var(--border);
+  border-radius: 8px; background: var(--bg); }
+.treso-kpi-l { font-size: .72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+.treso-kpi-v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 1.05rem; }
+.treso-kpi-s { font-size: .74rem; color: var(--text-muted); }
+.treso-zone { fill: transparent; }
+.treso-col { cursor: default; outline: none; }
+.treso-col.is-actif .treso-zone, .treso-col:focus-visible .treso-zone { fill: var(--border); fill-opacity: .45; }
+.treso-apport { stroke: var(--text); stroke-width: 2.5; stroke-linecap: round; }
+.treso-svg { width: 100%; height: 170px; }
+.treso-mois { display: grid; margin-top: .3rem; font: .68rem var(--mono); color: var(--text-muted); text-align: center; }
+.treso-pastille { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: .35rem; }
+.treso-pastille--apport { height: 3px; background: var(--text); vertical-align: middle; }
+.treso-note { margin: 0; font-size: .8rem; color: var(--text-muted); }
+.treso-ops summary { cursor: pointer; font-size: .85rem; color: var(--primary); }
+.treso-ops .table-scroll { margin-top: .6rem; max-height: 420px; overflow: auto; }
+.treso-lib { max-width: 46ch; font-size: .8rem; }
+.treso-vide { font-size: .85rem; margin: .5rem 0; }
+.treso-apercu-liste { margin: .3rem 0 .6rem; padding-left: 1.1rem; font-size: .8rem; color: var(--text-muted);
+  max-height: 180px; overflow: auto; }
