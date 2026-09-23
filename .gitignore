@@ -42,3 +42,6 @@ backups/
 
 # Consignes privees de Claude Code (le depot est public)
 CLAUDE.local.md
+
+# Secrets (cle d API) : a cote de la base, jamais versionnes
+secrets.json

@@ -1,7 +1,7 @@
 import json
 import os
 from flask import Blueprint, jsonify, request
-from models import get_db, load_referential, REFERENTIAL_TEMPLATES, parse_number, get_db_path
+from models import get_db, load_referential, REFERENTIAL_TEMPLATES, parse_number, get_db_path, validate_string
 from auth import login_required, csrf_protect
 
 referential_bp = Blueprint('referential', __name__)
@@ -298,16 +298,18 @@ from services.settings import load_settings as _load_settings, save_settings as 
 @referential_bp.route('/api/settings', methods=['GET'])
 @login_required
 def get_settings():
-    s = _load_settings()
-    api_key = s.get('anthropic_api_key', '')
+    from services.settings import lire_secrets, migrer_cle_depuis_la_base
+    with get_db() as conn:
+        migrer_cle_depuis_la_base(conn)
+    api_key = lire_secrets().get('anthropic_api_key', '')
     env_key = os.environ.get('ANTHROPIC_API_KEY', '')
-    effective = api_key or env_key
     result = {
         'anthropic_api_key_set': bool(api_key),
         'anthropic_api_key_masked': (api_key[:10] + '...' + api_key[-4:]) if len(api_key) > 14 else '',
         'anthropic_api_key_env': bool(env_key),
-        'effective_source': 'db' if api_key else ('env' if env_key else 'none'),
-        'llm_available': bool(effective),
+        # L'environnement l'emporte toujours sur le fichier de secrets.
+        'effective_source': 'env' if env_key else ('fichier' if api_key else 'none'),
+        'llm_available': bool(env_key or api_key),
     }
     return jsonify(result)
 
@@ -316,18 +318,18 @@ def get_settings():
 @login_required
 @csrf_protect
 def update_settings():
-    d = request.json
-    if not d:
+    from services.settings import ecrire_secret, migrer_cle_depuis_la_base
+    d = request.get_json(silent=True)
+    if not isinstance(d, dict) or not d:
         return jsonify({'error': 'Corps requis'}), 400
     with get_db() as conn:
-        s = _load_settings()
+        migrer_cle_depuis_la_base(conn)
         if 'anthropic_api_key' in d:
             key = (d['anthropic_api_key'] or '').strip()
-            if key:
-                if not key.startswith('sk-ant-'):
-                    return jsonify({'error': 'Format de cle invalide (attendu : sk-ant-...)'}), 400
-                s['anthropic_api_key'] = key
-            else:
-                s.pop('anthropic_api_key', None)
-        _save_settings(conn, s)
+            if key and not key.startswith('sk-ant-'):
+                return jsonify({'error': 'Format de cle invalide (attendu : sk-ant-...)'}), 400
+            if not validate_string(key, 300):
+                return jsonify({'error': 'Cle trop longue'}), 400
+            # Hors de la base : ni sauvegarde ni export ne l'emportent.
+            ecrire_secret('anthropic_api_key', key or None)
     return jsonify({'ok': True})

@@ -13,8 +13,8 @@ async function _load() {
 function _renderStatus() {
   const el = document.getElementById('settings-api-status');
   if (!el || !_current) return;
-  if (_current.effective_source === 'db') {
-    el.innerHTML = `<span style="color:var(--success)">Active</span> (configurée ici) &mdash; ${esc(_current.anthropic_api_key_masked)}`;
+  if (_current.effective_source === 'fichier') {
+    el.innerHTML = `<span style="color:var(--success)">Active</span> (configurée ici, hors de la base et des sauvegardes) &mdash; ${esc(_current.anthropic_api_key_masked)}`;
   } else if (_current.effective_source === 'env') {
     el.innerHTML = `<span style="color:var(--success)">Active</span> (variable d'environnement)`;
   } else {
@@ -22,7 +22,7 @@ function _renderStatus() {
   }
   // Seule une cle enregistree ici se supprime ici ; celle de l'environnement,
   // non.
-  document.getElementById('btn-delete-api-key')?.classList.toggle('hidden', _current.effective_source !== 'db');
+  document.getElementById('btn-delete-api-key')?.classList.toggle('hidden', !_current.anthropic_api_key_set);
 }
 
 export async function openSettingsModal() {

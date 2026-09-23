@@ -215,7 +215,7 @@ class TestSettingsAPI:
         r = client.get('/api/settings')
         data = r.get_json()
         assert data['anthropic_api_key_set'] is True
-        assert data['effective_source'] == 'db'
+        assert data['effective_source'] == 'fichier'
         # Key should be masked — starts with first chars, ends with ...
         masked = data['anthropic_api_key_masked']
         assert masked.startswith('sk-ant-tes')

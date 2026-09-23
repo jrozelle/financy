@@ -131,7 +131,9 @@
 - Inputs validés côté serveur (validate_date, validate_number, validate_pct, validate_string)
 
 ## Sécurité
-- Pas de clé API en dur : variables d'environnement uniquement
+- Pas de clé API en dur ni en base : variable d'environnement, sinon fichier
+  `secrets.json` à côté de la base (hors git, hors sauvegardes et exports, droits
+  600), via `services/settings.py`
 - Mode démo (`is_demo_mode()`) : aucun appel réseau (providers et LLM mockés)
 - Uploads : limite de taille, vérif MIME, stockage temporaire purgé
 
