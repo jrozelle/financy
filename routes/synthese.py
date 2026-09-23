@@ -675,6 +675,14 @@ def projection_epargne():
     })
 
 
+def _est_liquidite(p):
+    """Un compte de liquidites personnelles : ses mouvements, hors versements
+    vers les placements, sont l'epargne qui entre (le salaire n'a pas de flux)."""
+    from services.contribution import PLACEMENT
+    return (p.get('category') == 'Cash & dépôts' and (p.get('envelope') or '') not in PLACEMENT
+            and not p.get('entity'))
+
+
 @synthese_bp.route('/api/contribution')
 @login_required
 def contribution():
@@ -713,8 +721,9 @@ def contribution():
             for p in positions:
                 cle = (p['owner'], p.get('envelope') or '', p.get('establishment') or '',
                        p.get('entity') or '', p.get('label') or '')
-                c = comptes.setdefault(cle, {'net': 0.0})
+                c = comptes.setdefault(cle, {'net': 0.0, 'dette': 0.0, 'liq': _est_liquidite(p)})
                 c['net'] += p['net_attributed'] or 0
+                c['dette'] += p.get('debt_attributed') or 0
             arretes.append({
                 'date': date,
                 'family_net': sum(p['net_attributed'] for p in positions),

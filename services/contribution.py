@@ -24,6 +24,10 @@ import logging
 
 logger = logging.getLogger('financy.contribution')
 
+# Enveloppes dont un compte « Cash & dépôts » reste du financier (les especes
+# d'un PEA) : meme jeu que `ENVELOPPES_DE_PLACEMENT` cote navigateur.
+PLACEMENT = {'PEA', 'PEA-PME', 'Assurance-vie', 'PER', 'CTO', 'Crypto'}
+
 
 def _apports(conn, debut, fin, owner=None):
     """Apports externes nets sur ]debut, fin]. La borne basse est exclue :
@@ -102,6 +106,38 @@ def _hors_suivi(conn, precedent, courant, owner=None):
     return round(total, 2), details
 
 
+CHAMPS = ('variation', 'epargne', 'versements', 'capital', 'performance', 'hors_suivi')
+
+
+def _versements_placements(conn, debut, fin, owner=None):
+    """Versements nets vers les placements sur ]debut, fin] : l'argent qui a
+    quitte les liquidites (ou qui arrive d'ailleurs) pour etre investi."""
+    from routes.performance import _flux_signed
+    q = ('SELECT type, amount FROM flux WHERE date > ? AND date <= ? AND envelope IN (%s)'
+         % ','.join('?' * len(PLACEMENT)))
+    p = [debut, fin, *PLACEMENT]
+    if owner:
+        q += ' AND owner = ?'
+        p.append(owner)
+    return round(sum(_flux_signed(dict(r)) for r in conn.execute(q, p)), 2)
+
+
+def _epargne_et_capital(precedent, courant, owner=None):
+    """Sur les comptes presents aux deux arretes : la variation des liquidites
+    (le salaire epargne, moins ce qui en est parti) et la baisse des dettes (le
+    capital rembourse, qui est de l'epargne aussi). Un compte qui entre ou sort
+    du suivi releve de `_hors_suivi`."""
+    a, b = precedent.get('comptes') or {}, courant.get('comptes') or {}
+    liq = capital = 0.0
+    for cle in set(a) & set(b):
+        if owner and cle[0] != owner:
+            continue
+        if a[cle].get('liq') and b[cle].get('liq'):
+            liq += b[cle]['net'] - a[cle]['net']
+        capital += a[cle].get('dette', 0.0) - b[cle].get('dette', 0.0)
+    return round(liq, 2), round(capital, 2)
+
+
 def _trimestre(date):
     """'2026-08-31' -> ('2026-T3', 'T3 26')"""
     an, mois = int(date[:4]), int(date[5:7])
@@ -123,18 +159,19 @@ def _par_trimestre(periodes):
         cle, libelle = _trimestre(p['fin'])
         g = groupes.setdefault(cle, {
             'cle': cle, 'libelle': libelle, 'debut': p['debut'], 'fin': p['fin'],
-            'variation': 0.0, 'apports': 0.0, 'performance': 0.0, 'hors_suivi': 0.0,
+            'variation': 0.0, 'epargne': 0.0, 'versements': 0.0, 'capital': 0.0,
+            'performance': 0.0, 'hors_suivi': 0.0,
             'comptes_hors_suivi': [],
         })
         # La periode la plus ancienne du trimestre en donne le debut, la plus
         # recente la fin : les bornes doivent couvrir tout ce qu'on additionne.
         g['debut'] = min(g['debut'], p['debut'])
         g['fin'] = max(g['fin'], p['fin'])
-        for champ in ('variation', 'apports', 'performance', 'hors_suivi'):
+        for champ in CHAMPS:
             g[champ] += p.get(champ, 0.0)
         g['comptes_hors_suivi'] += p.get('comptes_hors_suivi', [])
     for g in groupes.values():
-        for champ in ('variation', 'apports', 'performance', 'hors_suivi'):
+        for champ in CHAMPS:
             g[champ] = round(g[champ], 2)
     return [groupes[c] for c in sorted(groupes)]
 
@@ -147,7 +184,13 @@ def decompose(conn, arretes, owner=None, limite=8):
         owner:   titulaire, ou None pour la famille
         limite:  nombre de periodes rendues, les plus recentes
 
-    Returns {'periodes': [...], 'total_apports': x, 'total_performance': y}
+    Quatre parts, dont la somme redonne la variation :
+    - epargne : l'argent qui entre — hausse des liquidites plus versements vers
+      les placements. Un DCA depuis un livret n'y compte pas : il sort du livret
+      et entre au PEA. Le salaire, qui arrive sans flux, y compte ;
+    - capital : la baisse des dettes, du salaire transforme en patrimoine ;
+    - hors_suivi : les comptes qui entrent dans le suivi ou en sortent ;
+    - performance : le reste, rendement des placements et revalorisations.
     """
     net = (lambda h: (h.get('by_owner') or {}).get(owner, 0.0)) if owner \
         else (lambda h: h.get('family_net') or 0.0)
@@ -155,22 +198,27 @@ def decompose(conn, arretes, owner=None, limite=8):
     periodes = []
     for precedent, courant in zip(arretes, arretes[1:]):
         delta = round(net(courant) - net(precedent), 2)
-        apports = _apports(conn, precedent['date'], courant['date'], owner)
+        versements = _versements_placements(conn, precedent['date'], courant['date'], owner)
+        epargne, capital = _epargne_et_capital(precedent, courant, owner)
         hors, comptes = _hors_suivi(conn, precedent, courant, owner)
+        epargne = round(epargne + versements, 2)
         periodes.append({
             'debut':       precedent['date'],
             'fin':         courant['date'],
             'variation':   delta,
-            'apports':     apports,
+            'epargne':     epargne,
+            'versements':  versements,
+            'capital':     capital,
             'hors_suivi':  hors,
             'comptes_hors_suivi': comptes,
-            'performance': round(delta - apports - hors, 2),
+            'performance': round(delta - epargne - capital - hors, 2),
         })
 
     periodes = _par_trimestre(periodes)[-limite:]
     return {
         'periodes':          periodes,
-        'total_apports':     round(sum(p['apports'] for p in periodes), 2),
+        'total_epargne':     round(sum(p['epargne'] for p in periodes), 2),
+        'total_capital':     round(sum(p['capital'] for p in periodes), 2),
         'total_performance': round(sum(p['performance'] for p in periodes), 2),
         'total_hors_suivi':  round(sum(p['hors_suivi'] for p in periodes), 2),
         'total_variation':   round(sum(p['variation'] for p in periodes), 2),
@@ -198,11 +246,6 @@ def epargne_mensuelle(conn, fin, mois=6):
     n = len(v)
     mediane = (v[n // 2] if n % 2 else (v[n // 2 - 1] + v[n // 2]) / 2) if n else 0.0
     return {'mois': parmois, 'mediane': round(mediane, 2)}
-
-
-# Enveloppes dont un compte « Cash & dépôts » reste du financier (les especes
-# d'un PEA) : meme jeu que `ENVELOPPES_DE_PLACEMENT` cote navigateur.
-PLACEMENT = {'PEA', 'PEA-PME', 'Assurance-vie', 'PER', 'CTO', 'Crypto'}
 
 
 def _liquidites_par_compte(conn, date):

@@ -1,4 +1,4 @@
-"""Tests de la décomposition apports / performance."""
+"""Tests de la décomposition : épargne, capital remboursé, comptes hors suivi, performance."""
 import os
 import tempfile
 
@@ -56,9 +56,9 @@ class TestDecomposition:
             r = decompose(conn, _arretes(('2026-01-31', 100000), ('2026-03-31', 105000)))
         p = r['periodes'][0]
         assert p['variation'] == 5000
-        assert p['apports'] == 1000
+        assert p['epargne'] == 1000
         assert p['performance'] == 4000
-        assert p['apports'] + p['performance'] == p['variation']
+        assert p['epargne'] + p['performance'] == p['variation']
 
     def test_hausse_entierement_due_a_l_epargne(self):
         # Le patrimoine monte de 2 000 et 2 000 ont ete verses : le marche n'y
@@ -68,7 +68,7 @@ class TestDecomposition:
             conn.commit()
             r = decompose(conn, _arretes(('2026-01-31', 50000), ('2026-03-31', 52000)))
         assert r['periodes'][0]['performance'] == 0
-        assert r['periodes'][0]['apports'] == 2000
+        assert r['periodes'][0]['epargne'] == 2000
 
     def test_retrait_compte_en_negatif(self):
         with get_db() as conn:
@@ -76,7 +76,7 @@ class TestDecomposition:
             conn.commit()
             r = decompose(conn, _arretes(('2026-01-31', 50000), ('2026-03-31', 48000)))
         p = r['periodes'][0]
-        assert p['apports'] == -3000
+        assert p['epargne'] == -3000
         assert p['performance'] == 1000        # −2 000 de variation, −3 000 sortis
 
     def test_dividendes_et_frais_ne_sont_pas_des_apports(self):
@@ -89,7 +89,7 @@ class TestDecomposition:
             conn.commit()
             r = decompose(conn, _arretes(('2026-01-31', 50000), ('2026-03-31', 50600)))
         p = r['periodes'][0]
-        assert p['apports'] == 0
+        assert p['epargne'] == 0
         assert p['performance'] == 600
 
     def test_borne_basse_exclue(self):
@@ -99,14 +99,14 @@ class TestDecomposition:
             _flux(conn, '2026-01-31', 'Versement', 5000)
             conn.commit()
             r = decompose(conn, _arretes(('2026-01-31', 50000), ('2026-03-31', 51000)))
-        assert r['periodes'][0]['apports'] == 0
+        assert r['periodes'][0]['epargne'] == 0
 
     def test_borne_haute_incluse(self):
         with get_db() as conn:
             _flux(conn, '2026-03-31', 'Versement', 5000)
             conn.commit()
             r = decompose(conn, _arretes(('2026-01-31', 50000), ('2026-03-31', 55000)))
-        assert r['periodes'][0]['apports'] == 5000
+        assert r['periodes'][0]['epargne'] == 5000
 
     def test_filtrage_par_titulaire(self):
         with get_db() as conn:
@@ -122,7 +122,7 @@ class TestDecomposition:
             r = decompose(conn, arretes, owner='Paul')
         p = r['periodes'][0]
         assert p['variation'] == 1500          # la part de Paul seulement
-        assert p['apports'] == 1000            # ses versements seulement
+        assert p['epargne'] == 1000            # ses versements seulement
         assert p['performance'] == 500
 
     def test_limite_garde_les_periodes_recentes(self):
@@ -140,10 +140,10 @@ class TestDecomposition:
             conn.commit()
             r = decompose(conn, _arretes(
                 ('2026-01-31', 100000), ('2026-03-31', 104000), ('2026-05-31', 108000)))
-        assert r['total_apports'] == 3000
+        assert r['total_epargne'] == 3000
         assert r['total_variation'] == 8000
         assert r['total_performance'] == 5000
-        assert r['total_apports'] + r['total_performance'] == r['total_variation']
+        assert r['total_epargne'] + r['total_performance'] == r['total_variation']
 
 
 class TestGroupementTrimestriel:
@@ -160,7 +160,7 @@ class TestGroupementTrimestriel:
         assert len(r['periodes']) == 1               # juillet et aout, un seul T3
         p = r['periodes'][0]
         assert p['libelle'] == 'T3 26'
-        assert p['apports'] == 1500                  # les deux versements
+        assert p['epargne'] == 1500                  # les deux versements
         assert p['variation'] == 3000                # 100 000 -> 103 000
 
     def test_bornes_couvrent_tout_le_trimestre(self):
@@ -211,7 +211,7 @@ class TestEndpoint:
         assert r.status_code == 200
         p = r.json['periodes'][0]
         assert p['variation'] == 3000
-        assert p['apports'] == 1000
+        assert p['epargne'] == 1000
         assert p['performance'] == 2000
 
     def test_limite_bornee(self, client):
@@ -236,7 +236,7 @@ class TestComptesHorsSuivi:
     def _arretes(self, a, b):
         def arr(d, comptes):
             return {'date': d, 'family_net': sum(comptes.values()), 'by_owner': {'Paul': sum(comptes.values())},
-                    'comptes': {k: {'net': v} for k, v in comptes.items()}}
+                    'comptes': {k: {'net': v, 'liq': k[1].startswith('Livret')} for k, v in comptes.items()}}
         return [arr('2026-02-16', a), arr('2026-03-03', b)]
 
     LIVRET = ('Paul', 'Livret', 'Bourso', '', '')
@@ -249,7 +249,7 @@ class TestComptesHorsSuivi:
             conn.commit()
             r = decompose(conn, self._arretes({self.LIVRET: 150000}, {self.LIVRET: 50000, self.AV: 100000}))
         p = r['periodes'][0]
-        assert p['apports'] == -100000
+        assert p['epargne'] == -100000
         assert p['hors_suivi'] == 100000
         assert p['performance'] == 0
         assert p['comptes_hors_suivi'][0]['compte'].startswith('Assurance-vie')
@@ -262,7 +262,7 @@ class TestComptesHorsSuivi:
             conn.commit()
             r = decompose(conn, self._arretes({self.LIVRET: 150000}, {self.LIVRET: 150000, self.AV: 100000}))
         p = r['periodes'][0]
-        assert p['hors_suivi'] == 0 and p['apports'] == 100000 and not p['comptes_hors_suivi']
+        assert p['hors_suivi'] == 0 and p['epargne'] == 100000 and not p['comptes_hors_suivi']
 
     def test_un_changement_d_enveloppe_s_annule(self):
         a = {('Paul', 'Biens', '', '', 'Montres'): 22000}
@@ -271,3 +271,35 @@ class TestComptesHorsSuivi:
             r = decompose(conn, self._arretes(a, b))
         assert r['periodes'][0]['hors_suivi'] == 0
         assert not r['periodes'][0]['comptes_hors_suivi']
+
+
+class TestEpargneEtCapital:
+    """L'argent qui entre, et lui seul : un DCA ne compte pas, le salaire qui
+    arrive sans flux compte, le capital rembourse est de l'epargne."""
+
+    LIVRET = ('Paul', 'Livret A', 'Bourso', '', '')
+    PEA = ('Paul', 'PEA', 'Bourso', '', '')
+    RP = ('Paul', 'Immobilier', '', 'Maison', '')
+
+    def _arretes(self, a, b):
+        def arr(d, comptes):
+            return {'date': d, 'family_net': sum(c['net'] for c in comptes.values()),
+                    'by_owner': {'Paul': sum(c['net'] for c in comptes.values())}, 'comptes': comptes}
+        return [arr('2026-06-30', a), arr('2026-09-30', b)]
+
+    def test_dca_salaire_et_capital(self):
+        with get_db() as conn:
+            _flux(conn, '2026-07-15', 'Versement', 3000)          # DCA du livret vers le PEA
+            conn.commit()
+            avant = {self.LIVRET: {'net': 20000, 'liq': True}, self.PEA: {'net': 10000},
+                     self.RP: {'net': 100000, 'dette': 200000}}
+            # Le livret a perdu 3 000 de DCA mais recu 2 000 de salaire ; le PEA
+            # a gagne 300 ; 1 500 de capital ont ete rembourses.
+            apres = {self.LIVRET: {'net': 19000, 'liq': True}, self.PEA: {'net': 13300},
+                     self.RP: {'net': 101500, 'dette': 198500}}
+            r = decompose(conn, self._arretes(avant, apres))
+        p = r['periodes'][0]
+        assert p['epargne'] == 2000 and p['versements'] == 3000
+        assert p['capital'] == 1500
+        assert p['performance'] == 300
+        assert p['epargne'] + p['capital'] + p['hors_suivi'] + p['performance'] == p['variation']

@@ -1,5 +1,11 @@
 /**
- * « D'où vient la hausse » : épargne versée contre performance des marchés.
+ * « D'où vient la hausse » : l'epargne nouvelle, le capital rembourse, la
+ * performance des marches — et les comptes entres ou sortis du suivi.
+ *
+ * L'epargne n'est pas la somme des versements : un DCA qui vide un livret dans
+ * un PEA est un versement sans etre de l'epargne, et le salaire qui gonfle un
+ * compte courant en est sans aucun flux. Le capital rembourse sur un credit
+ * est de l'epargne aussi ; compte en performance, il flattait les marches.
  *
  * Le chiffre de variation pose une question a laquelle il ne repond pas. Une
  * hausse de 200 000 EUR peut venir de l'epargne — qui se pilote — ou du marche
@@ -28,7 +34,7 @@ export async function loadContribution() {
   // Une periode sans mouvement ni apport n'apporte rien au graphe : elle y
   // occupe une colonne pour n'y montrer qu'un trait a zero.
   const periodes = (d.periodes || [])
-    .filter(p => Math.abs(p.variation) > 100 || Math.abs(p.apports) > 100 || Math.abs(p.hors_suivi || 0) > 100);
+    .filter(p => [p.variation, p.epargne, p.capital, p.hors_suivi].some(v => Math.abs(v || 0) > 100));
   // Moins de deux periodes ne fait pas une comparaison : on n'affiche rien
   // plutot qu'une barre solitaire qui n'apprend rien.
   if (periodes.length < 2) { carte.style.display = 'none'; return; }
@@ -71,7 +77,7 @@ function dessiner(periodes) {
   const L = Math.max(Math.round(hote.clientWidth || 0), 78 * periodes.length + 30);
   const H = 150, BAS = 30, MARGE = 26;
 
-  const parts3 = p => [p.apports, p.performance, p.hors_suivi || 0];
+  const parts3 = p => [p.epargne, p.capital, p.performance, p.hors_suivi || 0];
   const haut = Math.max(...periodes.map(p => parts3(p).reduce((t, v) => t + Math.max(0, v), 0)), 0);
   const bas  = Math.min(...periodes.map(p => parts3(p).reduce((t, v) => t + Math.min(0, v), 0)), 0);
   const etendue = (haut - bas) || 1;
@@ -96,9 +102,9 @@ function dessiner(periodes) {
     // Les segments d'abord : ce sont eux qui font monter `hautCumul`. Lire le
     // sommet avant de les dessiner posait le libelle sur la ligne zero, a
     // l'interieur de la barre.
-    const segments = seg(p.performance, 'var(--chart-1)') + seg(p.apports, 'var(--chart-4)')
-                   + seg(p.hors_suivi || 0, 'var(--text-muted)');
-    const total = p.apports + p.performance + (p.hors_suivi || 0);
+    const segments = seg(p.performance, 'var(--chart-1)') + seg(p.capital, 'var(--chart-2)')
+                   + seg(p.epargne, 'var(--chart-4)') + seg(p.hors_suivi || 0, 'var(--text-muted)');
+    const total = parts3(p).reduce((t, v) => t + v, 0);
     const sommet = Math.min(hautCumul, zero);
     const yVal = sommet - 7;
     // Un libelle par barre, en mois abrege : la date complete se chevauchait
@@ -120,7 +126,7 @@ function dessiner(periodes) {
   hote.innerHTML = `
     <div class="courbe-cadre">
       <svg class="contrib-svg" viewBox="0 0 ${L} ${H + BAS}"
-           role="img" aria-label="Décomposition de la variation par période : apports et performance">
+           role="img" aria-label="Décomposition de la variation par période : épargne, capital remboursé, performance">
         <line x1="10" y1="${zero.toFixed(1)}" x2="${L - 10}" y2="${zero.toFixed(1)}" class="contrib-zero"/>
         ${parts}
       </svg>
@@ -130,7 +136,7 @@ function dessiner(periodes) {
 }
 
 /** Detail d'une periode au survol, au focus clavier ou au toucher : dates,
- *  apports, performance, comptes ajoutes, variation. Une bulle maison — un
+ *  epargne, capital rembourse, performance, comptes ajoutes, variation. Une bulle maison — un
  *  `title` ne s'afficherait ni sur mobile ni de facon fiable. */
 function _cablerBulle(hote, periodes) {
   const bulle = hote.querySelector('.courbe-bulle');
@@ -142,7 +148,9 @@ function _cablerBulle(hote, periodes) {
     if (!p) return;
     const hs = p.hors_suivi || 0;
     bulle.innerHTML = `<span class="courbe-bulle-d">${esc(p.libelle)} · du ${fmtDate(p.debut)} au ${fmtDate(p.fin)}</span>`
-      + ligne('var(--chart-4)', 'Apports', p.apports)
+      + ligne('var(--chart-4)', 'Épargne nouvelle', p.epargne)
+      + (Math.abs(p.versements || 0) >= 1 ? `<span class="courbe-bulle-a">dont ${fmt(p.versements)} versés sur les placements</span>` : '')
+      + (Math.abs(p.capital || 0) >= 1 ? ligne('var(--chart-2)', 'Capital remboursé', p.capital) : '')
       + ligne('var(--chart-1)', 'Performance', p.performance)
       + (Math.abs(hs) >= 1 ? ligne('var(--text-muted)', 'Comptes ajoutés ou retirés', hs) : '')
       + `<span class="courbe-bulle-l contrib-bulle-total">Variation du net<b>${
@@ -185,8 +193,10 @@ function legende(d) {
   const comptes = (d.periodes || []).flatMap(p => p.comptes_hors_suivi || []);
   const hors = d.total_hors_suivi || 0;
   hote.innerHTML = `
-    <span><i style="background:var(--chart-4)"></i>Apports
-      <b class="num">${fmt(d.total_apports)}</b></span>
+    <span><i style="background:var(--chart-4)"></i>Épargne nouvelle
+      <b class="num">${fmt(d.total_epargne)}</b></span>
+    ${Math.abs(d.total_capital || 0) >= 1 ? `<span><i style="background:var(--chart-2)"></i>Capital remboursé
+      <b class="num">${fmt(d.total_capital)}</b></span>` : ''}
     <span><i style="background:var(--chart-1)"></i>Performance
       <b class="num">${fmt(d.total_performance)}</b></span>
     ${Math.abs(hors) >= 1 ? `<button type="button" class="contrib-hors" aria-expanded="false" aria-controls="contrib-hors-liste">
@@ -198,7 +208,7 @@ function legende(d) {
       ${comptes.map(c => `<li><span>${esc(c.compte)}</span><span class="contrib-hors-date">${
         ({ entree: 'apparu', sortie: 'disparu', deplace: 'changé d’enveloppe' })[c.sens] || ''} au ${fmtDate(c.date)}</span><b class="num">${fmt(c.montant)}</b></li>`).join('')}
       <li class="contrib-hors-aide">Aucun versement ni retrait enregistré ne l'explique. Si l'argent venait
-        d'un autre compte suivi, il manque un flux : ajoutez-le dans Flux, la part rejoindra les apports.</li>
+        d'un autre compte suivi, il manque un flux : ajoutez-le dans Flux, la part rejoindra l'épargne.</li>
     </ul>` : ''}`;
   const b = hote.querySelector('.contrib-hors');
   b?.addEventListener('click', () => {
