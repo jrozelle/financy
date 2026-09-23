@@ -115,17 +115,24 @@ export async function importJson() {
     const text = await file.text();
     const data = JSON.parse(text);
 
-    if (data.allocation_targets && typeof data.allocation_targets === 'object') {
+    // Ancien format : les cibles voyageaient a part. Le format 2 les porte dans
+    // `config`, que le serveur n'applique que si elles manquent.
+    if (!data.format && data.allocation_targets && typeof data.allocation_targets === 'object') {
       await saveTargets(data.allocation_targets);
     }
 
     const result = await api('POST', '/api/import-json', data);
-    const parts = [];
-    if (result.positions)        parts.push(`${result.positions} position(s)`);
-    if (result.flux)             parts.push(`${result.flux} flux`);
-    if (result.entities)         parts.push(`${result.entities} entité(s)`);
-    if (result.entity_snapshots) parts.push(`${result.entity_snapshots} snapshot(s) entité`);
-    showJsonImportResult('✓ Importé : ' + (parts.join(', ') || 'rien de nouveau') + '.', true);
+    const n = (v, un, plusieurs) => v ? `${v} ${v > 1 ? plusieurs : un}` : null;
+    const ajoute = [n(result.positions, 'position', 'positions'), n(result.holdings, 'ligne de titres', 'lignes de titres'),
+                    n(result.flux, 'flux', 'flux'), n(result.transactions, 'opération', 'opérations'),
+                    n(result.entities, 'entité', 'entités')].filter(Boolean);
+    // Ce qui existait deja n'est ni double ni ecrase : le dire, sinon « rien de
+    // nouveau » laisse croire a un echec.
+    const garde = [n(result.positions_existantes, 'position déjà présente', 'positions déjà présentes'),
+                   n(result.doublons, 'doublon écarté', 'doublons écartés')].filter(Boolean);
+    showJsonImportResult(`Ajouté : ${ajoute.join(', ') || 'rien de nouveau'}.`
+      + (garde.length ? ` Conservé tel quel : ${garde.join(', ')}.` : '')
+      + (result.backup ? ` Copie de la base avant import : ${result.backup}.` : ''), true);
     await refreshDates();
     await loadHistorique();
     await loadEntities();

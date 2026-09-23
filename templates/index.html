@@ -824,8 +824,8 @@
         <div class="card">
           <h2>Importer depuis JSON</h2>
           <p class="text-muted" style="margin-bottom:1rem">
-            Restaure un export JSON précédent. Les positions déjà présentes ne sont pas dupliquées.<br>
-            Les allocations cibles sont restaurées si incluses.
+            Restaure un export JSON. Ce qui existe déjà est gardé tel quel, jamais doublé ni écrasé ;
+            une copie de la base est faite avant.
           </p>
           <div class="form-group">
             <label for="import-json-file">Fichier .json</label>
@@ -838,8 +838,8 @@
         <div class="card">
           <h2>Exporter en JSON</h2>
           <p class="text-muted" style="margin-bottom:1rem">
-            Télécharge toutes tes données (positions, flux, entités, cibles) en JSON.<br>
-            Utile pour backup ou migration.
+            Toutes tes données — positions et lignes de titres, flux, opérations, entités, cours,
+            profils, référentiel — en un fichier. La clé API n'y figure pas.
           </p>
           <button class="btn btn-secondary" id="btn-export">Télécharger patrimoine.json</button>
         </div>
