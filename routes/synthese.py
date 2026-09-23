@@ -665,11 +665,19 @@ def contribution():
                 _freeze_holdings(holdings_map)
             positions = [compute_position(dict(r), get_entity_map(conn, date), ref, holdings_map)
                          for r in rows]
+            # Par compte, pour reperer ceux qui entrent ou sortent du suivi.
+            comptes = {}
+            for p in positions:
+                cle = (p['owner'], p.get('envelope') or '', p.get('establishment') or '',
+                       p.get('entity') or '', p.get('label') or '')
+                c = comptes.setdefault(cle, {'net': 0.0})
+                c['net'] += p['net_attributed'] or 0
             arretes.append({
                 'date': date,
                 'family_net': sum(p['net_attributed'] for p in positions),
                 'by_owner': {o: sum(p['net_attributed'] for p in positions if p['owner'] == o)
                              for o in set(p['owner'] for p in positions)},
+                'comptes': comptes,
             })
         data = decompose(conn, arretes, owner, limite)
     return jsonify(data)

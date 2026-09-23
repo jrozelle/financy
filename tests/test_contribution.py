@@ -226,3 +226,48 @@ class TestEndpoint:
         app.config['TESTING'] = True
         with app.test_client() as anon:
             assert anon.get('/api/contribution').status_code in (302, 401)
+
+
+class TestComptesHorsSuivi:
+    """Un compte qui apparait n'a pas rapporte sa valeur (cas reel du 03/03/2026 :
+    une assurance-vie de 100 000 €, alimentee par un retrait du livret dont seule
+    la jambe de sortie etait enregistree, passait pour 100 000 € de performance)."""
+
+    def _arretes(self, a, b):
+        def arr(d, comptes):
+            return {'date': d, 'family_net': sum(comptes.values()), 'by_owner': {'Paul': sum(comptes.values())},
+                    'comptes': {k: {'net': v} for k, v in comptes.items()}}
+        return [arr('2026-02-16', a), arr('2026-03-03', b)]
+
+    LIVRET = ('Paul', 'Livret', 'Bourso', '', '')
+    AV = ('Paul', 'Assurance-vie', 'CA31', '', '')
+
+    def test_un_compte_apparu_sans_versement_n_est_pas_de_la_performance(self):
+        with get_db() as conn:
+            conn.execute("INSERT INTO flux (date, owner, envelope, establishment, type, amount) "
+                         "VALUES ('2026-02-27','Paul','Livret','Bourso','Retrait',100000)")
+            conn.commit()
+            r = decompose(conn, self._arretes({self.LIVRET: 150000}, {self.LIVRET: 50000, self.AV: 100000}))
+        p = r['periodes'][0]
+        assert p['apports'] == -100000
+        assert p['hors_suivi'] == 100000
+        assert p['performance'] == 0
+        assert p['comptes_hors_suivi'][0]['compte'].startswith('Assurance-vie')
+        assert p['comptes_hors_suivi'][0]['sens'] == 'entree'
+
+    def test_le_flux_enregistre_fait_disparaitre_l_ecart(self):
+        with get_db() as conn:
+            conn.execute("INSERT INTO flux (date, owner, envelope, establishment, type, amount) "
+                         "VALUES ('2026-02-27','Paul','Assurance-vie','CA31','Versement',100000)")
+            conn.commit()
+            r = decompose(conn, self._arretes({self.LIVRET: 150000}, {self.LIVRET: 150000, self.AV: 100000}))
+        p = r['periodes'][0]
+        assert p['hors_suivi'] == 0 and p['apports'] == 100000 and not p['comptes_hors_suivi']
+
+    def test_un_changement_d_enveloppe_s_annule(self):
+        a = {('Paul', 'Biens', '', '', 'Montres'): 22000}
+        b = {('Paul', 'Autre', '', '', 'Montres'): 22000}
+        with get_db() as conn:
+            r = decompose(conn, self._arretes(a, b))
+        assert r['periodes'][0]['hors_suivi'] == 0
+        assert not r['periodes'][0]['comptes_hors_suivi']

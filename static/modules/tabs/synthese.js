@@ -301,7 +301,9 @@ async function _legendeEvolution(owner, debut, fin) {
     const du = d.periodes?.[0]?.debut, au = d.periodes?.[d.periodes.length - 1]?.fin;
     if (d.periodes?.length && du === debut.date && au === fin.date) {
       decompo = `<span><i style="background:var(--chart-4)"></i>Épargne versée <b>${fmtSigne(d.total_apports)}</b></span>`
-              + `<span><i style="background:var(--chart-1)"></i>Marchés <b>${fmtSigne(d.total_performance)}</b></span>`;
+              + `<span><i style="background:var(--chart-1)"></i>Marchés <b>${fmtSigne(d.total_performance)}</b></span>`
+              + (Math.abs(d.total_hors_suivi || 0) >= 1
+                  ? `<span><i style="background:var(--text-muted)"></i>Comptes ajoutés ou retirés <b>${fmtSigne(d.total_hors_suivi)}</b></span>` : '');
     }
   } catch { /* la decomposition est un plus : sans elle, la courbe reste lisible */ }
   if (jeton !== _legendeJeton) return;

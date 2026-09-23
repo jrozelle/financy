@@ -11,7 +11,8 @@
  */
 import { S } from '../state.js';
 import { api } from '../api.js';
-import { fmt } from '../utils.js';
+import { fmt, esc, fmtDate } from '../utils.js';
+import { isMasked } from '../mask.js';
 
 export async function loadContribution() {
   const carte = document.getElementById('card-contribution');
@@ -27,7 +28,7 @@ export async function loadContribution() {
   // Une periode sans mouvement ni apport n'apporte rien au graphe : elle y
   // occupe une colonne pour n'y montrer qu'un trait a zero.
   const periodes = (d.periodes || [])
-    .filter(p => Math.abs(p.variation) > 100 || Math.abs(p.apports) > 100);
+    .filter(p => Math.abs(p.variation) > 100 || Math.abs(p.apports) > 100 || Math.abs(p.hors_suivi || 0) > 100);
   // Moins de deux periodes ne fait pas une comparaison : on n'affiche rien
   // plutot qu'une barre solitaire qui n'apprend rien.
   if (periodes.length < 2) { carte.style.display = 'none'; return; }
@@ -70,8 +71,9 @@ function dessiner(periodes) {
   const L = Math.max(Math.round(hote.clientWidth || 0), 78 * periodes.length + 30);
   const H = 150, BAS = 30, MARGE = 26;
 
-  const haut = Math.max(...periodes.map(p => Math.max(0, p.apports) + Math.max(0, p.performance)), 0);
-  const bas  = Math.min(...periodes.map(p => Math.min(0, p.apports) + Math.min(0, p.performance)), 0);
+  const parts3 = p => [p.apports, p.performance, p.hors_suivi || 0];
+  const haut = Math.max(...periodes.map(p => parts3(p).reduce((t, v) => t + Math.max(0, v), 0)), 0);
+  const bas  = Math.min(...periodes.map(p => parts3(p).reduce((t, v) => t + Math.min(0, v), 0)), 0);
   const etendue = (haut - bas) || 1;
   const zero = MARGE + (H - MARGE) * (haut / etendue);
   const ech = v => (Math.abs(v) / etendue) * (H - MARGE);
@@ -94,8 +96,9 @@ function dessiner(periodes) {
     // Les segments d'abord : ce sont eux qui font monter `hautCumul`. Lire le
     // sommet avant de les dessiner posait le libelle sur la ligne zero, a
     // l'interieur de la barre.
-    const segments = seg(p.performance, 'var(--chart-1)') + seg(p.apports, 'var(--chart-4)');
-    const total = p.apports + p.performance;
+    const segments = seg(p.performance, 'var(--chart-1)') + seg(p.apports, 'var(--chart-4)')
+                   + seg(p.hors_suivi || 0, 'var(--text-muted)');
+    const total = p.apports + p.performance + (p.hors_suivi || 0);
     const sommet = Math.min(hautCumul, zero);
     const yVal = sommet - 7;
     // Un libelle par barre, en mois abrege : la date complete se chevauchait
@@ -120,6 +123,8 @@ function dessiner(periodes) {
  *  « +0 k » sur une periode a 400 EUR laisse croire a un mouvement nul. */
 function _millier(v) {
   const signe = v >= 0 ? '+' : '−';
+  // Ecrit a la main, ce libelle echappait au mode discretion.
+  if (isMasked()) return `${signe}•••`;
   const a = Math.abs(v);
   return a >= 1000 ? `${signe}${Math.round(a / 1000)} k`
                    : `${signe}${Math.round(a)}`;
@@ -130,11 +135,31 @@ function legende(d) {
   if (!hote) return;
   const part = d.total_variation
     ? Math.round((d.total_performance / d.total_variation) * 100) : null;
+  // Comptes entres ou sortis du suivi sans flux pour l'expliquer : leur valeur
+  // n'est pas de la performance, et elle designe souvent un flux oublie. Le
+  // detail se lit a l'ecran, compte par compte.
+  const comptes = (d.periodes || []).flatMap(p => p.comptes_hors_suivi || []);
+  const hors = d.total_hors_suivi || 0;
   hote.innerHTML = `
     <span><i style="background:var(--chart-4)"></i>Apports
       <b class="num">${fmt(d.total_apports)}</b></span>
     <span><i style="background:var(--chart-1)"></i>Performance
       <b class="num">${fmt(d.total_performance)}</b></span>
+    ${Math.abs(hors) >= 1 ? `<button type="button" class="contrib-hors" aria-expanded="false" aria-controls="contrib-hors-liste">
+      <i style="background:var(--text-muted)"></i>Comptes ajoutés ou retirés <b class="num">${fmt(hors)}</b>
+      <span class="contrib-hors-voir">${comptes.length} compte${comptes.length > 1 ? 's' : ''} ▾</span></button>` : ''}
     ${part !== null && d.total_variation > 0
-      ? `<span class="contrib-part">${part} % de la hausse vient des marchés</span>` : ''}`;
+      ? `<span class="contrib-part">${part} % de la hausse vient des marchés</span>` : ''}
+    ${comptes.length ? `<ul class="contrib-hors-liste" id="contrib-hors-liste" hidden>
+      ${comptes.map(c => `<li><span>${esc(c.compte)}</span><span class="contrib-hors-date">${
+        ({ entree: 'apparu', sortie: 'disparu', deplace: 'changé d’enveloppe' })[c.sens] || ''} au ${fmtDate(c.date)}</span><b class="num">${fmt(c.montant)}</b></li>`).join('')}
+      <li class="contrib-hors-aide">Aucun versement ni retrait enregistré ne l'explique. Si l'argent venait
+        d'un autre compte suivi, il manque un flux : ajoutez-le dans Flux, la part rejoindra les apports.</li>
+    </ul>` : ''}`;
+  const b = hote.querySelector('.contrib-hors');
+  b?.addEventListener('click', () => {
+    const ouvert = b.getAttribute('aria-expanded') === 'true';
+    b.setAttribute('aria-expanded', String(!ouvert));
+    hote.querySelector('#contrib-hors-liste').hidden = ouvert;
+  });
 }
