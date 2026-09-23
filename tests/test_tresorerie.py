@@ -211,3 +211,30 @@ class TestParts:
         d = client.get('/api/snapshots/update?source=2026-08-31&cible=2026-09-30').get_json()
         e = next(x for x in d['entites'] if x['name'] == 'SCI T')
         assert e['valeur_proposee'] == 39600 + 1500
+
+
+class TestImpotSocietes:
+    def test_bareme(self):
+        assert t.impot_societes(-100) == 0
+        assert t.impot_societes(10000) == 1500
+        assert t.impot_societes(52500) == 42500 * 0.15 + 10000 * 0.25
+
+    def test_deficit_reporte_absorbe_le_benefice(self, client):
+        with get_db() as conn:
+            conn.execute("INSERT INTO entities (name, type) VALUES ('SCI T', 'SCI')")
+        r = client.put('/api/entites/SCI T/exercices', headers=H,
+                       json={'exercices': [{'fin': '2025-12-31', 'resultat': -5264.28, 'source': 'liasse'}]})
+        assert r.status_code == 200
+        with get_db() as conn:
+            ops = [('2026-01-10', 'SCPI X DISTRIBUTION', 1000.0), ('2026-02-10', 'SCPI X DISTRIBUTION', 1000.0)]
+            t.enregistrer(conn, 'SCI T', _releve(ops), 'r.pdf')
+            f = t.bilan(conn, 'SCI T', mois=2)['fiscal']
+        assert f['annee'] == '2026' and f['deficit_reportable'] == 5264.28
+        assert f['projection']['resultat'] == 2000 and f['impot'] == 0
+        assert f['deficit_apres'] == pytest.approx(3264.28)
+
+    def test_exercice_invalide(self, client):
+        with get_db() as conn:
+            conn.execute("INSERT INTO entities (name, type) VALUES ('SCI T', 'SCI')")
+        assert client.put('/api/entites/SCI T/exercices', headers=H,
+                          json={'exercices': [{'fin': 'hier', 'resultat': 1}]}).status_code == 400

@@ -121,3 +121,29 @@ def enregistrer_parts(entite):
                  num(l.get('prix_souscription')), num(l.get('prix_retrait')), l.get('date_prix') or None,
                  l.get('source') or None))
         return jsonify(svc.parts(conn, entite) or {'lignes': []})
+
+
+@tresorerie_bp.route('/api/entites/<path:entite>/exercices', methods=['PUT'])
+@login_required
+@csrf_protect
+def enregistrer_exercices(entite):
+    """Remplace les exercices clos de l'entite : fin, resultat fiscal, debut et
+    source facultatifs. Un resultat negatif est un deficit reportable."""
+    lignes = (request.get_json(silent=True) or {}).get('exercices')
+    if not isinstance(lignes, list) or len(lignes) > 50:
+        return jsonify({'error': 'Liste d’exercices attendue'}), 400
+    for l in lignes:
+        if not l.get('fin') or not validate_date(l['fin']) or (l.get('debut') and not validate_date(l['debut'])):
+            return jsonify({'error': 'Date d’exercice invalide'}), 400
+        if l.get('resultat') is None or not validate_number(l['resultat'], allow_negative=True):
+            return jsonify({'error': f'Résultat invalide pour l’exercice clos le {l["fin"]}'}), 400
+        if not validate_string(l.get('source'), 200):
+            return jsonify({'error': 'Source trop longue'}), 400
+    with get_db() as conn:
+        if not conn.execute('SELECT 1 FROM entities WHERE name=?', (entite,)).fetchone():
+            return jsonify({'error': f'Entité inconnue : {entite}'}), 404
+        conn.execute('DELETE FROM entite_exercices WHERE entity=?', (entite,))
+        for l in lignes:
+            conn.execute('INSERT INTO entite_exercices (entity, debut, fin, resultat, source) VALUES (?,?,?,?,?)',
+                         (entite, l.get('debut') or None, l['fin'], float(l['resultat']), l.get('source') or None))
+        return jsonify({'exercices': svc.exercices(conn, entite)})

@@ -765,6 +765,23 @@ def _migration_017(conn):
         )""")
 
 
+
+def _migration_018(conn):
+    """Exercices clos d'une entite a l'IS, d'apres ses comptes : le resultat
+    fiscal de chacun. Les deficits se reportent sur les benefices suivants ;
+    l'estimation de l'exercice en cours part de la."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS entite_exercices (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            entity    TEXT NOT NULL,
+            debut     TEXT,
+            fin       TEXT NOT NULL,
+            resultat  REAL NOT NULL,          -- resultat fiscal : negatif = deficit
+            source    TEXT,
+            UNIQUE(entity, fin)
+        )""")
+
+
 MIGRATIONS = [
     (1, _migration_001),
     (2, _migration_002),
@@ -783,6 +800,7 @@ MIGRATIONS = [
     (15, _migration_015),
     (16, _migration_016),
     (17, _migration_017),
+    (18, _migration_018),
 ]
 
 

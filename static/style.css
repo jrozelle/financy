@@ -3937,3 +3937,4 @@ td.arbo-part > * { vertical-align: middle; }
 .treso-prix { width: 6.5rem; text-align: right; font-family: var(--mono); }
 .treso-estime { display: block; font-size: .7rem; color: var(--text-muted); }
 .treso-parts-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .6rem; }
+.treso-fiscal { margin: .6rem 0; font-size: .85rem; max-width: 78ch; line-height: 1.55; }

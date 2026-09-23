@@ -107,6 +107,58 @@ def parts(conn, entite):
             'complet': all(p['valeur_retrait'] is not None for p in out)} if out else None
 
 
+# Impot sur les societes, taux 2026 : reduit jusqu'a 42 500 € de benefice pour
+# une PME dont le capital est detenu a 75 % au moins par des personnes physiques.
+IS_SEUIL_REDUIT = 42500.0
+IS_TAUX_REDUIT = 0.15
+IS_TAUX_NORMAL = 0.25
+
+
+def impot_societes(benefice):
+    if benefice <= 0:
+        return 0.0
+    return round(min(benefice, IS_SEUIL_REDUIT) * IS_TAUX_REDUIT
+                 + max(0.0, benefice - IS_SEUIL_REDUIT) * IS_TAUX_NORMAL, 2)
+
+
+def exercices(conn, entite):
+    return [dict(r) for r in conn.execute(
+        'SELECT * FROM entite_exercices WHERE entity=? ORDER BY fin', (entite,))]
+
+
+def fiscal(conn, entite, ops, mensuel, credit_pret_id):
+    """Estimation de l'IS de l'exercice en cours, deficits anterieurs imputes.
+
+    En tresorerie, la ou le cabinet travaille en droits constates : une
+    distribution de decembre versee en janvier change d'exercice. D'ou une
+    projection sur l'annee a partir des douze derniers mois, plutot que le
+    seul cumul a date.
+    """
+    clos = exercices(conn, entite)
+    if not clos:
+        return None
+    report = 0.0                              # deficits reportables, cumules
+    for e in clos:
+        report = report - e['resultat'] if e['resultat'] < 0 else max(0.0, report - e['resultat'])
+    annee = str(int(clos[-1]['fin'][:4]) + 1)
+    interets = 0.0
+    if credit_pret_id:
+        r = conn.execute("SELECT SUM(interets) i, SUM(assurance) a FROM pret_echeances "
+                         "WHERE pret_id=? AND substr(date,1,4)=?", (credit_pret_id, annee)).fetchone()
+        interets = (r['i'] or 0) + (r['a'] or 0)
+    revenus = sum(m['revenu'] for m in mensuel)
+    frais = -sum(m['frais'] for m in mensuel) * 12 / max(1, len(mensuel))
+    resultat = round(revenus - interets - frais, 2)
+    base = resultat - report if resultat > 0 else 0.0
+    return {
+        'exercices': clos, 'annee': annee, 'deficit_reportable': round(report, 2),
+        'projection': {'revenus': round(revenus, 2), 'interets': round(interets, 2),
+                       'frais': round(frais, 2), 'resultat': resultat},
+        'impot': impot_societes(base),
+        'deficit_apres': round(report - resultat if resultat < 0 else max(0.0, report - resultat), 2),
+    }
+
+
 def _mois(d):
     return d[:7]
 
@@ -168,6 +220,7 @@ def bilan(conn, entite, mois=12):
     # Tresorerie reconstituee : tous comptes, depuis le premier releve.
     tresorerie = round(sum(o['montant'] for o in ops), 2)
 
+    fisc = fiscal(conn, entite, ops, mensuel, pret['id'] if pret else None)
     detenues = parts(conn, entite)
     base_rendement = (detenues or {}).get('montant_souscrit') or valeur
     # Frais d'entree deja partis : ce que les parts ont coute, moins ce qu'on en
@@ -177,6 +230,7 @@ def bilan(conn, entite, mois=12):
     return {
         'entite': entite,
         'parts': detenues,
+        'fiscal': fisc,
         'frais_latents': frais_latents,
         'periode': {'debut': fenetre[0], 'fin': fin, 'mois': mois},
         'premiere_operation': ops[0]['date'],

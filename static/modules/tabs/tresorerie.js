@@ -89,6 +89,7 @@ function _bloc(b, idx) {
       <span><i class="treso-pastille treso-pastille--apport"></i>Apports des associés</span>
     </div>
     ${_parts(b, idx)}
+    ${_fiscal(b, idx)}
     <details class="treso-ops">
       <summary>Les ${b.operations.length} opérations</summary>
       <div class="table-scroll" tabindex="0" role="region" aria-label="Opérations de ${esc(b.entite)}">
@@ -133,6 +134,38 @@ function _parts(b, idx) {
     <div class="treso-parts-actions">
       <button type="button" class="btn btn-secondary btn-sm" data-parts-ajouter="${idx}">Ajouter une part</button>
       <button type="button" class="btn btn-primary btn-sm" data-parts-enregistrer="${idx}">Enregistrer les prix</button>
+    </div>
+  </details>`;
+}
+
+/** Impot sur les societes : les exercices clos (d'apres les comptes du
+ *  cabinet) et l'estimation de l'exercice en cours, deficits imputes. */
+function _fiscal(b, idx) {
+  const f = b.fiscal;
+  const clos = f?.exercices || [];
+  const ligne = e => `<tr><td><input type="date" class="ref-input" data-k="fin" value="${e.fin || ''}" aria-label="Clôture de l'exercice"></td>
+    <td class="num"><input type="text" inputmode="decimal" class="ref-input treso-prix" data-k="resultat" value="${e.resultat ?? ''}" aria-label="Résultat fiscal"></td>
+    <td><input type="text" class="ref-input" data-k="source" value="${esc(e.source || '')}" aria-label="Source"></td></tr>`;
+  const p = f?.projection;
+  const resume = f ? `<p class="treso-fiscal">Exercice ${f.annee}, projeté sur l'année : ${fmt(p.revenus)} de revenus,
+      ${fmt(p.interets)} d'intérêts et d'assurance, ${fmt(p.frais)} de frais, soit un résultat de
+      <b>${p.resultat >= 0 ? '' : '−'}${fmt(Math.abs(p.resultat))}</b>.
+      ${f.impot > 0 ? `Impôt estimé : <b>${fmt(f.impot)}</b>, après ${fmt(f.deficit_reportable)} de déficits reportés.`
+        : `<b>Pas d'impôt</b> : ${p.resultat < 0 ? 'nouveau déficit' : `bénéfice absorbé par les déficits antérieurs`},
+           ${fmt(f.deficit_apres)} de déficits restant à reporter.`}
+      Estimation en trésorerie, le cabinet travaille en droits constatés.</p>` : '';
+  return `<details class="treso-parts treso-fisc">
+    <summary>Impôt sur les sociétés${f ? ` : ${f.impot > 0 ? fmt(f.impot) + ' estimés' : 'pas d’impôt estimé'} en ${f.annee}` : ''}</summary>
+    ${resume}
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Exercices clos de ${esc(b.entite)}">
+      <table class="data-table" data-exercices="${idx}">
+        <thead><tr><th>Exercice clos le</th><th class="num">Résultat fiscal</th><th>Source</th></tr></thead>
+        <tbody>${clos.map(ligne).join('')}${ligne({})}</tbody>
+      </table>
+    </div>
+    <p class="treso-note">Un résultat négatif est un déficit, reporté sur les bénéfices suivants.</p>
+    <div class="treso-parts-actions">
+      <button type="button" class="btn btn-primary btn-sm" data-exercices-enregistrer="${idx}">Enregistrer les exercices</button>
     </div>
   </details>`;
 }
@@ -218,6 +251,18 @@ function _cabler(sec, b) {
     try {
       await api('PUT', `/api/entites/${encodeURIComponent(b.entite)}/parts`, { parts: lignes });
       toast('Prix enregistrés : la prochaine mise à jour proposera la valeur au prix de retrait', 'success');
+      loadTresorerie();
+    } catch { /* toast deja affiche */ }
+  });
+
+  sec.querySelector('[data-exercices-enregistrer]')?.addEventListener('click', async () => {
+    const exercices = [...sec.querySelectorAll('[data-exercices] tbody tr')].map(tr => {
+      const v = k => tr.querySelector(`[data-k="${k}"]`).value.trim();
+      return { fin: v('fin'), resultat: v('resultat') === '' ? null : parseLocaleNumber(v('resultat'), null), source: v('source') || null };
+    }).filter(e => e.fin);
+    try {
+      await api('PUT', `/api/entites/${encodeURIComponent(b.entite)}/exercices`, { exercices });
+      toast('Exercices enregistrés', 'success');
       loadTresorerie();
     } catch { /* toast deja affiche */ }
   });
