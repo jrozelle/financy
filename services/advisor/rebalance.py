@@ -1,13 +1,14 @@
 """
 Generation des propositions d'arbitrage (phase 7).
 
-Trois niveaux de propositions, tous deterministes (pas de LLM en phase 7) :
+Deux niveaux de propositions, tous deterministes (pas de LLM en phase 7) :
 
 1. bucket  : alleger une categorie surponderee vers une categorie sous-ponderee
             (montants en €, base sur compute_gap).
-2. fiscal  : opportunites fiscales standard (plafond PEA, AV >8 ans, etc.).
-3. security: pour chaque categorie surponderee, suggere les holdings concretes
-            a alleger en priorite (les plus surponderees ou les moins-values).
+2. fiscal  : opportunites fiscales chiffrees (plafond PEA, moins-values du CTO).
+Le niveau « security » (alleger telle ligne) a disparu : il repetait la
+proposition de poche, qui nomme desormais les lignes mobilisables. Les
+propositions deja enregistrees de ce genre restent lisibles dans l'historique.
 
 Le LLM (phase 7+) peut ensuite enrichir le `rationale` de chaque proposition,
 avec prompt caching sur le contexte profil/positions.
@@ -18,11 +19,13 @@ from datetime import datetime
 from typing import List, Dict, Optional
 
 from models import _holding_value_or_none
+from services.advisor.allocation import CLASSE_DE
 
 logger = logging.getLogger('financy.advisor.rebalance')
 
 # Plafond PEA classique (hors PEA-PME)
 PEA_PLAFOND = 150_000
+SEUIL_MOINS_VALUE = 200
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -51,7 +54,7 @@ NON_ARBITRABLE = {'Immobilier', 'Objets de valeur', 'Société', 'Parts sociales
 
 # ─── Bucket level ────────────────────────────────────────────────────────────
 
-LIQUIDITES = 'Cash / Fond Euro'
+LIQUIDITES = 'Cash'
 
 
 def _eur(v):
@@ -61,40 +64,72 @@ def _eur(v):
     return f'⟦{round(v, 2)}⟧'
 
 
-def _bucket_proposals(gap, threshold_eur=2000, total_eur=0.0, reserve=None):
-    """A partir du gap (cf. allocation.compute_gap), genere des allegements
-    par couple (categorie surponderee → categorie sous-ponderee).
+def _reglemente(ligne):
+    return any(env in ligne['libelle'] for env in ('Livret A', 'LDDS', 'LEP'))
 
-    Exclut les categories non-arbitrables (immobilier, objets de valeur, etc.).
 
-    `reserve` : montant que le titulaire garde disponible (profil). Les
-    liquidites mobilisables sont `reel - max(cible, reserve)` : sans elle, le
+def _lignes(lignes, n=3):
+    txt = ', '.join(f"{l['libelle']} ({_eur(l['montant'])})" for l in lignes[:n])
+    return txt + (f' et {len(lignes) - n} autre(s)' if len(lignes) > n else '')
+
+
+def _bucket_proposals(gap, threshold_eur=2000, total_eur=0.0, reserve=None, reglementes=0.0):
+    """A partir du gap par classe (allocation.allocation_financiere), genere
+    des allegements (classe surponderee -> classe sous-ponderee).
+
+    Une classe ne cede que sa part LIBRE : un contrat nanti, un PER ou un
+    produit structure comptent dans l'exposition mais ne bougent pas.
+    Les liquidites gardent en outre la reserve : celle du profil, a defaut les
+    livrets reglementes, l'epargne de precaution par excellence. Sans elle, le
     conseiller proposait d'investir l'argent destine a nantir un credit.
     """
-    arbitrable = [g for g in gap if g['category'] not in NON_ARBITRABLE]
-
-    # Fusionner Cash & Fond Euro en une seule poche "Cash/Fond Euro"
-    # (le fonds euro est du quasi-cash securise, meme profil de risque)
     merged = {}
-    for g in arbitrable:
-        key = LIQUIDITES if g['category'] in ('Cash & dépôts', 'Fond Euro', 'Monétaire') else g['category']
-        if key not in merged:
-            merged[key] = {'category': key, 'delta_eur': 0, 'actual_eur': 0, 'target_eur': 0}
-        merged[key]['delta_eur'] += g['delta_eur']
-        merged[key]['actual_eur'] += (g.get('actual_pct') or 0) * total_eur
-        merged[key]['target_eur'] += (g.get('target_pct') or 0) * total_eur
-    liq = merged.get(LIQUIDITES)
-    note_reserve = ''
-    if liq and liq['delta_eur'] < 0:
-        garde = max(liq['target_eur'], reserve or 0)
-        liq['delta_eur'] = min(0, -(liq['actual_eur'] - garde))
-        note_reserve = (f' Réserve déclarée de {_eur(reserve)} préservée.' if reserve
-                        else ' Aucune réserve déclarée dans le profil : tout l’excédent sur la cible est proposé.')
-    arbitrable = list(merged.values())
+    for g in gap:
+        if g['category'] in NON_ARBITRABLE or g['category'] == 'Autres':
+            continue
+        key = CLASSE_DE.get(g['category'], g['category'])
+        m = merged.setdefault(key, {'category': key, 'delta_eur': 0.0, 'actual_eur': 0.0,
+                                    'target_eur': 0.0, 'libre_eur': 0.0,
+                                    'lignes_libres': [], 'lignes_bloquees': []})
+        actual = g.get('actual_eur', (g.get('actual_pct') or 0) * total_eur)
+        m['delta_eur'] += g['delta_eur']
+        m['actual_eur'] += actual
+        m['target_eur'] += g.get('target_eur', (g.get('target_pct') or 0) * total_eur)
+        m['libre_eur'] += g.get('libre_eur', actual)
+        m['lignes_libres'] += g.get('lignes_libres') or []
+        m['lignes_bloquees'] += g.get('lignes_bloquees') or []
 
-    over  = sorted([g for g in arbitrable if g['delta_eur'] < -threshold_eur],
+    notes = {}
+    for key, m in merged.items():
+        if m['delta_eur'] >= 0:
+            continue
+        excedent = -m['delta_eur']
+        libre = m['libre_eur']
+        note = ''
+        if key == LIQUIDITES:
+            garde = reserve if reserve else reglementes
+            libre = max(0.0, libre - garde)
+            excedent = min(excedent, max(0.0, m['actual_eur'] - max(m['target_eur'], garde)))
+            if reserve:
+                note = f' Réserve déclarée de {_eur(reserve)} préservée.'
+            elif reglementes:
+                note = (f' Aucune réserve déclarée : les livrets réglementés ({_eur(reglementes)}) '
+                        'sont gardés comme épargne de précaution.')
+            else:
+                note = ' Aucune réserve déclarée dans le profil : tout l’excédent sur la cible est proposé.'
+        # Les lignes d'ou vient l'argent ; en liquidites, hors livrets gardes.
+        sources = [l for l in m['lignes_libres']
+                   if not (key == LIQUIDITES and not reserve and _reglemente(l))]
+        if sources:
+            note = f' Mobilisable : {_lignes(sources)}.' + note
+        if m['lignes_bloquees'] and libre < excedent:
+            note += f' Bloqué, donc laissé en place : {_lignes(m["lignes_bloquees"])}.'
+        m['delta_eur'] = -min(excedent, libre)
+        notes[key] = note
+
+    over  = sorted([m for m in merged.values() if m['delta_eur'] < -threshold_eur],
                    key=lambda g: g['delta_eur'])
-    under = sorted([g for g in arbitrable if g['delta_eur'] >  threshold_eur],
+    under = sorted([m for m in merged.values() if m['delta_eur'] >  threshold_eur],
                    key=lambda g: -g['delta_eur'])
 
     out = []
@@ -109,8 +144,8 @@ def _bucket_proposals(gap, threshold_eur=2000, total_eur=0.0, reserve=None):
             kind='bucket',
             label=f'Alléger {src_cat} de {_eur(amt)} vers {dst_cat}',
             from_ref=src_cat, to_ref=dst_cat, amount=amt,
-            rationale=(f'{src_cat} au-dessus de la cible de {_eur(src_amt)}, {dst_cat} en dessous de {_eur(dst_amt)}.'
-                       + (note_reserve if src_cat == LIQUIDITES else '')),
+            rationale=(f'{src_cat} au-dessus de la cible de {_eur(src_amt)} mobilisables, '
+                       f'{dst_cat} en dessous de {_eur(dst_amt)}.' + notes.get(src_cat, '')),
         ))
         if amt >= src_amt:
             over_left.pop(0)
@@ -156,31 +191,25 @@ def _fiscal_proposals(profile, positions, versements_pea=None):
                        'Les gains réalisés dans le PEA sont exonérés d’impôt sur le revenu après cinq ans.'),
         ))
 
-    cto_value = sum(p.get('value') or 0 for p in by_env.get('CTO', []))
-    if cto_value > 0:
-        # Suggestion generique : verifier MV purgeables
+    # Moins-values latentes du CTO, ligne a ligne : realisees, elles
+    # s'imputent sur les plus-values des dix annees suivantes. Rien a dire s'il
+    # n'y en a pas — un « verifiez » sans chiffre n'est pas une proposition.
+    pertes = []
+    for p in by_env.get('CTO', []):
+        for h in (p.get('holdings_detail') or []):
+            mv, cost = _holding_value_or_none(h), h.get('cost_basis')
+            if mv is not None and cost and cost - mv >= SEUIL_MOINS_VALUE:
+                pertes.append((h.get('name') or h.get('isin'), cost - mv))
+    if pertes:
+        pertes.sort(key=lambda x: -x[1])
+        total = sum(x for _, x in pertes)
         out.append(_proposal(
             kind='fiscal',
-            label='Vérifier les moins-values latentes du CTO',
-            from_ref='CTO',
-            rationale='Une moins-value réalisée sur un CTO s’impute sur les plus-values des dix années suivantes. À examiner en fin d’année.',
-        ))
-
-    av_positions = by_env.get('Assurance-vie', [])
-    if av_positions:
-        out.append(_proposal(
-            kind='fiscal',
-            label='Vérifier l’ancienneté des assurances-vie (abattement après 8 ans)',
-            from_ref='Assurance-vie',
-            rationale='Après huit ans, les gains retirés sont exonérés d’impôt sur le revenu jusqu’à 4 600 € par an (9 200 € pour un couple), hors prélèvements sociaux.',
-        ))
-
-    if profile.get('employment_type') == 'TNS':
-        out.append(_proposal(
-            kind='fiscal',
-            label='Arbitrer rémunération, dividendes et versements PER',
-            from_ref='Remuneration',
-            rationale='Travailleur non salarié : les versements sur un PER se déduisent du revenu professionnel dans la limite du plafond. À rapprocher de l’arbitrage dividendes / rémunération selon la tranche marginale.',
+            label=f'{_eur(total)} de moins-values latentes sur le CTO',
+            from_ref='CTO', amount=total,
+            rationale=(', '.join(f'{n} ({_eur(x)})' for n, x in pertes[:3])
+                       + '. Réalisée, une moins-value s’impute sur les plus-values de l’année et des '
+                         'dix suivantes ; racheter la ligne ensuite garde l’exposition.'),
         ))
 
     pension_age = profile.get('pension_age')
@@ -196,60 +225,6 @@ def _fiscal_proposals(profile, positions, versements_pea=None):
     return out
 
 
-# ─── Security level ──────────────────────────────────────────────────────────
-
-def _security_proposals(positions, gap, threshold_eur=2000):
-    """Pour chaque categorie surponderee (delta_eur fortement negatif), liste
-    les holdings reelles a alleger. On suggere par ordre de poids decroissant."""
-    # Les liquidites se traitent en poche (_bucket_proposals), reserve deduite :
-    # proposer ici d'alleger un fonds euros ignorait la reserve, et sa
-    # « plus-value +0 € » ne mesurait rien.
-    over_categories = {g['category'] for g in gap if g['delta_eur'] < -threshold_eur
-                       and g['category'] not in ('Cash & dépôts', 'Fond Euro', 'Monétaire')}
-    if not over_categories:
-        return []
-
-    out = []
-    for cat in over_categories:
-        # On regarde les holdings agreges des positions de cette categorie
-        cat_positions = [p for p in positions if p.get('category') == cat]
-        # Aggregator par ISIN sur l'ensemble des holdings (priceables)
-        isin_totals = {}
-        for p in cat_positions:
-            for h in (p.get('holdings_detail') or []):
-                isin = h.get('isin')
-                if not isin:
-                    continue
-                # Meme valorisation que les positions : cours converti en
-                # euros, rien a defaut de taux. `quantite x cours` comptait en
-                # euros un cours en dollars.
-                mv = _holding_value_or_none(h)
-                if mv is None:
-                    continue
-                cost = h.get('cost_basis') or 0
-                rec = isin_totals.setdefault(isin, {'isin': isin, 'name': h.get('name'),
-                                                    'mv': 0, 'cost': 0})
-                rec['mv'] += mv
-                rec['cost'] += cost
-        if not isin_totals:
-            continue
-        ranked = sorted(isin_totals.values(), key=lambda r: -r['mv'])[:3]
-        for r in ranked:
-            label_isin = r['name'] or r['isin']
-            pnl = r['mv'] - r['cost'] if r['cost'] else None
-            pnl_txt = ''
-            if pnl is not None and abs(pnl) >= 1:
-                pnl_txt = f' (plus-value latente {"+" if pnl >= 0 else "−"}{_eur(abs(pnl))})'
-            out.append(_proposal(
-                kind='security',
-                label=f'Alléger {label_isin} ({r["isin"]}) — {_eur(r["mv"])} détenus',
-                from_ref=r['isin'], to_ref=cat,
-                amount=r['mv'],
-                rationale=f'{cat} au-dessus de la cible. {label_isin} est l’une des plus grosses lignes ({_eur(r["mv"])}){pnl_txt}.',
-            ))
-    return out
-
-
 # ─── Orchestration + persistence ─────────────────────────────────────────────
 
 def generate_proposals(profile, positions, allocation, versements_pea=None):
@@ -257,9 +232,9 @@ def generate_proposals(profile, positions, allocation, versements_pea=None):
     gap = allocation.get('gap') or []
     return [
         *_bucket_proposals(gap, total_eur=allocation.get('total_eur') or 0,
-                           reserve=(profile or {}).get('reserve_eur')),
+                           reserve=(profile or {}).get('reserve_eur'),
+                           reglementes=allocation.get('reglementes_eur') or 0),
         *_fiscal_proposals(profile, positions, versements_pea),
-        *_security_proposals(positions, gap),
     ]
 
 
@@ -269,10 +244,9 @@ def replace_proposals(conn, owner, snapshot_date, proposals):
     Conserve les anciennes propositions deja appliquees ou ecartees pour
     historique : on ne touche qu'aux 'pending'.
     """
-    conn.execute(
-        "DELETE FROM rebalance_proposals WHERE owner=? AND snapshot_date=? AND status='pending'",
-        (owner, snapshot_date)
-    )
+    # Toutes les propositions en attente, quel que soit leur arrete : celles
+    # d'un arrete anterieur sont perimees, et s'empilaient a chaque generation.
+    conn.execute("DELETE FROM rebalance_proposals WHERE owner=? AND status='pending'", (owner,))
     inserted = []
     for p in proposals:
         cur = conn.execute(

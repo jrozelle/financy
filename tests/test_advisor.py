@@ -38,7 +38,7 @@ class TestAllocationEngine:
         tns, adj = target_allocation({'horizon_years': 15, 'risk_tolerance': 3,
                                        'employment_type': 'TNS'})
         assert tns['Cash'] > base['Cash']
-        assert any('TNS' in a for a in adj)
+        assert any('non salarié' in a for a in adj)
 
     def test_normalisation(self):
         from services.advisor.allocation import target_allocation

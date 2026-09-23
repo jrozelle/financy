@@ -6,7 +6,7 @@ from models import (get_db, compute_position, get_entity_map, get_holdings_map,
                     load_referential,
                     validate_string, validate_number, validate_pct, validate_date,
                     parse_number)
-from services.advisor.allocation import (target_allocation, compute_actual_allocation,
+from services.advisor.allocation import (allocation_financiere, target_allocation, compute_actual_allocation,
                                          compute_gap, load_matrix)
 from services.advisor import macro as macro_svc
 from services.advisor import rebalance as rebalance_svc
@@ -253,6 +253,10 @@ def delete_objective(oid):
     return '', 204
 
 
+def _entites(conn):
+    return {r['name'] for r in conn.execute('SELECT name FROM entities')}
+
+
 # ─── Allocation cible vs actuelle ────────────────────────────────────────────
 
 @advisor_bp.route('/api/advisor/profiles/<owner>/allocation', methods=['GET'])
@@ -283,22 +287,11 @@ def get_allocation(owner):
         ref          = load_referential(conn)
         holdings_map = get_holdings_map(conn, [r['id'] for r in rows]) if rows else {}
         positions = [compute_position(dict(r), entity_map, ref, holdings_map) for r in rows]
+        entites = _entites(conn)
 
-    target, adjustments = target_allocation(_normalize_profile_dict(profile), matrix)
-    actual = compute_actual_allocation(positions)
-    total_eur = sum(max(0, p.get('net_attributed') or 0) for p in positions)
-    gap = compute_gap(target, actual, total_eur)
-
-    return jsonify({
-        'owner':        owner,
-        'snapshot_date': date,
-        'profile':      _normalize_profile_dict(profile),
-        'target':       target,
-        'actual':       actual,
-        'total_eur':    round(total_eur, 2),
-        'gap':          gap,
-        'adjustments':  adjustments,
-    })
+    alloc = allocation_financiere(_normalize_profile_dict(profile), positions, matrix, entites=entites)
+    return jsonify({'owner': owner, 'snapshot_date': date,
+                    'profile': _normalize_profile_dict(profile), **alloc})
 
 
 # ─── Macro snapshot (phase 7) ────────────────────────────────────────────────
@@ -420,11 +413,8 @@ def refresh_proposals(owner):
         if not date:
             return jsonify({'error': 'Aucune position trouvee pour ce proprietaire'}), 400
         matrix = load_matrix(conn)
-        target, adjustments = target_allocation(_normalize_profile_dict(profile), matrix)
-        actual = compute_actual_allocation(positions)
-        total = sum(max(0, p.get('net_attributed') or 0) for p in positions)
-        gap = compute_gap(target, actual, total)
-        allocation = {'target': target, 'actual': actual, 'gap': gap, 'total_eur': total}
+        allocation = allocation_financiere(_normalize_profile_dict(profile), positions, matrix,
+                                   entites=_entites(conn))
 
         # Le plafond du PEA porte sur les versements : ceux du titulaire,
         # tels que le journal des flux les connait (None s'il n'en a aucun).

@@ -143,12 +143,12 @@ def target_allocation(profile: dict, matrix=None) -> Tuple[Dict[str, float], Lis
         # LBO = concentration de risque pro, on compense
         base['Cash']    = base.get('Cash', 0) + 0.08
         base['Actions'] = max(0, base.get('Actions', 0) - 0.08)
-        adjustments.append('LBO detecte : +8% Cash / -8% Actions pour diluer la concentration de risque professionnelle.')
+        adjustments.append('LBO en cours : +8 % de liquidités, −8 % d’actions, pour ne pas ajouter du risque de marché au risque professionnel.')
 
     if profile.get('employment_type') == 'TNS':
         base['Cash']    = base.get('Cash', 0) + 0.05
         base['Actions'] = max(0, base.get('Actions', 0) - 0.05)
-        adjustments.append('TNS : +5% Cash / -5% Actions (pas de chomage, pas d\'abondement employeur).')
+        adjustments.append('Travailleur non salarié : +5 % de liquidités, −5 % d’actions (ni chômage ni abondement employeur).')
 
     # Approche retraite : shift progressif vers obligations
     horizon = profile.get('horizon_years')
@@ -157,13 +157,13 @@ def target_allocation(profile: dict, matrix=None) -> Tuple[Dict[str, float], Lis
         if shift > 0:
             base['Obligations'] = base.get('Obligations', 0) + shift
             base['Actions']     = max(0, base.get('Actions', 0) - shift)
-            adjustments.append(f'Horizon court ({horizon} ans) : +{shift*100:.0f}% Obligations / -{shift*100:.0f}% Actions.')
+            adjustments.append(f'Horizon court ({horizon} ans) : +{shift*100:.0f} % d’obligations, −{shift*100:.0f} % d’actions.')
 
     # Pas de RP, horizon > 5 : reserver un peu d'immobilier
     if profile.get('main_residence_owned') is False and (horizon is None or horizon >= 3):
         base['Immobilier'] = base.get('Immobilier', 0) + 0.05
         base['Actions']    = max(0, base.get('Actions', 0) - 0.05)
-        adjustments.append('Sans residence principale : +5% Immobilier (projet d\'acquisition).')
+        adjustments.append('Sans résidence principale : 5 % réservés à un projet d’acquisition, pris sur les actions.')
 
     # Clamp negatifs + normalise
     base = {k: max(0, v) for k, v in base.items()}
@@ -207,3 +207,106 @@ def compute_gap(target: Dict[str, float], actual: Dict[str, float],
         })
     rows.sort(key=lambda r: abs(r['delta_eur']), reverse=True)
     return rows
+
+
+# ─── Perimetre financier ─────────────────────────────────────────────────────
+#
+# La matrice raisonne en classes (Cash, Obligations, Actions...), les positions
+# en categories du referentiel (Cash & dépôts, Fond Euro, Produits Structurés...).
+# Comparer les deux sans table de passage produisait des absurdites : « alleger
+# Cash / Fond Euro vers Cash », un fonds euros vise a 0 % faute de cle.
+
+CLASSE_DE = {
+    'Cash & dépôts': 'Cash', 'Monétaire': 'Cash',
+    # Capital garanti, rendement de portefeuille obligataire : c'est ainsi qu'un
+    # conseiller le range.
+    'Fond Euro': 'Obligations', 'Obligations': 'Obligations',
+    'Actions': 'Actions', 'Produits Structurés': 'Actions', 'Crypto': 'Actions',
+}
+
+# Ni la residence, ni une SCPI a credit, ni un tableau, ni les parts de sa
+# propre societe ne s'arbitrent contre un ETF. Les compter faussait toutes les
+# proportions : la cible s'applique au seul patrimoine financier.
+HORS_PERIMETRE = {'Immobilier', 'SCPI', 'Objets de valeur', 'Parts sociales', 'Société'}
+
+LIVRETS_REGLEMENTES = {'Livret A', 'LDDS', 'LEP'}
+
+
+def _libelle(p):
+    # « Livret Bourso+ BoursoBank », pas « Cash & dépôts Livret Bourso+ » :
+    # la categorie est deja celle de la classe. Seul le fonds euros se nomme,
+    # l'enveloppe (« Assurance-vie ») ne le distinguant pas des unites de compte.
+    tete = p.get('label') or ('Fonds euros' if p.get('category') == 'Fond Euro' else None)
+    return ' '.join(x for x in (tete, p.get('envelope'), p.get('establishment')) if x)
+
+
+def allocation_financiere(profile: dict, positions: List[dict], matrix=None, entites=()) -> dict:
+    """Cible, reel et ecarts par classe, sur le patrimoine financier.
+
+    Chaque classe distingue ce qui peut bouger (`libre_eur`) de ce qui compte
+    dans l'exposition sans pouvoir bouger (`bloque_eur` : contrat nanti, PER,
+    produit structure). Les categories hors perimetre ne disparaissent pas :
+    elles sont decomptees dans `exclus`.
+    """
+    target, adjustments = target_allocation(profile, matrix)
+    cible = _normalize({k: v for k, v in target.items() if k != 'Immobilier'})
+
+    classes: Dict[str, dict] = {}
+    exclus: Dict[str, float] = {}
+    reglementes = 0.0
+    for p in positions:
+        cat = p.get('category') or 'Autres'
+        net = max(0.0, p.get('net_attributed') or 0)
+        if not net:
+            continue
+        if cat in HORS_PERIMETRE:
+            exclus[cat] = exclus.get(cat, 0) + net
+            continue
+        # Un compte au nom d'une entite declaree est la tresorerie de la
+        # societe, pas l'epargne du titulaire (meme regle que les constats).
+        if {p.get('label'), p.get('entity')} & set(entites):
+            exclus['Trésorerie de société'] = exclus.get('Trésorerie de société', 0) + net
+            continue
+        c = classes.setdefault(CLASSE_DE.get(cat, 'Autres'),
+                               {'actual_eur': 0.0, 'libre_eur': 0.0, 'bloque_eur': 0.0,
+                                'lignes_libres': [], 'lignes_bloquees': []})
+        libre = 0.0 if p.get('liquidity') == 'Bloqué' else min(net, p.get('mobilizable_value') or 0)
+        c['actual_eur'] += net
+        c['libre_eur'] += libre
+        if libre <= 0:
+            c['bloque_eur'] += net
+        ligne = {'libelle': _libelle(p), 'montant': round(net, 2)}
+        (c['lignes_libres'] if libre > 0 else c['lignes_bloquees']).append(ligne)
+        if p.get('envelope') in LIVRETS_REGLEMENTES:
+            reglementes += net
+
+    total = sum(c['actual_eur'] for c in classes.values())
+    gap = []
+    for cle in sorted(set(cible) | set(classes)):
+        c = classes.get(cle, {'actual_eur': 0.0, 'libre_eur': 0.0, 'bloque_eur': 0.0,
+                              'lignes_libres': [], 'lignes_bloquees': []})
+        t = cible.get(cle, 0.0)
+        a = c['actual_eur'] / total if total else 0.0
+        if not t and not c['actual_eur']:
+            continue
+        gap.append({
+            'category': cle,
+            'target_pct': round(t, 4), 'actual_pct': round(a, 4), 'delta_pct': round(t - a, 4),
+            'delta_eur': round((t - a) * total, 2),
+            'actual_eur': round(c['actual_eur'], 2), 'target_eur': round(t * total, 2),
+            'libre_eur': round(c['libre_eur'], 2),
+            'bloque_eur': round(c['bloque_eur'], 2),
+            'lignes_libres': sorted(c['lignes_libres'], key=lambda l: -l['montant']),
+            'lignes_bloquees': sorted(c['lignes_bloquees'], key=lambda l: -l['montant']),
+        })
+    gap.sort(key=lambda r: abs(r['delta_eur']), reverse=True)
+    return {
+        'target': cible,
+        'actual': {g['category']: g['actual_pct'] for g in gap if g['actual_eur']},
+        'gap': gap,
+        'total_eur': round(total, 2),
+        'bloque_eur': round(sum(g['bloque_eur'] for g in gap), 2),
+        'exclus': [{'category': k, 'montant': round(v, 2)} for k, v in sorted(exclus.items(), key=lambda kv: -kv[1])],
+        'reglementes_eur': round(reglementes, 2),
+        'adjustments': adjustments,
+    }

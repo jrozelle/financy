@@ -296,7 +296,7 @@ async function _loadAllocation(profile) {
   // Tableau d'ecarts
   const tbody = document.getElementById('advisor-gap-tbody');
   if (!data.gap.length || !data.total_eur) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:1rem;color:var(--text-muted);font-style:italic">Pas de positions sur ce propriétaire. Saisissez des positions pour comparer.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:1rem;color:var(--text-muted);font-style:italic">Pas de positions sur ce propriétaire. Saisissez des positions pour comparer.</td></tr>';
     _allocChart = destroyChart(_allocChart);
     return;
   }
@@ -308,8 +308,18 @@ async function _loadAllocation(profile) {
       <td class="num">${fmtPct(g.actual_pct * 100)}</td>
       <td class="num ${cls}">${fmtPct(g.delta_pct * 100, 1, true)}</td>
       <td class="num ${cls}">${g.delta_eur > 0 ? '+' : ''}${fmt(g.delta_eur)}</td>
+      <td class="num">${g.bloque_eur ? fmt(g.bloque_eur) : '—'}</td>
     </tr>`;
   }).join('');
+  // Ce qui est hors du calcul ne disparait pas : il est decompte ici.
+  const perim = document.getElementById('advisor-perimetre');
+  if (perim) {
+    const exclus = (data.exclus || []).map(e => `${esc(e.category)} ${fmt(e.montant)}`).join(', ');
+    perim.innerHTML = `Calcul sur le patrimoine financier : ${fmt(data.total_eur)}`
+      + (data.bloque_eur ? `, dont ${fmt(data.bloque_eur)} bloqués (contrat nanti, PER, produit structuré) :
+         ils comptent dans l'exposition, mais les propositions n'y touchent pas` : '')
+      + '.' + (exclus ? ` Hors calcul, car ils ne s'arbitrent pas : ${exclus}.` : '');
+  }
 
   _renderAllocationChart(data);
 }

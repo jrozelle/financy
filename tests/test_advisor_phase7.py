@@ -179,14 +179,82 @@ class TestRebalanceEngine:
         props = generate_proposals({'horizon_years': 10}, positions, allocation)
         assert any(p['kind'] == 'fiscal' and 'PEA' in p['label'] for p in props)
 
-    def test_tns_proposal(self):
+    def test_pas_de_conseil_generique(self):
+        """Un « verifiez » sans chiffre n'est pas une proposition : ni le PER
+        du TNS, ni l'anciennete des AV, ni un CTO sans moins-value."""
         from services.advisor.rebalance import generate_proposals
-        positions = [{'category': 'Actions', 'envelope': 'PEA', 'net_attributed': 30000, 'value': 30000}]
-        allocation = {'gap': [], 'target': {}, 'actual': {}, 'total_eur': 30000}
-        props_salarie = generate_proposals({'employment_type': 'salarie'}, positions, allocation)
-        props_tns     = generate_proposals({'employment_type': 'TNS'}, positions, allocation)
-        assert not any('PER' in p['label'] for p in props_salarie)
-        assert any('PER' in p['label'] for p in props_tns)
+        positions = [{'category': 'Actions', 'envelope': 'CTO', 'value': 5000, 'net_attributed': 5000,
+                      'holdings_detail': [{'isin': 'X', 'name': 'Gagnant', 'market_value': 5000,
+                                           'cost_basis': 4000}]},
+                     {'category': 'Fond Euro', 'envelope': 'Assurance-vie', 'value': 9000, 'net_attributed': 9000}]
+        allocation = {'gap': [], 'total_eur': 14000}
+        assert generate_proposals({'employment_type': 'TNS'}, positions, allocation) == []
+
+    def test_moins_values_du_cto_chiffrees(self):
+        from services.advisor.rebalance import generate_proposals
+        positions = [{'category': 'Actions', 'envelope': 'CTO', 'value': 1700, 'net_attributed': 1700,
+                      'holdings_detail': [
+                          {'isin': 'A', 'name': 'Perdant', 'market_value': 700, 'cost_basis': 1000},
+                          {'isin': 'B', 'name': 'Gagnant', 'market_value': 1000, 'cost_basis': 500}]}]
+        props = generate_proposals({}, positions, {'gap': [], 'total_eur': 1700})
+        assert len(props) == 1 and props[0]['amount'] == pytest.approx(300)
+        assert 'Perdant' in props[0]['rationale'] and 'Gagnant' not in props[0]['rationale']
+
+
+class TestPerimetreFinancier:
+    """La cible s'applique au patrimoine financier, et seule sa part libre
+    peut bouger."""
+
+    def _p(self, cat, env, net, liquidity='J0–J1', mob=None, **kw):
+        return {'category': cat, 'envelope': env, 'net_attributed': net, 'value': net,
+                'liquidity': liquidity, 'mobilizable_value': net if mob is None else mob, **kw}
+
+    def _profil(self):
+        return {'horizon_years': 20, 'risk_tolerance': 4}
+
+    def test_immobilier_et_objets_hors_calcul_mais_decomptes(self):
+        from services.advisor.allocation import allocation_financiere
+        a = allocation_financiere(self._profil(), [
+            self._p('Actions', 'PEA', 60000), self._p('Immobilier', 'Immobilier', 300000, 'Bloqué', 0),
+            self._p('Objets de valeur', 'Biens', 20000, 'Bloqué', 0)])
+        assert a['total_eur'] == 60000
+        assert {e['category'] for e in a['exclus']} == {'Immobilier', 'Objets de valeur'}
+        assert 'Immobilier' not in a['target']
+        assert sum(a['target'].values()) == pytest.approx(1, abs=1e-3)
+
+    def test_les_categories_rangees_dans_les_classes(self):
+        from services.advisor.allocation import allocation_financiere
+        a = allocation_financiere(self._profil(), [
+            self._p('Fond Euro', 'Assurance-vie', 10000), self._p('Cash & dépôts', 'Livret A', 10000),
+            self._p('Produits Structurés', 'Assurance-vie', 10000), self._p('Crypto', 'Crypto', 10000)])
+        classes = {g['category']: g['actual_eur'] for g in a['gap']}
+        assert classes == {'Obligations': 10000, 'Cash': 10000, 'Actions': 20000}
+
+    def test_le_bloque_compte_mais_ne_bouge_pas(self):
+        """Un fonds euros nanti pese dans l'exposition ; seul le libre est propose."""
+        from services.advisor.allocation import allocation_financiere
+        from services.advisor.rebalance import generate_proposals
+        positions = [self._p('Fond Euro', 'Assurance-vie', 80000, 'Bloqué', 0, label='AV nantie'),
+                     self._p('Fond Euro', 'Assurance-vie', 10000, mob=9500, label='AV libre'),
+                     self._p('Actions', 'PEA', 10000)]
+        a = allocation_financiere(self._profil(), positions)
+        oblig = next(g for g in a['gap'] if g['category'] == 'Obligations')
+        assert oblig['bloque_eur'] == pytest.approx(80000) and oblig['libre_eur'] == pytest.approx(9500)
+        bucket = [p for p in generate_proposals(self._profil(), positions, a) if p['kind'] == 'bucket']
+        assert bucket and bucket[0]['amount'] == pytest.approx(9500)
+        assert 'AV nantie' in bucket[0]['rationale'] and 'AV libre' in bucket[0]['rationale']
+
+    def test_sans_reserve_les_livrets_reglementes_sont_gardes(self):
+        from services.advisor.allocation import allocation_financiere
+        from services.advisor.rebalance import generate_proposals
+        positions = [self._p('Cash & dépôts', 'Livret A', 22950), self._p('Cash & dépôts', 'Livret Bourso+', 50000),
+                     self._p('Actions', 'PEA', 10000)]
+        a = allocation_financiere(self._profil(), positions)
+        cash = next(g for g in a['gap'] if g['category'] == 'Cash')
+        bucket = [p for p in generate_proposals(self._profil(), positions, a) if p['kind'] == 'bucket']
+        total = sum(p['amount'] for p in bucket)
+        assert total == pytest.approx(cash['actual_eur'] - max(cash['target_eur'], 22950))
+        assert 'livrets réglementés' in bucket[0]['rationale']
 
 
 # ─── Proposals route ─────────────────────────────────────────────────────────
@@ -263,3 +331,19 @@ class TestUsage:
             assert r.get_json()['budget_usd'] == 5.0
         finally:
             os.environ.pop('ADVISOR_BUDGET_USD', None)
+
+
+class TestPropositionsPerimees:
+    def test_la_generation_purge_les_attentes_des_arretes_anterieurs(self, client):
+        from models import get_db
+        from services.advisor.rebalance import replace_proposals, list_proposals
+        p = {'kind': 'bucket', 'label': 'x', 'from_ref': None, 'to_ref': None, 'amount': 1,
+             'rationale': '', 'status': 'pending'}
+        with get_db() as conn:
+            replace_proposals(conn, 'Personne 1', '2026-01-01', [p, p])
+            garde = conn.execute("SELECT id FROM rebalance_proposals LIMIT 1").fetchone()['id']
+            conn.execute("UPDATE rebalance_proposals SET status='applied' WHERE id=?", (garde,))
+            replace_proposals(conn, 'Personne 1', '2026-02-01', [p])
+            rows = list_proposals(conn, 'Personne 1')
+        assert sorted((r['snapshot_date'], r['status']) for r in rows) == [
+            ('2026-01-01', 'applied'), ('2026-02-01', 'pending')]
