@@ -3820,3 +3820,8 @@ td.arbo-part > * { vertical-align: middle; }
 .puce--pos { background: var(--success-light); color: var(--success); }
 .puce--neg { background: var(--danger-light); color: var(--danger); }
 .dispo-bloque { margin-top: .35rem; padding-top: .45rem; border-top: 1px dashed var(--border); }
+
+/* Bascule Tableau / Arborescence : a droite, dans les deux vues. */
+#tab-positions #positions-filters { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
+#tab-positions #positions-filters > .filter-select { flex: 1 1 14rem; width: auto; }
+#tab-positions #positions-filters > #pos-view-toggle { margin-left: auto; width: auto; flex: none; }

@@ -186,11 +186,11 @@ export function renderPosViewToggle() {
   // entiere pour deux boutons. Il rejoint la barre d'outils de l'arbre.
   const isTree = S.positionsView === 'tree';
   const place = toggle => {
+    // Meme place dans les deux vues : en bout de barre, a droite. En tableau
+    // il passait en tete, et changeait de cote a chaque bascule.
     const hote = isTree ? document.querySelector('#positions-tree-wrap .arbo-barre-outils')
-                        : document.querySelector('#tab-positions .header-actions');
-    if (hote && toggle.parentElement !== hote) {
-      isTree ? hote.appendChild(toggle) : hote.insertBefore(toggle, hote.firstChild);
-    }
+                        : document.getElementById('positions-filters');
+    if (hote && toggle.parentElement !== hote) hote.appendChild(toggle);
     document.querySelector('#tab-positions .positions-toolbar')?.classList.toggle('hidden', isTree);
   };
   const existing = document.getElementById('pos-view-toggle');

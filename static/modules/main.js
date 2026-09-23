@@ -494,7 +494,8 @@ function wireEvents() {
         drilldownHistory({ subtitle: 'Évolution enveloppe', title: btn.dataset.envelope, filters: f });
       }
       if (btn.dataset.action === 'history-etabl') {
-        const f = { owner: btn.dataset.owner };
+        // Sans titulaire (etablissement partage), l'historique couvre tous.
+        const f = btn.dataset.owner ? { owner: btn.dataset.owner } : {};
         if (btn.dataset.establishment) f.establishment = btn.dataset.establishment;
         if (btn.dataset.entity) f.entity = btn.dataset.entity;
         const label = btn.dataset.establishment || btn.dataset.entity || '';

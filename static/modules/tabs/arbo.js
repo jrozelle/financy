@@ -158,6 +158,31 @@ function _parTitulaire(positions) {
   }).sort((a, b) => b.brut - a.brut);
 }
 
+/** Par etablissement : la banque ou l'assureur, puis ses comptes — le
+ *  titulaire en pastille. C'est la lecture d'un releve : « ce que j'ai chez
+ *  Boursorama », tous titulaires confondus. */
+function _parEtablissement(positions) {
+  const etabs = new Map();
+  positions.forEach(p => {
+    const nom = p.establishment || p.entity || 'Sans établissement';
+    if (!etabs.has(nom)) etabs.set(nom, { cle: `e${nom}`, niveau: 0, nom, sous: '', enfants: [],
+      contexte: { owner: p.owner, establishment: p.establishment || null, entity: p.establishment ? null : p.entity } });
+    const f = _feuille(p, 1, { avecEtab: false });
+    f.couleur = NATURES.find(n => n.id === natureDe(p.category, p.envelope))?.couleur;
+    f.pastille = true;
+    etabs.get(nom).enfants.push(f);
+  });
+  return [...etabs.values()].map(e => {
+    const titulaires = new Set(e.enfants.map(f => f.position.owner));
+    e.sous = `${e.enfants.length} compte${e.enfants.length > 1 ? 's' : ''}`
+      + (titulaires.size > 1 ? ` · ${titulaires.size} titulaires` : '');
+    // Un seul titulaire : « Ajouter » cree le compte a son nom ; plusieurs,
+    // le formulaire demandera lequel.
+    if (titulaires.size > 1) e.contexte = { ...e.contexte, owner: null };
+    return Object.assign(e, _somme(e.enfants));
+  }).sort((a, b) => b.brut - a.brut);
+}
+
 // ── Tri ──────────────────────────────────────────────────────────────────
 const CLES_TRI = {
   nom:  n => (n.nom || '').toLocaleLowerCase('fr'),
@@ -233,7 +258,8 @@ function _estOuvert(n) {
 
 function _racines() {
   const ps = _dernier.positions;
-  return _groupe === 'titulaire' ? _parTitulaire(ps) : _groupe === 'plat' ? _aPlat(ps) : _parNature(ps);
+  return _groupe === 'titulaire' ? _parTitulaire(ps) : _groupe === 'etablissement' ? _parEtablissement(ps)
+       : _groupe === 'plat' ? _aPlat(ps) : _parNature(ps);
 }
 
 function _cellulePv(n) {
