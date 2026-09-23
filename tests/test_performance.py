@@ -622,41 +622,41 @@ class TestAlerteValorisation:
     def test_devise_sans_taux_signalee(self):
         """Sans taux de change, le cours etranger ne valorise rien."""
         a = holding_price_warning({'isin': 'US0000000001', 'name': 'ADOBE',
-                                   'quantity': 10, 'market_value': 1893.67,
-                                   'last_price': 225.11, 'currency': 'USD',
+                                   'quantity': 7, 'market_value': 1894.15,
+                                   'last_price': 312.40, 'currency': 'USD',
                                    'is_priceable': True})
         assert a and a['kind'] == 'devise' and 'USD' in a['reason']
 
     def test_devise_convertie_donne_un_cours_frais(self):
         """Avec le taux, le dollar se convertit et le cours du jour s'applique.
 
-        225,11 USD / 1,1545 = 194,98 EUR, soit exactement la valeur enregistree
+        312,40 USD / 1,1545 = 270,59 EUR, soit exactement la valeur enregistree
         d'Adobe : c'est ce qui prouve que l'ecart de 15,45 % etait bien le
         change, et rien d'autre.
         """
         from models import _holding_decision
-        h = {'isin': 'US0000000001', 'name': 'ADOBE', 'quantity': 10,
-             'market_value': 1893.67, 'last_price': 225.11, 'currency': 'USD',
+        h = {'isin': 'US0000000001', 'name': 'ADOBE', 'quantity': 7,
+             'market_value': 1894.15, 'last_price': 312.40, 'currency': 'USD',
              'is_priceable': True, 'fx_rate': 1.1545,
              'as_of_date': '2026-08-12', 'last_price_date': '2026-08-21'}
         valeur, a = _holding_decision(h)
-        assert valeur == pytest.approx(1949.8, abs=1)
+        assert valeur == pytest.approx(1894.15, abs=1)
         assert a is None, "converti, l ecart disparait : plus rien a signaler"
 
     def test_taux_absurde_ne_valorise_pas(self):
         from models import _holding_decision
         valeur, a = _holding_decision(
-            {'isin': 'X', 'quantity': 10, 'market_value': 1893.67,
-             'last_price': 225.11, 'currency': 'USD', 'is_priceable': True,
+            {'isin': 'X', 'quantity': 7, 'market_value': 1894.15,
+             'last_price': 312.40, 'currency': 'USD', 'is_priceable': True,
              'fx_rate': 0})
-        assert valeur == pytest.approx(1893.67)
+        assert valeur == pytest.approx(1894.15)
         assert a['kind'] == 'devise'
 
     def test_divergence_valeur_saisie_retenue(self):
         """Saisie aussi recente que le cours : c'est elle qui l'emporte."""
         a = holding_price_warning({'isin': 'US0000000001', 'name': 'ADOBE',
-                                   'quantity': 10, 'market_value': 1893.67,
-                                   'last_price': 225.11, 'currency': 'EUR',
+                                   'quantity': 7, 'market_value': 1894.15,
+                                   'last_price': 312.40, 'currency': 'EUR',
                                    'is_priceable': True, 'as_of_date': '2026-08-12',
                                    'last_price_date': '2026-08-12'})
         assert a and a['kind'] == 'divergence'
@@ -671,8 +671,8 @@ class TestAlerteValorisation:
         saisie datait de six semaines.
         """
         a = holding_price_warning({'isin': 'CRYPTO_BTC', 'name': 'Bitcoin',
-                                   'quantity': 0.05493065, 'market_value': 3027.6,
-                                   'last_price': 57816.6, 'currency': 'EUR',
+                                   'quantity': 0.0452, 'market_value': 2610.0,
+                                   'last_price': 68210.4, 'currency': 'EUR',
                                    'is_priceable': True, 'as_of_date': '2026-07-02',
                                    'last_price_date': '2026-08-21'})
         assert a and a['kind'] == 'cours_retenu'
@@ -686,13 +686,13 @@ class TestAlerteValorisation:
         """
         from models import _holding_decision
         cas = [
-            {'quantity': 10, 'market_value': 1893.67, 'last_price': 225.11,
+            {'quantity': 7, 'market_value': 1894.15, 'last_price': 312.40,
              'currency': 'EUR', 'is_priceable': True,
              'as_of_date': '2026-08-12', 'last_price_date': '2026-08-12'},
-            {'quantity': 0.055, 'market_value': 3027.6, 'last_price': 57816.6,
+            {'quantity': 0.0452, 'market_value': 2610.0, 'last_price': 68210.4,
              'currency': 'EUR', 'is_priceable': True,
              'as_of_date': '2026-07-02', 'last_price_date': '2026-08-21'},
-            {'quantity': 10, 'market_value': 1893.67, 'last_price': 225.11,
+            {'quantity': 7, 'market_value': 1894.15, 'last_price': 312.40,
              'currency': 'USD', 'is_priceable': True},
         ]
         for h in cas:
@@ -720,13 +720,13 @@ class TestAlerteValorisation:
         with get_db() as conn:
             conn.execute("""INSERT INTO securities (isin, name, currency, is_priceable,
                 last_price, last_price_date, data_source)
-                VALUES ('US0000000001','ADOBE','USD',1,258.75,'2026-08-01','yahoo')""")
-            for d, v in (('2026-01-01', 2000), ('2026-08-01', 1893.67)):
+                VALUES ('US0000000001','ADOBE','USD',1,312.40,'2026-08-01','yahoo')""")
+            for d, v in (('2026-01-01', 2000), ('2026-08-01', 1894.15)):
                 cur = conn.execute("""INSERT INTO positions (date, owner, category,
                     envelope, establishment, value, debt, ownership_pct, debt_pct)
                     VALUES (?,'Alice','Actions','CTO','X',?,0,1.0,1.0)""", (d, v))
                 conn.execute("""INSERT INTO holdings (position_id, isin, quantity,
-                    market_value, as_of_date) VALUES (?,'US0000000001',10,?,?)""",
+                    market_value, as_of_date) VALUES (?,'US0000000001',7,?,?)""",
                     (cur.lastrowid, v, d))
             conn.commit()
         g = client.get('/api/performance').get_json()['groups'][0]
@@ -738,17 +738,39 @@ class TestAlerteValorisation:
         with get_db() as conn:
             conn.execute("""INSERT INTO securities (isin, name, currency, is_priceable,
                 last_price, last_price_date, data_source)
-                VALUES ('US0000000001','ADOBE','USD',1,258.75,'2026-08-01','yahoo')""")
+                VALUES ('US0000000001','ADOBE','USD',1,312.40,'2026-08-01','yahoo')""")
             cur = conn.execute("""INSERT INTO positions (date, owner, category, envelope,
                 establishment, value, debt, ownership_pct, debt_pct)
-                VALUES ('2026-08-01','Alice','Actions','CTO','X',1893.67,0,1.0,1.0)""")
+                VALUES ('2026-08-01','Alice','Actions','CTO','X',1894.15,0,1.0,1.0)""")
             conn.execute("""INSERT INTO holdings (position_id, isin, quantity,
-                market_value, as_of_date) VALUES (?,'US0000000001',10,1893.67,'2026-08-01')""",
+                market_value, as_of_date) VALUES (?,'US0000000001',7,1894.15,'2026-08-01')""",
                 (cur.lastrowid,))
             conn.execute("""INSERT INTO positions (date, owner, category, envelope,
                 establishment, value, debt, ownership_pct, debt_pct)
                 VALUES ('2026-01-01','Alice','Actions','CTO','X',2000,0,1.0,1.0)""")
             conn.commit()
         d = client.get('/api/performance').get_json()
-        # 10 x 225,11 = 2 251,12 si le dollar passait pour de l euro
-        assert d['groups'][0]['value'] == pytest.approx(1893.67, abs=1)
+        # 7 x 312,40 = 2 186,80 si le dollar passait pour de l euro
+        assert d['groups'][0]['value'] == pytest.approx(1894.15, abs=1)
+
+
+class TestCompteQuiApparait:
+    """Un compte ouvert par un versement declare ne compte qu'une fois : la
+    valeur d'apparition moins le versement deja enregistre."""
+
+    def test_versement_du_jour_d_ouverture_pas_compte_deux_fois(self):
+        from routes.performance import _composition_flux
+        cle_a = ('PEA', 'Banque', 'Paul', None)
+        cle_b = ('Assurance-vie', 'Assureur', 'Paul', None)
+        membres = {cle_a: {'2026-02-16': 50000, '2026-03-03': 50500},
+                   cle_b: {'2026-03-03': 100000}}
+        flux = [('2026-03-03', 100000.0, ('Assurance-vie', 'Assureur', 'Paul'))]
+        assert _composition_flux(['2026-02-16', '2026-03-03'], membres, flux) == []
+        # Sans versement declare, l'apparition reste un apport implicite.
+        assert _composition_flux(['2026-02-16', '2026-03-03'], membres, []) == [('2026-03-03', 100000)]
+
+    def test_par_enveloppe_la_cle_courte_ne_plante_pas(self):
+        from routes.performance import _composition_flux
+        membres = {('PEA',): {'2026-01-01': 1000}, ('CTO',): {'2026-02-01': 500}}
+        assert _composition_flux(['2026-01-01', '2026-02-01'], membres,
+                                 [('2026-01-15', 500.0, ('CTO', None, 'Paul'))]) == [('2026-02-01', -1000)]

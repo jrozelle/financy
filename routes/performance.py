@@ -186,7 +186,7 @@ def _values_by_group(conn, dates, grouping, owner=None):
     return by_date, cats, meta, alertes
 
 
-def _composition_flux(dates, members):
+def _composition_flux(dates, members, flux=None):
     """Flux synthetiques traduisant les changements de composition d'un agregat.
 
     Un agregat (une enveloppe, l'ensemble du patrimoine) additionne plusieurs
@@ -199,21 +199,43 @@ def _composition_flux(dates, members):
     comme un retrait, dates a la fin de la sous-periode : poids nul dans le
     denominateur de Dietz, ce qui neutralise l'effet sans fabriquer de rendement.
 
-    `members` : {cle de compte: {date: valeur}}. Retourne [(date, montant signe)].
+    L'apport implicite est la valeur du compte MOINS les flux deja enregistres
+    sur lui dans la sous-periode : un versement declare le jour de l'ouverture
+    est deja compte, et l'ajouter a la valeur le comptait deux fois — 100 000 €
+    d'assurance-vie versee faisaient 200 000 € de flux, et −60 % sur quinze
+    jours. Meme regle que « D'ou vient la hausse » (`services/contribution.py`).
+
+    `members` : {cle de compte (enveloppe, etablissement, titulaire): {date: valeur}}.
+    `flux` : [(date, montant signe, (enveloppe, etablissement, titulaire))].
+    Retourne [(date, montant signe)].
     """
+    def declares(cle, d0, d1):
+        # Par enveloppe, la cle se reduit a (enveloppe,) : titulaire et
+        # etablissement ne filtrent plus.
+        env = cle[0]
+        etab = cle[1] if len(cle) > 1 else None
+        owner = cle[2] if len(cle) > 2 else None
+        return sum(m for d, m, (f_env, f_etab, f_owner) in (flux or [])
+                   if d0 < d <= d1 and f_env == env and (len(cle) < 3 or f_owner == owner)
+                   and (not etab or not f_etab or f_etab == etab))
     out = []
     for k in range(len(dates) - 1):
         d0, d1 = dates[k], dates[k + 1]
         delta = 0.0
-        for vals in members.values():
+        for cle, vals in members.items():
             at0, at1 = d0 in vals, d1 in vals
             if at1 and not at0:
-                delta += vals[d1]
+                delta += vals[d1] - declares(cle, d0, d1)
             elif at0 and not at1:
-                delta -= vals[d0]
+                delta -= vals[d0] + declares(cle, d0, d1)
         if abs(delta) > 0.005:
             out.append((d1, delta))
     return out
+
+
+def _flux_par_compte(flux):
+    return [(f['date'], _flux_signed(f), (f.get('envelope') or 'Autre', f.get('establishment') or None,
+                                          f.get('owner'))) for f in flux if _flux_signed(f)]
 
 
 def _chain(dates, values, flux):
@@ -468,7 +490,7 @@ def get_performance():
                 continue
             g_fees += abs(f.get('amount') or 0)
 
-        comp = _composition_flux(g_dates, mvals) if len(members) > 1 else []
+        comp = _composition_flux(g_dates, mvals, _flux_par_compte(flux)) if len(members) > 1 else []
         serie, cumul, days, gaps, suspects = _chain(g_dates, g_values, g_flux + comp)
         tri, tri_periode, tri_jours = _tri(g_dates, g_values, g_flux + comp)
 
@@ -539,7 +561,7 @@ def get_performance():
         g_flux = [(f['date'], _flux_signed(f)) for f in flux
                   if ((f.get('envelope') or 'Autre'), f.get('owner')) in pairs
                   and _flux_signed(f)]
-        comp = _composition_flux(g_dates, mvals)
+        comp = _composition_flux(g_dates, mvals, _flux_par_compte(flux))
         serie, cumul, days, gaps, suspects = _chain(g_dates, g_values, g_flux + comp)
         tri, tri_periode, tri_jours = _tri(g_dates, g_values, g_flux + comp)
         if cumul is None:
