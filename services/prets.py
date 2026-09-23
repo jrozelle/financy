@@ -7,14 +7,16 @@ from __future__ import annotations
 
 from datetime import date as _date
 
+from services.montants import centimes, euros, ligne_en_euros
+
 
 def crd_a(conn, pret_id, date):
     r = conn.execute('SELECT crd FROM pret_echeances WHERE pret_id=? AND date<=? '
                      'ORDER BY date DESC, rang DESC LIMIT 1', (pret_id, date)).fetchone()
     if r:
-        return r['crd']
+        return euros(r['crd'])
     m = conn.execute('SELECT montant FROM prets WHERE id=?', (pret_id,)).fetchone()
-    return (m['montant'] or 0.0) if m else 0.0
+    return euros(m['montant'] or 0) if m else 0.0
 
 
 def dettes_par_entite(conn, date):
@@ -85,8 +87,9 @@ def resume(conn, date=None):
     date = date or _date.today().isoformat()
     out = []
     for p in conn.execute('SELECT * FROM prets ORDER BY entity, libelle'):
-        p = dict(p)
-        ech = conn.execute('SELECT * FROM pret_echeances WHERE pret_id=? ORDER BY rang', (p['id'],)).fetchall()
+        p = ligne_en_euros('prets', p)
+        ech = [ligne_en_euros('pret_echeances', e) for e in conn.execute(
+            'SELECT * FROM pret_echeances WHERE pret_id=? ORDER BY rang', (p['id'],))]
         a_venir = [e for e in ech if e['date'] > date]
         # En differe, l'echeance du mois (interets seuls, ou rien) n'est pas la
         # mensualite qui suivra : les deux se disent. Le differe court tant que
@@ -157,13 +160,13 @@ def projection(conn, depuis=None, parts=None):
 
 def est_in_fine(conn, pret_id):
     """Un pret dont tout le capital se rembourse a la derniere echeance."""
-    r = conn.execute('SELECT COUNT(*) n, SUM(CASE WHEN capital > 0.005 THEN 1 ELSE 0 END) k, '
+    r = conn.execute('SELECT COUNT(*) n, SUM(CASE WHEN capital > 0 THEN 1 ELSE 0 END) k, '
                      'MAX(rang) dernier FROM pret_echeances WHERE pret_id=?', (pret_id,)).fetchone()
     if not r['n'] or r['k'] != 1:
         return False
     d = conn.execute('SELECT capital FROM pret_echeances WHERE pret_id=? AND rang=?',
                      (pret_id, r['dernier'])).fetchone()
-    return bool(d and d['capital'] > 0.005)
+    return bool(d and d['capital'] > 0)          # centimes
 
 
 def enregistrer(conn, tableau, entity=None, libelle=None, source=None):
@@ -173,11 +176,12 @@ def enregistrer(conn, tableau, entity=None, libelle=None, source=None):
         'INSERT INTO prets (libelle, preteur, emprunteur, entity, montant, taux, debut, fin, source) '
         'VALUES (?,?,?,?,?,?,?,?,?)',
         (libelle or tableau.libelle, tableau.preteur, tableau.emprunteur, entity,
-         tableau.montant, tableau.taux, e[0].date, e[-1].date, source))
+         centimes(tableau.montant), tableau.taux, e[0].date, e[-1].date, source))
     pid = cur.lastrowid
     conn.executemany('INSERT INTO pret_echeances (pret_id, rang, date, capital, interets, assurance, crd) '
                      'VALUES (?,?,?,?,?,?,?)',
-                     [(pid, x.rang, x.date, x.capital, x.interets, x.assurance, x.crd) for x in e])
+                     [(pid, x.rang, x.date, centimes(x.capital), centimes(x.interets or 0),
+                       centimes(x.assurance or 0), centimes(x.crd)) for x in e])
     return pid
 
 
@@ -190,7 +194,7 @@ def calendrier(conn, depuis=None, nb=12, parts=None):
                 if parts is None or r['id'] in parts}
     part_de = (lambda i: parts[i]) if parts is not None else (lambda i: 1.0)
     montants = ('capital', 'interets', 'assurance', 'crd', 'montant')
-    lignes = [dict(r) for r in conn.execute('SELECT * FROM pret_echeances WHERE date > ? ORDER BY date, pret_id',
+    lignes = [ligne_en_euros('pret_echeances', r) for r in conn.execute('SELECT * FROM pret_echeances WHERE date > ? ORDER BY date, pret_id',
                                             (depuis,)) if r['pret_id'] in libelles]
     prochaines = [dict({c: (round(v * part_de(r['pret_id']), 2) if c in montants else v) for c, v in r.items()},
                        pret=libelles[r['pret_id']]) for r in lignes[:nb]]

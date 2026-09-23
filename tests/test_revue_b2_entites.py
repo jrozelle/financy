@@ -76,7 +76,7 @@ class TestRenommage:
     def test_le_nom_suit_dans_prets_releves_parts_exercices(self, client):
         e = _entite(client)
         with get_db() as conn:
-            conn.execute("INSERT INTO prets (libelle, entity, montant) VALUES ('Prêt', 'SCI Exemple', 1000)")
+            conn.execute("INSERT INTO prets (libelle, entity, montant) VALUES ('Prêt', 'SCI Exemple', 100000)")
             conn.execute("INSERT INTO entite_operations (entity, date, libelle, montant, nature) "
                          "VALUES ('SCI Exemple', '2026-01-02', 'x', 10, 'autre')")
             conn.execute("INSERT INTO entite_parts (entity, nom, parts) VALUES ('SCI Exemple', 'SCPI A', 10)")
@@ -116,7 +116,7 @@ class TestSuppression:
     def test_refusee_tant_qu_un_pret_y_est_rattache(self, client):
         e = _entite(client)
         with get_db() as conn:
-            conn.execute("INSERT INTO prets (libelle, entity, montant) VALUES ('Prêt', 'SCI Exemple', 1000)")
+            conn.execute("INSERT INTO prets (libelle, entity, montant) VALUES ('Prêt', 'SCI Exemple', 100000)")
             conn.execute("INSERT INTO entite_operations (entity, date, libelle, montant, nature) "
                          "VALUES ('SCI Exemple', '2026-01-02', 'x', 10, 'autre')")
         r = client.delete(f"/api/entities/{e['id']}?force=1", headers=H)

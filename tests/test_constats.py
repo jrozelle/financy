@@ -164,11 +164,11 @@ class TestGarderOuRembourser:
         conn.execute("INSERT INTO positions (date, owner, category, envelope, value, entity) "
                      "VALUES ('2026-09-01', 'Paul', 'Immobilier', 'Immobilier', 0, 'Maison')")
         conn.execute("INSERT INTO prets (id, libelle, entity, montant, taux, debut, fin) "
-                     "VALUES (1, 'Prêt maison', 'Maison', 100000, 1.1, '2026-01-05', '2036-12-05')")
-        crd = 100000
+                     "VALUES (1, 'Prêt maison', 'Maison', 10000000, 1.1, '2026-01-05', '2036-12-05')")
+        crd = 10000000                     # centimes
         for i in range(1, 13):
-            crd -= 700
-            conn.execute('INSERT INTO pret_echeances VALUES (1, ?, ?, 700, 90, 0, ?)',
+            crd -= 70000
+            conn.execute('INSERT INTO pret_echeances VALUES (1, ?, ?, 70000, 9000, 0, ?)',
                          (i, f'2027-{i:02d}-05', crd))
 
     def _credits(self, owner=None):

@@ -7,6 +7,7 @@ from flask import Blueprint, jsonify, request
 from auth import login_required, csrf_protect
 from models import get_db, validate_date, validate_string
 from services import prets as svc
+from services.montants import centimes
 
 logger = logging.getLogger('financy')
 prets_bp = Blueprint('prets', __name__)
@@ -118,7 +119,7 @@ def importer():
             return jsonify({'error': f'Entité inconnue : {entity}'}), 400
         # Le meme echeancier deux fois doublerait la dette projetee.
         deja = conn.execute('SELECT id, libelle FROM prets WHERE montant=? AND debut=? AND fin=?',
-                            (tableau.montant, tableau.echeances[0].date, tableau.echeances[-1].date)).fetchone()
+                            (centimes(tableau.montant), tableau.echeances[0].date, tableau.echeances[-1].date)).fetchone()
         apercu = tableau.to_dict()
         apercu['echeances'] = len(tableau.echeances)
         apercu['deja'] = dict(deja) if deja else None

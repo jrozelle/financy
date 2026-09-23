@@ -103,9 +103,9 @@ class TestBilan:
     def _base(self, conn):
         conn.execute("INSERT INTO entities (name, type) VALUES ('SCI T', 'SCI')")
         conn.execute("INSERT INTO entity_snapshots (entity_name, date, gross_assets, debt) VALUES ('SCI T', '2026-01-01', 100000, 100000)")
-        conn.execute("INSERT INTO prets (id, libelle, entity, montant, taux) VALUES (1, 'P', 'SCI T', 100000, 5)")
+        conn.execute("INSERT INTO prets (id, libelle, entity, montant, taux) VALUES (1, 'P', 'SCI T', 10000000, 5)")  # centimes
         for mois in ('01', '02'):
-            conn.execute('INSERT INTO pret_echeances VALUES (1, ?, ?, 300, 400, 0, 99000)', (int(mois), f'2026-{mois}-05'))
+            conn.execute('INSERT INTO pret_echeances VALUES (1, ?, ?, 30000, 40000, 0, 9900000)', (int(mois), f'2026-{mois}-05'))
 
     def test_levier(self):
         with get_db() as conn:

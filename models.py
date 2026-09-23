@@ -950,6 +950,39 @@ def _migration_021(conn):
         ) STRICT""", ('resultat',))
 
 
+def _migration_022(conn):
+    """Credits en centimes entiers (tables STRICT) : montant emprunte, et
+    chaque echeance (capital, interets, assurance, restant du). Un pret se
+    reconnaissait a un montant flottant ; son echeancier cumulait des
+    arrondis que la verification du tableau tolerait."""
+    _reconstruire_en_centimes(conn, 'prets', """
+        CREATE TABLE {t} (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            libelle     TEXT NOT NULL,
+            preteur     TEXT,
+            emprunteur  TEXT,
+            entity      TEXT,               -- entite dont il porte la dette
+            montant     INTEGER,            -- centimes
+            taux        REAL,
+            debut       TEXT,
+            fin         TEXT,
+            source      TEXT,               -- nom du document importe
+            created_at  TEXT DEFAULT CURRENT_TIMESTAMP,
+            ira         TEXT DEFAULT 'legale'
+        ) STRICT""", ('montant',))
+    _reconstruire_en_centimes(conn, 'pret_echeances', """
+        CREATE TABLE {t} (
+            pret_id    INTEGER NOT NULL,
+            rang       INTEGER NOT NULL,
+            date       TEXT NOT NULL,
+            capital    INTEGER NOT NULL,    -- centimes : baisse du restant du
+            interets   INTEGER NOT NULL DEFAULT 0,
+            assurance  INTEGER NOT NULL DEFAULT 0,
+            crd        INTEGER NOT NULL,    -- centimes : restant du APRES l'echeance
+            PRIMARY KEY (pret_id, rang)
+        ) STRICT""", ('capital', 'interets', 'assurance', 'crd'))
+
+
 MIGRATIONS = [
     (1, _migration_001),
     (2, _migration_002),
@@ -972,6 +1005,7 @@ MIGRATIONS = [
     (19, _migration_019),
     (20, _migration_020),
     (21, _migration_021),
+    (22, _migration_022),
 ]
 
 

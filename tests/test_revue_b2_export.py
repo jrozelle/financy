@@ -16,10 +16,10 @@ def _seed():
     with get_db() as conn:
         conn.execute("INSERT INTO entities (name, type) VALUES ('SCI Exemple', 'SCI')")
         conn.execute("INSERT INTO prets (id, libelle, entity, montant, taux, debut, fin) "
-                     "VALUES (7, 'Prêt SCPI', 'SCI Exemple', 100000, 3.5, '2025-01-05', '2040-01-05')")
+                     "VALUES (7, 'Prêt SCPI', 'SCI Exemple', 10000000, 3.5, '2025-01-05', '2040-01-05')")
         for rang in (1, 2):
-            conn.execute('INSERT INTO pret_echeances VALUES (7, ?, ?, 300, 290, 10, ?)',
-                         (rang, f'2025-0{rang}-05', 100000 - 300 * rang))
+            conn.execute('INSERT INTO pret_echeances VALUES (7, ?, ?, 30000, 29000, 1000, ?)',   # centimes
+                         (rang, f'2025-0{rang}-05', 10000000 - 30000 * rang))
         conn.execute("INSERT INTO entite_operations (entity, date, libelle, montant, nature, banque, compte) "
                      "VALUES ('SCI Exemple', '2026-01-10', 'SCPI A DISTRIBUTION', 35000, 'revenu', 'Qonto', '0001')")
         conn.execute("INSERT INTO entite_parts (entity, nom, parts, montant_souscrit) VALUES ('SCI Exemple', 'SCPI A', 40, 1000000)")

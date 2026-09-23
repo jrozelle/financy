@@ -19,6 +19,8 @@ COLONNES = {
     'entite_soldes_initiaux': ('solde',),
     'entite_parts':           ('montant_souscrit',),
     'entite_exercices':       ('resultat',),
+    'prets':                  ('montant',),
+    'pret_echeances':         ('capital', 'interets', 'assurance', 'crd'),
 }
 
 

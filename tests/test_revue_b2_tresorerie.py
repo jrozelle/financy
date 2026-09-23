@@ -48,10 +48,10 @@ class TestSoldeInitial:
 class TestTousLesPrets:
     def test_le_bilan_agrege_les_prets_de_l_entite(self):
         with get_db() as conn:
-            conn.execute("INSERT INTO prets (id, libelle, entity, montant, taux) VALUES (1, 'P1', ?, 100000, 2)", (SCI,))
-            conn.execute("INSERT INTO prets (id, libelle, entity, montant, taux) VALUES (2, 'P2', ?, 50000, 4)", (SCI,))
-            for pid, crd in ((1, 60000), (2, 20000)):
-                conn.execute('INSERT INTO pret_echeances VALUES (?, 1, ?, 100, 50, 5, ?)', (pid, '2026-01-05', crd))
+            conn.execute("INSERT INTO prets (id, libelle, entity, montant, taux) VALUES (1, 'P1', ?, 10000000, 2)", (SCI,))
+            conn.execute("INSERT INTO prets (id, libelle, entity, montant, taux) VALUES (2, 'P2', ?, 5000000, 4)", (SCI,))
+            for pid, crd in ((1, 6000000), (2, 2000000)):   # centimes
+                conn.execute('INSERT INTO pret_echeances VALUES (?, 1, ?, 10000, 5000, 500, ?)', (pid, '2026-01-05', crd))
             t.enregistrer(conn, SCI, _releve('2026-01-01', '2026-01-31', 0, [('2026-01-05', 'FEDERAL FINANCE', -310.0)]),
                           'r.pdf')
             c = t.bilan(conn, SCI, mois=1)['credit']

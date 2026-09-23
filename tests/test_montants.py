@@ -91,3 +91,18 @@ class TestReconstruction:
         assert 'STRICT' not in c.execute(
             "SELECT sql FROM sqlite_master WHERE name='entite_operations'").fetchone()[0]
         assert not c.execute("SELECT 1 FROM sqlite_master WHERE name LIKE '%__centimes'").fetchone()
+
+
+class TestCredits:
+    def test_echeancier_converti_cle_composee_conservee(self):
+        c = _base_v20()
+        models._migration_021(c)
+        c.execute("INSERT INTO prets (id, libelle, montant, taux) VALUES (1, 'P', 100000.0, 3.2)")
+        c.execute('INSERT INTO pret_echeances VALUES (1, 1, ?, 250.004, 266.67, 12.5, 99749.996)', ('2026-01-05',))
+        models._migration_022(c)
+        assert tuple(c.execute('SELECT montant, taux FROM prets').fetchone()) == (10000000, 3.2)
+        assert tuple(c.execute('SELECT capital, interets, assurance, crd FROM pret_echeances').fetchone()) \
+            == (25000, 26667, 1250, 9975000)
+        with pytest.raises(sqlite3.IntegrityError):
+            c.execute("INSERT INTO pret_echeances VALUES (1, 1, '2026-02-05', 1, 1, 0, 1)")
+        assert c.execute("SELECT 1 FROM sqlite_master WHERE name='idx_pret_echeances_date'").fetchone()

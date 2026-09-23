@@ -199,7 +199,7 @@ def fiscal(conn, entite, ops, mensuel, pret_ids):
         r = conn.execute(f"SELECT SUM(interets) i, SUM(assurance) a FROM pret_echeances "
                          f"WHERE pret_id IN ({','.join('?' * len(pret_ids))}) AND substr(date,1,4)=?",
                          (*pret_ids, annee)).fetchone()
-        interets = (r['i'] or 0) + (r['a'] or 0)
+        interets = euros((r['i'] or 0) + (r['a'] or 0))
     fenetre = {m['mois'] for m in mensuel}
     couverts = len({_mois(o['date']) for o in ops} & fenetre) or 1
     revenus = sum(m['revenu'] for m in mensuel) * 12 / couverts
@@ -251,21 +251,21 @@ def bilan(conn, entite, mois=12):
     # qu'il contient de capital.
     # Tous les prets de l'entite : n'en retenir que le premier taisait
     # l'echeance, le capital et les interets des suivants.
-    prets = conn.execute('SELECT * FROM prets WHERE entity=? ORDER BY id', (entite,)).fetchall()
+    prets = [ligne_en_euros('prets', p) for p in conn.execute('SELECT * FROM prets WHERE entity=? ORDER BY id', (entite,))]
     credit = None
     if prets:
         capital = interets = assurance = crd_total = 0.0
         ponderation = taux_pondere = 0.0
         for pret in prets:
-            ech = conn.execute(
+            ech = [ligne_en_euros('pret_echeances', e) for e in conn.execute(
                 "SELECT * FROM pret_echeances WHERE pret_id=? AND substr(date,1,7) BETWEEN ? AND ?",
-                (pret['id'], fenetre[0], fenetre[-1])).fetchall()
+                (pret['id'], fenetre[0], fenetre[-1]))]
             capital += sum(e['capital'] for e in ech if e['capital'] > 0)
             interets += sum(e['interets'] for e in ech)
             assurance += sum(e['assurance'] for e in ech)
             r = conn.execute('SELECT crd FROM pret_echeances WHERE pret_id=? AND substr(date,1,7)<=? '
                              'ORDER BY date DESC LIMIT 1', (pret['id'], fin)).fetchone()
-            crd = r['crd'] if r else (pret['montant'] or 0.0)
+            crd = euros(r['crd']) if r else (pret['montant'] or 0.0)
             crd_total += crd
             if pret['taux'] is not None:
                 # Taux moyen pondere par le restant du (a defaut, le montant).
