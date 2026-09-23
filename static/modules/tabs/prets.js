@@ -19,20 +19,26 @@ export async function loadPrets() {
   const carte = document.getElementById('prets-carte');
   if (!carte) return;
   _cabler();
+  // Vu par un titulaire : ses seuls credits, a sa part de dette. En famille,
+  // les credits se lisent entiers.
+  const qui = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : '';
+  const q = qui ? `titulaire=${encodeURIComponent(qui)}` : '';
   let res, pj, echeancier, cal;
   try {
     [res, pj, echeancier, cal] = await Promise.all([
-      api('GET', '/api/prets', null, { silent: true }),
-      api('GET', '/api/prets/projection', null, { silent: true }),
-      api('GET', `/api/prets/dettes?date=${today()}`, null, { silent: true }),
-      api('GET', '/api/prets/calendrier', null, { silent: true }),
+      api('GET', `/api/prets${q ? '?' + q : ''}`, null, { silent: true }),
+      api('GET', `/api/prets/projection${q ? '?' + q : ''}`, null, { silent: true }),
+      qui ? Promise.resolve(null) : api('GET', `/api/prets/dettes?date=${today()}`, null, { silent: true }),
+      api('GET', `/api/prets/calendrier${q ? '?' + q : ''}`, null, { silent: true }),
     ]);
   } catch { return; }
   const prets = res.prets || [];
   _kpi(prets);
   _prochaines(cal?.prochaines || [], prets);
   _annees(cal?.annees || []);
-  document.getElementById('prets-liste').innerHTML = prets.length ? _liste(prets) : `
+  document.getElementById('prets-liste').innerHTML = prets.length ? _liste(prets) : qui ? `
+    <p class="text-muted prets-vide">${esc(qui)} ne porte aucun crédit : aucune des entités dont il ou elle
+      détient des parts n'est financée à crédit.</p>` : `
     <p class="text-muted prets-vide">Aucun prêt. Importez le tableau d'amortissement de votre banque (PDF Caisse d'Épargne
       ou Arkéa) : la dette de l'entité se projettera d'elle-même.</p>`;
   _courbe(pj, prets);
@@ -53,7 +59,8 @@ function _liste(prets) {
       <div class="pret-nom">
         <i style="background:${COULEURS[i % COULEURS.length]}"></i>
         <span><b>${esc(p.libelle)}</b><small>${esc(p.preteur || '')}${p.taux ? ` · ${String(p.taux).replace('.', ',')} %` : ''}
-          · ${fmt(p.montant)} empruntés</small></span>
+          · ${fmt(p.montant)} empruntés${p.part != null && p.part < 1
+            ? ` · <b class="pret-part">part de ${esc(S.syntheseOwner)} : ${Math.round(p.part * 100)} %</b>` : ''}</small></span>
       </div>
       <label class="pret-entite"><span class="sr-only">Entité de ${esc(p.libelle)}</span>
         <select class="filter-select" data-pret-entite="${p.id}">${options(p.entity)}</select></label>
@@ -160,6 +167,9 @@ function _courbe(pj, prets) {
  *  au-dela, on le dit. */
 function _ecarts(echeancier, prets) {
   const hote = document.getElementById('prets-ecarts');
+  // Vue d'un titulaire : la dette d'une entite se compare a l'echeancier en
+  // montants entiers, pas a une part. Le controle reste en vue Famille.
+  if (!echeancier) { if (hote) hote.innerHTML = ''; return; }
   const lignes = Object.entries(echeancier || {}).map(([nom, prevu]) => {
     const ent = (S.entities || []).find(e => e.name === nom);
     if (!ent) return '';

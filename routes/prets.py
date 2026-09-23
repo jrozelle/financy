@@ -13,6 +13,15 @@ prets_bp = Blueprint('prets', __name__)
 MAX_BYTES = 5 * 1024 * 1024
 
 
+def _parts(conn):
+    """Quotes-parts du titulaire demande (`?titulaire=`), None pour la famille :
+    les credits se lisent alors entiers."""
+    t = (request.args.get('titulaire') or '').strip()
+    if not t or t == 'Famille' or not validate_string(t, 100):
+        return None
+    return svc.parts_titulaire(conn, t)
+
+
 @prets_bp.route('/api/prets', methods=['GET'])
 @login_required
 def liste():
@@ -20,21 +29,26 @@ def liste():
     if date and not validate_date(date):
         return jsonify({'error': 'Date invalide'}), 400
     with get_db() as conn:
-        return jsonify(svc.resume(conn, date))
+        r = svc.resume(conn, date)
+        parts = _parts(conn)
+        if parts is not None:
+            r['prets'] = [svc.a_la_part(p, parts[p['id']]) for p in r['prets'] if p['id'] in parts]
+            r['titulaire'] = request.args.get('titulaire')
+        return jsonify(r)
 
 
 @prets_bp.route('/api/prets/projection', methods=['GET'])
 @login_required
 def projection():
     with get_db() as conn:
-        return jsonify(svc.projection(conn))
+        return jsonify(svc.projection(conn, parts=_parts(conn)))
 
 
 @prets_bp.route('/api/prets/calendrier', methods=['GET'])
 @login_required
 def calendrier():
     with get_db() as conn:
-        return jsonify(svc.calendrier(conn))
+        return jsonify(svc.calendrier(conn, parts=_parts(conn)))
 
 
 @prets_bp.route('/api/prets/dettes', methods=['GET'])

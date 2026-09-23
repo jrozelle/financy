@@ -25,6 +25,39 @@ def dettes_par_entite(conn, date):
     return {k: round(v, 2) for k, v in out.items()}
 
 
+def parts_titulaire(conn, owner, date=None):
+    """{pret_id: part de dette de `owner`}, d'apres ses positions sur l'entite
+    qui porte chaque pret, au dernier arrete a `date`. La part est `debt_pct` :
+    detenir la moitie d'une indivision ne dit pas qu'on porte la moitie de son
+    credit (66 / 34 sur une residence, par exemple). Un pret qu'il ne porte pas
+    n'y figure pas."""
+    date = date or _date.today().isoformat()
+    d = conn.execute('SELECT MAX(date) d FROM positions WHERE date <= ?', (date,)).fetchone()['d']
+    if not d:
+        return {}
+    parts = {}
+    for r in conn.execute('SELECT entity, SUM(COALESCE(debt_pct, ownership_pct, 1)) part FROM positions '
+                          'WHERE date=? AND owner=? AND entity IS NOT NULL GROUP BY entity', (d, owner)):
+        parts[r['entity']] = min(1.0, r['part'] or 0)
+    return {p['id']: parts[p['entity']] for p in conn.execute('SELECT id, entity FROM prets')
+            if p['entity'] in parts and parts[p['entity']] > 0}
+
+
+_MONTANTS = ('crd', 'echeance_du_mois', 'interets_restants', 'ira', 'mensualite', 'montant', 'rembourse')
+
+
+def a_la_part(pret, part):
+    """Un pret vu par un titulaire : chaque montant a sa part de dette."""
+    out = dict(pret, part=part)
+    for k in _MONTANTS:
+        if isinstance(out.get(k), (int, float)):
+            out[k] = round(out[k] * part, 2)
+    if isinstance(out.get('prochaine'), dict):
+        out['prochaine'] = {k: (round(v * part, 2) if k in ('assurance', 'capital', 'crd', 'interets', 'montant')
+                                and isinstance(v, (int, float)) else v) for k, v in out['prochaine'].items()}
+    return out
+
+
 def taux_effectif(echeances):
     """Taux annuel deduit de l'echeancier : interets d'une echeance amortie
     rapportes au restant du qui la precede. Les tableaux Caisse d'Epargne
@@ -90,11 +123,13 @@ def resume(conn, date=None):
     return {'date': date, 'prets': out}
 
 
-def projection(conn, depuis=None):
+def projection(conn, depuis=None, parts=None):
     """Capital restant du, pret par pret et au total, au premier de chaque mois
     depuis `depuis` (defaut : aujourd'hui) jusqu'a la derniere echeance."""
     depuis = depuis or _date.today().isoformat()
     prets = [dict(p) for p in conn.execute('SELECT id, libelle, entity, fin FROM prets ORDER BY fin')]
+    if parts is not None:
+        prets = [p for p in prets if p['id'] in parts]
     if not prets:
         return {'dates': [], 'prets': [], 'total': []}
     fin = max(p['fin'] for p in prets if p['fin'])
@@ -108,8 +143,9 @@ def projection(conn, depuis=None):
     dates.append(fin)
     series = []
     for p in prets:
-        series.append({**p, 'in_fine': est_in_fine(conn, p['id']),
-                       'points': [round(crd_a(conn, p['id'], d), 2) for d in dates]})
+        k = parts[p['id']] if parts is not None else 1.0
+        series.append({**p, 'in_fine': est_in_fine(conn, p['id']), 'part': k,
+                       'points': [round(crd_a(conn, p['id'], d) * k, 2) for d in dates]})
     total = [round(sum(s['points'][i] for s in series), 2) for i in range(len(dates))]
     # Le restant du des seuls prets amortissables : leur capital se rembourse
     # sur les revenus, et c'est un enrichissement. Un pret in fine se rembourse
@@ -145,24 +181,30 @@ def enregistrer(conn, tableau, entity=None, libelle=None, source=None):
     return pid
 
 
-def calendrier(conn, depuis=None, nb=12):
+def calendrier(conn, depuis=None, nb=12, parts=None):
     """Les `nb` prochaines echeances, tous prets confondus, et le cumul par
     annee civile : capital rembourse, interets, assurance, restant du en fin
     d'annee."""
     depuis = depuis or _date.today().isoformat()
-    libelles = {r['id']: r['libelle'] for r in conn.execute('SELECT id, libelle FROM prets')}
-    prochaines = [dict(r, pret=libelles.get(r['pret_id'])) for r in conn.execute(
-        'SELECT * FROM pret_echeances WHERE date > ? ORDER BY date, pret_id LIMIT ?', (depuis, nb))]
+    libelles = {r['id']: r['libelle'] for r in conn.execute('SELECT id, libelle FROM prets')
+                if parts is None or r['id'] in parts}
+    part_de = (lambda i: parts[i]) if parts is not None else (lambda i: 1.0)
+    montants = ('capital', 'interets', 'assurance', 'crd', 'montant')
+    lignes = [dict(r) for r in conn.execute('SELECT * FROM pret_echeances WHERE date > ? ORDER BY date, pret_id',
+                                            (depuis,)) if r['pret_id'] in libelles]
+    prochaines = [dict({c: (round(v * part_de(r['pret_id']), 2) if c in montants else v) for c, v in r.items()},
+                       pret=libelles[r['pret_id']]) for r in lignes[:nb]]
     annees = {}
-    for r in conn.execute('SELECT * FROM pret_echeances WHERE date > ? ORDER BY date', (depuis,)):
+    for r in lignes:
         a = annees.setdefault(r['date'][:4], {'annee': r['date'][:4], 'capital': 0.0, 'interets': 0.0,
                                               'assurance': 0.0, 'echeances': 0})
-        a['capital'] += r['capital']; a['interets'] += r['interets']; a['assurance'] += r['assurance']
+        x = part_de(r['pret_id'])
+        a['capital'] += r['capital'] * x; a['interets'] += r['interets'] * x; a['assurance'] += r['assurance'] * x
         a['echeances'] += 1
     ids = list(libelles)
     for a in annees.values():
         fin = f"{a['annee']}-12-31"
-        a['crd_fin'] = round(sum(crd_a(conn, i, fin) for i in ids), 2)
+        a['crd_fin'] = round(sum(crd_a(conn, i, fin) * part_de(i) for i in ids), 2)
         for k in ('capital', 'interets', 'assurance'):
             a[k] = round(a[k], 2)
     return {'prochaines': prochaines, 'annees': [annees[k] for k in sorted(annees)]}

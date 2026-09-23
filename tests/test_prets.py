@@ -186,3 +186,29 @@ N° Date Capital Restant dû Montant échéance Capital amorti Intérêts
         from services.parsers.amortissement import _credit_agricole
         with pytest.raises(ValueError):
             _verifier(_credit_agricole(None, self.TEXTE.replace('140 000,00 440,32', '130 000,00 408,87')))
+
+
+class TestVueTitulaire:
+    def _base(self, conn):
+        conn.execute("INSERT INTO entities (name, type) VALUES ('Maison', 'Indivision')")
+        for owner, part in (('Paul', 0.66), ('Claire', 0.34)):
+            conn.execute("INSERT INTO positions (date, owner, category, envelope, value, entity, ownership_pct, debt_pct) "
+                         "VALUES ('2026-09-01', ?, 'Immobilier', 'Immobilier', 0, 'Maison', 0.5, ?)", (owner, part))
+        prets.enregistrer(conn, _tableau(3000.0, 3), 'Maison', 'Prêt maison')
+
+    def test_la_part_de_dette_proratise(self, client):
+        with get_db() as conn:
+            self._base(conn)
+        famille = client.get('/api/prets?date=2026-01-15').get_json()['prets'][0]
+        paul = client.get('/api/prets?date=2026-01-15&titulaire=Paul').get_json()['prets'][0]
+        assert paul['part'] == 0.66 and paul['crd'] == pytest.approx(famille['crd'] * 0.66, abs=0.01)
+        with get_db() as conn:
+            cal = prets.calendrier(conn, depuis='2026-01-01', parts=prets.parts_titulaire(conn, 'Claire'))
+        assert [e['capital'] for e in cal['prochaines']] == [pytest.approx(340, abs=0.01)] * 3
+        assert cal['annees'][0]['capital'] == pytest.approx(1020, abs=0.01)
+
+    def test_un_titulaire_sans_credit_n_en_voit_aucun(self, client):
+        with get_db() as conn:
+            self._base(conn)
+        assert client.get('/api/prets?titulaire=Zoé').get_json()['prets'] == []
+        assert client.get('/api/prets/projection?titulaire=Zoé').get_json()['prets'] == []
