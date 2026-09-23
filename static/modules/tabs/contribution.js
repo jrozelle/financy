@@ -104,19 +104,63 @@ function dessiner(periodes) {
     // Un libelle par barre, en mois abrege : la date complete se chevauchait
     // des quatre periodes.
     const mois = p.libelle || '';
+    // Zone de survol : toute la colonne, pas seulement la barre — une periode
+    // presque nulle n'aurait sinon qu'un pixel a viser.
+    const zone = `<rect class="contrib-zone" data-i="${i}" x="${(cx - pas / 2).toFixed(1)}" y="0" `
+               + `width="${pas.toFixed(1)}" height="${(H + BAS).toFixed(1)}" fill="transparent" tabindex="0" `
+               + `role="button" aria-label="${mois} : détail"/>`;
     return segments
          + `<text x="${cx.toFixed(1)}" y="${(H + 15).toFixed(1)}" text-anchor="middle" `
          + `class="contrib-axe">${mois}</text>`
          + `<text x="${cx.toFixed(1)}" y="${yVal.toFixed(1)}" text-anchor="middle" `
-         + `class="contrib-val">${_millier(total)}</text>`;
+         + `class="contrib-val">${_millier(total)}</text>`
+         + zone;
   }).join('');
 
   hote.innerHTML = `
-    <svg class="contrib-svg" viewBox="0 0 ${L} ${H + BAS}"
-         role="img" aria-label="Décomposition de la variation par période : apports et performance">
-      <line x1="10" y1="${zero.toFixed(1)}" x2="${L - 10}" y2="${zero.toFixed(1)}" class="contrib-zero"/>
-      ${parts}
-    </svg>`;
+    <div class="courbe-cadre">
+      <svg class="contrib-svg" viewBox="0 0 ${L} ${H + BAS}"
+           role="img" aria-label="Décomposition de la variation par période : apports et performance">
+        <line x1="10" y1="${zero.toFixed(1)}" x2="${L - 10}" y2="${zero.toFixed(1)}" class="contrib-zero"/>
+        ${parts}
+      </svg>
+      <div class="courbe-bulle" role="status" hidden></div>
+    </div>`;
+  _cablerBulle(hote, periodes);
+}
+
+/** Detail d'une periode au survol, au focus clavier ou au toucher : dates,
+ *  apports, performance, comptes ajoutes, variation. Une bulle maison — un
+ *  `title` ne s'afficherait ni sur mobile ni de facon fiable. */
+function _cablerBulle(hote, periodes) {
+  const bulle = hote.querySelector('.courbe-bulle');
+  const svg = hote.querySelector('svg');
+  const ligne = (couleur, nom, v) => `<span class="courbe-bulle-l"><i style="background:${couleur}"></i>${nom}<b>${
+    v >= 0 ? '+' : '−'}${fmt(Math.abs(v))}</b></span>`;
+  const montrer = zone => {
+    const p = periodes[+zone.dataset.i];
+    if (!p) return;
+    const hs = p.hors_suivi || 0;
+    bulle.innerHTML = `<span class="courbe-bulle-d">${esc(p.libelle)} · du ${fmtDate(p.debut)} au ${fmtDate(p.fin)}</span>`
+      + ligne('var(--chart-4)', 'Apports', p.apports)
+      + ligne('var(--chart-1)', 'Performance', p.performance)
+      + (Math.abs(hs) >= 1 ? ligne('var(--text-muted)', 'Comptes ajoutés ou retirés', hs) : '')
+      + `<span class="courbe-bulle-l contrib-bulle-total">Variation du net<b>${
+          p.variation >= 0 ? '+' : '−'}${fmt(Math.abs(p.variation))}</b></span>`;
+    bulle.hidden = false;
+    // Centree sur la colonne, sans deborder de la carte.
+    const r = zone.getBoundingClientRect(), c = hote.getBoundingClientRect();
+    const w = bulle.offsetWidth || 220;
+    const x = r.left - c.left + r.width / 2 - w / 2;
+    bulle.style.left = `${Math.max(0, Math.min(x, c.width - w))}px`;
+    bulle.style.top = '0px';
+    svg.querySelectorAll('.contrib-zone').forEach(z => z.classList.toggle('is-actif', z === zone));
+  };
+  const cacher = () => { bulle.hidden = true; svg.querySelectorAll('.is-actif').forEach(z => z.classList.remove('is-actif')); };
+  svg.addEventListener('pointerover', e => { const z = e.target.closest('.contrib-zone'); if (z) montrer(z); });
+  svg.addEventListener('pointerleave', cacher);
+  svg.addEventListener('focusin', e => { const z = e.target.closest('.contrib-zone'); if (z) montrer(z); });
+  svg.addEventListener('focusout', cacher);
 }
 
 /** Arrondi lisible : « +12 k » au-dessus de mille, la valeur exacte en deca —

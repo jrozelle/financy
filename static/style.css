@@ -3821,3 +3821,8 @@ td.arbo-part > * { vertical-align: middle; }
 #tab-positions #positions-filters { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
 #tab-positions #positions-filters > .filter-select { flex: 1 1 14rem; width: auto; }
 #tab-positions #positions-filters > #pos-view-toggle { margin-left: auto; width: auto; flex: none; }
+
+/* D'ou vient la hausse : colonne survolee, total de la bulle. */
+.contrib-zone { cursor: default; outline: none; }
+.contrib-zone.is-actif, .contrib-zone:focus-visible { fill: color-mix(in srgb, var(--text) 5%, transparent); }
+.contrib-bulle-total { border-top: 1px solid var(--border); padding-top: .25rem; margin-top: .1rem; font-weight: 600; }
