@@ -5,14 +5,11 @@
  * demonstration par-dessus l'epaule, capture d'ecran, partage de bug.
  * N'altere aucune donnee — c'est une couche de formatage, reversible d'un clic.
  *
- * Forme retenue : `X XXX 120,50 €` — un montant « modeste » de forme fixe,
- *   qui se lit comme un nombre plutot que comme un trou (23/09/2026).
- * - Les trois derniers chiffres de la partie entiere restent lisibles. Les
- *   totaux gardent ainsi de la vie (ils bougent, ils ont l'air vrais) la ou un
- *   bloc plein fige l'interface et la rend illisible a demontrer.
- * - Les groupes masques sont en nombre CONSTANT, meme pour 850 €. Sans cette
- *   largeur fixe, la longueur du nombre trahit l'ordre de grandeur aussi
- *   surement que le nombre lui-meme : `?? ???` contre `? ??? ???` se lit.
+ * Forme retenue : les trois derniers chiffres de la partie entiere, seuls —
+ *   `321 €` pour 104 321 € (23/09/2026). Plus simple que la forme precedente
+ *   (`X XXX 321 €`), et tout aussi sure : le montant affiche a toujours trois
+ *   chiffres, donc sa longueur ne trahit plus l'ordre de grandeur, et il se lit
+ *   comme un vrai montant, modeste, qui bouge avec la valeur.
  *
  * Les quantites de titres sont masquees au meme titre que les euros : le cours
  * d'un ETF est public, une quantite visible suffit a retrouver le montant.
@@ -21,9 +18,8 @@
 const CLE = 'financy_mask';
 const VISIBLES = 3;               // derniers chiffres laisses lisibles
 
-// Largeur fixe, la meme pour 850 € et pour 2 millions ; l'espace fine
-// insecable est celle des montants formates.
-const MASQUE = 'X XXX';
+// Axes de graphe : aucun chiffre (voir maskAxis).
+const MASQUE_AXE = '•••';
 
 let _actif = false;
 const _abonnes = new Set();
@@ -72,13 +68,13 @@ function _refleterDansLeDom() {
  * INVARIANT : la valeur passee doit etre ecrite EN ENTIER, jamais abregee.
  * Les trois chiffres laisses lisibles ne sont surs que si ce sont les unites,
  * dizaines et centaines. Sur une valeur abregee ils changent de rang et
- * trahissent tout : masquer "500 k€" rendrait "X XXX 500 k€", soit
+ * trahissent tout : masquer "500 k€" rendrait "500 k€", soit
  * 500 000 € annonces en clair. Abreger et masquer ne se composent pas.
  * Pour un libelle abrege (axe de graphe), utiliser `maskAxis`, qui ne laisse
  * aucun chiffre.
  *
  * @param {string} texte  ex. "24 610,75"
- * @returns {string}      ex. "X XXX 120,50"
+ * @returns {string}      ex. "120,50"
  */
 export function maskFormatted(texte) {
   const s = String(texte);
@@ -89,7 +85,7 @@ export function maskFormatted(texte) {
   const chiffres = entier.replace(/[^\d]/g, '');
   const queue = chiffres.slice(-VISIBLES).padStart(VISIBLES, '0');
   const dec = reste.length ? ',' + reste.join(',') : '';
-  return (neg ? '−' : '') + MASQUE + ' ' + queue + dec;
+  return (neg ? '−' : '') + queue + dec;
 }
 
 /** Masque une valeur d'axe.
@@ -99,4 +95,4 @@ export function maskFormatted(texte) {
  * des millions. Un tick n'a de toute facon pas de chiffres utiles a montrer —
  * l'echelle se lit sur la forme de la courbe, pas sur ses graduations.
  */
-export const maskAxis = () => MASQUE;
+export const maskAxis = () => MASQUE_AXE;
