@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from models import (get_db, compute_position, get_entity_map, get_holdings_map,
+from models import (get_db, compute_position, get_entity_map, get_holdings_map, holdings_a_date,
                     load_referential, snapshot_holdings_to_date,
                     validate_date, validate_number, validate_string,
                     validate_pct, parse_number)
@@ -37,7 +37,7 @@ def get_positions():
         rows = conn.execute(query, params).fetchall()
         entity_map   = get_entity_map(conn, date)
         ref          = load_referential(conn)
-        holdings_map = get_holdings_map(conn, [r['id'] for r in rows])
+        holdings_map = holdings_a_date(conn, [r['id'] for r in rows], date)
     return jsonify([compute_position(dict(r), entity_map, ref, holdings_map) for r in rows])
 
 
@@ -159,6 +159,8 @@ def snapshot_update(pid):
         return jsonify({'error': '% propriété ou dette invalide'}), 400
     if not validate_string(new_values.get('notes'), 2000):
         return jsonify({'error': 'Notes trop longues'}), 400
+    if not validate_number(new_values.get('value')) or not validate_number(new_values.get('debt')):
+        return jsonify({'error': 'Montant invalide'}), 400
 
     from services.snapshot import duplicate_position
 
@@ -174,7 +176,14 @@ def snapshot_update(pid):
 
         if not source_rows:
             return jsonify({'error': f'Aucune position à la date {source_date}'}), 404
+        if not any(r['id'] == pid for r in source_rows):
+            return jsonify({'error': f'Position {pid} absente de l\u2019arrêté du {source_date}'}), 404
 
+        # ON DELETE CASCADE est inerte : les lignes de titres de l'arrete
+        # remplace restaient orphelines. Meme purge que la duplication.
+        conn.execute('DELETE FROM holdings WHERE position_id IN '
+                     '(SELECT id FROM positions WHERE date=?)', (target_date,))
+        conn.execute('DELETE FROM holdings_snapshots WHERE snapshot_date=?', (target_date,))
         conn.execute('DELETE FROM positions WHERE date=?', (target_date,))
 
         created = []

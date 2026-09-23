@@ -1,7 +1,7 @@
 import logging
 from flask import Blueprint, jsonify, request
 from datetime import datetime
-from models import (get_db, compute_position, get_entity_map, get_holdings_map,
+from models import (get_db, compute_position, get_entity_map, get_holdings_map, holdings_a_date,
                     load_referential, snapshot_holdings_to_date, validate_date, validate_number,
                     validate_string, parse_number)
 from auth import login_required, csrf_protect
@@ -31,7 +31,7 @@ def get_timeline():
             d = row['date']
             pos_rows     = conn.execute('SELECT * FROM positions WHERE date=?', (d,)).fetchall()
             entity_map   = get_entity_map(conn, d)
-            holdings_map = get_holdings_map(conn, [r['id'] for r in pos_rows])
+            holdings_map = holdings_a_date(conn, [r['id'] for r in pos_rows], d)
             positions    = [compute_position(dict(r), entity_map, ref, holdings_map) for r in pos_rows]
             net = sum(p['net_attributed'] for p in positions)
             events.append({
@@ -93,7 +93,7 @@ def get_position_history():
         for date in dates:
             rows         = conn.execute('SELECT * FROM positions WHERE date=?', (date,)).fetchall()
             entity_map   = get_entity_map(conn, date)
-            holdings_map = get_holdings_map(conn, [r['id'] for r in rows])
+            holdings_map = holdings_a_date(conn, [r['id'] for r in rows], date)
             positions    = [compute_position(dict(r), entity_map, ref, holdings_map) for r in rows]
 
             if pos_id:
@@ -209,6 +209,8 @@ def auto_snapshot():
     """
     d = request.json or {}
     target_date = d.get('date') or datetime.now().strftime('%Y-%m-%d')
+    if not validate_date(target_date):
+        return jsonify({'error': 'Date invalide (format AAAA-MM-JJ attendu)'}), 400
 
     from services.snapshot import duplicate_snapshot
 
@@ -342,14 +344,19 @@ def appliquer_mise_a_jour_route():
             return jsonify({'error': 'Entité invalide'}), 400
         if not validate_number(v.get('gross_assets')) or not validate_number(v.get('debt')):
             return jsonify({'error': f'Montant invalide pour l\u2019entité {nom}'}), 400
-        entites[nom] = {'gross_assets': parse_number(v.get('gross_assets'), 0),
-                        'debt': parse_number(v.get('debt'), 0)}
+        # Seuls les champs envoyes changent : une dette absente valait 0, et
+        # 80 000 € de dette disparaissaient d'un appel qui ne parlait que du brut.
+        entites[nom] = {k: parse_number(v[k]) for k in ('gross_assets', 'debt') if v.get(k) is not None}
 
     with get_db() as conn:
         conn.execute('BEGIN IMMEDIATE')
         if not conn.execute('SELECT 1 FROM positions WHERE date=? LIMIT 1', (source,)).fetchone():
             conn.rollback()
             return jsonify({'error': f'Aucun arrêté au {source}'}), 404
+        connues = get_entity_map(conn, source)
+        for nom, v in entites.items():
+            for k in ('gross_assets', 'debt'):
+                v.setdefault(k, (connues.get(nom) or {}).get(k, 0))
         try:
             res = appliquer_mise_a_jour(conn, source, cible, soldes, entites)
         except ValueError as e:
@@ -385,11 +392,23 @@ def rename_snapshot():
                               (to_date,)).fetchone()['c']
         if exists > 0:
             return jsonify({'error': f'Un snapshot existe deja au {to_date}'}), 409
+        if conn.execute('SELECT 1 FROM snapshot_notes WHERE date=?', (to_date,)).fetchone():
+            return jsonify({'error': f'Une note existe deja au {to_date} : supprimez-la ou '
+                                     'choisissez une autre date'}), 409
         conn.execute('UPDATE positions SET date=? WHERE date=?', (to_date, from_date))
-        conn.execute('UPDATE entity_snapshots SET date=? WHERE date=?', (to_date, from_date))
+        # Une valorisation d'entite datee sert a tous les arretes suivants qui
+        # n'en ont pas : la deplacer changeait leur valeur. Elle est RECOPIEE a
+        # la nouvelle date (celle qui y existait deja l'emporte), jamais retiree.
+        conn.execute('''INSERT OR IGNORE INTO entity_snapshots (entity_name, date, gross_assets, debt)
+                        SELECT entity_name, ?, gross_assets, debt
+                        FROM entity_snapshots WHERE date=?''', (to_date, from_date))
         conn.execute('UPDATE holdings_snapshots SET snapshot_date=? WHERE snapshot_date=?',
                      (to_date, from_date))
         conn.execute('UPDATE snapshot_notes SET date=? WHERE date=?', (to_date, from_date))
+        # Les propositions suivent leur arrete : restees a l'ancienne date, elles
+        # n'etaient plus jamais purgees et s'affichaient a cote des nouvelles.
+        conn.execute('UPDATE rebalance_proposals SET snapshot_date=? WHERE snapshot_date=?',
+                     (to_date, from_date))
 
     logger.info('Rename snapshot: %s → %s (%d positions)', from_date, to_date, src)
     return jsonify({'ok': True, 'from_date': from_date, 'to_date': to_date, 'count': src})
@@ -415,8 +434,10 @@ def delete_snapshot():
         conn.execute('DELETE FROM holdings WHERE position_id IN '
                      '(SELECT id FROM positions WHERE date=?)', (date,))
         conn.execute('DELETE FROM holdings_snapshots WHERE snapshot_date=?', (date,))
-        conn.execute('DELETE FROM entity_snapshots WHERE date=?', (date,))
+        # Les valorisations d'entites restent : elles servent aux arretes
+        # suivants, dont la valeur changeait quand on supprimait celui-ci.
         conn.execute('DELETE FROM snapshot_notes WHERE date=?', (date,))
+        conn.execute("DELETE FROM rebalance_proposals WHERE snapshot_date=? AND status='pending'", (date,))
         conn.execute('DELETE FROM positions WHERE date=?', (date,))
     logger.info('Delete snapshot: %s (%d positions)', date, n)
     return jsonify({'ok': True, 'date': date, 'count': n})

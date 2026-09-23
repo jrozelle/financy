@@ -212,10 +212,12 @@ class TestGetEntityMap:
                 ('SCI A', '2024-06-01', 280000, 110000)
             )
 
-        # Date avant tous les snapshots → fallback sur la valeur courante
+        # Date avant tous les snapshots → la plus ancienne valorisation datee.
+        # La valeur courante reecrivait ces arretes a chaque modification de
+        # l'entite, sans le dire (revue du 23/09/2026).
         with get_db() as conn:
             result = get_entity_map(conn, '2023-01-01')
-        assert result['SCI A']['gross_assets'] == 300000  # fallback
+        assert result['SCI A']['gross_assets'] == 250000
 
         # Date entre les deux snapshots → utilise le premier
         with get_db() as conn:

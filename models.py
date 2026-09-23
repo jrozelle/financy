@@ -976,6 +976,19 @@ def freeze_holdings_prices(holdings_map):
     return holdings_map
 
 
+def holdings_a_date(conn, position_ids, date):
+    """Lignes de titres valorisables a `date` : cours du jour pour le dernier
+    arrete, valeur enregistree pour les autres. Trois routes (positions d'une
+    date, frise, historique d'une position) chargeaient les lignes sans figer
+    les cours : tout l'historique se revalorisait au cours du jour, et une
+    ligne achetee 10 € puis cotee 20 € dessinait une courbe plate a 20 €."""
+    hmap = get_holdings_map(conn, position_ids)
+    dernier = conn.execute('SELECT MAX(date) AS d FROM positions').fetchone()['d']
+    if date and dernier and date != dernier:
+        freeze_holdings_prices(hmap)
+    return hmap
+
+
 def get_holdings_map(conn, position_ids=None):
     """Retourne un dict {position_id: [holdings]} joint avec securities.
 
@@ -1046,9 +1059,14 @@ def get_entity_map(conn, date=None):
             FROM entities e
             LEFT JOIN entity_snapshots s
               ON s.entity_name = e.name
-             AND s.date = (
-                 SELECT MAX(date) FROM entity_snapshots es2
-                 WHERE es2.entity_name = e.name AND es2.date <= ?
+             AND s.date = COALESCE(
+                 (SELECT MAX(date) FROM entity_snapshots es2
+                   WHERE es2.entity_name = e.name AND es2.date <= ?),
+                 -- Avant la premiere valorisation datee, la plus ancienne :
+                 -- la valeur courante reecrivait ces arretes a chaque
+                 -- modification de l'entite, sans le dire.
+                 (SELECT MIN(date) FROM entity_snapshots es3
+                   WHERE es3.entity_name = e.name)
              )
         ''', (date,)).fetchall()
     else:
