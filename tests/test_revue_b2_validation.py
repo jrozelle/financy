@@ -11,6 +11,7 @@ from tests.test_api import client, anon_client, fresh_db, CSRF_HEADERS, _make_po
 
 import models  # noqa: E402
 from models import get_db  # noqa: E402
+from services.montants import centimes  # noqa: E402
 
 H = CSRF_HEADERS
 
@@ -124,7 +125,7 @@ class TestOutils:
         with get_db() as conn:
             for t, a in (('Versement', 1000), ('Retrait', 300), ('Dividende/Intérêt', 50), ('Frais', 20)):
                 conn.execute("INSERT INTO flux (date, owner, envelope, type, amount) VALUES ('2026-03-10', 'Paul', 'PEA', ?, ?)",
-                             (t, a))
+                             (t, centimes(a)))
         (f,) = [e for e in client.get('/api/timeline').get_json() if e['type'] == 'flux']
         assert f['value'] == 700 and f['label'] == '4 flux'
 

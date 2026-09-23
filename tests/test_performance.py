@@ -18,6 +18,7 @@ from app import app  # noqa: E402
 
 from routes.performance import annualise, _flux_signed, _chain, MIN_DAYS_ANNUALISE  # noqa: E402
 from models import holding_price_warning  # noqa: E402
+from services.montants import centimes  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -51,7 +52,7 @@ def _seed(dates_values, flux=(), owner='Alice', envelope='PEA'):
         for d, t, a in flux:
             conn.execute(
                 'INSERT INTO flux (date, owner, envelope, type, amount) VALUES (?,?,?,?,?)',
-                (d, owner, envelope, t, a))
+                (d, owner, envelope, t, centimes(a)))
         conn.commit()
 
 

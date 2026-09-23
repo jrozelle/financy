@@ -10,6 +10,7 @@ from services.advisor import macro as macro_svc
 from services.advisor import rebalance as rebalance_svc
 from services.advisor import llm as llm_svc
 from auth import login_required, csrf_protect
+from services.montants import euros
 
 logger = logging.getLogger('financy')
 advisor_bp = Blueprint('advisor', __name__)
@@ -425,9 +426,9 @@ def refresh_proposals(owner):
 
         # Le plafond du PEA porte sur les versements : ceux du titulaire,
         # tels que le journal des flux les connait (None s'il n'en a aucun).
-        versements_pea = conn.execute(
+        versements_pea = euros(conn.execute(
             "SELECT SUM(ABS(amount)) FROM flux WHERE owner=? AND envelope='PEA' "
-            "AND type='Versement'", (owner,)).fetchone()[0]
+            "AND type='Versement'", (owner,)).fetchone()[0])
         proposals = rebalance_svc.generate_proposals(
             _normalize_profile_dict(profile), positions, allocation, versements_pea
         )

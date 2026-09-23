@@ -21,6 +21,8 @@ COLONNES = {
     'entite_exercices':       ('resultat',),
     'prets':                  ('montant',),
     'pret_echeances':         ('capital', 'interets', 'assurance', 'crd'),
+    'flux':                   ('amount',),
+    'transactions':           ('gross', 'fees', 'net_eur'),
 }
 
 

@@ -983,6 +983,46 @@ def _migration_022(conn):
         ) STRICT""", ('capital', 'interets', 'assurance', 'crd'))
 
 
+def _migration_023(conn):
+    """Flux et operations sur titres en centimes entiers (tables STRICT). Le
+    rapprochement d'un flux et d'un document portait sur un montant
+    flottant ; le cours unitaire et la quantite restent en REAL."""
+    _reconstruire_en_centimes(conn, 'flux', """
+        CREATE TABLE {t} (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            date          TEXT    NOT NULL,
+            owner         TEXT    NOT NULL,
+            envelope      TEXT,
+            type          TEXT,
+            amount        INTEGER NOT NULL,     -- centimes
+            notes         TEXT,
+            created_at    TEXT    DEFAULT CURRENT_TIMESTAMP,
+            category      TEXT,
+            establishment TEXT    DEFAULT NULL
+        ) STRICT""", ('amount',))
+    _reconstruire_en_centimes(conn, 'transactions', """
+        CREATE TABLE {t} (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            date          TEXT    NOT NULL,              -- date d'execution
+            owner         TEXT    NOT NULL,
+            envelope      TEXT,
+            establishment TEXT,
+            isin          TEXT    NOT NULL REFERENCES securities(isin),
+            side          TEXT    NOT NULL CHECK (side IN ('ACHAT','VENTE')),
+            quantity      REAL    NOT NULL CHECK (quantity > 0),
+            price         REAL,                          -- cours en devise de negociation
+            currency      TEXT    DEFAULT 'EUR',
+            fx_rate       REAL,
+            gross         INTEGER,                       -- centimes, en devise
+            fees          INTEGER DEFAULT 0,             -- centimes, en EUR
+            net_eur       INTEGER NOT NULL,              -- centimes, montant regle
+            place         TEXT,
+            source_doc    TEXT,
+            notes         TEXT,
+            created_at    TEXT    DEFAULT CURRENT_TIMESTAMP
+        ) STRICT""", ('gross', 'fees', 'net_eur'))
+
+
 MIGRATIONS = [
     (1, _migration_001),
     (2, _migration_002),
@@ -1006,13 +1046,26 @@ MIGRATIONS = [
     (20, _migration_020),
     (21, _migration_021),
     (22, _migration_022),
+    (23, _migration_023),
 ]
 
 
 def init_db():
+    """Migre la base principale, et la base de demo si elle existe : restee a
+    son schema d'origine, elle aurait ete lue avec des regles qui ne sont plus
+    les siennes (montants en centimes, par exemple)."""
+    migrer(DB_PATH)
+    if os.path.exists(DEMO_DB_PATH) and os.path.abspath(DEMO_DB_PATH) != os.path.abspath(DB_PATH):
+        migrer(DEMO_DB_PATH)
+
+
+def migrer(chemin):
+    """Applique a la base `chemin` les migrations qui lui manquent."""
     import logging
     logger = logging.getLogger(__name__)
-    with get_db() as conn:
+    conn = sqlite3.connect(chemin)
+    conn.row_factory = sqlite3.Row
+    try:
         # Créer la table de versionnement
         conn.execute('''
             CREATE TABLE IF NOT EXISTS schema_version (
@@ -1036,6 +1089,9 @@ def init_db():
         # Pour les DB existantes sans schema_version, s'assurer qu'on enregistre la version max
         if current == 0 and MIGRATIONS:
             _set_schema_version(conn, MIGRATIONS[-1][0])
+        conn.commit()
+    finally:
+        conn.close()
 
 # ─── Calculs ─────────────────────────────────────────────────────────────────
 

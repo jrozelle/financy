@@ -13,6 +13,7 @@ from flask import Blueprint, jsonify, request
 from models import get_db, validate_date, validate_string
 from auth import login_required, csrf_protect
 from services.parsers.movements import parse_movements
+from services.montants import centimes, euros, ligne_en_euros
 
 movements_bp = Blueprint('movements', __name__)
 
@@ -70,7 +71,7 @@ def _known_operations(conn):
     signale pour que l'utilisateur tranche.
     """
     return {(r['date'], r['isin'], r['side'], round(r['quantity'] or 0, 6),
-             round(r['net_eur'] or 0, 2))
+             round(euros(r['net_eur'] or 0), 2))
             for r in conn.execute('SELECT date, isin, side, quantity, net_eur '
                                   'FROM transactions')}
 
@@ -100,7 +101,7 @@ def _flux_existants(conn):
     par = {}
     for r in conn.execute('SELECT id, date, owner, envelope, establishment, '
                           'type, amount, notes FROM flux'):
-        par.setdefault(_sig(r), []).append(
+        par.setdefault(_sig(ligne_en_euros('flux', r)), []).append(
             {'id': r['id'], 'date': r['date'],
              'provisoire': PROVISIONAL in (r['notes'] or '')})
     return par
@@ -312,7 +313,7 @@ def import_movements():
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
                 (i['date'], i['owner'] or owner, i['envelope'], i['establishment'], i['isin'],
                  i['side'], i['quantity'], i['price'], i['currency'], i['fx_rate'],
-                 i['gross'], i['fees'], i['net_eur'], i['place'], i['source_doc'],
+                 centimes(i['gross']), centimes(i['fees'] or 0), centimes(i['net_eur']), i['place'], i['source_doc'],
                  f"[import] {i['file']}"))
             inserted['transactions'] += cur.rowcount
         for i in fx:
@@ -330,7 +331,7 @@ def import_movements():
                 (date, owner, envelope, establishment, type, amount, notes)
                 VALUES (?,?,?,?,?,?,?)''',
                 (i['date'], i['owner'] or owner, i['envelope'], i['establishment'],
-                 i['flux_type'], i['net_eur'], note))
+                 i['flux_type'], centimes(i['net_eur']), note))
             inserted['flux'] += 1
         conn.commit()
     return jsonify({'step': 'commit', 'summary': summary, 'inserted': inserted})

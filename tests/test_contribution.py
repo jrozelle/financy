@@ -16,6 +16,7 @@ os.environ['PRICE_PROVIDER'] = 'mock'
 from models import init_db, get_db  # noqa: E402
 from app import app  # noqa: E402
 from services.contribution import decompose  # noqa: E402
+from services.montants import centimes  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -40,7 +41,7 @@ def client():
 
 def _flux(conn, date, type_, montant, owner='Paul'):
     conn.execute('INSERT INTO flux (date, owner, envelope, type, amount) '
-                 "VALUES (?,?,'PEA',?,?)", (date, owner, type_, montant))
+                 "VALUES (?,?,'PEA',?,?)", (date, owner, type_, centimes(montant)))
 
 
 def _arretes(*couples):
@@ -245,7 +246,7 @@ class TestComptesHorsSuivi:
     def test_un_compte_apparu_sans_versement_n_est_pas_de_la_performance(self):
         with get_db() as conn:
             conn.execute("INSERT INTO flux (date, owner, envelope, establishment, type, amount) "
-                         "VALUES ('2026-02-27','Paul','Livret','Bourso','Retrait',100000)")
+                         "VALUES ('2026-02-27','Paul','Livret','Bourso','Retrait',10000000)")  # centimes
             conn.commit()
             r = decompose(conn, self._arretes({self.LIVRET: 150000}, {self.LIVRET: 50000, self.AV: 100000}))
         p = r['periodes'][0]
@@ -258,7 +259,7 @@ class TestComptesHorsSuivi:
     def test_le_flux_enregistre_fait_disparaitre_l_ecart(self):
         with get_db() as conn:
             conn.execute("INSERT INTO flux (date, owner, envelope, establishment, type, amount) "
-                         "VALUES ('2026-02-27','Paul','Assurance-vie','CA31','Versement',100000)")
+                         "VALUES ('2026-02-27','Paul','Assurance-vie','CA31','Versement',10000000)")  # centimes
             conn.commit()
             r = decompose(conn, self._arretes({self.LIVRET: 150000}, {self.LIVRET: 150000, self.AV: 100000}))
         p = r['periodes'][0]

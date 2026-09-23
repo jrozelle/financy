@@ -58,9 +58,9 @@ def _base():
                       "VALUES (?, 'Claire', 'Cash & dépôts', 'Livret A', 'CEMP', ?)", (D, v))
         for _ in range(2):   # deux versements egaux le meme jour
             c.execute("INSERT INTO flux (date, owner, envelope, establishment, type, amount) "
-                      "VALUES ('2026-06-01', 'Paul', 'Assurance-vie', 'CA31', 'Versement', 500)")
+                      "VALUES ('2026-06-01', 'Paul', 'Assurance-vie', 'CA31', 'Versement', 50000)")  # centimes
         c.execute("INSERT INTO transactions (date, owner, envelope, isin, side, quantity, net_eur) "
-                  "VALUES ('2026-06-02', 'Paul', 'PEA', 'FR0000120271', 'ACHAT', 1, 100)")
+                  "VALUES ('2026-06-02', 'Paul', 'PEA', 'FR0000120271', 'ACHAT', 1, 10000)")  # centimes
         c.commit()
 
 

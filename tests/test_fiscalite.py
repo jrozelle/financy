@@ -21,6 +21,7 @@ os.environ['PRICE_PROVIDER'] = 'mock'
 from models import init_db, get_db  # noqa: E402
 from app import app  # noqa: E402
 from services.fiscalite import impot_latent, PS, PFU, IR_AV, ABATTEMENT_AV  # noqa: E402
+from services.montants import centimes  # noqa: E402
 
 DATE = '2026-06-30'
 
@@ -54,7 +55,7 @@ def _position(conn, envelope, valeur, owner='Paul', category='Actions', date=DAT
 
 def _versement(conn, envelope, montant, owner='Paul', date='2020-01-15'):
     conn.execute('INSERT INTO flux (date, owner, envelope, type, amount) VALUES (?,?,?,?,?)',
-                 (date, owner, envelope, 'Versement', montant))
+                 (date, owner, envelope, 'Versement', centimes(montant)))
 
 
 def _titre(conn, position_id, cout, valeur, isin='FR0000000001'):

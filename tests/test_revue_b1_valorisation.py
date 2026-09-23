@@ -23,6 +23,7 @@ from services.holdings_split import (find_or_create_position,  # noqa: E402
                                      split_holdings_by_category)
 from services.realized import compute_realized  # noqa: E402
 from services.reconcile import apply_ecart, reconcile_snapshot  # noqa: E402
+from services.montants import centimes  # noqa: E402
 
 CSRF = {'X-CSRF-Token': 'test'}
 USD = 'US00TEST0008'
@@ -256,7 +257,7 @@ def test_vente_retire_le_cout_au_pru_et_convertit_le_cours():
         hid = _holding(conn, pid, USD, 100, cost=1000, mv=2000, as_of='2026-08-01')
         conn.execute('INSERT INTO transactions (date, owner, envelope, establishment, '
                      'isin, side, quantity, net_eur, source_doc) '
-                     "VALUES ('2026-08-10','Paul','CTO','Banque Test',?,'VENTE',40,600,'v1')",
+                     "VALUES ('2026-08-10','Paul','CTO','Banque Test',?,'VENTE',40,60000,'v1')",  # centimes
                      (USD,))
         conn.commit()
         assert reconcile_snapshot(conn, '2026-09-01')['ecarts'][0]['holding_id'] == hid
@@ -319,7 +320,7 @@ def test_realise_endpoint_rend_la_ligne_detenue(client):
                          'establishment, isin, side, quantity, net_eur, source_doc) '
                          'VALUES (?,?,?,?,?,?,?,?,?)',
                          (t['date'], t['owner'], t['envelope'], t['establishment'],
-                          t['isin'], t['side'], t['quantity'], t['net_eur'], f'd{i}'))
+                          t['isin'], t['side'], t['quantity'], centimes(t['net_eur']), f'd{i}'))
         conn.commit()
     d = client.get('/api/transactions/realized').get_json()
     assert d['total_realized'] == 500

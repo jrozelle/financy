@@ -17,6 +17,7 @@ from models import init_db, get_db  # noqa: E402
 from app import app  # noqa: E402
 from services import tresorerie_entite as t  # noqa: E402
 from services.parsers.releve_bancaire import _qonto, Releve, Operation, ReleveIllisible  # noqa: E402
+from services.montants import centimes  # noqa: E402
 
 H = {'X-CSRF-Token': 'test'}
 
@@ -150,7 +151,7 @@ class TestEpargneMensuelle:
         with get_db() as conn:
             for mois, montant in (('03', 100000), ('04', 3000), ('05', 3200), ('06', 2800), ('07', 3100), ('08', 2900)):
                 conn.execute("INSERT INTO flux (date, owner, envelope, type, amount) VALUES (?, 'Paul', 'PEA', 'Versement', ?)",
-                             (f'2026-{mois}-15', montant))
+                             (f'2026-{mois}-15', centimes(montant)))
             e = epargne_mensuelle(conn, '2026-09-23')
         assert [m['apports'] for m in e['mois']] == [100000, 3000, 3200, 2800, 3100, 2900]
         assert e['mediane'] == pytest.approx(3050)
@@ -174,7 +175,7 @@ class TestEpargneNouvelle:
             self._pos(conn, '2026-08-31', 'Livret A', 8000)
             self._pos(conn, '2026-08-31', 'PEA', 8000, category='Actions')
             self._pos(conn, '2026-08-31', 'LDDS', 12000)
-            conn.execute("INSERT INTO flux (date, owner, envelope, type, amount) VALUES ('2026-08-15', 'Paul', 'PEA', 'Versement', 3000)")
+            conn.execute("INSERT INTO flux (date, owner, envelope, type, amount) VALUES ('2026-08-15', 'Paul', 'PEA', 'Versement', 300000)")  # centimes
             e = epargne_nouvelle(conn, '2026-09-01')
         (p,) = e['periodes']
         assert p['epargne'] == 1000 and p['versements'] == 3000

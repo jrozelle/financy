@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from models import get_db, validate_date, validate_number, validate_string, parse_number
 from auth import login_required, csrf_protect
+from services.montants import centimes, ligne_en_euros
 
 flux_bp = Blueprint('flux', __name__)
 
@@ -23,7 +24,7 @@ def get_flux():
             query += ' LIMIT ? OFFSET ?'
             params += [limit, offset]
         rows = conn.execute(query, params).fetchall()
-    return jsonify([dict(r) for r in rows])
+    return jsonify([ligne_en_euros('flux', r) for r in rows])
 
 
 def _erreur(d):
@@ -45,7 +46,7 @@ def _erreur(d):
 
 def _valeurs(d):
     return (d['date'], d['owner'], d.get('envelope'), d.get('establishment') or None,
-            d.get('type'), parse_number(d['amount']), d.get('notes'), d.get('category'))
+            d.get('type'), centimes(parse_number(d['amount'])), d.get('notes'), d.get('category'))
 
 
 @flux_bp.route('/api/flux', methods=['POST'])
@@ -60,7 +61,7 @@ def add_flux():
             'INSERT INTO flux (date, owner, envelope, establishment, type, amount, notes, category) '
             'VALUES (?,?,?,?,?,?,?,?)', _valeurs(d))
         row = conn.execute('SELECT * FROM flux WHERE id=?', (cur.lastrowid,)).fetchone()
-    return jsonify(dict(row)), 201
+    return jsonify(ligne_en_euros('flux', row)), 201
 
 
 @flux_bp.route('/api/flux/<int:fid>', methods=['PUT'])
@@ -77,7 +78,7 @@ def update_flux(fid):
             'UPDATE flux SET date=?, owner=?, envelope=?, establishment=?, type=?, amount=?, '
             'notes=?, category=? WHERE id=?', (*_valeurs(d), fid))
         row = conn.execute('SELECT * FROM flux WHERE id=?', (fid,)).fetchone()
-    return jsonify(dict(row))
+    return jsonify(ligne_en_euros('flux', row))
 
 
 @flux_bp.route('/api/flux/<int:fid>', methods=['DELETE'])

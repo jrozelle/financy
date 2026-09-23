@@ -21,6 +21,7 @@ os.environ['PRICE_PROVIDER'] = 'mock'
 from models import init_db, get_db  # noqa: E402
 from app import app  # noqa: E402
 from services.reconcile import reconcile_snapshot, apply_ecart  # noqa: E402
+from services.montants import centimes  # noqa: E402
 
 ISIN = 'IE0002XZSHO1'
 CSRF = {'X-CSRF-Token': 'test'}
@@ -73,7 +74,7 @@ def _seed(holding=None, txs=(), price=7.12, price_date='2026-08-21',
                    VALUES (?,?,?,?,?,?,?,?,?)''',
                 (t['date'], t.get('owner', owner), t.get('envelope', envelope),
                  t.get('establishment', establishment), t.get('isin', isin),
-                 t['side'], t['quantity'], t['net_eur'],
+                 t['side'], t['quantity'], centimes(t['net_eur']),
                  t.get('source_doc') or f"doc:{t['date']}:{t['quantity']}"))
         conn.commit()
     return pid, hid

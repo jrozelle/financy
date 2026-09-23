@@ -18,6 +18,7 @@ cliquer — un decompte seul obligerait a ouvrir pour savoir si c'est grave.
 from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
+from services.montants import euros
 
 logger = logging.getLogger('financy.todo')
 
@@ -120,7 +121,7 @@ def _flux_provisoires(conn):
         return None
 
     n = len(rows)
-    total = sum(abs(r['amount'] or 0) for r in rows)
+    total = sum(abs(euros(r['amount'] or 0)) for r in rows)
     # Le plus recent nomme le cas, le decompte dit l'ampleur : on juge sans ouvrir.
     r = rows[0]
     detail = (f"{r['owner']}" + (f" · {r['envelope']}" if r['envelope'] else '')

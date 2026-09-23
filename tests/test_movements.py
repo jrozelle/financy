@@ -21,6 +21,7 @@ from services.parsers.movements import (parse_avis_opere, parse_releve_especes, 
                                         _rows_from_words, _split_columns,
                                         _montants, detect_envelope, entete,
                                         parse_situation_generali)
+from services.montants import centimes  # noqa: E402
 
 # Gabarits reels reduits a l'essentiel, mise en page conservee.
 AVIS_ACHAT = """                                    OPERATION DE BOURSE
@@ -634,7 +635,7 @@ class TestFluxProvisoires:
                         1,0,1.0,1.0)""")
             conn.execute("""INSERT INTO flux (date, owner, envelope, establishment,
                 type, amount, notes) VALUES (?,'Camille','Assurance-vie','BoursoBank',
-                'Versement',?,?)""", (date, montant, notes))
+                'Versement',?,?)""", (date, centimes(montant), notes))
             conn.commit()
 
     def _post(self, client, step='preview'):
@@ -650,7 +651,7 @@ class TestFluxProvisoires:
         d = self._post(client, 'commit').get_json()
         assert d['inserted']['corrections'] == 1
         with get_db() as conn:
-            lignes = conn.execute("SELECT date, notes FROM flux WHERE amount=75.0").fetchall()
+            lignes = conn.execute("SELECT date, notes FROM flux WHERE amount=7500").fetchall()
         assert len(lignes) == 1, 'un seul enregistrement, pas deux'
         assert lignes[0]['date'] == '2025-06-13', 'redate par le document'
         assert '[provisoire]' not in lignes[0]['notes']
@@ -666,7 +667,7 @@ class TestFluxProvisoires:
         assert d['inserted']['flux'] == 3      # les trois autres operations
         assert d['inserted']['corrections'] == 0
         with get_db() as conn:
-            row = conn.execute("SELECT date FROM flux WHERE amount=75.0").fetchone()
+            row = conn.execute("SELECT date FROM flux WHERE amount=7500").fetchone()
         assert row['date'] == '2025-06-10', 'date d origine conservee'
 
     def test_hors_tolerance_reste_un_flux_distinct(self, client):
@@ -675,7 +676,7 @@ class TestFluxProvisoires:
         d = self._post(client, 'commit').get_json()
         assert d['inserted']['corrections'] == 0
         with get_db() as conn:
-            n = conn.execute('SELECT COUNT(*) FROM flux WHERE amount=75.0').fetchone()[0]
+            n = conn.execute('SELECT COUNT(*) FROM flux WHERE amount=7500').fetchone()[0]
         assert n == 2
 
     def test_montant_different_non_rapproche(self, client):
@@ -690,7 +691,7 @@ class TestFluxProvisoires:
         vise = [f for f in d['flux'] if f.get('corrects')]
         assert len(vise) == 1 and 'provisoire' in vise[0]['correction_reason']
         with get_db() as conn:
-            assert conn.execute("SELECT date FROM flux WHERE amount=75.0"
+            assert conn.execute("SELECT date FROM flux WHERE amount=7500"
                                 ).fetchone()[0] == '2025-06-10', 'apercu n ecrit rien'
 
 

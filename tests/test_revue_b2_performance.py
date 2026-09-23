@@ -18,7 +18,7 @@ def test_le_versement_d_un_compte_clos_n_entre_pas_dans_l_ensemble(client):
         # Versement sur le contrat B, clos depuis : il n'a rien a faire dans
         # l'ensemble, qui ne garde que le contrat A.
         conn.execute("INSERT INTO flux (date, owner, envelope, establishment, type, amount) "
-                     "VALUES ('2025-03-01', 'Paul', 'Assurance-vie', 'Assureur B', 'Versement', 3000)")
+                     "VALUES ('2025-03-01', 'Paul', 'Assurance-vie', 'Assureur B', 'Versement', 300000)")  # centimes
     data = client.get('/api/performance').get_json()
     glob = data['global']
     assert glob['accounts'] == 1
@@ -31,6 +31,6 @@ def test_le_versement_du_compte_garde_compte(client):
         for d, a in (('2025-01-01', 10000), ('2025-07-01', 13500), ('2026-01-01', 14000)):
             _pos(conn, d, 'Assureur A', a)
         conn.execute("INSERT INTO flux (date, owner, envelope, establishment, type, amount) "
-                     "VALUES ('2025-03-01', 'Paul', 'Assurance-vie', 'Assureur A', 'Versement', 3000)")
+                     "VALUES ('2025-03-01', 'Paul', 'Assurance-vie', 'Assureur A', 'Versement', 300000)")  # centimes
     glob = client.get('/api/performance').get_json()['global']
     assert glob['flux_count'] == 1 and glob['flux_net'] == 3000

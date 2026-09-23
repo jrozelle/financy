@@ -17,6 +17,7 @@ os.environ['PRICE_PROVIDER'] = 'mock'
 from models import init_db, get_db  # noqa: E402
 from app import app  # noqa: E402
 from services.todo import collect, COURS_PERIMES_JOURS  # noqa: E402
+from services.montants import centimes  # noqa: E402
 
 DATE = '2026-09-02'
 ISIN = 'IE0002XZSHO1'
@@ -65,7 +66,7 @@ def _avis(conn, date, qty, net, owner='Paul', envelope='PEA', etab='BoursoBank')
     conn.execute(
         '''INSERT INTO transactions (date, owner, envelope, establishment, isin,
            side, quantity, net_eur, source_doc) VALUES (?,?,?,?,?,'ACHAT',?,?,?)''',
-        (date, owner, envelope, etab, ISIN, qty, net, f'doc:{date}:{qty}'))
+        (date, owner, envelope, etab, ISIN, qty, centimes(net), f'doc:{date}:{qty}'))
 
 
 def _cles(rapport):
@@ -191,7 +192,7 @@ class TestFluxProvisoires:
     def test_flux_provisoire_remonte(self):
         with get_db() as conn:
             conn.execute("INSERT INTO flux (date, owner, envelope, type, amount, notes) "
-                         "VALUES ('2026-08-14','Léo','Assurance-vie','Versement',75,"
+                         "VALUES ('2026-08-14','Léo','Assurance-vie','Versement',7500,"
                          "'[provisoire] versement programmé')")
             conn.commit()
             r = collect(conn, DATE, AUJ)
@@ -204,7 +205,7 @@ class TestFluxProvisoires:
     def test_flux_atteste_ne_dit_rien(self):
         with get_db() as conn:
             conn.execute("INSERT INTO flux (date, owner, type, amount, notes) "
-                         "VALUES ('2026-08-14','Paul','Versement',500,'[import] avis.pdf')")
+                         "VALUES ('2026-08-14','Paul','Versement',50000,'[import] avis.pdf')")  # centimes
             conn.commit()
             r = collect(conn, DATE, AUJ)
         assert 'provisoires' not in _cles(r)
@@ -219,7 +220,7 @@ class TestAgregation:
             _holding(conn, pid)
             _avis(conn, '2026-08-17', 120, 851.64)
             conn.execute("INSERT INTO flux (date, owner, type, amount, notes) "
-                         "VALUES ('2026-08-14','Léo','Versement',75,'[provisoire] x')")
+                         "VALUES ('2026-08-14','Léo','Versement',7500,'[provisoire] x')")  # centimes
             conn.commit()
             r = collect(conn, DATE, AUJ)
         assert r['total'] == 3
@@ -242,7 +243,7 @@ class TestAgregation:
                             lambda *a, **k: (_ for _ in ()).throw(RuntimeError('boom')))
         with get_db() as conn:
             conn.execute("INSERT INTO flux (date, owner, type, amount, notes) "
-                         "VALUES ('2026-08-14','Léo','Versement',75,'[provisoire] x')")
+                         "VALUES ('2026-08-14','Léo','Versement',7500,'[provisoire] x')")  # centimes
             conn.commit()
             r = collect(conn, DATE, AUJ)
         assert _cles(r) == ['provisoires']

@@ -52,7 +52,7 @@ def test_renommer_une_categorie_propage_positions_flux_et_cibles(client):
     with get_db() as c:
         c.execute("INSERT INTO positions (date, owner, category, envelope, value) VALUES ('2026-01-01','Paul','Actions','PEA',1000)")
         c.execute("INSERT INTO positions (date, owner, category, envelope, value) VALUES ('2025-01-01','Paul','Actions','PEA',900)")
-        c.execute("INSERT INTO flux (date, owner, envelope, type, amount, category) VALUES ('2026-01-02','Paul','PEA','Versement',10,'Actions')")
+        c.execute("INSERT INTO flux (date, owner, envelope, type, amount, category) VALUES ('2026-01-02','Paul','PEA','Versement',1000,'Actions')")  # centimes
         c.execute("INSERT INTO config (key, value) VALUES ('allocation_targets', '{\"Actions\": 60}')")
         c.commit()
     def f(ref):
@@ -72,7 +72,7 @@ def test_renommer_une_categorie_propage_positions_flux_et_cibles(client):
 def test_renommer_une_enveloppe_propage(client):
     with get_db() as c:
         c.execute("INSERT INTO positions (date, owner, category, envelope, value) VALUES ('2026-01-01','Paul','Actions','PEA',1000)")
-        c.execute("INSERT INTO flux (date, owner, envelope, type, amount) VALUES ('2026-01-02','Paul','PEA','Versement',10)")
+        c.execute("INSERT INTO flux (date, owner, envelope, type, amount) VALUES ('2026-01-02','Paul','PEA','Versement',1000)")  # centimes
         c.commit()
     def f(ref):
         ref['envelope_meta']['PEA Bourso'] = ref['envelope_meta'].pop('PEA')

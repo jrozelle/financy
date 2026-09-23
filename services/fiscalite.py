@@ -29,6 +29,7 @@ Le resultat est une estimation d'ordre de grandeur, pas une declaration.
 """
 from __future__ import annotations
 import logging
+from services.montants import ligne_en_euros
 
 logger = logging.getLogger('financy.fiscalite')
 
@@ -86,7 +87,7 @@ def _apports_par_enveloppe(conn, date_max, owner=None):
 
     apports, verses = {}, set()
     for r in conn.execute(q, p):
-        f = dict(r)
+        f = ligne_en_euros('flux', r)
         env = f.get('envelope') or 'Autre'
         apports[env] = apports.get(env, 0.0) + _flux_signed(f)
         if (f.get('type') or '') == 'Versement':

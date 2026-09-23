@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, request
 from models import get_db
 from auth import login_required
 from services.realized import compute_realized
+from services.montants import ligne_en_euros
 
 transactions_bp = Blueprint('transactions', __name__)
 
@@ -18,7 +19,7 @@ def _load(conn, owner=None, envelope=None, isin=None):
     if isin:
         q += ' AND isin=?'; p.append(isin)
     q += ' ORDER BY date, id'
-    return [dict(r) for r in conn.execute(q, p).fetchall()]
+    return [ligne_en_euros('transactions', r) for r in conn.execute(q, p).fetchall()]
 
 
 @transactions_bp.route('/api/transactions')

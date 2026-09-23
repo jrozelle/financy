@@ -21,6 +21,7 @@ preleves a l'interieur du contrat ; tous deux appartiennent au rendement.
 """
 from __future__ import annotations
 import logging
+from services.montants import ligne_en_euros
 
 logger = logging.getLogger('financy.contribution')
 
@@ -39,7 +40,7 @@ def _apports(conn, debut, fin, owner=None):
     if owner:
         q += ' AND owner = ?'
         p.append(owner)
-    return round(sum(_flux_signed(dict(r)) for r in conn.execute(q, p)), 2)
+    return round(sum(_flux_signed(ligne_en_euros('flux', r)) for r in conn.execute(q, p)), 2)
 
 
 def _apports_par_compte(conn, debut, fin, owner=None):
@@ -54,7 +55,7 @@ def _apports_par_compte(conn, debut, fin, owner=None):
     out = {}
     for r in conn.execute(q, p):
         cle = (r['owner'], r['envelope'] or '', r['establishment'] or '')
-        out[cle] = out.get(cle, 0.0) + _flux_signed(dict(r))
+        out[cle] = out.get(cle, 0.0) + _flux_signed(ligne_en_euros('flux', r))
     return out
 
 
@@ -119,7 +120,7 @@ def _versements_placements(conn, debut, fin, owner=None):
     if owner:
         q += ' AND owner = ?'
         p.append(owner)
-    return round(sum(_flux_signed(dict(r)) for r in conn.execute(q, p)), 2)
+    return round(sum(_flux_signed(ligne_en_euros('flux', r)) for r in conn.execute(q, p)), 2)
 
 
 def _epargne_et_capital(precedent, courant, owner=None):
@@ -293,7 +294,7 @@ def epargne_nouvelle(conn, fin, jours=183):
         if precedent is not None:
             communs = set(precedent[1]) & set(courant)
             dliq = sum(courant[k] - precedent[1][k] for k in communs)
-            vers = sum(_flux_signed(dict(r)) for r in conn.execute(
+            vers = sum(_flux_signed(ligne_en_euros('flux', r)) for r in conn.execute(
                 'SELECT type, amount FROM flux WHERE date > ? AND date <= ? AND envelope IN (%s)'
                 % ','.join('?' * len(PLACEMENT)), (precedent[0], a, *PLACEMENT)))
             duree = (_d.fromisoformat(a) - _d.fromisoformat(precedent[0])).days

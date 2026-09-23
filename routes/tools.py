@@ -6,6 +6,7 @@ from models import (get_db, compute_position, get_entity_map, holdings_a_date,
                     validate_string, parse_number)
 from auth import login_required, csrf_protect
 from routes.performance import _flux_signed
+from services.montants import ligne_en_euros
 
 logger = logging.getLogger('financy')
 tools_bp = Blueprint('tools', __name__)
@@ -57,7 +58,7 @@ def get_timeline():
         par_mois = {}
         for f in conn.execute('SELECT date, type, amount FROM flux ORDER BY date'):
             m = par_mois.setdefault(f['date'][:7], {'total': 0.0, 'cnt': 0})
-            m['total'] += _flux_signed(dict(f))
+            m['total'] += _flux_signed(ligne_en_euros('flux', f))
             m['cnt'] += 1
         for month, m in sorted(par_mois.items()):
             events.append({

@@ -160,7 +160,7 @@ def import_xlsx():
                         continue
                     cur = conn.execute(
                         'INSERT INTO flux (date, owner, envelope, type, amount, notes) VALUES (?,?,?,?,?,?)',
-                        tuple(ligne.values()))
+                        tuple(ligne_en_centimes('flux', ligne).values()))
                     flux_vus.add(cur.lastrowid)
                     flux_imported += 1
 

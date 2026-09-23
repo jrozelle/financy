@@ -16,6 +16,7 @@ os.environ['PRICE_PROVIDER'] = 'mock'
 from models import init_db, get_db  # noqa: E402
 from app import app  # noqa: E402
 from services.realized import compute_realized  # noqa: E402
+from services.montants import centimes  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -57,7 +58,7 @@ def _seed_tx(rows):
                 (date, owner, envelope, isin, side, quantity, net_eur, fees, source_doc)
                 VALUES (?,?,?,?,?,?,?,?,?)''',
                 (r['date'], 'Alice', r['envelope'], r['isin'], r['side'],
-                 r['quantity'], r['net_eur'], r.get('fees', 0), r.get('source_doc')))
+                 r['quantity'], centimes(r['net_eur']), centimes(r.get('fees', 0)), r.get('source_doc')))
         conn.commit()
 
 

@@ -31,6 +31,7 @@ from models import (get_db, load_referential, compute_position, get_entity_map,
                     holding_price_warning, holdings_a_date)
 from models import validate_date
 from auth import login_required
+from services.montants import ligne_en_euros
 
 performance_bp = Blueprint('performance', __name__)
 
@@ -408,7 +409,7 @@ def get_performance():
         # les changements de composition d'un agregat ne sont visibles qu'a ce
         # niveau.
         by_date, cats, meta, alertes = _values_by_group(conn, dates, 'account', owner)
-        flux = [dict(r) for r in conn.execute('SELECT * FROM flux ORDER BY date')]
+        flux = [ligne_en_euros('flux', r) for r in conn.execute('SELECT * FROM flux ORDER BY date')]
     if owner:
         flux = [f for f in flux if f['owner'] == owner]
 

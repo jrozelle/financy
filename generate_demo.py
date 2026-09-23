@@ -310,6 +310,10 @@ def generate():
 
     conn.commit()
     conn.close()
+    # Ecrite au schema d'origine (en euros) ; les migrations l'amenent au
+    # schema courant, comme n'importe quelle base — centimes compris.
+    import models
+    models.migrer(DB_PATH)
     print(f"✓ demo.db générée ({DB_PATH})")
 
 

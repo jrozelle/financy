@@ -25,6 +25,7 @@ comptee et signalee, jamais devinee.
 """
 from __future__ import annotations
 import logging
+from services.montants import ligne_en_euros
 
 logger = logging.getLogger('financy.reconcile')
 
@@ -80,6 +81,7 @@ def reconcile_snapshot(conn, snapshot_date):
            ORDER BY date, id''',
         (snapshot_date,)
     ).fetchall()
+    txs = [ligne_en_euros('transactions', t) for t in txs]
 
     tx_by_key = {}
     for t in txs:
