@@ -60,8 +60,13 @@ REGIMES = {
     'SCI':            (None,        'Abattements pour duree de detention : la date d\'acquisition manque'),
     'SCPI':           (None,        'Abattements pour duree de detention : la date d\'acquisition manque'),
     'Holding':        (None,        'Cession de titres de societe : regime propre, hors de ce calcul'),
+    'Entité':         (None,        'Parts d\'une SCI ou d\'une indivision : regime de l\'immobilier, '
+                                    'date d\'acquisition inconnue'),
+    'Autre':          (None,        'Enveloppe non precisee : regime inconnu'),
 }
-REGIME_INCONNU = ('pfu', 'Enveloppe hors referentiel : prelevement forfaitaire par defaut')
+# Une enveloppe hors referentiel n'a pas de regime connu : lui preter le
+# prelevement forfaitaire inventait un impot. Elle est ecartee, et comptee.
+REGIME_INCONNU = (None, 'Enveloppe hors referentiel : regime inconnu')
 
 
 def _apports_par_enveloppe(conn, date_max, owner=None):
@@ -119,19 +124,31 @@ def _pru_par_enveloppe(conn, date, owner=None):
 
 
 def _valeurs_par_enveloppe(conn, date, owner=None):
-    q = ('SELECT envelope, owner, SUM(value) v FROM positions '
-         'WHERE date = ? AND COALESCE(value, 0) <> 0')
-    p = [date]
+    """Brut attribue par enveloppe, valorise comme la synthese.
+
+    L'ancienne version sommait `positions.value` : ni entite (une position
+    liee a une SCI vaut 0 en base), ni quote-part, ni cours du jour. Le « brut »
+    de la carte tombait a 540 000 € pour 1 560 000 € dans les indicateurs, et
+    l'immobilier detenu en SCI disparaissait sans meme figurer parmi les
+    enveloppes ecartees.
+    """
+    from models import compute_position, get_entity_map, holdings_a_date, load_referential
+    q, p = 'SELECT * FROM positions WHERE date = ?', [date]
     if owner:
         q += ' AND owner = ?'
         p.append(owner)
-    q += ' GROUP BY envelope, owner'
-
+    rows = conn.execute(q, p).fetchall()
+    em, ref = get_entity_map(conn, date), load_referential(conn)
+    hm = holdings_a_date(conn, [r['id'] for r in rows], date)
     valeurs, titulaires = {}, {}
-    for r in conn.execute(q, p):
-        env = r['envelope'] or 'Autre'
-        valeurs[env] = valeurs.get(env, 0.0) + (r['v'] or 0)
-        titulaires.setdefault(env, set()).add(r['owner'])
+    for r in rows:
+        pos = compute_position(dict(r), em, ref, hm)
+        v = pos.get('gross_attributed') or 0
+        if abs(v) < 0.005:
+            continue
+        env = pos.get('envelope') or pos.get('entity') and 'Entité' or 'Autre'
+        valeurs[env] = valeurs.get(env, 0.0) + v
+        titulaires.setdefault(env, set()).add(pos['owner'])
     return valeurs, titulaires
 
 
@@ -140,8 +157,23 @@ def _assiette(env, valeur, apports, verses, pru):
 
     Retourne (None, None, motif) quand aucune source ne tient — mieux vaut une
     enveloppe ecartee et comptee qu'un nombre invente.
+
+    Le prix de revient des titres passe D'ABORD quand il couvre la majorite
+    des lignes : le journal des flux ne porte souvent que les versements
+    recents, et « valeur moins apports » prenait alors tout le capital ancien
+    pour du gain — 160 000 € de plus-value sur 235 000 € d'assurance-vie, pour
+    9 000 € au prix de revient.
     """
-    # 1. Les apports traces, quand l'enveloppe porte au moins un versement.
+    e = pru.get(env)
+    if e and e['lignes'] and e['sans_pru'] <= e['lignes'] / 2:
+        pv = round(e['valeur'] - e['cout'], 2)
+        reserve = None
+        if e['sans_pru']:
+            reserve = (f"{e['sans_pru']} ligne{'s' if e['sans_pru'] > 1 else ''} sur "
+                       f"{e['lignes']} sans prix de revient distinct : gain sous-estime")
+        return max(0.0, pv), 'prix de revient', reserve
+
+    # A defaut, les apports traces, quand l'enveloppe porte au moins un versement.
     if env in verses:
         pv = round(valeur - apports.get(env, 0.0), 2)
         if pv < 0:
@@ -150,18 +182,13 @@ def _assiette(env, valeur, apports, verses, pru):
             return None, None, (f'Apports saisis ({apports.get(env, 0):,.0f} EUR) superieurs a la '
                                 f'valeur : des retraits manquent au journal'
                                 .replace(',', ' '))
-        return pv, 'apports', None
-
-    # 2. A defaut, le prix de revient des titres detenus.
-    e = pru.get(env)
-    if e and e['lignes'] and e['sans_pru'] < e['lignes']:
-        pv = round(e['valeur'] - e['cout'], 2)
         reserve = None
-        if e['sans_pru']:
-            reserve = (f"{e['sans_pru']} ligne{'s' if e['sans_pru'] > 1 else ''} sur "
-                       f"{e['lignes']} sans prix de revient distinct : gain sous-estime")
-        return max(0.0, pv), 'prix de revient', reserve
+        if e and e['lignes']:
+            reserve = 'Prix de revient trop lacunaire : estimation sur les versements saisis'
+        return pv, 'apports', reserve
 
+    if e and e['lignes']:
+        return None, None, 'Prix de revient inconnu sur la plupart des lignes, et aucun versement saisi'
     return None, None, 'Ni versement saisi ni prix de revient : la part de gain est inconnue'
 
 
@@ -174,9 +201,10 @@ def _impot(regime, assiette, nb_titulaires):
     if regime == 'ps_seuls':
         return assiette * PS, None
     if regime == 'av':
-        # L'abattement porte sur les gains RETIRES dans l'annee, une fois par
-        # titulaire : 4 600 EUR seul, 9 200 EUR pour un couple.
-        abattement = ABATTEMENT_AV * max(1, nb_titulaires)
+        # L'abattement porte sur les gains RETIRES dans l'annee, par FOYER
+        # fiscal : 4 600 EUR seul, 9 200 EUR pour un couple. Compte par
+        # titulaire, il atteignait 18 400 EUR avec deux enfants rattaches.
+        abattement = ABATTEMENT_AV * min(2, max(1, nb_titulaires))
         taxable = max(0.0, assiette - abattement)
         return taxable * (IR_AV + PS), abattement
     return assiette * PFU, None

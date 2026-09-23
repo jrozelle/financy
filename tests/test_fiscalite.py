@@ -143,11 +143,23 @@ class TestAssiette:
         assert _ligne(r, 'Livret Bourso+') is None
         assert 'retraits manquent' in _ecartee(r, 'Livret Bourso+')['motif']
 
-    def test_les_apports_priment_sur_le_prix_de_revient(self):
+    def test_le_prix_de_revient_prime_sur_un_journal_partiel(self):
+        # Cas reel du 23/09/2026 : le journal ne porte que les versements
+        # recents (5 000), les titres ont coute 45 000. « Valeur moins apports »
+        # prenait 45 000 de gain ; le prix de revient en dit 5 000.
         with get_db() as conn:
             pid = _position(conn, 'CTO', 50000)
+            _versement(conn, 'CTO', 5000)
+            _titre(conn, pid, 45000, 50000)
+            conn.commit()
+            r = impot_latent(conn, DATE)
+        assert _ligne(r, 'CTO')['source'] == 'prix de revient'
+        assert _ligne(r, 'CTO')['plus_value'] == pytest.approx(5000)
+
+    def test_sans_prix_de_revient_les_apports_servent(self):
+        with get_db() as conn:
+            _position(conn, 'CTO', 50000)
             _versement(conn, 'CTO', 30000)
-            _titre(conn, pid, 10000, 50000)
             conn.commit()
             r = impot_latent(conn, DATE)
         assert _ligne(r, 'CTO')['source'] == 'apports'
@@ -293,3 +305,17 @@ class TestEndpoint:
         app.config['TESTING'] = True
         with app.test_client() as anon:
             assert anon.get('/api/impot-latent').status_code in (302, 401)
+
+
+class TestValorisation:
+    def test_une_position_d_entite_pese_au_brut_et_est_ecartee(self):
+        # Sommer positions.value oubliait les entites (valeur 0 en base) :
+        # l'immobilier en SCI disparaissait, meme des enveloppes ecartees.
+        with get_db() as conn:
+            conn.execute("INSERT INTO entities (name, type, gross_assets, debt) VALUES ('SCI', 'SCI', 200000, 0)")
+            conn.execute("INSERT INTO positions (date, owner, category, envelope, value, entity, ownership_pct) "
+                         "VALUES (?, 'Paul', 'Immobilier', 'SCI', 0, 'SCI', 0.5)", (DATE,))
+            conn.commit()
+            r = impot_latent(conn, DATE)
+        assert r['brut'] == pytest.approx(100000)
+        assert _ecartee(r, 'SCI')['valeur'] == pytest.approx(100000)

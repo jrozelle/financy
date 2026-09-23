@@ -68,7 +68,7 @@ function rendu(d) {
         <span class="fisc-val">${d.impot ? '−' + fmt(d.impot) : fmt(0)}</span>
       </div>
       <div class="fisc-bloc fisc-bloc--net">
-        <span class="fisc-label">Net après impôt</span>
+        <span class="fisc-label">Brut après impôt</span>
         <span class="fisc-val">${fmt(d.net_apres_impot)}</span>
       </div>
     </div>
