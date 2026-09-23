@@ -14,8 +14,12 @@ l'historique git (`git log`), un commit par phase.
       ce qui empêche de supprimer une entité qui a des relevés)
 - [ ] Soldes d'ouverture des comptes d'entité déjà importés : réimporter le premier
       relevé de chaque compte
-- [ ] CSS : échelle de tailles de police et d'espacements, sélecteurs d'en-tête sans
-      surenchère de `!important`
+- [ ] CSS : échelle de tailles de police et d'espacements
+- [ ] Téléphone, suite de l'audit iPhone : vue Tableau des positions (colonne
+      figée peu utile, arbre par défaut ?), échéanciers des crédits en lignes
+      sur deux niveaux, « Supprimer » rangé dans la fiche (entités, crédits,
+      flux), barre d'actions collante dans les modales, synthèse longue
+      (cartes secondaires repliées), feuille « Plus » avec sa croix en tête
 
 ## Fait, en bref
 
