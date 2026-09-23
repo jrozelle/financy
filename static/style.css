@@ -2675,11 +2675,7 @@ body { padding-left: var(--rail-w); }
   color: #fff; font: inherit; font-weight: 600; font-size: .95rem;
 }
 .fin-rail-brand:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 8px; }
-.fin-rail-mark {
-  width: 32px; height: 32px; border-radius: 9px; flex: none;
-  background: linear-gradient(145deg, var(--primary), #1f4f4b);
-  display: grid; place-items: center; color: #fff; font-size: 14px; font-weight: 700;
-}
+.fin-rail-mark { width: 32px; height: 32px; border-radius: 9px; flex: none; display: block; }
 .fin-rail-nom { display: none; }
 
 /* Une entree : l'icone, puis le nom. `.fin-rail .fin-rail-item` (0,2,0) passe

@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="csrf-token" content="{{ csrf_token }}">
   <title>Financy</title>
+  <link rel="icon" href="/static/icons/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/static/icons/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="/static/style.css">
   <script src="/static/vendor/chart.umd.min.js"></script>
 </head>
@@ -18,7 +21,7 @@
          vrai bouton plutot qu'un div : atteignable au clavier, annonce comme
          une commande. `data-tab-switch` est deja delegue dans main.js. -->
     <button type="button" class="fin-rail-brand" data-tab-switch="synthese">
-      <span class="fin-rail-mark">F</span><span class="fin-rail-nom">Financy</span>
+      <img class="fin-rail-mark" src="/static/icons/favicon.svg" alt="" width="32" height="32"><span class="fin-rail-nom">Financy</span>
     </button>
 
     <button type="button" class="tab-btn fin-rail-item" data-tab="synthese"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg><span class="fin-rail-lib">Synthèse</span></button>

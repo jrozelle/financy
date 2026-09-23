@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Financy : la courbe de progression des indicateurs, aux couleurs des
+       trois natures du patrimoine (liquidites, financier, immobilier). -->
+  <defs>
+    <linearGradient id="trajectoire" x1="12" y1="46" x2="50" y2="21" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3d74b8"/>
+      <stop offset=".5" stop-color="#5fb3a8"/>
+      <stop offset="1" stop-color="#d09a4b"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="#171b26"/>
+  <path d="M12 46 L24 37 L34 41 L50 21" fill="none" stroke="url(#trajectoire)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="50" cy="21" r="6.5" fill="#ffffff"/>
+</svg>

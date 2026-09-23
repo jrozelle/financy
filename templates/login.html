@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Connexion — Financy</title>
+  <link rel="icon" href="/static/icons/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/static/icons/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="/static/style.css">
   <style>
     body { display:flex; align-items:center; justify-content:center; min-height:100vh; background:var(--bg); }
@@ -16,7 +19,7 @@
 </head>
 <body>
   <div class="login-card">
-    <h1>&#9670; Financy</h1>
+    <h1 style="display:flex;align-items:center;justify-content:center;gap:.6rem"><img src="/static/icons/favicon.svg" alt="" width="36" height="36" style="border-radius:10px"> Financy</h1>
     {% if error %}
       <div class="login-error">{{ error }}</div>
     {% endif %}
