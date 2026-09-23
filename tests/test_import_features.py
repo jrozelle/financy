@@ -95,26 +95,26 @@ class TestTextPasteParser:
         "AMUNDI ETF MSCI WORLD\n"
         "Voir la fiche\n"
         "Valorisation\n"
-        "4 976,52 \u20ac\n"
+        "5 075,26 \u20ac\n"
         "Code ISIN\n"
         "FR0013297546\n"
         "Nombre de parts\n"
-        "30,61\n"
+        "29,64\n"
         "Valeur de la part\n"
-        "145,63 \u20ac\n"
+        "171,23 \u20ac\n"
     )
 
     MULTI_BLOCK = (
         "AMUNDI ETF MSCI WORLD\n"
         "Voir la fiche\n"
         "Valorisation\n"
-        "4 976,52 \u20ac\n"
+        "5 075,26 \u20ac\n"
         "Code ISIN\n"
         "FR0013297546\n"
         "Nombre de parts\n"
-        "30,61\n"
+        "29,64\n"
         "Valeur de la part\n"
-        "145,63 \u20ac\n"
+        "171,23 \u20ac\n"
         "\n"
         "LYXOR UCITS STOXX 600\n"
         "Voir la fiche\n"
@@ -134,9 +134,9 @@ class TestTextPasteParser:
         assert len(result.lines) == 1
         line = result.lines[0]
         assert line.isin == 'FR0013297546'
-        assert line.quantity == pytest.approx(30.61)
-        assert line.unit_price == pytest.approx(145.63)
-        assert line.market_value == pytest.approx(4976.52)
+        assert line.quantity == pytest.approx(29.64)
+        assert line.unit_price == pytest.approx(171.23)
+        assert line.market_value == pytest.approx(5075.26)
 
     def test_parse_multiple_blocks(self):
         from services.parsers.text_paste import parse_pasted_text

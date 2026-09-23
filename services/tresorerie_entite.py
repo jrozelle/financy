@@ -27,10 +27,14 @@ NATURES = {
 _EXCEPTIONNEL = re.compile(r'distrib\w* capital|plus-value', re.I)
 _REVENU = re.compile(r'scpi|dividende|distribution|activimmo|immorente|pierre europe|transitions europe', re.I)
 _ECHEANCE = re.compile(r'federal finance|pechean|echeance pret|remboursement pret', re.I)
-_FRAIS = re.compile(r'qonto|cabinet|abonnement|frais|cotisation|commission', re.I)
+_FRAIS = re.compile(r'qonto|abonnement|frais|cotisation|commission|honoraires|facture|fact-\d', re.I)
+# Fournisseurs propres a une entite (son cabinet comptable...) : ils se
+# reglent en base, cle `tresorerie_fournisseurs` (noms separes par des
+# virgules), et non dans le code — le depot est public.
+CLE_FOURNISSEURS = 'tresorerie_fournisseurs'
 
 
-def classer(libelle, montant, entite='', associes=()):
+def classer(libelle, montant, entite='', associes=(), fournisseurs=()):
     """Nature d'une operation, d'apres son libelle.
 
     La tete du libelle (avant « — ») nomme la contrepartie ; le motif qui suit
@@ -49,7 +53,7 @@ def classer(libelle, montant, entite='', associes=()):
         return 'revenu_exceptionnel'
     if montant > 0 and _REVENU.search(libelle):
         return 'revenu'
-    if montant < 0 and _FRAIS.search(libelle):
+    if montant < 0 and (_FRAIS.search(libelle) or any(f.lower() in libelle.lower() for f in fournisseurs if f)):
         return 'frais'
     return 'autre'
 
@@ -61,14 +65,23 @@ def associes(conn, entite):
         'SELECT DISTINCT owner FROM positions WHERE entity=?', (entite,))}
 
 
+def fournisseurs(conn):
+    try:
+        r = conn.execute('SELECT value FROM config WHERE key=?', (CLE_FOURNISSEURS,)).fetchone()
+    except Exception:
+        return ()
+    return tuple(x.strip() for x in (r['value'] if r else '').split(',') if x.strip())
+
+
 def enregistrer(conn, entite, releve, source, noms_associes=()):
     """Enregistre les operations d'un releve verifie. Renvoie (ajoutees, deja_la)."""
     ajoutees = 0
+    connus = fournisseurs(conn)
     for o in releve.operations:
         cur = conn.execute(
             'INSERT OR IGNORE INTO entite_operations '
             '(entity, date, libelle, montant, nature, banque, compte, source) VALUES (?,?,?,?,?,?,?,?)',
-            (entite, o.date, o.libelle, o.montant, classer(o.libelle, o.montant, entite, noms_associes),
+            (entite, o.date, o.libelle, o.montant, classer(o.libelle, o.montant, entite, noms_associes, connus),
              releve.banque, releve.compte, source))
         ajoutees += cur.rowcount
     return ajoutees, len(releve.operations) - ajoutees

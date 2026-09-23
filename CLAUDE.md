@@ -7,15 +7,15 @@
 - Ne push jamais sans feu vert explicite de l'utilisateur
 - Ne crée jamais de PR sans demande explicite
 - Après chaque phase : rappeler la checklist de test local et attendre le feedback
-- Déploiement prod : `git pull` sur `/srv/docker/tools/financy/app` puis
-  `docker compose up -d --build financy` depuis `/srv/docker` (le conteneur
-  appartient au projet compose de ce répertoire, pas de `app/`). `static/` et
-  `templates/` sont montés en lecture seule : un changement de `static/` ne
-  demande qu'un `git pull`, un gabarit un `docker restart financy` (Jinja ne
-  recharge pas), du Python un rebuild.
-- La base prod est `/srv/docker/tools/financy/data/patrimoine.db` (pas sous
-  `app/`). Toute mutation est précédée d'une copie datée
-  `patrimoine.db.bak-AAAAMMJJ-HHMM-<motif>` dans ce même dossier, faite
+- Déploiement prod : `git pull` dans le dépôt déployé, puis
+  `docker compose up -d --build financy` depuis le projet compose parent (le
+  conteneur n'appartient pas au compose de `app/`). `static/` et `templates/`
+  sont montés en lecture seule : un changement de `static/` ne demande qu'un
+  `git pull`, un gabarit un `docker restart financy` (Jinja ne recharge pas),
+  du Python un rebuild. Hôte, chemins et accès : `CLAUDE.local.md` (non
+  versionné).
+- Toute mutation de la base prod est précédée d'une copie datée
+  `patrimoine.db.bak-AAAAMMJJ-HHMM-<motif>` dans le dossier de la base, faite
   conteneur arrêté quand une migration suit, et d'une simulation affichant les
   lignes visées avant écriture.
 - Rotation des copies (`services/backups.py`, après chaque sauvegarde de
@@ -153,7 +153,7 @@
 
 ## Environnement
 - Dev local : venv Python + SQLite locale (`financy_dev.db`)
-- Prod : Docker sur nas
+- Prod : Docker sur un NAS (détails dans `CLAUDE.local.md`)
 - Pas de préprod Docker intermédiaire
 
 ## Roadmap en cours

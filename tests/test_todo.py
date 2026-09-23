@@ -51,13 +51,13 @@ def _position(conn, date=DATE, owner='Paul', envelope='PEA', etab='BoursoBank'):
 
 def _titre(conn, isin=ISIN, price_date='2026-09-02', priceable=1):
     conn.execute('INSERT OR IGNORE INTO securities (isin, name, last_price, '
-                 'last_price_date, is_priceable) VALUES (?,?,6.93,?,?)',
+                 'last_price_date, is_priceable) VALUES (?,?,7.12,?,?)',
                  (isin, 'ETF Test', price_date, priceable))
 
 
-def _holding(conn, pid, isin=ISIN, qty=3350, as_of='2026-08-12'):
+def _holding(conn, pid, isin=ISIN, qty=2640, as_of='2026-08-12'):
     conn.execute('INSERT INTO holdings (position_id, isin, quantity, cost_basis, '
-                 'market_value, as_of_date) VALUES (?,?,?,19760.4,23100,?)',
+                 'market_value, as_of_date) VALUES (?,?,?,15470.4,19140,?)',
                  (pid, isin, qty, as_of))
 
 
@@ -78,22 +78,22 @@ class TestEcartsDeQuantite:
             _titre(conn)
             pid = _position(conn)
             _holding(conn, pid)
-            _avis(conn, '2026-08-17', 150, 921.98)
-            _avis(conn, '2026-08-31', 190, 1153.96)
+            _avis(conn, '2026-08-17', 120, 851.64)
+            _avis(conn, '2026-08-31', 215, 1535.19)
             conn.commit()
             r = collect(conn, DATE, AUJ)
         s = next(x for x in r['signaux'] if x['cle'] == 'reconcile')
         assert s['severite'] == 'warn'
         assert s['nombre'] == 1                    # une ligne concernee
-        assert s['montant'] == 2075.94             # 921,98 + 1153,96
+        assert s['montant'] == 2386.83             # 851,64 + 1 535,19
         assert s['onglet'] == 'actifs'
 
     def test_photo_a_jour_ne_dit_rien(self):
         with get_db() as conn:
             _titre(conn)
             pid = _position(conn)
-            _holding(conn, pid, qty=3645, as_of='2026-09-01')
-            _avis(conn, '2026-08-17', 150, 921.98)
+            _holding(conn, pid, qty=2975, as_of='2026-09-01')
+            _avis(conn, '2026-08-17', 120, 851.64)
             conn.commit()
             r = collect(conn, DATE, AUJ)
         assert 'reconcile' not in _cles(r)
@@ -105,7 +105,7 @@ class TestCoursPerimes:
         with get_db() as conn:
             _titre(conn, price_date=vieux)
             pid = _position(conn)
-            _holding(conn, pid, qty=3645, as_of='2026-09-01')
+            _holding(conn, pid, qty=2975, as_of='2026-09-01')
             conn.commit()
             r = collect(conn, DATE, AUJ)
         s = next(x for x in r['signaux'] if x['cle'] == 'cours')
@@ -118,7 +118,7 @@ class TestCoursPerimes:
         with get_db() as conn:
             _titre(conn, price_date=frais)
             pid = _position(conn)
-            _holding(conn, pid, qty=3645, as_of='2026-09-01')
+            _holding(conn, pid, qty=2975, as_of='2026-09-01')
             conn.commit()
             r = collect(conn, DATE, AUJ)
         assert 'cours' not in _cles(r)
@@ -137,7 +137,7 @@ class TestCoursPerimes:
         with get_db() as conn:
             _titre(conn, price_date=vieux)
             pid = _position(conn)
-            _holding(conn, pid, qty=3645, as_of='2026-09-01')
+            _holding(conn, pid, qty=2975, as_of='2026-09-01')
             conn.commit()
             r = collect(conn, DATE, AUJ)
         s = next(x for x in r['signaux'] if x['cle'] == 'cours')
@@ -153,7 +153,7 @@ class TestCoursPerimes:
             conn.execute("INSERT INTO securities (isin, name, ticker, last_price_date, "
                          "is_priceable) VALUES ('FR1459AB4169','Opp Taux',NULL,NULL,1)")
             pid = _position(conn)
-            _holding(conn, pid, qty=3645, as_of='2026-09-01')
+            _holding(conn, pid, qty=2975, as_of='2026-09-01')
             conn.execute("INSERT INTO holdings (position_id, isin, quantity, as_of_date) "
                          "VALUES (?,'FR1459AB4169',10,'2026-09-01')", (pid,))
             conn.commit()
@@ -181,7 +181,7 @@ class TestCoursPerimes:
         with get_db() as conn:
             _titre(conn, price_date='2020-01-01', priceable=0)
             pid = _position(conn)
-            _holding(conn, pid, qty=3645, as_of='2026-09-01')
+            _holding(conn, pid, qty=2975, as_of='2026-09-01')
             conn.commit()
             r = collect(conn, DATE, AUJ)
         assert 'cours' not in _cles(r)
@@ -217,7 +217,7 @@ class TestAgregation:
             _titre(conn, price_date=vieux)
             pid = _position(conn)
             _holding(conn, pid)
-            _avis(conn, '2026-08-17', 150, 921.98)
+            _avis(conn, '2026-08-17', 120, 851.64)
             conn.execute("INSERT INTO flux (date, owner, type, amount, notes) "
                          "VALUES ('2026-08-14','Léo','Versement',75,'[provisoire] x')")
             conn.commit()
@@ -231,7 +231,7 @@ class TestAgregation:
         with get_db() as conn:
             _titre(conn)
             pid = _position(conn)
-            _holding(conn, pid, qty=3645, as_of='2026-09-01')
+            _holding(conn, pid, qty=2975, as_of='2026-09-01')
             conn.commit()
             r = collect(conn, DATE, AUJ)
         assert r == {'signaux': [], 'total': 0}
@@ -254,7 +254,7 @@ class TestEndpoint:
             _titre(conn)
             pid = _position(conn)
             _holding(conn, pid)
-            _avis(conn, '2026-08-17', 150, 921.98)
+            _avis(conn, '2026-08-17', 120, 851.64)
             conn.commit()
         r = client.get('/api/todo')
         assert r.status_code == 200

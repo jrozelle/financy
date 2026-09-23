@@ -24,9 +24,9 @@ QONTO = """Relevés de compte
 Du 01/10/2025 au 31/10/2025
 SCI Test
 Solde au 01/10 + 485.59 EUR
-Entrées + 1760.12 EUR
+Entrées + 1912.40 EUR
 Sorties - 1540.25 EUR
-BIC: QNTOFRP1XXX Solde au 31/10 + 612.20 EUR
+BIC: QNTOFRP1XXX Solde au 31/10 + 857.74 EUR
 Date de valeur Transactions Débit Crédit
 02/10 Paul MARTIN + 1100.00 EUR
 Appro SCI
@@ -70,7 +70,7 @@ class TestLectureQonto:
 
     def test_un_total_faux_est_refuse(self):
         with pytest.raises(ReleveIllisible):
-            _qonto(QONTO.replace('Entrées + 1760.12', 'Entrées + 1760.13'))
+            _qonto(QONTO.replace('Entrées + 1912.40', 'Entrées + 1912.41'))
 
 
 class TestClassement:
@@ -85,9 +85,13 @@ class TestClassement:
         ('Exemplia — transfert compte courant', -1400, 'interne'),
         ('CABINET — FACT-202601-07038', -55.01, 'frais'),
         ('Inconnu', -12, 'autre'),
+        ('Virement Vir Inst vers Fournisseur X', -55.01, 'autre'),
     ])
     def test_nature(self, libelle, montant, nature):
         assert t.classer(libelle, montant, 'Exemplia', {'Paul', 'Claire'}) == nature
+
+    def test_fournisseur_regle_en_base(self):
+        assert t.classer('Virement Vir Inst vers Fournisseur X', -55.01, 'Exemplia', (), ('fournisseur x',)) == 'frais'
 
 
 def _releve(ops):

@@ -1,32 +1,45 @@
 # Financy
 
-Application web de suivi patrimonial familial — visualisez, analysez et pilotez votre patrimoine en famille.
+Suivi du patrimoine familial, auto-hébergé : ce que vous possédez, ce que vous
+devez, d'où vient ce qui a bougé, et ce que deviendra le tout — à partir des
+documents que vos banques vous envoient déjà.
 
-## Fonctionnalités
+Financy ne se connecte à aucune banque. Il lit les documents (relevés, avis
+d'opéré, tableaux d'amortissement), les vérifie, et range chaque mouvement.
+Les données restent chez vous, dans un fichier SQLite.
 
-| Onglet | Description |
-|--------|-------------|
-| **Synthèse** | KPI (actif brut, dette, net, mobilisable), graphiques par catégorie / enveloppe, historique du patrimoine, allocation cible vs réelle, performance, alertes configurables |
-| **Positions** | Vue tableau (tri, filtre, recherche) et vue arborescente (propriétaire → établissement → enveloppe → catégorie) avec édition inline, snapshots datés et duplication |
-| **Flux** | Versements, retraits, dividendes — filtrés et totalisés par type et par personne |
-| **Entités** | SCI, indivisions — versionnées avec historique de valorisation et parts détenues |
-| **Référentiel** | Propriétaires, catégories, enveloppes, mobilisabilité — tout configurable |
-| **Import / Export** | Import XLSX ou JSON, export JSON, sauvegarde et restauration complète |
-| **Outils** | Simulation d'épargne, auto-snapshot |
+## Ce que fait l'application
 
-## Démarrage rapide
+| Page | Ce qu'on y lit |
+|------|----------------|
+| **Synthèse** | Patrimoine net, brut, dettes et mobilisable ; ce qui a bougé depuis l'arrêté précédent ; d'où vient la hausse (épargne nouvelle, capital remboursé, performance des marchés) ; évolution par catégorie ; projection à 5–20 ans ; impôt latent « si vous vendiez tout » |
+| **Positions** | Chaque compte, en tableau ou en arbre (titulaire → établissement → enveloppe), triable et filtrable ; mise à jour d'un arrêté en une passe |
+| **Actifs** | Les titres détenus, leurs cours, leur devise, et tout arbitrage de valorisation signalé |
+| **Entités** | SCI, holdings, indivisions : valeur, dette, parts de chaque titulaire ; trésorerie et levier d'une société lus sur ses relevés bancaires ; parts de SCPI au prix de retrait ; impôt sur les sociétés estimé |
+| **Crédits** | Tableaux d'amortissement importés ou saisis, différé total ou partiel, prêts in fine, indemnités de remboursement anticipé, échéances à venir |
+| **Performance** | Rendement de votre argent (TRI) et rendement comparable à un indice (TWR), par compte ou par enveloppe, face à un indice de référence |
+| **Flux** | Versements, retraits, dividendes et frais ; flux provisoires rapprochés du document qui les atteste |
+| **Conseil** | Constats tirés des chiffres (plafonds, espèces qui dorment, ancienneté des contrats, garder ou rembourser un crédit) et propositions d'arbitrage sur la part libre du patrimoine financier |
 
-### Installation locale
+Et aussi : un mode discrétion qui ne laisse lisibles que les trois derniers
+chiffres de chaque montant (pour montrer l'écran sans montrer le patrimoine),
+un thème sombre, un mode démo sur des données fictives, et l'installation sur
+l'écran d'accueil d'un téléphone.
 
-```bash
-python3 -m venv venv
-source venv/bin/activate        # Windows : venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env            # optionnel — adapter les valeurs
-python3 app.py
-```
+## Principes
 
-Ouvrir [http://localhost:5017](http://localhost:5017).
+- **Un document se vérifie avant d'être cru.** Un relevé doit redonner son solde
+  final, un tableau d'amortissement tomber à zéro. Sinon il est refusé, plutôt
+  que de fausser les chiffres en silence.
+- **Rien n'est écarté sans le dire.** Un compte hors d'un calcul figure dans un
+  décompte, avec sa raison.
+- **Une valorisation au plus près de la sortie.** Une part de SCPI vaut son prix
+  de retrait, pas son prix d'achat ; un contrat d'assurance-vie se taxe selon son
+  ancienneté réelle.
+- **Pas de conseil générique.** Un constat s'appuie sur vos chiffres ; il ne
+  cite aucun taux de marché, seulement ceux de vos contrats.
+
+## Démarrage
 
 ### Docker Compose (recommandé)
 
@@ -35,70 +48,65 @@ cp .env.example .env            # adapter les valeurs
 docker compose up -d
 ```
 
-L'application est accessible sur [http://localhost:5017](http://localhost:5017).
+L'application écoute sur [http://localhost:5017](http://localhost:5017). La base
+est persistée dans `./data/`. Après une mise à jour : `docker compose up -d --build`.
 
-Pour reconstruire après une mise à jour :
+### En local
 
 ```bash
-docker compose up -d --build
+python3 -m venv venv
+source venv/bin/activate
+python -m pip install -r requirements.txt
+cp .env.example .env
+python app.py
 ```
 
-La base de données est persistée dans `./data/` grâce au volume monté.
+Pour découvrir l'application sans rien saisir, activez le **mode démo** depuis
+les réglages : il bascule sur une base fictive et coupe tout appel réseau.
 
 ## Configuration
 
-Toutes les variables se définissent dans un fichier `.env` (voir `.env.example`) :
+Dans `.env` (voir `.env.example`) :
 
-| Variable | Défaut | Description |
-|----------|--------|-------------|
-| `FINANCY_PASSWORD` | *(vide — pas d'auth)* | Mot de passe d'accès à l'application |
-| `SECRET_KEY` | *(générée au démarrage)* | Clé secrète Flask pour les sessions (min. 32 caractères en production) |
-| `DB_PATH` | `patrimoine.db` | Chemin vers la base SQLite |
-| `PORT` | `5017` | Port d'écoute |
-| `SESSION_TIMEOUT_MINUTES` | `60` | Durée d'inactivité avant déconnexion |
-| `FLASK_ENV` | `development` | `production` désactive le debug et active les cookies Secure |
+| Variable | Défaut | Rôle |
+|----------|--------|------|
+| `FINANCY_PASSWORD` | *(vide : pas d'authentification)* | Mot de passe d'accès |
+| `SECRET_KEY` | *(générée au démarrage)* | Clé des sessions (32 caractères minimum en production) |
+| `DB_PATH` | `patrimoine.db` | Base SQLite |
+| `HOST` / `PORT` | `0.0.0.0` / `5017` | Adresse d'écoute |
+| `SESSION_TIMEOUT_MINUTES` | `60` | Inactivité avant déconnexion |
+| `FLASK_ENV` | `development` | `production` coupe le débogage et exige des cookies sécurisés |
+| `PRICE_PROVIDER` | `yahoo` | Source des cours ; `mock` n'appelle aucun réseau |
+| `SCHEDULER_ENABLED` | `false` | Rafraîchissement quotidien des cours (`SCHEDULER_HOUR`, `SCHEDULER_MINUTE`, `SCHEDULER_TZ`) |
+| `ANTHROPIC_API_KEY` | *(vide)* | Synthèse macroéconomique rédigée par un modèle, facultative (`ADVISOR_MODEL`, `ADVISOR_LLM_PROVIDER`, `ADVISOR_BUDGET_USD`) |
 
-## Import de données
+## Importer ses données
 
-Un fichier Excel modèle vierge est inclus dans le dépôt : **`Patrimoine_Familial_blank.xlsx`**.
-
-Il contient 7 onglets pré-formatés :
-
-| Onglet | Contenu |
-|--------|---------|
-| README | Mode d'emploi |
-| Listes | Valeurs de référence (catégories, enveloppes…) |
-| Positions | Lignes de patrimoine |
-| Flux | Versements, retraits, dividendes |
-| Entites | SCI, indivisions |
-| Synthese | Snapshots patrimoniaux |
-| TCD | Tableau croisé dynamique |
-
-1. Téléchargez `Patrimoine_Familial_blank.xlsx`
-2. Remplissez les onglets avec vos données
-3. Dans l'application → **Import / Export** → **Import XLSX**
-
-L'import JSON est également disponible pour les sauvegardes existantes.
+- **Documents** : avis d'opéré, relevés de comptes, tableaux d'amortissement et
+  avis de réalisation de prêt (PDF), copier-coller d'un tableau de positions
+  depuis le site de la banque.
+- **Tableur** : le modèle vierge `Patrimoine_Familial_blank.xlsx` (positions,
+  flux, entités), à remplir puis importer depuis **Import / Export**.
+- **Sauvegarde** : export et import JSON complets. Chaque import est précédé
+  d'une copie de la base, et les copies suivent une rotation (tout sur 30 jours,
+  puis une par mois).
 
 ## Sécurité
 
-- Authentification par mot de passe avec comparaison timing-safe
-- Rate limiting sur la page de login (10 tentatives / 5 min)
-- Sessions avec timeout configurable et régénération après login
-- En-têtes de sécurité (CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy)
-- Cookies HttpOnly / SameSite=Lax (+ Secure en production)
-- Validation et assainissement de toutes les entrées
+- Mot de passe comparé en temps constant, tentatives de connexion limitées
+- Sessions à durée limitée, régénérées à la connexion
+- Protection CSRF sur toute écriture, entrées validées côté serveur
+- En-têtes de sécurité (CSP, X-Frame-Options, Referrer-Policy), cookies HttpOnly et SameSite
+- Aucune clé en dur : tout passe par l'environnement
 
 ## Tests
 
 ```bash
-pip install pytest
-python3 -m pytest tests/ -v
+python -m pip install -r requirements-dev.txt
+python -m pytest -q
 ```
 
-## Stack technique
+## Stack
 
-- **Backend** : Python 3.12 / Flask 3 / SQLite
-- **Frontend** : HTML + CSS + JavaScript vanilla (aucun framework)
-- **Graphiques** : Chart.js 4
-- **Conteneurisation** : Docker + Docker Compose
+Python 3.12 et Flask 3, SQLite, JavaScript sans framework (modules ES),
+graphiques en SVG et Chart.js, Docker.

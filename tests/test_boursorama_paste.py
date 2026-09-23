@@ -14,53 +14,53 @@ from services.parsers.boursorama_paste import (
 from tests.test_api import client, fresh_db, CSRF_HEADERS, _make_position  # noqa: F401
 
 
-# ─── Echantillons reels (4 sources) ──────────────────────────────────────────
+# ─── Echantillons fictifs, a la mise en page reelle (4 sources) ──────────────────────────────────────────
 
 ANAE = '''Valeur     Date de dernière valorisation     Quantité     Px. Revient     Cours     Montant     +/- latentes     +/- %
 ACTIF EURO
     02/06/2026
-    -     -     -     41 205,16 €     141,61 €     0,33 %
+    -     -     -     41 205,16 €     134,20 €     0,33 %
 AM ACTIONS EMERGENTS-R
 FR0013297546     27/05/2026
-    30.5474     -     158,55 €     5 412,37 €     594,10 €     10,40 %
+    28.4163     -     176,58 €     5 017,75 €     512,34 €     11,37 %
 AM OBLIG MONDE RESPONSABLE-R
 FR001400T779     27/05/2026
-    25.54967     -     89,65 €     2 604,48 €     -7,05 €     -0,27 %'''
+    24.81507     -     101,37 €     2 515,50 €     -11,62 €     -0,46 %'''
 
 PEA = '''    Valeur    Quantité    Px. Revient    Cours    Montant    +/- Latentes    +/- %    Notification
 
 ISHARES MSCI WORLD SWAP PEA ETF
 IE0002XZSHO1
 
-3 200
+2 750
 
-5,75 €
+5,48 €
 
-5,88 €
+6,71 €
 - 0,49 %
 
-18 825,41 €
+18 452,50 €
 
-2 810,45 €
+3 382,50 €
 
-15,27 %
+22,45 %
 
 
 AMUNDI PEA EMERG MSCI ESG TR UCITS ETFC
 FR0013412020
 
-170
+145
 
-28,52 €
+31,92 €
 
-30,51 €
+34,86 €
 - 3,54 %
 
-5 187,44 €
+5 054,70 €
 
-338,97 €
+426,30 €
 
-6,08 %'''
+9,21 %'''
 
 BOURSOVIE = '''Valeur    Date de Valeur    Quantité    Px. Revient    Cours    Montant    +/- Latentes    +/- %
 Fonds en Euros (Euro Exclusif)
@@ -82,32 +82,32 @@ FR0010315770
 
 05/06/2026
 
-46,4357
+44,1582
 
-350,41 €
+391,26 €
 
-361,55 €
+409,83 €
 
-19 297,30 €
+18 097,36 €
 
-594,33 €
+820,02 €
 
-2,77 %
+4,75 %
 iShares Core MSCI Emerging Markets IMI UCITS ETF
 IE00BKM4GZ66
 
 05/06/2026
 
-83,9703
+81,2043
 
-40,70 €
+47,15 €
 
-40,49 €
+46,02 €
 
-3 907,98 €
+3 737,02 €
 
--19,73 €
-- 0,50 %'''
+-91,76 €
+- 2,40 %'''
 
 LUCYA = '''Valeur     Date de dernière valorisation     Quantité     Px. Revient     Cours     Montant     +/- latentes     +/- %
 Fonds Général Retraite
@@ -115,7 +115,7 @@ FGPERIN     -
     -     -     -     8 312,95 €     -     -
 Amundi Core MSCI World ETF Acc
 IE000BI8OT95     02/06/2026
-    44.5548     -     135,73 €     6 790,20 €     -     11,40 %'''
+    43.6851     -     149,62 €     6 536,16 €     -     11,84 %'''
 
 
 # CTO : noms d'actions courts en majuscules + ISIN a la ligne, % journalier
@@ -125,35 +125,35 @@ CTO = '''    Valeur    Quantité    Px. Revient    Cours    Montant    +/- Laten
 ADOBE
 US00724F1012
 
-10
+7
 
-156,51 €
+312,40 €
 
-161,25 €
+296,15 €
 2,91 %
 
-1 574,12 €
+2 073,05 €
 
-47,41 €
+-113,75 €
 
-2,64 %
+-5,20 %
 
 
 APPLE
 US0378331005
 
-8
+12
 
-150,00 €
+162,50 €
 
-152,42 €
+188,40 €
 0,80 %
 
-1 219,39 €
+2 260,80 €
 
-175,39 €
+310,80 €
 
-14,62 %'''
+15,94 %'''
 
 
 def _by_isin(lines):
@@ -170,18 +170,18 @@ V
 ISHARES MSCI WORLD SWAP PEA UCITS ETF EUR (ACC)
 IE0002XZSHO1
     
-3 645
+3 560
     
-5,24 €
+5,87 €
     
-6,05 €
+6,88 €
 0,17 %
     
-24 610,75 €
+24 492,80 €
     
-3 391,96 €
+3 595,60 €
     
-13,45 %
+17,21 %
     
 A
 V
@@ -189,18 +189,18 @@ V
 AMUNDI NASDAQ-100 DAILY (2X) LEVERAGED UCITS ETF ACC
 FR0010342592
     
-82
+67
     
-8,02 €
+8,94 €
     
-8,08 €
+9,15 €
 - 0,30 %
     
-662,46 €
+613,05 €
     
-4,82 €
+14,07 €
     
-0,73 %"""
+2,35 %"""
 
 class TestDetection:
     def test_all_sources_detected(self):
@@ -221,10 +221,10 @@ class TestAnae:
     def test_fund_and_pru(self):
         d = _by_isin(parse_boursorama_paste(ANAE))
         l = d['FR0013297546']
-        assert l.quantity == 30.5474
-        assert l.unit_price == 158.55
-        assert l.market_value == 5412.37
-        assert l.cost_basis == 4832.06      # Montant - latentes
+        assert l.quantity == 28.4163
+        assert l.unit_price == 176.58
+        assert l.market_value == 5017.75
+        assert l.cost_basis == 4505.41      # Montant - latentes
         assert l.as_of_date == '2026-05-27'
 
     def test_fonds_euros(self):
@@ -242,10 +242,10 @@ class TestPEA:
         d = _by_isin(parse_boursorama_paste(PEA))
         assert set(d) == {'IE0002XZSHO1', 'FR0013412020'}
         a = d['IE0002XZSHO1']
-        assert a.quantity == 3200.0
-        assert a.unit_price == 5.88        # Cours (pas le % journalier -0,49)
-        assert a.market_value == 18825.41
-        assert a.cost_basis == 18400.0     # Px.Revient 5,75 x 3200
+        assert a.quantity == 2750.0
+        assert a.unit_price == 6.71        # Cours (pas le % journalier -0,49)
+        assert a.market_value == 18452.50
+        assert a.cost_basis == 15070.0     # Px.Revient 5,48 x 2750
 
     def test_no_false_fonds_euros(self):
         # un PEA d'ETF ne doit pas creer de pseudo-fonds-euros
@@ -264,16 +264,16 @@ class TestBoursoVie:
     def test_fund_with_px_revient(self):
         d = _by_isin(parse_boursorama_paste(BOURSOVIE))
         l = d['FR0010315770']
-        assert l.quantity == 46.4357
-        assert l.unit_price == 361.55
-        assert l.market_value == 19297.30
-        assert l.cost_basis == 18265.33    # 350,41 x 46,4357
+        assert l.quantity == 44.1582
+        assert l.unit_price == 409.83
+        assert l.market_value == 18097.36
+        assert l.cost_basis == 17277.34    # 391,26 x 44,1582
 
     def test_negative_latente(self):
         d = _by_isin(parse_boursorama_paste(BOURSOVIE))
         l = d['IE00BKM4GZ66']
-        assert l.market_value == 3907.98
-        assert l.unit_price == 40.49
+        assert l.market_value == 3737.02
+        assert l.unit_price == 46.02
 
 
 class TestLucya:
@@ -286,9 +286,9 @@ class TestLucya:
     def test_real_isin_fund(self):
         d = _by_isin(parse_boursorama_paste(LUCYA))
         l = d['IE000BI8OT95']
-        assert l.quantity == 44.5548
-        assert l.market_value == 6950.99
-        assert l.unit_price == 135.73
+        assert l.quantity == 43.6851
+        assert l.market_value == 6536.16
+        assert l.unit_price == 149.62
 
 
 class TestCTO:
@@ -306,13 +306,13 @@ class TestCTO:
     def test_quantity_not_merged_with_px_revient(self):
         d = _by_isin(parse_boursorama_paste(CTO))
         adobe = d['US00724F1012']
-        assert adobe.quantity == 10          # pas 8856,51
-        assert adobe.unit_price == 161.25    # Cours, pas le % journalier 2,91
-        assert adobe.market_value == 1574.12
-        assert adobe.cost_basis == 1565.1    # Px.Revient 156,51 x 10
+        assert adobe.quantity == 7           # pas 7312,40
+        assert adobe.unit_price == 296.15    # Cours, pas le % journalier 2,91
+        assert adobe.market_value == 2073.05
+        assert adobe.cost_basis == 2186.8    # Px.Revient 312,40 x 7
         apple = d['US0378331005']
-        assert apple.quantity == 8           # pas 7090,50
-        assert apple.market_value == 1219.39
+        assert apple.quantity == 12          # pas 12162,50
+        assert apple.market_value == 2260.80
 
     def test_no_false_fonds_euros(self):
         assert all(not l.isin.startswith('FONDS_EUROS_')
@@ -333,7 +333,7 @@ class TestSeparatorRobustness:
 
     def test_nbsp_thousands(self):
         nb = chr(0x00a0)
-        self._check(ANAE.replace('5 566', '6' + nb + '398'), 3)
+        self._check(ANAE.replace('5 017', '5' + nb + '017'), 3)
 
 
 class TestFullImport:
@@ -368,13 +368,13 @@ class TestFullImport:
         by_cat = {p['category']: p for p in avs}
         assert set(by_cat) == {'Fond Euro', 'Actions', 'Obligations'}
         total = sum(p['value'] for p in avs)
-        assert abs(total - (41205.16 + 5412.37 + 2604.48)) < 0.5
+        assert abs(total - (41205.16 + 5017.75 + 2515.50)) < 0.5
 
     def test_pea_single_actions_position(self, client):
         pea = self._import(client, PEA, envelope='PEA')
         by_cat = {p['category']: p for p in pea}
         assert set(by_cat) == {'Actions'}
-        assert abs(by_cat['Actions']['value'] - (18825.41 + 5187.44)) < 0.5
+        assert abs(by_cat['Actions']['value'] - (18452.50 + 5054.70)) < 0.5
 
 class TestBoutonsAchatVente:
     """Regression : la colonne de boutons fabriquait deux faux fonds euros par
@@ -389,13 +389,13 @@ class TestBoutonsAchatVente:
     def test_valeurs_intactes(self):
         d = _by_isin(parse_boursorama_paste(PEA_BOUTONS_AV))
         a = d['IE0002XZSHO1']
-        assert a.quantity == 3645.3
-        assert a.unit_price == 6.05
-        assert a.market_value == 24610.75
-        assert a.cost_basis == 21450.10      # Px.Revient 5,24 x 3645
+        assert a.quantity == 3560.0
+        assert a.unit_price == 6.88
+        assert a.market_value == 24492.80
+        assert a.cost_basis == 20897.20      # Px.Revient 5,87 x 3560
         b = d['FR0010342592']
-        assert b.quantity == 71.3
-        assert b.market_value == 648.20
+        assert b.quantity == 67.0
+        assert b.market_value == 613.05
 
 
 class TestBoutonsDInterface:

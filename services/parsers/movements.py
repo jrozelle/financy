@@ -384,7 +384,7 @@ def _montants(line):
     """Montants d'une ligne, chacun avec le bord droit de sa colonne.
 
     Recolle les jetons qu'une espace de milliers a separes : sans cela
-    "1 000,00" se lisait 0,00 et "2 480,00" se lisait 488,94 — des montants
+    "1 000,00" se lisait 0,00 et "2 345,00" se lisait 345,00 — des montants
     tronques, mais plausibles, qui entraient en base sans rien signaler.
     Le raccord n'est retenu que si la chaine reconstituee est un montant
     valide : c'est la forme, et non l'espacement, qui tranche.

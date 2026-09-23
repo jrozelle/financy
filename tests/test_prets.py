@@ -167,22 +167,22 @@ class TestCreditAgricoleInFine:
     TEXTE = """AVIS DE RÉALISATION
 CREDIT AGRICOLE 18.03.2026
 Jean Dupont S.A.S. HOLDING EXEMPLE
-Taux : 4,0000 TAUX FIXE Montant déjà réalisé :150 000,00
-Différé total : Montant du crédit :160 000,00
+Taux : 4,0000 TAUX FIXE Montant déjà réalisé :130 000,00
+Différé total : Montant du crédit :140 000,00
 N° Date Capital Restant dû Montant échéance Capital amorti Intérêts
-1 05.04.2026 160 000,00 440,32 0,00 440,32
-2 05.05.2026 160 000,00 466,67 0,00 466,67
-3 05.06.2026 0,00 140 466,67 160 000,00 466,67
+1 05.04.2026 140 000,00 440,32 0,00 440,32
+2 05.05.2026 140 000,00 466,67 0,00 466,67
+3 05.06.2026 0,00 140 466,67 140 000,00 466,67
 """
 
     def test_in_fine_lu_et_verifie(self):
         from services.parsers.amortissement import _credit_agricole
         t = _verifier(_credit_agricole(None, self.TEXTE))
         assert t.libelle == 'Prêt in fine' and t.emprunteur == 'HOLDING EXEMPLE'
-        assert t.montant == 160000 and t.taux == 4.0
-        assert [e.capital for e in t.echeances] == [0, 0, 160000] and t.echeances[-1].crd == 0
+        assert t.montant == 140000 and t.taux == 4.0
+        assert [e.capital for e in t.echeances] == [0, 0, 140000] and t.echeances[-1].crd == 0
 
     def test_une_tranche_seule_est_refusee(self):
         from services.parsers.amortissement import _credit_agricole
         with pytest.raises(ValueError):
-            _verifier(_credit_agricole(None, self.TEXTE.replace('160 000,00 440,32', '150 000,00 408,87')))
+            _verifier(_credit_agricole(None, self.TEXTE.replace('140 000,00 440,32', '130 000,00 408,87')))

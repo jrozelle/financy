@@ -39,3 +39,6 @@ backups/
 
 # Logs
 *.log
+
+# Consignes privees de Claude Code (le depot est public)
+CLAUDE.local.md

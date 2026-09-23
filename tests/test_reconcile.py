@@ -1,7 +1,7 @@
 """Tests du rapprochement entre la photo (`holdings`) et le journal (`transactions`).
 
 Scenario de reference : celui rencontre en prod. Une photo au 12/08 portant
-3 350 parts, deux avis d'achat posterieurs (150 le 17/08, 190 le 31/08) jamais
+2 640 parts, deux avis d'achat posterieurs (120 le 17/08, 215 le 31/08) jamais
 repercutes, et un arrete du 02/09 qui recopie la photo perimee.
 """
 import os
@@ -46,7 +46,7 @@ def client():
         yield c
 
 
-def _seed(holding=None, txs=(), price=6.03, price_date='2026-08-21',
+def _seed(holding=None, txs=(), price=7.12, price_date='2026-08-21',
           date='2026-09-02', owner='Paul', envelope='PEA',
           establishment='BoursoBank', isin=ISIN):
     """Cree un arrete avec une position a holdings et un journal d'operations."""
@@ -79,11 +79,11 @@ def _seed(holding=None, txs=(), price=6.03, price_date='2026-08-21',
     return pid, hid
 
 
-PHOTO = {'quantity': 3350, 'cost_basis': 19760.40,
-         'market_value': 23100.0, 'as_of_date': '2026-08-12'}
+PHOTO = {'quantity': 2640, 'cost_basis': 15470.40,
+         'market_value': 19140.0, 'as_of_date': '2026-08-12'}
 AVIS = [
-    {'date': '2026-08-17', 'side': 'ACHAT', 'quantity': 150, 'net_eur': 921.98},
-    {'date': '2026-08-31', 'side': 'ACHAT', 'quantity': 190, 'net_eur': 1153.96},
+    {'date': '2026-08-17', 'side': 'ACHAT', 'quantity': 120, 'net_eur': 851.64},
+    {'date': '2026-08-31', 'side': 'ACHAT', 'quantity': 215, 'net_eur': 1535.19},
 ]
 
 
@@ -94,15 +94,15 @@ class TestDetection:
             r = reconcile_snapshot(conn, '2026-09-02')
         assert len(r['ecarts']) == 1
         e = r['ecarts'][0]
-        assert e['quantity'] == 3350
-        assert e['delta_quantity'] == 340
-        assert e['expected'] == 3645
-        assert e['cost_delta'] == 2075.94
+        assert e['quantity'] == 2640
+        assert e['delta_quantity'] == 335
+        assert e['expected'] == 2975
+        assert e['cost_delta'] == 2386.83
         assert [o['date'] for o in e['operations']] == ['2026-08-17', '2026-08-31']
 
     def test_photo_a_jour_aucun_ecart(self):
         # date de valeur posterieure aux deux avis : rien a signaler
-        _seed({**PHOTO, 'quantity': 3645, 'as_of_date': '2026-09-01'}, AVIS)
+        _seed({**PHOTO, 'quantity': 2975, 'as_of_date': '2026-09-01'}, AVIS)
         with get_db() as conn:
             r = reconcile_snapshot(conn, '2026-09-02')
         assert r['ecarts'] == []
@@ -110,13 +110,13 @@ class TestDetection:
 
     def test_vente_donne_un_delta_negatif(self):
         _seed(PHOTO, [{'date': '2026-08-20', 'side': 'VENTE',
-                       'quantity': 50, 'net_eur': 301.9}])
+                       'quantity': 40, 'net_eur': 284.80}])
         with get_db() as conn:
             r = reconcile_snapshot(conn, '2026-09-02')
         e = r['ecarts'][0]
-        assert e['delta_quantity'] == -50
-        assert e['expected'] == 3800
-        assert e['cost_delta'] == -301.9
+        assert e['delta_quantity'] == -40
+        assert e['expected'] == 2600
+        assert e['cost_delta'] == -284.8
 
     def test_operation_posterieure_a_l_arrete_ignoree(self):
         # un avis du 15/09 ne saurait figurer dans l'arrete du 02/09
@@ -149,18 +149,18 @@ class TestBruitEcarte:
 
     def test_titre_encore_detenu_mais_absent_de_la_photo(self):
         _seed(None, [{'date': '2026-08-17', 'side': 'ACHAT',
-                      'quantity': 150, 'net_eur': 921.98}])
+                      'quantity': 120, 'net_eur': 851.64}])
         with get_db() as conn:
             r = reconcile_snapshot(conn, '2026-09-02')
         assert len(r['absents']) == 1
-        assert r['absents'][0]['expected'] == 150
+        assert r['absents'][0]['expected'] == 120
         assert r['ignores']['soldees'] == 0
 
     def test_titulaires_distincts_ne_se_confondent_pas(self):
         # meme ISIN, meme enveloppe, meme etablissement, deux personnes :
         # l'avis de Paul ne doit pas etre imputé a la ligne de Claire
         pid, hid = _seed(PHOTO, AVIS)
-        _seed({'quantity': 100, 'cost_basis': 500.0, 'market_value': 602.9,
+        _seed({'quantity': 80, 'cost_basis': 420.0, 'market_value': 569.6,
                'as_of_date': '2026-08-12'}, (), owner='Claire')
         with get_db() as conn:
             r = reconcile_snapshot(conn, '2026-09-02')
@@ -193,11 +193,11 @@ class TestApplication:
             detail = apply_ecart(conn, '2026-09-02', hid)
             conn.commit()
             row = conn.execute('SELECT * FROM holdings WHERE id=?', (hid,)).fetchone()
-        assert row['quantity'] == 3645
-        assert row['cost_basis'] == 21938.48
+        assert row['quantity'] == 2975
+        assert row['cost_basis'] == 17857.23
         assert row['as_of_date'] == '2026-08-31'      # date du dernier avis integre
-        assert row['market_value'] == 25261.93        # 3645 x cours 6,03
-        assert detail['quantity'] == {'avant': 3349.5, 'apres': 3645.3}
+        assert row['market_value'] == 21182.00        # 2975 x cours 7,12
+        assert detail['quantity'] == {'avant': 2640.0, 'apres': 2975.0}
 
     def test_rejouer_ne_double_pas(self):
         _seed(PHOTO, AVIS)
@@ -207,17 +207,17 @@ class TestApplication:
             assert apply_ecart(conn, '2026-09-02', hid) is None
             conn.commit()
             row = conn.execute('SELECT quantity FROM holdings WHERE id=?', (hid,)).fetchone()
-        assert row['quantity'] == 3645
+        assert row['quantity'] == 2975
 
     def test_sans_cours_le_prix_de_la_photo_sert(self):
-        # market_value 23100 / 3350 parts = 6,1422 EUR la part
+        # market_value 19140 / 2640 parts = 7,2500 EUR la part
         _seed(PHOTO, AVIS, price=None, price_date=None)
         with get_db() as conn:
             hid = reconcile_snapshot(conn, '2026-09-02')['ecarts'][0]['holding_id']
             apply_ecart(conn, '2026-09-02', hid)
             conn.commit()
             row = conn.execute('SELECT market_value FROM holdings WHERE id=?', (hid,)).fetchone()
-        assert row['market_value'] == 25735.8          # 3645 x 6,14
+        assert row['market_value'] == 21568.75         # 2975 x 7,25
 
 
 class TestEndpoints:
@@ -246,10 +246,10 @@ class TestEndpoints:
         assert len(r.json['appliquees']) == 1
         with get_db() as conn:
             pos = conn.execute('SELECT value FROM positions WHERE id=?', (pid,)).fetchone()
-        assert pos['value'] == 25261.93               # positions.value suit les holdings
+        assert pos['value'] == 21182.00               # positions.value suit les holdings
 
     def test_apply_ligne_sans_ecart_est_ignoree(self, client):
-        _, hid = _seed({**PHOTO, 'quantity': 3645, 'as_of_date': '2026-09-01'}, AVIS)
+        _, hid = _seed({**PHOTO, 'quantity': 2975, 'as_of_date': '2026-09-01'}, AVIS)
         r = client.post('/api/holdings/reconcile/apply',
                         json={'date': '2026-09-02', 'holding_ids': [hid]},
                         headers=CSRF)

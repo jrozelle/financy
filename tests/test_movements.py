@@ -455,8 +455,8 @@ class TestMontantsRecolles:
 
     def test_million_recolle(self):
         line = [{'text': '2', 'x0': 540.0, 'x1': 543.5, 'top': 10.0},
-                {'text': '488,94', 'x0': 545.2, 'x1': 578.3, 'top': 10.0}]
-        assert _montants(line) == [(2228.9, 578.3)]
+                {'text': '345,00', 'x0': 545.2, 'x1': 578.3, 'top': 10.0}]
+        assert _montants(line) == [(2345.0, 578.3)]
 
     def test_jeton_eloigne_non_recolle(self):
         """Une quantite separee du montant par la colonne suivante reste dehors."""
