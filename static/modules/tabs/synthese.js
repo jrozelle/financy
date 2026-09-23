@@ -1,7 +1,6 @@
-import { S, syntheseHistChart, setSyntheseHistChart } from '../state.js';
+import { S } from '../state.js';
 import { dessinerCourbe } from '../courbe.js';
-import { fmt, fmtDate, esc, kpiDelta, getColors, destroyChart, parseLocaleNumber, fmtAxis, sparkline, fmtPct,
-         tsJour, echelleTemps, titreDate } from '../utils.js';
+import { fmt, fmtDate, esc, kpiDelta, parseLocaleNumber, sparkline, fmtPct } from '../utils.js';
 import { api } from '../api.js';
 import { loadTodo } from '../todo.js';
 import { loadContribution } from './contribution.js';
@@ -111,17 +110,18 @@ export function renderSynthese() {
   // deja charge, filtrees sur le titulaire courant comme le reste de la page.
   const serie = cle => (S.historique || []).map(h =>
     isFamily ? h[`family_${cle}`] : h.by_owner_detail?.[owner]?.[cle]);
+  const dates = (S.historique || []).map(h => h.date);
 
   document.getElementById('kpi-net').innerHTML         = fmt(kpi.net) + varHtml('net_delta', 'net_pct')
-    + sparkline(serie('net'), { couleur: 'var(--primary)' });
+    + sparkline(serie('net'), { couleur: 'var(--primary)', dates });
   document.getElementById('kpi-gross').innerHTML       = fmt(kpi.gross) + varHtml('gross_delta')
-    + sparkline(serie('gross'), { couleur: 'var(--primary)' });
+    + sparkline(serie('gross'), { couleur: 'var(--primary)', dates });
   // La dette prend une couleur neutre : elle n'est ni bonne ni mauvaise en soi,
   // et la teindre en rouge ferait lire une baisse comme un probleme.
   document.getElementById('kpi-debt').innerHTML        = fmt(kpi.debt) + varHtml('debt_delta', null, { invert: true })
-    + sparkline(serie('debt'), { couleur: 'var(--text-muted)' });
+    + sparkline(serie('debt'), { couleur: 'var(--text-muted)', dates });
   document.getElementById('kpi-mobilizable').innerHTML = fmt(kpi.mob) + varHtml('mob_delta')
-    + sparkline(serie('mob'), { couleur: 'var(--primary)' });
+    + sparkline(serie('mob'), { couleur: 'var(--primary)', dates });
 
   // Sous-titres : un montant seul ne se situe pas. « 530 000 € » ne dit pas
   // ce qu'il contient ; « dont 280 000 € d'immobilier » le qualifie d'un mot.
@@ -177,100 +177,60 @@ export function renderSynthese() {
   renderWealthTarget(kpi.net);
 }
 
+/** « Evolution par categorie » : une ligne par groupe — nom, tendance,
+ *  valeur, variation. Sept aires empilees ne se lisaient pas : l'epaisseur
+ *  d'une bande qui flotte sur les autres ne se mesure pas a l'oeil, et une
+ *  poche de 5 % n'y etait qu'un lisere. Ici chaque ligne a son echelle, et
+ *  les chiffres se lisent sans survol. */
 export async function renderSyntheseHistory() {
   const card = document.getElementById('synthese-history-detail-card');
-  if (!card) return;
+  const hote = document.getElementById('evolution-groupes');
+  if (!card || !hote) return;
   if (S.historique.length < 2) { card.style.display = 'none'; return; }
   card.style.display = '';
 
   const groupBy = document.getElementById('synthese-history-group').value;
   const owner   = S.syntheseOwner === 'Famille' ? null : S.syntheseOwner;
   const url     = `/api/historique?group_by=${groupBy}${owner ? `&owner=${encodeURIComponent(owner)}` : ''}`;
-
   const history = await api('GET', url);
-  const dates   = history.map(h => fmtDate(h.date));
+  if (history.length < 2) { card.style.display = 'none'; return; }
 
-  // Douze series empilees et une legende de douze entrees : on distingue les
-  // trois plus grosses, les autres forment un liseré illisible qui occupe la
-  // moitie de la legende. On garde les six premieres par poids et on regroupe
-  // le reste, qui reste ainsi compte sans encombrer.
-  const MAX_SERIES = 6;
-  const poids = {};
-  history.forEach(h => Object.entries(h.by_group || {}).forEach(([k, v]) => {
-    poids[k] = Math.max(poids[k] || 0, Math.abs(v || 0));
-  }));
-  const classees = Object.keys(poids).sort((a, b) => poids[b] - poids[a]);
-  const gardees = classees.slice(0, MAX_SERIES);
-  const fondues = classees.slice(MAX_SERIES);
+  const d0 = history[0].date, d1 = history[history.length - 1].date;
+  const groupes = [...new Set(history.flatMap(h => Object.keys(h.by_group || {})))];
+  const lignes = groupes.map(g => {
+    const serie = history.map(h => h.by_group?.[g] || 0);
+    const debut = serie[0], fin = serie[serie.length - 1];
+    return { g, serie, debut, fin, delta: fin - debut };
+  }).filter(l => l.serie.some(v => Math.abs(v) >= 1))
+    .sort((a, b) => Math.abs(b.fin) - Math.abs(a.fin));
+  const totalFin = lignes.reduce((t, l) => t + Math.max(0, l.fin), 0);
 
-  const serie = g => history.map(h => ({ x: tsJour(h.date), y: Math.round(h.by_group?.[g] || 0) }));
-  const colors = getColors();
-  const datasets = gardees.map((g, i) => ({
-    label: g,
-    data:  serie(g),
-    backgroundColor: colors[i % colors.length] + 'cc',
-    borderColor:     colors[i % colors.length],
-    borderWidth: 1.5, cubicInterpolationMode: 'monotone', pointRadius: 2,
-    fill: true,
-  }));
-  if (fondues.length) {
-    // Un canvas ne resout pas var(--x) : la couleur se lit une fois ici.
-    const gris = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim();
-    datasets.push({
-      label: `${fondues.length} autres`,
-      data: history.map(h => ({
-        x: tsJour(h.date),
-        y: Math.round(fondues.reduce((t, g) => t + (h.by_group?.[g] || 0), 0)),
-      })),
-      backgroundColor: gris + '55',
-      borderColor: gris,
-      borderWidth: 1.5, cubicInterpolationMode: 'monotone', pointRadius: 2, fill: true,
+  const sous = document.getElementById('evolution-groupes-sous');
+  if (sous) sous.textContent = `Du ${fmtDate(d0)} au ${fmtDate(d1)} · une ligne ouvre sa composition`;
+  hote.innerHTML = lignes.map(l => {
+    const pct = l.debut ? (l.delta / Math.abs(l.debut)) * 100 : null;
+    const sens = Math.abs(l.delta) < 1 ? 'evg-stable' : l.delta > 0 ? 'pos' : 'neg';
+    const part = totalFin > 0 && l.fin > 0 ? fmtPct(l.fin / totalFin * 100, 0) : '';
+    return `<button type="button" class="evg-ligne" data-groupe="${esc(l.g)}">
+      <span class="evg-nom">${esc(l.g)}${part ? `<span class="evg-part">${part}</span>` : ''}</span>
+      <span class="evg-spark">${sparkline(l.serie, { couleur: l.delta < 0 ? 'var(--danger)' : 'var(--primary)', dates: history.map(h => h.date) })}</span>
+      <span class="evg-valeur">${fmt(l.fin)}</span>
+      <span class="evg-delta ${sens}">${Math.abs(l.delta) < 1 ? 'stable'
+        : `${l.delta > 0 ? '+' : '−'}${fmt(Math.abs(l.delta))}${pct != null && isFinite(pct) ? `<small>${fmtPct(pct, 1, true)}</small>` : ''}`}</span>
+    </button>`;
+  }).join('');
+
+  hote.onclick = e => {
+    const b = e.target.closest('.evg-ligne');
+    if (!b) return;
+    const group = b.dataset.groupe;
+    api('GET', `/api/positions?date=${d1}`).then(positions => {
+      let filtered = owner ? positions.filter(p => p.owner === owner) : positions;
+      if (groupBy === 'category')      filtered = filtered.filter(p => p.category === group);
+      else if (groupBy === 'envelope')  filtered = filtered.filter(p => (p.envelope || 'Autre') === group);
+      drilldownPositions(filtered, `${group} — ${fmtDate(d1)}`, `Évolution par ${groupBy === 'category' ? 'catégorie' : 'enveloppe'}`, { showOwner: !owner });
     });
-  }
-
-  destroyChart(syntheseHistChart);
-  setSyntheseHistChart(new Chart(
-    document.getElementById('synthese-history-detail-chart').getContext('2d'),
-    {
-      type: 'line',
-      data: { datasets },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        onClick: (_, elements) => {
-          if (!elements.length) return;
-          const el = elements[0];
-          const dateLabel = history[el.index]?.date;
-          const group = groupList[el.datasetIndex];
-          if (!dateLabel || !group) return;
-          api('GET', `/api/positions?date=${dateLabel}`).then(positions => {
-            let filtered = owner ? positions.filter(p => p.owner === owner) : positions;
-            if (groupBy === 'category')      filtered = filtered.filter(p => p.category === group);
-            else if (groupBy === 'envelope')  filtered = filtered.filter(p => (p.envelope || 'Autre') === group);
-            else if (groupBy === 'owner')     filtered = filtered.filter(p => p.owner === group);
-            drilldownPositions(filtered, `${group} — ${fmtDate(dateLabel)}`, `Évolution par ${groupBy}`, { showOwner: groupBy !== 'owner' });
-          });
-        },
-        scales: {
-          // Bornes aux arretes : sans elles, l'axe s'arrondit a la graduation
-          // suivante et laisse une marge vide avant le premier et apres le dernier.
-          x: { ...echelleTemps(history.map(h => h.date), { taille: 11, max: 8 }), grid: undefined },
-          y: { stacked: true, ticks: {
-            font: { size: 11 },
-            callback: fmtAxis
-          }},
-        },
-        plugins: {
-          legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 8, boxWidth: 12 } },
-          tooltip: { callbacks: {
-            title: titreDate,
-            label: ctx => ` ${ctx.dataset.label} : ${fmt(ctx.parsed.y)}`,
-            afterBody: () => 'Cliquer pour détailler',
-          }},
-        },
-      },
-    }
-  ));
+  };
 }
 
 export async function loadHistorique() {
@@ -536,16 +496,15 @@ async function renderSnapshotDiff(owner, isFamily) {
   const t = data.totals || {};
   const badge = s => s === 'new' ? ' <span class="h-badge h-badge-fresh">nouveau</span>'
     : s === 'closed' ? ' <span class="h-badge h-badge-expired">clôturé</span>' : '';
-  // La VARIATION est l'information ; l'avant et l'apres ne servaient qu'a la
-  // calculer de tete. Le montant passe donc a gauche, en gros, et le compte a
-  // droite — on lit d'abord ce qui a bouge, ensuite ou.
+  // On lit un compte puis son chiffre, comme partout ailleurs : libelle a
+  // gauche, montant a droite, aligne en colonne.
   const VISIBLES = 6;
   const ligne = (m, i) => `
         <div class="mv-item"${i >= VISIBLES ? ' data-mv-reste hidden' : ''}>
           <button type="button" class="mv-ligne" aria-expanded="false">
+            <span class="mv-ou">${esc(m.label || '—')}${badge(m.status)}</span>
             <span class="mv-montant ${m.delta >= 0 ? 'pos' : 'neg'}">${
               m.delta >= 0 ? '+' : '−'}${fmt(Math.abs(m.delta))}</span>
-            <span class="mv-ou">${esc(m.label || '—')}${badge(m.status)}</span>
             <span class="mv-qui">${esc([m.owner, m.establishment].filter(Boolean).join(' · '))}</span>
           </button>
           <p class="mv-detail" hidden>${

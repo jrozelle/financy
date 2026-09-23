@@ -47,7 +47,7 @@ export async function initDemoToggle() {
       return;
     }
     toggle.checked = res.demo;
-    status.textContent = res.demo ? 'Mode démo actif' : 'Données réelles';
+    status.textContent = res.demo ? 'Actuellement : base de démonstration.' : 'Actuellement : vos données réelles.';
     updateDemoBadge({ demo: res.demo });
   } catch {
     card.style.display = 'none';
@@ -58,7 +58,7 @@ export async function initDemoToggle() {
     const demo = toggle.checked;
     try {
       await api('PUT', '/api/demo-mode', { demo });
-      status.textContent = demo ? 'Mode démo actif' : 'Données réelles';
+      status.textContent = demo ? 'Actuellement : base de démonstration.' : 'Actuellement : vos données réelles.';
       updateDemoBadge({ demo });
       toast(demo ? 'Mode démo activé' : 'Retour aux données réelles');
       await reloadAll();

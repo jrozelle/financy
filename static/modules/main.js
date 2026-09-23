@@ -59,7 +59,7 @@ async function init() {
   _lireContexte();
   _refleterContexte();
   ecrireContexte();          // une valeur ignoree disparait aussi de l'adresse
-  await switchTab(_tabFromUrl() || 'synthese', { pushHistory: false });
+  await _ouvrirDepuisAdresse(_tabFromUrl());
   initDemoToggle();
 }
 
@@ -230,7 +230,22 @@ function _installTableOverflowHints() {
 
 function _tabFromUrl() {
   const path = location.pathname.replace(/^\//, '');
+  if (path === 'reglages') return 'preferences';
   return VALID_TABS.has(path) ? path : null;
+}
+
+/** Une adresse de reglage (/referentiel, /reglages...) designe une FENETRE,
+ *  pas un ecran : ouverte seule, elle laissait la synthese vide derriere elle,
+ *  « — » partout une fois fermee, et un rafraichissement la rouvrait. L'ecran
+ *  de fond se charge d'abord ; l'adresse revient a lui. */
+async function _ouvrirDepuisAdresse(tab) {
+  if (tab && (tab === 'preferences' || estUnReglage(tab))) {
+    history.replaceState(history.state, '', '/' + location.search);
+    await switchTab('synthese', { pushHistory: false });
+    ouvrirReglages(tab);
+    return;
+  }
+  await switchTab(tab || 'synthese', { pushHistory: false });
 }
 
 let _lastLoadedTab = null;
@@ -256,7 +271,9 @@ function _majBoutonAjouter(tab) {
     btn.classList.toggle('hidden', !a);
     // « Ajouter » seul en mode etroit : le complement reste lu par les
     // lecteurs d'ecran, et la barre du haut garde deux rangs.
-    if (a) btn.innerHTML = a.libelle.replace(/^Ajouter (.+)$/, 'Ajouter<span class="head-complement"> $1</span>');
+    // Un seul element de texte : dans le flex du bouton, deux noeuds freres
+    // perdaient l'espace qui les separait (« Ajouterune position »).
+    if (a) btn.innerHTML = `<span>${a.libelle.replace(/^Ajouter (.+)$/, 'Ajouter<span class="head-complement"> $1</span>')}</span>`;
   }
   if (maj) {
     maj.classList.toggle('hidden', !MISE_A_JOUR.has(tab));
@@ -381,7 +398,7 @@ function wireEvents() {
     _lireContexte();
     _refleterContexte();
     _lastLoadedTab = null;
-    switchTab(tab, { pushHistory: false });
+    _ouvrirDepuisAdresse(tab);
   });
 
   // Date selects (with spinner)

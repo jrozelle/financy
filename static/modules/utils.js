@@ -51,8 +51,13 @@ export const fmtAxis = (v, _i, ticks) => {
  * @param {number[]} valeurs  serie chronologique, au moins deux points
  * @param {object}   opts     couleur CSS, inversion du sens « bon/mauvais »
  */
-export function sparkline(valeurs, { couleur = 'var(--primary)', hauteur = 26 } = {}) {
-  const pts = (valeurs || []).filter(v => typeof v === 'number' && isFinite(v));
+export function sparkline(valeurs, { couleur = 'var(--primary)', hauteur = 26, dates = null } = {}) {
+  // `dates` (AAAA-MM-JJ, alignees sur les valeurs) place les points a leur
+  // vraie date. Sans elles, les points sont equidistants — et deux arretes a
+  // un jour d'ecart pesaient autant qu'un trimestre, ce qui faussait la pente.
+  const couples = (valeurs || []).map((v, i) => [v, dates?.[i]])
+    .filter(([v, d]) => typeof v === 'number' && isFinite(v) && (!dates || d));
+  const pts = couples.map(c => c[0]);
   if (pts.length < 2) return '';            // un point ne fait pas une tendance
 
   const min = Math.min(...pts), max = Math.max(...pts);
@@ -61,7 +66,10 @@ export function sparkline(valeurs, { couleur = 'var(--primary)', hauteur = 26 } 
   // Une serie plate se dessine au milieu plutot que sur un bord : une division
   // par zero la collerait en haut et simulerait un sommet.
   const y = v => amp === 0 ? H / 2 : H - 2 - ((v - min) / amp) * (H - 4);
-  const x = i => (i / (pts.length - 1)) * L;
+  const ts = dates ? couples.map(c => Date.parse(c[1] + 'T12:00:00')) : null;
+  const x = ts && ts[ts.length - 1] > ts[0]
+    ? i => ((ts[i] - ts[0]) / (ts[ts.length - 1] - ts[0])) * L
+    : i => (i / (pts.length - 1)) * L;
 
   const d = pts.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ');
   const dernier = { x: x(pts.length - 1), y: y(pts[pts.length - 1]) };

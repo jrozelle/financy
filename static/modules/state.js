@@ -26,9 +26,7 @@ export const S = {
   entityPositions: null,
 };
 
-export let syntheseHistChart = null;
 
-export function setSyntheseHistChart(v) { syntheseHistChart = v; }
 
 export let _targetsCache = null;
 export let _alertsCache  = null;

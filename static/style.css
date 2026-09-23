@@ -3296,18 +3296,19 @@ a.settings-item { display: inline-flex; align-items: center; text-decoration: no
 .mv-item { border-bottom: 1px solid var(--border); }
 .mv-item:last-child { border-bottom: 0; }
 .mv-ligne {
-  display: grid; grid-template-columns: auto 1fr; gap: .1rem .8rem; width: 100%;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .1rem .8rem; width: 100%;
   padding: calc(.55rem * var(--d)) 0; align-items: baseline;
   background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer;
 }
 .mv-ligne:hover .mv-ou { color: var(--accent); }
 .mv-ligne:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
-.mv-detail { margin: 0 0 .55rem; font-size: .76rem; color: var(--text-muted); font-variant-numeric: tabular-nums; text-align: right; }
+.mv-detail { margin: 0 0 .55rem; font-size: .76rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .mv-plus { margin-top: .5rem; padding: 0; background: none; border: 0; color: var(--accent); font: inherit; font-size: .78rem; cursor: pointer; }
 .mv-plus:hover { text-decoration: underline; }
-.mv-montant { font-family: var(--mono); font-size: .88rem; font-weight: 600; grid-row: 1 / 3; align-self: center; }
-.mv-ou { font-size: .84rem; font-weight: 450; text-align: right; }
-.mv-qui { grid-column: 2; color: var(--text-muted); font-size: .74rem; text-align: right; }
+.mv-ou { font-size: .84rem; font-weight: 450; grid-column: 1; grid-row: 1; }
+.mv-qui { grid-column: 1; grid-row: 2; color: var(--text-muted); font-size: .74rem; }
+.mv-montant { grid-column: 2; grid-row: 1 / 3; align-self: center; text-align: right;
+  font-family: var(--mono); font-size: .88rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .mv-montant.pos { color: var(--success); }
 .mv-montant.neg { color: var(--danger); }
 
@@ -3770,3 +3771,31 @@ td.arbo-part > * { vertical-align: middle; }
 
 /* Actifs : le nom cede la place aux chiffres. Complet dans la fenetre du titre. */
 #actifs-tbody td.act-nom { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+
+/* ── Evolution par categorie : une ligne par groupe ────────────────────── */
+.evg-liste { display: flex; flex-direction: column; }
+.evg-ligne {
+  display: grid; grid-template-columns: minmax(8rem, 1.2fr) minmax(4rem, 1fr) 8rem 9rem;
+  align-items: center; gap: 1rem; width: 100%;
+  padding: calc(.55rem * var(--d)) .25rem; border: 0; border-bottom: 1px solid var(--border);
+  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.evg-ligne:last-child { border-bottom: 0; }
+@media (hover: hover) { .evg-ligne:hover { background: var(--card-hover); } }
+.evg-ligne:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; border-radius: 6px; }
+.evg-nom { font-size: .86rem; font-weight: 500; display: flex; align-items: baseline; gap: .5rem; min-width: 0; }
+.evg-part { font-size: .72rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.evg-spark { height: 26px; display: block; }
+.evg-spark .spark { width: 100%; height: 26px; display: block; }
+.evg-valeur { text-align: right; font-family: var(--mono); font-size: .86rem; font-variant-numeric: tabular-nums; }
+.evg-delta { text-align: right; font-family: var(--mono); font-size: .82rem; font-variant-numeric: tabular-nums; }
+.evg-delta small { display: block; font-size: .7rem; color: var(--text-muted); }
+.evg-delta.pos { color: var(--success); }
+.evg-delta.neg { color: var(--danger); }
+.evg-stable { color: var(--text-muted); font-family: inherit; }
+@media (max-width: 640px) {
+  .evg-ligne { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "nom valeur" "spark delta"; row-gap: .2rem; }
+  .evg-nom { grid-area: nom; } .evg-valeur { grid-area: valeur; }
+  .evg-spark { grid-area: spark; } .evg-delta { grid-area: delta; }
+}

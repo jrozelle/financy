@@ -188,7 +188,8 @@
             <option value="envelope">Enveloppe</option>
           </select>
         </div>
-        <div class="chart-wrap-wide"><canvas id="synthese-history-detail-chart"></canvas></div>
+        <p class="card-sub" id="evolution-groupes-sous"></p>
+        <div id="evolution-groupes" class="evg-liste"></div>
       </div>
 
 
@@ -848,10 +849,13 @@
             Bascule vers une base de données fictive pour explorer l'application sans risque.<br>
             Tes vraies données ne sont pas affectées.
           </p>
+          <!-- Le libelle dit ce que la case active ; l'etat se lit a cote. « [ ]
+               Donnees reelles » laissait deviner si cocher voulait dire reel ou demo. -->
           <label class="toggle-label" style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
-            <input type="checkbox" id="demo-toggle">
-            <span id="demo-status">Chargement…</span>
+            <input type="checkbox" id="demo-toggle" aria-describedby="demo-status">
+            Utiliser la base de démonstration
           </label>
+          <p class="form-aide" id="demo-status" aria-live="polite">Chargement…</p>
         </div>
 
         <div class="card">
