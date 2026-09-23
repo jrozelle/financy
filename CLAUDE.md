@@ -2,7 +2,7 @@
 
 ## Workflow
 - Branche de travail : `main`. La branche `claude/asset-import-tracking-8psft`
-  est abandonnée à `d045e86` — ne pas y revenir sans raison explicite.
+  est abandonnée à `2050474` — ne pas y revenir sans raison explicite.
 - 1 commit par phase fonctionnelle, message clair en français
 - Ne push jamais sans feu vert explicite de l'utilisateur
 - Ne crée jamais de PR sans demande explicite
