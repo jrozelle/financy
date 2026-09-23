@@ -22,6 +22,7 @@ os.environ['PRICE_PROVIDER'] = 'mock'
 from models import init_db, get_db  # noqa: E402
 from app import app  # noqa: E402
 import routes.prices as prices  # noqa: E402
+from services.montants import centimes  # noqa: E402
 
 D = '2026-09-01'
 
@@ -53,7 +54,7 @@ def _ligne(c, isin, devise, cours, qty, cout, taux=None, mv=None):
     pid = c.execute("INSERT INTO positions (date, owner, category, envelope, value) "
                     "VALUES (?, 'Paul', 'Actions', 'CTO', 0)", (D,)).lastrowid
     c.execute('INSERT INTO holdings (position_id, isin, quantity, cost_basis, market_value, as_of_date) '
-              'VALUES (?,?,?,?,?,?)', (pid, isin, qty, cout, mv, D))
+              'VALUES (?,?,?,?,?,?)', (pid, isin, qty, centimes(cout), centimes(mv), D))
     if taux:
         c.execute("INSERT INTO fx_rates (pair, date, rate) VALUES (?, ?, ?)", (f'EUR{devise}', D, taux))
     c.commit()

@@ -16,6 +16,7 @@ from datetime import date
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models import get_db, init_db  # noqa: E402
+from services.montants import centimes  # noqa: E402
 
 SEED_MARKER = '[seed_dev]'
 TODAY = date.today().isoformat()
@@ -73,8 +74,8 @@ def main():
                VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
             (SEED_POSITION['date'], SEED_POSITION['owner'],
              SEED_POSITION['category'], SEED_POSITION['envelope'],
-             SEED_POSITION['establishment'], SEED_POSITION['value'],
-             SEED_POSITION['debt'], SEED_POSITION['notes'],
+             SEED_POSITION['establishment'], centimes(SEED_POSITION['value']),
+             centimes(SEED_POSITION['debt']), SEED_POSITION['notes'],
              SEED_POSITION['entity'], SEED_POSITION['ownership_pct'],
              SEED_POSITION['debt_pct'])
         )
@@ -102,7 +103,7 @@ def main():
                        (position_id, isin, quantity, cost_basis, market_value, as_of_date)
                        VALUES (?,?,?,?,?,?)''',
                     (position_id, h['isin'], h['quantity'],
-                     h['cost_basis'], h['market_value'], TODAY)
+                     centimes(h['cost_basis']), centimes(h['market_value']), TODAY)
                 )
             print(f'{len(SEED_HOLDINGS)} holdings seedes.')
         else:

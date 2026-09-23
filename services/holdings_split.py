@@ -6,6 +6,7 @@ les lignes sont reparties dans des positions compagnons par categorie.
 """
 import logging
 from services.securities import _infer_asset_class
+from services.montants import centimes, euros
 
 logger = logging.getLogger('financy.holdings_split')
 
@@ -127,7 +128,7 @@ def _replace_holdings(conn, position_id, items):
         'SELECT isin, cost_basis FROM holdings WHERE position_id=?', (position_id,)
     ).fetchall():
         if row['cost_basis']:
-            existing[row['isin']] = row['cost_basis']
+            existing[row['isin']] = euros(row['cost_basis'])
 
     conn.execute('DELETE FROM holdings WHERE position_id=?', (position_id,))
     for item in items:
@@ -143,5 +144,5 @@ def _replace_holdings(conn, position_id, items):
                (position_id, isin, quantity, cost_basis, market_value, as_of_date)
                VALUES (?,?,?,?,?,?)''',
             (position_id, item['isin'], item['quantity'],
-             cost, item.get('market_value'), item.get('as_of_date'))
+             centimes(cost), centimes(item.get('market_value')), item.get('as_of_date'))
         )

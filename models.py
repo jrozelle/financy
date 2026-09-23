@@ -1070,6 +1070,35 @@ def _migration_024(conn):
         ) STRICT""", ('gross_assets', 'debt', 'tresorerie'))
 
 
+def _migration_025(conn):
+    """Lignes de titres et leurs photos datees en centimes entiers (tables
+    STRICT) : prix de revient et valorisation. Quantite et cours unitaire
+    restent en REAL."""
+    _reconstruire_en_centimes(conn, 'holdings', """
+        CREATE TABLE {t} (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            position_id  INTEGER NOT NULL REFERENCES positions(id) ON DELETE CASCADE,
+            isin         TEXT NOT NULL REFERENCES securities(isin),
+            quantity     REAL NOT NULL,
+            cost_basis   INTEGER,                -- centimes
+            market_value INTEGER,                -- centimes
+            as_of_date   TEXT,
+            created_at   TEXT DEFAULT CURRENT_TIMESTAMP
+        ) STRICT""", ('cost_basis', 'market_value'))
+    _reconstruire_en_centimes(conn, 'holdings_snapshots', """
+        CREATE TABLE {t} (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            snapshot_date  TEXT NOT NULL,
+            position_id    INTEGER NOT NULL,
+            isin           TEXT NOT NULL,
+            quantity       REAL,
+            cost_basis     INTEGER,              -- centimes
+            price          REAL,                 -- cours unitaire
+            market_value   INTEGER,              -- centimes
+            created_at     TEXT DEFAULT CURRENT_TIMESTAMP
+        ) STRICT""", ('cost_basis', 'market_value'))
+
+
 MIGRATIONS = [
     (1, _migration_001),
     (2, _migration_002),
@@ -1095,6 +1124,7 @@ MIGRATIONS = [
     (22, _migration_022),
     (23, _migration_023),
     (24, _migration_024),
+    (25, _migration_025),
 ]
 
 
@@ -1460,9 +1490,10 @@ def get_holdings_map(conn, position_ids=None):
         # Table holdings absente (migration 005 pas appliquée)
         return {}
 
+    from services.montants import ligne_en_euros
     result = {}
     for r in rows:
-        d = dict(r)
+        d = ligne_en_euros('holdings', r)
         if d.get('is_priceable') is not None:
             d['is_priceable'] = bool(d['is_priceable'])
         result.setdefault(d['position_id'], []).append(d)
@@ -1485,9 +1516,9 @@ def sync_position_value(conn, position_id):
         'FROM holdings WHERE position_id=?', (position_id,)
     ).fetchone()
     if row['n'] > 0:
-        from services.montants import centimes
+        # Centimes des deux cotes : la somme est exacte, rien a arrondir.
         conn.execute('UPDATE positions SET value=? WHERE id=?',
-                     (centimes(row['v'] or 0), position_id))
+                     (int(row['v'] or 0), position_id))
 
 
 def get_entity_map(conn, date=None):

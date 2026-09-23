@@ -134,3 +134,18 @@ def test_la_demo_versionnee_est_au_schema_courant_et_vraisemblable():
     assert c.execute('SELECT version FROM schema_version').fetchone()[0] == models.MIGRATIONS[-1][0]
     total = c.execute('SELECT SUM(value) FROM positions').fetchone()[0] / 100
     assert 100_000 < total < 10_000_000          # patrimoine fictif, en euros
+
+
+class TestLignesDeTitres:
+    def test_cout_et_valeur_convertis_quantite_et_cours_intacts(self):
+        c = _base_v20()
+        for v in range(21, 25):
+            getattr(models, f'_migration_{v:03d}')(c)
+        c.execute("INSERT INTO holdings (position_id, isin, quantity, cost_basis, market_value) "
+                  "VALUES (1, 'FR0000000001', 2975.5, 17857.234, 21182.0)")
+        c.execute("INSERT INTO holdings_snapshots (snapshot_date, position_id, isin, quantity, cost_basis, price, market_value) "
+                  "VALUES ('2026-08-31', 1, 'FR0000000001', 2975.5, 17857.23, 7.1188, 21182.0)")
+        models._migration_025(c)
+        assert tuple(c.execute('SELECT quantity, cost_basis, market_value FROM holdings').fetchone()) \
+            == (2975.5, 1785723, 2118200)
+        assert tuple(c.execute('SELECT price, market_value FROM holdings_snapshots').fetchone()) == (7.1188, 2118200)

@@ -8,6 +8,7 @@ from models import (get_db, validate_isin, validate_number, validate_string,
                     _holding_value_or_none)
 from services.securities import upsert_security as _upsert_security
 from auth import login_required, csrf_protect
+from services.montants import centimes, euros
 
 holdings_bp = Blueprint('holdings', __name__)
 
@@ -77,8 +78,8 @@ def _holding_row_to_dict(row):
         'position_id':     row['position_id'],
         'isin':            row['isin'],
         'quantity':        row['quantity'],
-        'cost_basis':      row['cost_basis'],
-        'market_value':    row['market_value'],
+        'cost_basis':      euros(row['cost_basis']),
+        'market_value':    euros(row['market_value']),
         'as_of_date':      row['as_of_date'],
         'name':            row['sec_name'],
         'ticker':          row['sec_ticker'],
@@ -167,8 +168,8 @@ def add_holding(position_id):
                VALUES (?,?,?,?,?,?)''',
             (position_id, isin,
              parse_number(d['quantity']),
-             parse_number(d['cost_basis']) if d.get('cost_basis') is not None else None,
-             parse_number(d['market_value']) if d.get('market_value') is not None else None,
+             centimes(parse_number(d['cost_basis'])) if d.get('cost_basis') is not None else None,
+             centimes(parse_number(d['market_value'])) if d.get('market_value') is not None else None,
              _holding_as_of_date(d))
         )
         sync_position_value(conn, position_id)
@@ -258,12 +259,12 @@ def update_holding(holding_id):
             if d['cost_basis'] is not None and not validate_number(d['cost_basis']):
                 return jsonify({'error': 'Prix de revient invalide'}), 400
             updates.append('cost_basis=?')
-            params.append(parse_number(d['cost_basis']) if d['cost_basis'] is not None else None)
+            params.append(centimes(parse_number(d['cost_basis'])) if d['cost_basis'] is not None else None)
         if 'market_value' in d:
             if d['market_value'] is not None and not validate_number(d['market_value']):
                 return jsonify({'error': 'Valorisation invalide'}), 400
             updates.append('market_value=?')
-            params.append(parse_number(d['market_value']) if d['market_value'] is not None else None)
+            params.append(centimes(parse_number(d['market_value'])) if d['market_value'] is not None else None)
             if 'as_of_date' not in d and d['market_value'] is not None:
                 updates.append('as_of_date=?')
                 params.append(datetime.now().strftime('%Y-%m-%d'))

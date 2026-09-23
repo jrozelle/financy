@@ -26,6 +26,8 @@ COLONNES = {
     'positions':              ('value', 'debt'),
     'entities':               ('gross_assets', 'debt'),
     'entity_snapshots':       ('gross_assets', 'debt', 'tresorerie'),
+    'holdings':               ('cost_basis', 'market_value'),
+    'holdings_snapshots':     ('cost_basis', 'market_value'),
 }
 
 

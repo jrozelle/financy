@@ -25,7 +25,7 @@ comptee et signalee, jamais devinee.
 """
 from __future__ import annotations
 import logging
-from services.montants import ligne_en_euros
+from services.montants import centimes, ligne_en_euros, lignes_en_euros
 
 logger = logging.getLogger('financy.reconcile')
 
@@ -70,6 +70,7 @@ def reconcile_snapshot(conn, snapshot_date):
            ORDER BY p.owner, p.envelope, h.isin''',
         (snapshot_date,)
     ).fetchall()
+    holdings = lignes_en_euros('holdings', holdings)
 
     # Journal borne a l'arrete : une operation posterieure a la date du snapshot
     # ne saurait y figurer.
@@ -228,12 +229,12 @@ def apply_ecart(conn, snapshot_date, holding_id):
     if cible is None:
         return None
 
-    h = conn.execute(
+    h = ligne_en_euros('holdings', conn.execute(
         '''SELECT h.quantity, h.cost_basis, h.market_value, h.position_id,
                   s.last_price, s.last_price_date, s.currency
            FROM holdings h LEFT JOIN securities s ON s.isin = h.isin
            WHERE h.id = ?''', (holding_id,)
-    ).fetchone()
+    ).fetchone())
 
     new_qty = round((h['quantity'] or 0) + cible['delta_quantity'], 6)
     new_cost = round(_cout_apres(h['quantity'], h['cost_basis'],
@@ -258,7 +259,7 @@ def apply_ecart(conn, snapshot_date, holding_id):
     conn.execute(
         'UPDATE holdings SET quantity=?, cost_basis=?, market_value=?, as_of_date=? '
         'WHERE id=?',
-        (new_qty, new_cost, new_mv, new_as_of, holding_id)
+        (new_qty, centimes(new_cost), centimes(new_mv), new_as_of, holding_id)
     )
     logger.info('Reconcile %s: holding %s %s -> %s parts (%+.6f), cout %+.2f',
                 snapshot_date, holding_id, h['quantity'], new_qty,

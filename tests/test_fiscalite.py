@@ -60,7 +60,7 @@ def _versement(conn, envelope, montant, owner='Paul', date='2020-01-15'):
 
 def _titre(conn, position_id, cout, valeur, isin='FR0000000001'):
     conn.execute('INSERT INTO holdings (position_id, isin, quantity, cost_basis, market_value) '
-                 'VALUES (?,?,?,?,?)', (position_id, isin, 1, cout, valeur))
+                 'VALUES (?,?,?,?,?)', (position_id, isin, 1, centimes(cout), centimes(valeur)))
 
 
 def _ligne(r, envelope):

@@ -16,6 +16,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 import logging
 import time
+from services.montants import euros
 
 logger = logging.getLogger('financy.prices')
 
@@ -525,7 +526,7 @@ def _latest_manual_unit_price(conn, isin):
     ).fetchone()
     if not row or not row['market_value'] or not row['quantity']:
         return None
-    return (row['market_value'] / row['quantity'], row['d'])
+    return (euros(row['market_value']) / row['quantity'], row['d'])
 
 
 def _fx_rate_for(conn, devise):

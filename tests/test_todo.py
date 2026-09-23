@@ -58,7 +58,7 @@ def _titre(conn, isin=ISIN, price_date='2026-09-02', priceable=1):
 
 def _holding(conn, pid, isin=ISIN, qty=2640, as_of='2026-08-12'):
     conn.execute('INSERT INTO holdings (position_id, isin, quantity, cost_basis, '
-                 'market_value, as_of_date) VALUES (?,?,?,15470.4,19140,?)',
+                 'market_value, as_of_date) VALUES (?,?,?,1547040,1914000,?)',  # centimes
                  (pid, isin, qty, as_of))
 
 

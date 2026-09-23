@@ -728,7 +728,7 @@ class TestAlerteValorisation:
                     VALUES (?,'Alice','Actions','CTO','X',?,0,1.0,1.0)""", (d, centimes(v)))
                 conn.execute("""INSERT INTO holdings (position_id, isin, quantity,
                     market_value, as_of_date) VALUES (?,'US0000000001',7,?,?)""",
-                    (cur.lastrowid, v, d))
+                    (cur.lastrowid, centimes(v), d))
             conn.commit()
         g = client.get('/api/performance').get_json()['groups'][0]
         assert len(g['price_warnings']) == 1
@@ -744,7 +744,7 @@ class TestAlerteValorisation:
                 establishment, value, debt, ownership_pct, debt_pct)
                 VALUES ('2026-08-01','Alice','Actions','CTO','X',189415,0,1.0,1.0)""")  # centimes
             conn.execute("""INSERT INTO holdings (position_id, isin, quantity,
-                market_value, as_of_date) VALUES (?,'US0000000001',7,1894.15,'2026-08-01')""",
+                market_value, as_of_date) VALUES (?,'US0000000001',7,189415,'2026-08-01')""",  # centimes
                 (cur.lastrowid,))
             conn.execute("""INSERT INTO positions (date, owner, category, envelope,
                 establishment, value, debt, ownership_pct, debt_pct)

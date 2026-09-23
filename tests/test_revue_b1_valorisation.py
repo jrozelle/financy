@@ -73,7 +73,7 @@ def _holding(conn, pid, isin, qty, cost=None, mv=None, as_of=None):
     return conn.execute(
         'INSERT INTO holdings (position_id, isin, quantity, cost_basis, '
         'market_value, as_of_date) VALUES (?,?,?,?,?,?)',
-        (pid, isin, qty, cost, mv, as_of)).lastrowid
+        (pid, isin, qty, centimes(cost), centimes(mv), as_of)).lastrowid
 
 
 def _fx(conn, devise='USD', rate=1.25, date='2026-09-01'):
@@ -211,8 +211,8 @@ def test_commit_garde_le_prix_de_revient_connu(client):
     with get_db() as conn:
         row = conn.execute('SELECT cost_basis, market_value FROM holdings '
                            'WHERE position_id=?', (pid,)).fetchone()
-    assert row['cost_basis'] == 800
-    assert row['market_value'] == 1100
+    assert row['cost_basis'] == 80000                # centimes
+    assert row['market_value'] == 110000
 
 
 # ─── Auto-split : position compagnon ─────────────────────────────────────────
@@ -264,8 +264,8 @@ def test_vente_retire_le_cout_au_pru_et_convertit_le_cours():
         apply_ecart(conn, '2026-09-01', hid)
         row = conn.execute('SELECT * FROM holdings WHERE id=?', (hid,)).fetchone()
     assert row['quantity'] == 60
-    assert row['cost_basis'] == 600          # 1000 - 40 x PRU 10, pas 1000 - 600
-    assert row['market_value'] == 1200       # 60 x 25 USD / 1,25
+    assert row['cost_basis'] == 60000        # centimes : 1000 - 40 x PRU 10, pas 1000 - 600
+    assert row['market_value'] == 120000     # centimes : 60 x 25 USD / 1,25
 
 
 # ─── Impot latent : assiette au prix de revient ──────────────────────────────

@@ -64,8 +64,8 @@ def _seed(holding=None, txs=(), price=7.12, price_date='2026-08-21',
             cur = conn.execute(
                 'INSERT INTO holdings (position_id, isin, quantity, cost_basis, '
                 'market_value, as_of_date) VALUES (?,?,?,?,?,?)',
-                (pid, isin, holding['quantity'], holding.get('cost_basis'),
-                 holding.get('market_value'), holding.get('as_of_date')))
+                (pid, isin, holding['quantity'], centimes(holding.get('cost_basis')),
+                 centimes(holding.get('market_value')), holding.get('as_of_date')))
             hid = cur.lastrowid
         for t in txs:
             conn.execute(
@@ -195,9 +195,9 @@ class TestApplication:
             conn.commit()
             row = conn.execute('SELECT * FROM holdings WHERE id=?', (hid,)).fetchone()
         assert row['quantity'] == 2975
-        assert row['cost_basis'] == 17857.23
+        assert row['cost_basis'] == 1785723            # centimes
         assert row['as_of_date'] == '2026-08-31'      # date du dernier avis integre
-        assert row['market_value'] == 21182.00        # 2975 x cours 7,12
+        assert row['market_value'] == 2118200         # centimes : 2975 x cours 7,12
         assert detail['quantity'] == {'avant': 2640.0, 'apres': 2975.0}
 
     def test_rejouer_ne_double_pas(self):
@@ -218,7 +218,7 @@ class TestApplication:
             apply_ecart(conn, '2026-09-02', hid)
             conn.commit()
             row = conn.execute('SELECT market_value FROM holdings WHERE id=?', (hid,)).fetchone()
-        assert row['market_value'] == 21568.75         # 2975 x 7,25
+        assert row['market_value'] == 2156875          # centimes : 2975 x 7,25
 
 
 class TestEndpoints:

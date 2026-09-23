@@ -298,7 +298,7 @@ def import_xlsx():
                         '''INSERT INTO holdings
                            (position_id, isin, quantity, cost_basis, market_value, as_of_date)
                            VALUES (?,?,?,?,?,?)''',
-                        (pos['id'], raw_isin, quantity, cost_basis, market_value, as_of_date)
+                        (pos['id'], raw_isin, quantity, centimes(cost_basis), centimes(market_value), as_of_date)
                     )
                     holdings_imported += 1
 

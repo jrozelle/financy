@@ -18,6 +18,7 @@ from services.parsers import parse_pdf, parse_csv, parse_pasted_text
 from services.parsers.common import PdfEncryptedError, PdfImageScanError
 from services.securities import upsert_security
 from auth import login_required, csrf_protect
+from services.montants import lignes_en_euros
 
 logger = logging.getLogger('financy')
 pdf_import_bp = Blueprint('pdf_import', __name__)
@@ -280,6 +281,6 @@ def _commit(position_id):
     return jsonify({
         'position_id': position_id,
         'count': len(validated),
-        'holdings': [dict(r) for r in holdings],
+        'holdings': lignes_en_euros('holdings', holdings),
         'split_categories': categories if len(categories) > 1 else None,
     })
