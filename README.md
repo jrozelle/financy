@@ -12,7 +12,7 @@ Les données restent chez vous, dans un fichier SQLite.
 
 | Page | Ce qu'on y lit |
 |------|----------------|
-| **Synthèse** | Patrimoine net, brut, dettes et mobilisable ; ce qui a bougé depuis l'arrêté précédent ; d'où vient la hausse (épargne nouvelle, capital remboursé, performance des marchés) ; évolution par catégorie ; projection à 5–20 ans ; impôt latent « si vous vendiez tout » |
+| **Synthèse** | Des widgets que l'on déplace, redimensionne ou masque, disposition mémorisée d'un appareil à l'autre : patrimoine net, brut, dettes et mobilisable ; ce qui a bougé depuis l'arrêté précédent ; d'où vient la hausse (épargne nouvelle, capital remboursé, performance des marchés) ; évolution par catégorie ; projection à 5–20 ans ; impôt latent « si vous vendiez tout » |
 | **Positions** | Chaque compte, en tableau ou en arbre (titulaire → établissement → enveloppe), triable et filtrable ; mise à jour d'un arrêté en une passe |
 | **Actifs** | Les titres détenus, leurs cours, leur devise, et tout arbitrage de valorisation signalé |
 | **Entités** | SCI, holdings, indivisions : valeur, dette, parts de chaque titulaire ; trésorerie et levier d'une société lus sur ses relevés bancaires ; parts de SCPI au prix de retrait ; impôt sur les sociétés estimé |
@@ -78,7 +78,7 @@ Dans `.env` (voir `.env.example`) :
 | `FLASK_ENV` | `development` | `production` coupe le débogage et exige des cookies sécurisés |
 | `PRICE_PROVIDER` | `yahoo` | Source des cours ; `mock` n'appelle aucun réseau |
 | `SCHEDULER_ENABLED` | `false` | Rafraîchissement quotidien des cours (`SCHEDULER_HOUR`, `SCHEDULER_MINUTE`, `SCHEDULER_TZ`) |
-| `ANTHROPIC_API_KEY` | *(vide)* | Synthèse macroéconomique rédigée par un modèle, facultative (`ADVISOR_MODEL`, `ADVISOR_LLM_PROVIDER`, `ADVISOR_BUDGET_USD`) |
+| `ANTHROPIC_API_KEY` | *(vide)* | Synthèse macroéconomique rédigée par un modèle, facultative (`ADVISOR_MODEL`, `ADVISOR_LLM_PROVIDER`, `ADVISOR_BUDGET_USD`). Saisie dans les réglages, la clé va dans `secrets.json`, à côté de la base : ignoré par git, absent des sauvegardes et des exports, lisible du seul propriétaire. La variable d'environnement l'emporte toujours. |
 
 ## Importer ses données
 
