@@ -9,7 +9,7 @@ Utilise par :
 import logging
 from datetime import datetime
 from models import (get_db, compute_position, get_entity_map, get_holdings_map,
-                    load_referential, snapshot_holdings_to_date)
+                    load_referential, snapshot_holdings_to_date, validate_number)
 
 logger = logging.getLogger('financy.snapshot')
 
@@ -138,6 +138,22 @@ def preparer_mise_a_jour(conn, source_date, target_date):
     for e in entites:
         if e['name'] in echeancier:
             e['dette_echeancier'] = echeancier[e['name']]
+    # La tresorerie d'une entite dont les releves sont importes : la valeur
+    # proposee remplace celle que l'arrete precedent comprenait, sans la
+    # recompter.
+    try:
+        from services.tresorerie_entite import tresorerie_a
+        for e in entites:
+            t = tresorerie_a(conn, e['name'], target_date)
+            if not t:
+                continue
+            avant = conn.execute('SELECT tresorerie FROM entity_snapshots WHERE entity_name=? AND date<=? '
+                                 'ORDER BY date DESC LIMIT 1', (e['name'], source_date)).fetchone()
+            incluse = (avant['tresorerie'] or 0.0) if avant else 0.0
+            e['tresorerie'] = {**t, 'incluse_avant': round(incluse, 2)}
+            e['valeur_proposee'] = round(e['gross_assets'] - incluse + t['montant'], 2)
+    except Exception:
+        pass                      # table absente (base non migree)
 
     existe = conn.execute('SELECT 1 FROM positions WHERE date=? LIMIT 1', (target_date,)).fetchone()
     return {
@@ -190,8 +206,12 @@ def appliquer_mise_a_jour(conn, source_date, target_date, soldes, entites):
         if nom not in connues:
             refusees.append({'entite': nom, 'motif': 'entité inconnue'})
             continue
-        conn.execute('''INSERT OR REPLACE INTO entity_snapshots (entity_name, date, gross_assets, debt)
-                        VALUES (?,?,?,?)''', (nom, target_date, vals['gross_assets'], vals['debt']))
+        treso = vals.get('tresorerie')
+        if treso is not None and not validate_number(treso, allow_negative=True):
+            refusees.append({'entite': nom, 'motif': 'trésorerie invalide'})
+            continue
+        conn.execute('''INSERT OR REPLACE INTO entity_snapshots (entity_name, date, gross_assets, debt, tresorerie)
+                        VALUES (?,?,?,?,?)''', (nom, target_date, vals['gross_assets'], vals['debt'], treso))
         ent_maj += 1
 
     return {'target_date': target_date, 'cree': source_date != target_date,

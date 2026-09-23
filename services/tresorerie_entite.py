@@ -74,6 +74,16 @@ def enregistrer(conn, entite, releve, source, noms_associes=()):
     return ajoutees, len(releve.operations) - ajoutees
 
 
+def tresorerie_a(conn, entite, date):
+    """Solde de tous les comptes de l'entite a `date`, reconstitue depuis le
+    premier releve, et date de la derniere operation connue. None sans releve."""
+    r = conn.execute('SELECT COUNT(*) n, SUM(montant) s, MAX(date) d FROM entite_operations '
+                     'WHERE entity=? AND date<=?', (entite, date)).fetchone()
+    if not r['n']:
+        return None
+    return {'montant': round(r['s'], 2), 'au': r['d']}
+
+
 def _mois(d):
     return d[:7]
 

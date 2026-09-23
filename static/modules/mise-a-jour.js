@@ -151,7 +151,11 @@ function ligneEntite(e) {
   // La dette d'une entite a echeancier est pre-remplie d'apres le tableau
   // d'amortissement a la date de l'arrete ; l'ancienne valeur reste lisible.
   const echeancier = e.dette_echeancier;
-  const propose = cle => (cle === 'debt' && echeancier != null) ? echeancier : e[cle];
+  // La valeur d'une entite a releves comprend sa tresorerie a la date de
+  // l'arrete, en remplacement de celle que l'arrete precedent comprenait.
+  const treso = e.tresorerie;
+  const propose = cle => (cle === 'debt' && echeancier != null) ? echeancier
+    : (cle === 'gross_assets' && e.valeur_proposee != null) ? e.valeur_proposee : e[cle];
   const champ = (cle, lib) => `
         <label class="maj-champ">
           <span class="maj-unite">${lib}</span>
@@ -160,13 +164,18 @@ function ligneEntite(e) {
         </label>`;
   const note = echeancier != null && Math.abs(echeancier - e.debt) >= 0.01
     ? `<span class="maj-echeancier">Dette selon l’échéancier au ${fmtDate(_prep.target_date)} : ${fmt(echeancier)} (précédente : ${fmt(e.debt)})</span>` : '';
+  // Des releves anciens d'un mois et demi ne disent plus le solde du jour.
+  const vieux = treso && (new Date(_prep.target_date) - new Date(treso.au)) / 864e5 > 45;
+  const noteTreso = treso ? `<span class="maj-echeancier${vieux ? ' maj-echeancier--vieux' : ''}">Valeur :
+      ${fmt(e.gross_assets - treso.incluse_avant)} hors trésorerie + ${fmt(treso.montant)} de trésorerie, d’après les relevés
+      jusqu’au ${fmtDate(treso.au)}${vieux ? ' — relevés anciens : importez les derniers avant de valider' : ''}</span>` : '';
   return `
       <div class="maj-ligne maj-ligne--entite" data-ligne="e:${esc(e.name)}">
         <span class="maj-nom">${esc(e.name)}</span>
         ${champ('gross_assets', 'valeur')}
         ${champ('debt', 'dette')}
         <span class="maj-delta" aria-live="polite"></span>
-        ${note}
+        ${note}${noteTreso}
       </div>`;
 }
 
@@ -212,7 +221,9 @@ function modifies() {
   // Une entite s'enregistre entiere : valeur ET dette, meme si une seule a bouge.
   Object.keys(entites).forEach(nomE => {
     const src = _prep.entites.find(e => e.name === nomE);
-    entites[nomE] = { gross_assets: src.gross_assets, debt: src.debt, ...entites[nomE] };
+    entites[nomE] = { gross_assets: src.gross_assets, debt: src.debt, ...entites[nomE],
+      // La part de tresorerie comprise, pour ne pas la recompter au prochain arrete.
+      ...(src.tresorerie ? { tresorerie: src.tresorerie.montant } : {}) };
   });
   return { soldes, entites, n, total, invalide };
 }

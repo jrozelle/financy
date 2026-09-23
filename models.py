@@ -733,6 +733,17 @@ def _migration_015(conn):
     conn.execute("CREATE INDEX IF NOT EXISTS idx_entite_op ON entite_operations(entity, date)")
 
 
+
+def _migration_016(conn):
+    """Part de tresorerie comprise dans la valeur d'un arrete d'entite. Sans
+    elle, ajouter la tresorerie a la valeur precedente la recompterait a
+    chaque arrete."""
+    try:
+        conn.execute("ALTER TABLE entity_snapshots ADD COLUMN tresorerie REAL")
+    except Exception:
+        pass            # colonne deja presente
+
+
 MIGRATIONS = [
     (1, _migration_001),
     (2, _migration_002),
@@ -749,6 +760,7 @@ MIGRATIONS = [
     (13, _migration_013),
     (14, _migration_014),
     (15, _migration_015),
+    (16, _migration_016),
 ]
 
 

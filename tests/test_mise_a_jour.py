@@ -163,3 +163,45 @@ class TestDetteDupliquee:
                 duplicate_snapshot(c, d, cible); c.commit(); d = cible
             dettes = [r['debt'] for r in c.execute('SELECT debt FROM positions ORDER BY date')]
         assert dettes == [100000] * 4
+
+
+class TestTresorerieDeLEntite:
+    """La valeur proposee d'une entite a releves comprend sa tresorerie a la
+    date de l'arrete, sans recompter celle de l'arrete precedent."""
+
+    def _ops(self, c, *ops):
+        for d, m in ops:
+            c.execute("INSERT INTO entite_operations (entity, date, libelle, montant, nature) "
+                      "VALUES ('SCI A', ?, ?, ?, 'revenu')", (d, f'op {d} {m}', m))
+        c.commit()
+
+    def _entite(self, client):
+        d = client.get(f'/api/snapshots/update?source={SRC}&cible={CIBLE}').get_json()
+        return next(e for e in d['entites'] if e['name'] == 'SCI A')
+
+    def test_sans_releve_rien_ne_change(self, client, arrete):
+        e = self._entite(client)
+        assert 'tresorerie' not in e and 'valeur_proposee' not in e
+
+    def test_premiere_inclusion(self, client, arrete):
+        with get_db() as c:
+            self._ops(c, ('2026-08-01', 1500.0), ('2026-09-20', 500.0), ('2026-09-30', 999.0))
+        e = self._entite(client)
+        # L'operation posterieure a l'arrete n'est pas comptee.
+        assert e['tresorerie'] == {'montant': 2000.0, 'au': '2026-09-20', 'incluse_avant': 0.0}
+        assert e['valeur_proposee'] == 302000.0
+
+    def test_la_tresorerie_incluse_n_est_pas_recomptee(self, client, arrete):
+        with get_db() as c:
+            c.execute("UPDATE entity_snapshots SET gross_assets=301500, tresorerie=1500 WHERE entity_name='SCI A'")
+            self._ops(c, ('2026-08-01', 1500.0), ('2026-09-20', 500.0))
+        assert self._entite(client)['valeur_proposee'] == 302000.0
+
+    def test_l_arrete_memorise_sa_tresorerie(self, client, arrete):
+        client.post('/api/snapshots/update', headers=CSRF, json={
+            'source_date': SRC, 'target_date': CIBLE,
+            'entites': {'SCI A': {'gross_assets': 302000, 'debt': 200000, 'tresorerie': 2000}}})
+        with get_db() as c:
+            r = c.execute("SELECT tresorerie FROM entity_snapshots WHERE entity_name='SCI A' AND date=?",
+                          (CIBLE,)).fetchone()
+        assert r['tresorerie'] == 2000

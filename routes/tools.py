@@ -346,7 +346,12 @@ def appliquer_mise_a_jour_route():
             return jsonify({'error': f'Montant invalide pour l\u2019entité {nom}'}), 400
         # Seuls les champs envoyes changent : une dette absente valait 0, et
         # 80 000 € de dette disparaissaient d'un appel qui ne parlait que du brut.
-        entites[nom] = {k: parse_number(v[k]) for k in ('gross_assets', 'debt') if v.get(k) is not None}
+        # Tresorerie comprise dans la valeur (entite a releves) : un solde de
+        # compte peut etre debiteur.
+        if not validate_number(v.get('tresorerie'), allow_negative=True):
+            return jsonify({'error': f'Trésorerie invalide pour l\u2019entité {nom}'}), 400
+        entites[nom] = {k: parse_number(v[k]) for k in ('gross_assets', 'debt', 'tresorerie')
+                        if v.get(k) is not None}
 
     with get_db() as conn:
         conn.execute('BEGIN IMMEDIATE')

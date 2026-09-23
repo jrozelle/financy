@@ -3836,6 +3836,7 @@ td.arbo-part > * { vertical-align: middle; }
 
 /* Mise a jour : dette proposee d'apres l'echeancier du pret. */
 .maj-echeancier { grid-column: 1 / -1; font-size: .74rem; color: var(--text-muted); }
+.maj-echeancier--vieux { color: var(--danger); }
 
 /* ── Credits (onglet Entites) ─────────────────────────────────────────── */
 .prets-tete { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
