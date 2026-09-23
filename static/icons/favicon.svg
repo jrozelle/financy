@@ -2,13 +2,17 @@
   <!-- Financy : la courbe de progression des indicateurs, aux couleurs des
        trois natures du patrimoine (liquidites, financier, immobilier). -->
   <defs>
-    <linearGradient id="trajectoire" x1="12" y1="46" x2="50" y2="21" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#3d74b8"/>
-      <stop offset=".5" stop-color="#5fb3a8"/>
-      <stop offset="1" stop-color="#d09a4b"/>
+    <linearGradient id="fond" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#34425c"/>
+      <stop offset="1" stop-color="#232d40"/>
+    </linearGradient>
+    <linearGradient id="trajectoire" x1="12" y1="45" x2="50" y2="20" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4f8ad0"/>
+      <stop offset=".5" stop-color="#6cc4b8"/>
+      <stop offset="1" stop-color="#e3ad5c"/>
     </linearGradient>
   </defs>
-  <rect width="64" height="64" rx="16" fill="#171b26"/>
-  <path d="M12 46 L24 37 L34 41 L50 21" fill="none" stroke="url(#trajectoire)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-  <circle cx="50" cy="21" r="6.5" fill="#ffffff"/>
+  <rect width="64" height="64" rx="14" fill="url(#fond)"/>
+  <path d="M12 45 C17 41, 20 37, 24.5 37.5 S30.5 42.5, 35 40 S44.5 27, 50 20" fill="none" stroke="url(#trajectoire)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="50" cy="20" r="6.5" fill="#ffffff"/>
 </svg>
