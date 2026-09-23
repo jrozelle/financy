@@ -1,5 +1,12 @@
 # Plan — Actifs & conseil patrimonial
 
+> **Document historique.** Plan d'origine (avril 2026), réalisé puis largement
+> dépassé : la branche citée ci-dessous est abandonnée, les numéros de ligne
+> sont périmés, et l'application a depuis gagné les crédits, la trésorerie des
+> entités, l'ancienneté des contrats, la synthèse personnalisable, etc. L'état
+> à jour est dans `TODO.md` ; les règles permanentes, dans `CLAUDE.md`. Ce plan
+> est conservé pour la trace des décisions de conception.
+
 Branche : `claude/asset-import-tracking-8psft`
 
 ## Objectif global

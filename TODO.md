@@ -244,8 +244,8 @@ Backlog :
 
 --- Actifs & conseil patrimonial ---
 
-Spec détaillée : docs/plan-actifs-conseil.md
-Branche : main (claude/asset-import-tracking-8psft abandonnée à d045e86)
+Plan d'origine (historique) : docs/plan-actifs-conseil.md
+Branche : main (claude/asset-import-tracking-8psft abandonnée à 2050474)
 
 Setup :
 - [x] Dev local : venv + .env.example + DB isolée financy_dev.db

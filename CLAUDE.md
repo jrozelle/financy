@@ -159,5 +159,5 @@
 - Pas de préprod Docker intermédiaire
 
 ## Roadmap en cours
-- Feature actifs & conseil patrimonial : voir `docs/plan-actifs-conseil.md`
-- État d'avancement : voir `TODO.md` section « Actifs & conseil patrimonial »
+- État d'avancement : `TODO.md` (seule référence à jour)
+- `docs/plan-actifs-conseil.md` : plan d'origine d'avril 2026, historique
