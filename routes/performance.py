@@ -44,6 +44,9 @@ MIN_DAYS_ANNUALISE = 180
 # Objets de valeur : reevalues a la main, sans flux, souvent par paliers. Un
 # tableau qu'on fait estimer n'a pas "performe" parce que son estimation a
 # change.
+# Categories sans exposition aux marches : l'epargne de precaution.
+SANS_RISQUE_MARCHE = {'Cash & dépôts', 'Monétaire', 'Fond Euro'}
+
 NON_MEASURABLE_CATEGORIES = {
     'Objets de valeur': 'réévalué à la main, sans flux',
 }
@@ -518,36 +521,53 @@ def get_performance():
     # Ensemble : memes regles, sur les seuls comptes mesurables.
     keep = [a for gk, members in groups.items() for a in members
             if next(e for e in out if e['key'] == '|'.join(str(x or '') for x in gk))['status'] == 'ok']
-    glob = None
-    if keep:
-        mvals = {a: acct_values[a] for a in keep}
+
+    def ensemble(comptes, libelle):
+        if not comptes:
+            return None
+        mvals = {a: acct_values[a] for a in comptes}
         g_dates = sorted({d for v in mvals.values() for d in v})
         g_values = {d: sum(v[d] for v in mvals.values() if d in v) for d in g_dates}
-        pairs = {(a[0], a[2]) for a in keep}
+        pairs = {(a[0], a[2]) for a in comptes}
         g_flux = [(f['date'], _flux_signed(f)) for f in flux
                   if ((f.get('envelope') or 'Autre'), f.get('owner')) in pairs
                   and _flux_signed(f)]
         comp = _composition_flux(g_dates, mvals)
         serie, cumul, days, gaps, suspects = _chain(g_dates, g_values, g_flux + comp)
         tri, tri_periode, tri_jours = _tri(g_dates, g_values, g_flux + comp)
-        if cumul is not None:
-            window = [(d, a) for d, a in g_flux
-                      if serie[0]['date'] < d <= serie[-1]['date']]
-            glob = {'label': 'Ensemble mesurable', 'serie': serie, 'twr': cumul,
-                    'days': days, 'twr_annualise': annualise(cumul, days),
-                    'tri': tri, 'tri_periode': tri_periode, 'tri_jours': tri_jours,
-                    'annualisable': days >= MIN_DAYS_ANNUALISE,
-                    'value': g_values[g_dates[-1]], 'dates_count': len(g_dates),
-                    'gaps': gaps, 'suspect_periods': suspects,
-                    'flux_count': len(window),
-                    'flux_net': round(sum(a for _, a in window), 2),
-                    'accounts': len(keep),
-                    'groups': sorted(e['key'] for e in out if e['status'] == 'ok')}
+        if cumul is None:
+            return None
+        window = [(d, a) for d, a in g_flux if serie[0]['date'] < d <= serie[-1]['date']]
+        return {'label': libelle, 'serie': serie, 'twr': cumul,
+                'days': days, 'twr_annualise': annualise(cumul, days),
+                'tri': tri, 'tri_periode': tri_periode, 'tri_jours': tri_jours,
+                'annualisable': days >= MIN_DAYS_ANNUALISE,
+                'value': g_values[g_dates[-1]], 'dates_count': len(g_dates),
+                'gaps': gaps, 'suspect_periods': suspects,
+                'flux_count': len(window),
+                'flux_net': round(sum(a for _, a in window), 2),
+                'accounts': len(comptes)}
+
+    glob = ensemble(keep, 'Ensemble mesurable')
+    if glob:
+        glob['groups'] = sorted(e['key'] for e in out if e['status'] == 'ok')
+    # Comparer a un ETF World l'ensemble mesurable revenait a comparer une
+    # epargne de precaution — livrets, fonds euros, sans risque ni rendement de
+    # marche — a un indice actions : l'ecart ne disait rien du choix des
+    # placements. La comparaison porte sur les seuls comptes exposes aux
+    # marches ; un contrat mixte (assurance-vie en UC et fonds euros) y reste.
+    marche_cpt = [a for a in keep
+                  if (cats.get(a) or set()) - SANS_RISQUE_MARCHE
+                  and not str(a[0] or '').lower().startswith(('livret', 'ldds', 'lep', 'pel', 'cel'))]
+    marche = ensemble(marche_cpt, 'Placements exposés aux marchés')
+    if marche:
+        marche['exclus'] = len(keep) - len(marche_cpt)
+        marche['exclus_valeur'] = round((glob or {}).get('value', 0) - marche['value'], 2)
 
     return jsonify({
         'dates': dates, 'first_date': dates[0], 'date': dates[-1],
         'owner': owner, 'grouping': grouping, 'groupings': list(GROUPINGS),
-        'groups': out, 'global': glob,
+        'groups': out, 'global': glob, 'marche': marche,
         'excluded': [{'label': e['label'], 'value': e['value'], 'status': e['status'],
                       'reason': e['reason'], 'dates_count': e['dates_count'],
                       'last_date': e['last_date']}

@@ -343,7 +343,10 @@ async function renderChart(d) {
   const hote = document.getElementById('perf-courbe');
   const legende = document.getElementById('perf-legende');
   if (!hote) return;
-  const g = V.focus ? d.groups.find(x => x.key === V.focus) : d.global;
+  // Sans compte choisi, la comparaison porte sur la part exposee aux marches :
+  // l'epargne de precaution, sans risque, face a un indice actions, faisait
+  // passer la prudence pour une contre-performance.
+  const g = V.focus ? d.groups.find(x => x.key === V.focus) : (d.marche || d.global);
   const serie = (g?.serie || []).filter(p => p.index != null);
   if (serie.length < 2) {
     hote.innerHTML = '<p class="courbe-vide">Deux arrêtés valorisés au moins sont nécessaires pour une courbe.</p>';
@@ -383,7 +386,9 @@ async function renderChart(d) {
     const z = communs[communs.length - 1];
     comp = { debut: a.date, fin: z.date, moi: z.index / a.index - 1, etf: prixDe(z.date) / p0 - 1 };
   }
-  const nom = V.focus ? g.label : 'Vos placements';
+  const nom = V.focus ? g.label : (d.marche ? 'Vos placements exposés aux marchés' : 'Vos placements');
+  const horsMarche = !V.focus && d.marche?.exclus
+    ? `<span class="courbe-note">Hors ${d.marche.exclus} compte${d.marche.exclus > 1 ? 's' : ''} sans risque de marché — livrets, comptes, fonds euros — pour ${fmt(d.marche.exclus_valeur)}.</span>` : '';
   dessinerCourbe(hote, {
     series: [
       { nom, couleur: 'var(--primary)', points: serie.map(p => ({ date: p.date, v: p.index })), aire: true },
@@ -407,6 +412,7 @@ async function renderChart(d) {
     <span class="courbe-note">${Math.abs(ecart) < 0.05 ? 'au niveau de l’ETF' : `${pts} point${Math.abs(ecart) >= 2 ? 's' : ''} ${ecart > 0 ? 'de mieux' : 'de moins'}`}
       du ${fmtDate(comp.debut)} au ${fmtDate(comp.fin)}${comp.debut !== debut ? ' — les cours de l’ETF commencent là' : ''}${
       recale ? ` (cours de l’ETF du ${fmtDate(recale.cours.date)} pour l’arrêté du ${fmtDate(recale.arrete)})` : ''}</span>
-    ${etf.devise && etf.devise !== 'EUR' ? `<span class="courbe-note">L’ETF est coté en ${esc(etf.devise)} : l’écart inclut l’effet du change.</span>` : ''}`;
+    ${etf.devise && etf.devise !== 'EUR' ? `<span class="courbe-note">L’ETF est coté en ${esc(etf.devise)} : l’écart inclut l’effet du change.</span>` : ''}
+    ${horsMarche}`;
 }
 
