@@ -156,3 +156,40 @@ class TestLivretsDistincts:
             _pos(c, 'Livret A', 40000, owner='Claire'); c.commit()      # 1,74 fois le plafond
             r = constats(c, D)
         assert any('au-dessus du plafond' in k['titre'] for k in r['constats'])
+
+
+class TestGarderOuRembourser:
+    def _base(self, conn, entite_type='Indivision'):
+        conn.execute("INSERT INTO entities (name, type) VALUES ('Maison', ?)", (entite_type,))
+        conn.execute("INSERT INTO positions (date, owner, category, envelope, value, entity) "
+                     "VALUES ('2026-09-01', 'Paul', 'Immobilier', 'Immobilier', 0, 'Maison')")
+        conn.execute("INSERT INTO prets (id, libelle, entity, montant, taux, debut, fin) "
+                     "VALUES (1, 'Prêt maison', 'Maison', 100000, 1.1, '2026-01-05', '2036-12-05')")
+        crd = 100000
+        for i in range(1, 13):
+            crd -= 700
+            conn.execute('INSERT INTO pret_echeances VALUES (1, ?, ?, 700, 90, 0, ?)',
+                         (i, f'2027-{i:02d}-05', crd))
+
+    def _credits(self, owner=None):
+        from services.advisor.constats import constats
+        with get_db() as conn:
+            return [k for k in constats(conn, '2026-09-01', owner)['constats'] if k['onglet'] == 'credits']
+
+    def test_garder_est_la_norme_et_le_seuil_est_le_taux_du_contrat(self):
+        with get_db() as conn:
+            self._base(conn)
+        (k,) = self._credits()
+        assert k['niveau'] == 'info' and 'le garder' in k['titre']
+        assert '1,1 % net fait mieux' in k['detail']
+
+    def test_une_sci_garde_son_levier(self):
+        with get_db() as conn:
+            self._base(conn, 'SCI')
+        (k,) = self._credits()
+        assert 'levier' in k['detail'] and 'fait mieux' not in k['detail']
+
+    def test_le_credit_d_une_autre_personne_n_apparait_pas(self):
+        with get_db() as conn:
+            self._base(conn)
+        assert self._credits(owner='Claire') == []

@@ -172,6 +172,13 @@ def constats(conn, date, owner=None):
                 'montant': round(dette - brut, 2),
             })
 
+    # 7. Credits : garder ou rembourser. Garder est la norme — l'argent reste
+    # disponible, l'inflation allege la dette, et un rachat coute des
+    # indemnites. Le constat chiffre ce que rapporterait le remboursement, et
+    # le seul taux qu'il cite est celui du contrat : il donne le seuil au-dela
+    # duquel une epargne sure fait mieux, sans parier sur les taux du marche.
+    out += _garder_ou_rembourser(conn, date, {p.get('entity') for p in ps if p.get('entity')}, owner)
+
     # 6. Concentration immobiliere.
     brut_total = sum(p['gross_attributed'] for p in ps)
     immo = sum(p['gross_attributed'] for p in ps if p.get('category') in ('Immobilier', 'SCPI'))
@@ -185,8 +192,53 @@ def constats(conn, date, owner=None):
         })
 
     ordre = {'alerte': 0, 'action': 1, 'info': 2}
-    out.sort(key=lambda c: (ordre[c['niveau']], -abs(c.get('montant') or 0)))
+    # « Garder le credit » n'appelle aucun geste : en dernier, quel que soit
+    # son montant, que le restant du placerait sinon en tete.
+    out.sort(key=lambda c: (ordre[c['niveau']], c['onglet'] == 'credits', -abs(c.get('montant') or 0)))
     return {'date': date, 'owner': owner, 'constats': out}
+
+
+def _pct(v):
+    return f"{v:.2f}".rstrip('0').rstrip('.').replace('.', ',') + ' %'
+
+
+def _garder_ou_rembourser(conn, date, entites, owner):
+    try:
+        from services.prets import resume
+        prets = resume(conn, date)['prets']
+    except Exception:
+        return []                 # table absente (base non migree)
+    out = []
+    for p in prets:
+        crd, taux = p.get('crd') or 0, p.get('taux_retenu')
+        if crd < 1000 or not taux:
+            continue
+        # Vu par une personne, seuls les credits de ses entites la concernent.
+        if owner and p.get('entity') not in entites:
+            continue
+        gain = (p.get('interets_restants') or 0) - (p.get('ira') or 0)
+        annee_fin = (p.get('fin') or '')[:4]
+        levier = p.get('entity') and conn.execute(
+            "SELECT 1 FROM entities WHERE name=? AND type IN ('SCI', 'Holding')", (p['entity'],)).fetchone()
+        # Rembourser par anticipation, c'est placer l'argent au taux du credit :
+        # sans risque, mais sans retour possible. Les interets epargnes sont
+        # le rendement de ce placement, pas un manque a gagner.
+        detail = (f"Rembourser demanderait {_eur(crd)} tout de suite. Ce serait placer cet argent à "
+                  f"{_pct(taux)} par an, sans risque mais sans retour possible : {_eur(gain)} d'intérêts "
+                  f"épargnés d'ici {annee_fin}, indemnités de {_eur(p.get('ira') or 0)} déduites. ")
+        if levier:
+            detail += ("Ici, la dette est le levier du montage : c'est elle qui fait grossir l'entité, "
+                       "et ses intérêts se déduisent des revenus qu'elle perçoit. La rembourser l'arrêterait.")
+        else:
+            detail += (f"Toute épargne sûre qui rapporte plus de {_pct(taux)} net fait mieux que ce "
+                       "remboursement, en restant disponible.")
+        out.append({
+            'niveau': 'info', 'onglet': 'credits',
+            'titre': f"{p['libelle']} à {_pct(taux)}{' (déduit de l’échéancier)' if p.get('taux_deduit') else ''} : le garder",
+            'detail': detail,
+            'montant': round(crd, 2),
+        })
+    return out
 
 
 def _livret_fiscalise(p):
