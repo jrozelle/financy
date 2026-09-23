@@ -56,7 +56,8 @@ function _verdict(b) {
          Le montage s'enrichit dès que les parts se revalorisent de plus de
          <b>${(-ecart / (b.parts?.valeur_retrait || b.valeur || 1) * 100).toFixed(2).replace('.', ',')} % par an</b>, avant impôt.`);
   }
-  return phrases.join(' ');
+  // Une idee par ligne : en paragraphe, cinq chiffres se lisaient d'un bloc.
+  return phrases.map(ph => `<li>${ph}</li>`).join('');
 }
 
 function _bloc(b, idx) {
@@ -70,7 +71,7 @@ function _bloc(b, idx) {
       <h3>${esc(b.entite)}</h3>
       <span class="text-muted">${moisLib(b.periode.debut)} – ${moisLib(b.periode.fin)}, d'après ${nbReleves} relevé${nbReleves > 1 ? 's' : ''}</span>
     </div>
-    <p class="treso-verdict">${_verdict(b)}</p>
+    <ul class="treso-verdict">${_verdict(b)}</ul>
     <div class="treso-kpis">
       ${kpi('Revenus', fmt(t.revenu), t.revenu_exceptionnel ? `+ ${fmt(t.revenu_exceptionnel)} exceptionnels` : 'distributions récurrentes')}
       ${kpi('Échéances', fmt(-t.echeance), c ? `dont ${fmt(c.capital)} de capital` : '')}

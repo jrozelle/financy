@@ -3893,7 +3893,11 @@ td.arbo-part > * { vertical-align: middle; }
 .treso-tete { display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem .8rem; }
 .treso-tete h3 { margin: 0; font-size: 1rem; }
 .treso-tete .text-muted { font-size: .8rem; }
-.treso-verdict { margin: 0; max-width: 78ch; font-size: .9rem; line-height: 1.55; }
+.treso-verdict { margin: 0; padding: 0; list-style: none; display: grid; gap: .3rem;
+  font-size: .9rem; line-height: 1.5; }
+.treso-verdict li { padding-left: .9rem; position: relative; }
+.treso-verdict li::before { content: ''; position: absolute; left: 0; top: .6em; width: .35rem; height: .35rem;
+  border-radius: 50%; background: var(--primary); }
 .treso-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .6rem; }
 .treso-kpi { display: grid; gap: .1rem; padding: .6rem .75rem; border: 1px solid var(--border);
   border-radius: 8px; background: var(--bg); }
