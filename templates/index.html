@@ -347,7 +347,7 @@
         <div id="flux-drop" class="dropzone" tabindex="0" role="button"
              aria-label="Importer des avis d'opérés ou des relevés d'espèces">
           <input type="file" id="flux-drop-input" accept="application/pdf" multiple hidden>
-          <span class="dropzone-main">Déposez ici vos avis d'opérés ou relevés d'espèces</span>
+          <span class="dropzone-main"><span class="dz-souris">Déposez ici</span><span class="dz-doigt">Choisissez</span> vos avis d'opérés ou relevés d'espèces</span>
           <span class="dropzone-sub">PDF BoursoBank · plusieurs fichiers acceptés · rien n'est écrit avant votre validation</span>
         </div>
         <div id="flux-import-report" class="hidden"></div>
@@ -806,7 +806,7 @@
         <div id="macro-empty" class="text-muted" style="font-size:13px;margin-bottom:.875rem;display:none">
           Aucun arrêté pour le moment.
         </div>
-        <div id="macro-content" class="form-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:.875rem;display:none">
+        <div id="macro-content" class="form-grid" style="margin-bottom:.875rem;display:none">
           <div class="form-group">
             <label for="macro-rates">Régime de taux</label>
             <select id="macro-rates"><option value="bas">Bas</option><option value="neutre">Neutre</option><option value="haut">Haut</option></select>
@@ -819,7 +819,7 @@
             <label for="macro-bias">Biais actions</label>
             <select id="macro-bias"><option value="defensif">Défensif</option><option value="neutre">Neutre</option><option value="offensif">Offensif</option></select>
           </div>
-          <div class="form-group full-span" style="grid-column:span 3">
+          <div class="form-group full-span" style="grid-column:1 / -1">
             <label for="macro-summary">Synthèse</label>
             <textarea id="macro-summary" rows="4" maxlength="4000" style="border:1px solid var(--border);border-radius:6px;padding:.5rem .75rem;font-size:13px;background:var(--card);color:var(--text);font-family:inherit;resize:vertical"></textarea>
           </div>

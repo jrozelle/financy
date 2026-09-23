@@ -469,8 +469,10 @@ export function openPosModal(id = null, prefill = {}) {
     document.getElementById('pos-category').value      = p.category;
     document.getElementById('pos-envelope').value      = p.envelope || '';
     document.getElementById('pos-establishment').value = p.establishment || '';
-    document.getElementById('pos-value').value         = p.value || 0;
-    document.getElementById('pos-debt').value          = p.debt || 0;
+    // Au centime : une valeur deduite d'une entite s'affichait brute
+    // (« 5367.970895604706 »).
+    document.getElementById('pos-value').value         = Math.round((p.value || 0) * 100) / 100;
+    document.getElementById('pos-debt').value          = Math.round((p.debt || 0) * 100) / 100;
     document.getElementById('pos-ownership').value     = Math.round((p.ownership_pct ?? 1) * 100);
     document.getElementById('pos-debt-pct').value      = Math.round((p.debt_pct ?? 1) * 100);
     document.getElementById('pos-entity-select').value = p.entity || '';
@@ -525,7 +527,8 @@ export function openPosModal(id = null, prefill = {}) {
   }
   updatePosInfo();
   document.getElementById('position-modal').classList.remove('hidden');
-  document.getElementById('pos-date').focus();
+  // Au doigt, un champ date qui prend le focus ouvre aussitot la roue d'iOS.
+  if (!matchMedia('(pointer: coarse)').matches) document.getElementById('pos-date').focus();
 }
 
 /** Titulaire propose a la creation : celui de la vue, ou aucun en famille,

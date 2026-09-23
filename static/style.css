@@ -1753,9 +1753,6 @@ textarea:focus-visible {
   .owners-table {
     min-width: 560px;
   }
-  #entities-synthese .owners-table {
-    min-width: 760px;
-  }
 
   /* Nav tabs devient un drawer caché derrière le hamburger */
 
@@ -4098,4 +4095,64 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 /* Au-dessus de la barre d'onglets du telephone, pas sur elle. */
 @media (max-width: 780px) {
   html.is-masked body::before { bottom: calc(env(safe-area-inset-bottom, 0px) + 4.6rem); }
+}
+
+/* ── Telephone : ce que l'audit iPhone a releve ────────────────────────── */
+#macro-content { grid-template-columns: repeat(3, 1fr); }
+.dz-doigt { display: none; }
+@media (hover: none) and (pointer: coarse) {
+  .dz-souris { display: none; }
+  .dz-doigt { display: inline; }
+}
+@media (max-width: 640px) {
+  #macro-content { grid-template-columns: 1fr; }
+  /* Tableaux des cartes : les colonnes secondaires cedent la place. Le detail
+     reste dans l'onglet de chaque carte (Repartition, Performance, Entites). */
+  .rep th:nth-child(n+4), .rep td:nth-child(n+4) { display: none; }
+  .comptes th:nth-child(3), .comptes td:nth-child(3),
+  .comptes th:nth-child(4), .comptes td:nth-child(4) { display: none; }
+  #entities-synthese .owners-table th:nth-child(-n+4):not(:first-child),
+  #entities-synthese .owners-table td:nth-child(-n+4):not(:first-child) { display: none; }
+  #entities-synthese .owners-table { min-width: 0; }
+  /* Chiffres plus serres : Net et Rendement tenaient hors cadre. */
+  .rep th, .rep td, .comptes th, .comptes td,
+  #entities-synthese .owners-table th, #entities-synthese .owners-table td { padding-inline: .3rem; }
+  .rep td, .comptes td, #entities-synthese .owners-table td { font-size: 12.5px; }
+  .rep th:first-child, .rep td:first-child, .comptes th:first-child, .comptes td:first-child {
+    padding-left: 0; min-width: 0; width: auto; }
+  .rep td.num, .rep tbody td:not(:first-child), .comptes td.num { white-space: nowrap; }
+  .comptes th:first-child, .comptes td:first-child { width: 55%; }
+  .rep-wrap, .comptes-wrap {
+    background:
+      linear-gradient(to right, var(--card) 30%, transparent) left / 32px 100% no-repeat local,
+      linear-gradient(to left, var(--card) 30%, transparent) right / 32px 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, color-mix(in srgb, var(--text) 16%, transparent), transparent) left / 12px 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, color-mix(in srgb, var(--text) 16%, transparent), transparent) right / 12px 100% no-repeat scroll;
+  }
+  /* Douze mois sous le graphe de tresorerie : un sur deux, sinon ils se
+     touchent (« sept.oct.nov. »). */
+  .treso-mois span:nth-child(even) { visibility: hidden; }
+  .treso-tete > * { min-width: 0; overflow-wrap: anywhere; }
+  /* Rien sous 11 px au telephone. */
+  .kpi-label, .kpi-sub, .rep th, .h-badge, .fx-marque, .proposal-kind,
+  .constat-niveau, .settings-section-label, .treso-mois { font-size: 11px; }
+  .fin-rail-lib { font-size: 11px; }
+}
+/* Cibles au doigt : 44 px, la mesure d'iOS. */
+@media (pointer: coarse) {
+  .modal-close, #dd-close { min-width: 44px; min-height: 44px; display: inline-grid; place-items: center; }
+  .btn-icon, .fx-btn, .fisc-detail-btn { min-height: 44px; }
+  .btn-icon, .fx-btn { min-width: 44px; justify-content: center; }
+  .seg-btn { min-height: 40px; }
+  /* Liens en ligne et petites poignees : la zone de toucher deborde, le
+     dessin ne bouge pas (sinon lignes et titres se decaleraient). */
+  .constat-voir, .link-carte, .mv-plus, .h-isin-btn, .rec-journal-toggle, #perf-excl,
+  .arbo-chevron, .w-poignee { position: relative; }
+  .constat-voir::after, .link-carte::after, .mv-plus::after, .h-isin-btn::after,
+  .rec-journal-toggle::after, #perf-excl::after, .arbo-chevron::after, .w-poignee::after {
+    content: ""; position: absolute; left: 50%; top: 50%; width: max(100%, 44px); height: max(100%, 44px);
+    transform: translate(-50%, -50%); }
+  input[type="checkbox"], input[type="radio"] { width: 22px; height: 22px; }
+  /* La feuille « Plus » ne laisse pas defiler la page derriere elle. */
+  .fin-rail.is-open { overscroll-behavior: contain; }
 }
