@@ -3,6 +3,7 @@ import { initMask, toggleMask, isMasked, onMaskChange } from './mask.js';
 import { wireTodo } from './todo.js';
 import { wireReglages, estUnReglage, ouvrir as ouvrirReglages } from './reglages.js';
 import { initBarreMobile } from './barre-mobile.js';
+import { etiqueter, dateCourte } from './select-etiquette.js';
 import { fmtDate, esc, applyChartTheme, refreshChartsTheme } from './utils.js';
 import { api, buildSelects } from './api.js';
 import { closeModal, openModal, trapModalFocus, installModalScrollLock } from './dialogs.js';
@@ -296,6 +297,29 @@ const AJOUTS = {
  *  les soldes. Sur Positions, il cede la couleur pleine a « Ajouter ». */
 const MISE_A_JOUR = new Set(['synthese', 'positions']);
 
+/** Sur telephone, la periode de comparaison quitte la barre du haut pour le
+ *  menu « ··· » : une seule rangee de controles, de meme gabarit. */
+function _placerPeriode(seg) {
+  if (!seg || seg._place) return;
+  seg._place = true;
+  const origine = seg.parentElement, suivant = seg.nextSibling;
+  const menu = document.getElementById('snapshot-dropdown');
+  // Meme gabarit que les autres sections du menu : l'etiquette, puis le
+  // segment au retrait des entrees.
+  const etiquette = document.createElement('div');
+  etiquette.className = 'settings-section-label';
+  etiquette.textContent = 'Comparer à';
+  const bloc = document.createElement('div');
+  bloc.className = 'menu-periode';
+  const mq = window.matchMedia('(max-width: 780px)');
+  const placer = () => {
+    if (mq.matches && menu) { bloc.appendChild(seg); menu.prepend(etiquette, bloc); }
+    else { origine.insertBefore(seg, suivant); etiquette.remove(); bloc.remove(); }
+  };
+  placer();
+  mq.addEventListener('change', placer);
+}
+
 function _majBoutonAjouter(tab) {
   const btn = document.getElementById('head-ajouter');
   const maj = document.getElementById('head-maj');
@@ -306,8 +330,15 @@ function _majBoutonAjouter(tab) {
     // lecteurs d'ecran, et la barre du haut garde deux rangs.
     // Un seul element de texte : dans le flex du bouton, deux noeuds freres
     // perdaient l'espace qui les separait (« Ajouterune position »).
-    if (a) btn.innerHTML = `<span>${a.libelle.replace(/^Ajouter (.+)$/, 'Ajouter<span class="head-complement"> $1</span>')}</span>`;
+    if (a) {
+      btn.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg>`
+        + `<span class="head-lib">${a.libelle.replace(/^Ajouter (.+)$/, 'Ajouter<span class="head-complement"> $1</span>')}</span>`;
+      btn.setAttribute('aria-label', a.libelle);
+    }
   }
+  // « Periode / 1 an » ne regle que la synthese : ailleurs, il n'agissait sur
+  // rien.
+  document.getElementById('seg-periode')?.classList.toggle('hidden', tab !== 'synthese');
   if (maj) {
     maj.classList.toggle('hidden', !MISE_A_JOUR.has(tab));
     maj.classList.toggle('btn-primary', !a);
@@ -470,6 +501,8 @@ function wireEvents() {
 
   // Global owner filter
   document.getElementById('global-owner-filter')?.addEventListener('change', _onGlobalOwnerChange);
+  etiqueter(document.getElementById('global-owner-filter'));
+  etiqueter(document.getElementById('synthese-date-select'), dateCourte);
 
   // Browser back/forward
   window.addEventListener('popstate', e => {
@@ -717,6 +750,7 @@ function wireEvents() {
     { cle: 'an',      libelle: '1 an' },
   ];
   const segPeriode = document.getElementById('seg-periode');
+  _placerPeriode(segPeriode);
   if (segPeriode) {
     segPeriode.replaceChildren(...PERIODES.map(p => {
       const b = document.createElement('button');

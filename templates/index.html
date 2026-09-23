@@ -115,8 +115,10 @@
              visible d'ajouter une position, un flux ou une entite. -->
         <!-- Le geste le plus frequent : tous les soldes sur un seul ecran. Il
              passait par « ••• → Dupliquer », puis une modale par compte. -->
-        <button type="button" class="btn btn-primary btn-sm hidden" id="head-maj">Mettre à jour</button>
-        <button type="button" class="btn btn-primary btn-sm hidden" id="head-ajouter">Ajouter</button>
+        <button type="button" class="btn btn-primary btn-sm hidden head-action" id="head-maj" aria-label="Mettre à jour les soldes">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
+          <span class="head-lib">Mettre à jour</span></button>
+        <button type="button" class="btn btn-primary btn-sm hidden head-action" id="head-ajouter">Ajouter</button>
         <div class="head-recherche" id="global-search">
           <button type="button" class="head-icone" id="head-loupe" aria-label="Rechercher (touche /)"
                   aria-expanded="false" aria-controls="head-recherche-pop">

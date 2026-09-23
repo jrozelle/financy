@@ -1993,7 +1993,6 @@ kbd {
 }
 
 @media (max-width: 640px) {
-  #global-owner-filter { max-width: 120px; }
   #tab-actifs .kpi-grid { grid-template-columns: 1fr !important; }
   #tab-actifs .data-table { min-width: 920px; }
 }
@@ -2001,48 +2000,17 @@ kbd {
 .tab-btn { flex: 0 0 auto; }
 
 @media (max-width: 640px) {
-  #global-owner-filter {
-    width: 100px;
-    max-width: none;
-    min-height: 40px;
-  }
   #btn-keyboard-help {
     display: none;
   }
 }
 
 /* ── UX cleanup: one global owner selector, secondary actions in menu ─── */
-#global-owner-filter {
-  width: 100%;
-  min-height: 38px;
-}
 #tab-synthese .page-header #btn-print {
   display: none !important;
 }
 
-@media (max-width: 640px) {
-  #global-owner-filter {
-    width: clamp(112px, 32vw, 150px);
-  }
-}
 
-/* ── Navigation UX: global context first, page actions second ───────────── */#global-owner-filter,
-#synthese-date-select {
-  width: 100% !important;
-  height: var(--nav-control-height);
-  min-height: var(--nav-control-height);
-  border: 1px solid var(--border) !important;
-  border-radius: 8px !important;
-  background: var(--card) !important;
-  color: var(--text) !important;
-  font-size: 14px !important;
-  line-height: 1.2;
-}
-#global-owner-filter,
-#synthese-date-select {
-  padding: 0 .7rem !important;
-  cursor: pointer;
-}
 .page-header h1 {
   display: none !important;
 }
@@ -2073,10 +2041,7 @@ kbd {
   min-height: 40px;
 }
 
-@media (max-width: 780px) {#global-owner-filter,
-#synthese-date-select {
-    font-size: 14px !important;
-  }
+@media (max-width: 780px) {
   .settings-item {
     min-height: 44px;
     padding: .7rem .9rem;
@@ -2084,11 +2049,6 @@ kbd {
   }
 }
 
-@media (max-width: 430px) {#global-owner-filter,
-#synthese-date-select {
-    font-size: 13px !important;
-  }
-}
 
 /* ── Mobile tab surfaces: consistent toolbars, filters and tables ───────── */
 @media (max-width: 780px) {
@@ -2295,14 +2255,7 @@ kbd {
   display: none !important;
 }
 
-@media (max-width: 780px) {#global-owner-filter,
-#synthese-date-select {
-    font-size: 13px !important;
-  }
-  #global-owner-filter,
-  #synthese-date-select {
-    padding: 0 .45rem !important;
-  }
+@media (max-width: 780px) {
   #tab-positions .positions-toolbar,
   #tab-flux .page-toolbar {
     max-width: 100%;
@@ -2331,13 +2284,6 @@ kbd {
   }
 }
 
-@media (max-width: 430px) {
-  #global-owner-filter,
-  #synthese-date-select {
-    font-size: 12px !important;
-    padding: 0 .35rem !important;
-  }
-}
 
 /* ── Onglet Performance ───────────────────────────────────────────────── */
 #perf-controls { display: flex; align-items: center; gap: .9rem; flex-wrap: wrap; margin: .25rem 0 1rem; }
@@ -2909,16 +2855,16 @@ main > .tab-content > .page-header > h1 { display: none; }
 
 .page-head-tools #global-owner-filter,
 .page-head-tools #synthese-date-select {
-  width: auto !important;
-  height: var(--ctrl-h) !important;
-  min-height: var(--ctrl-h) !important;
-  padding: 0 1.6rem 0 .6rem !important;
-  border-radius: 8px !important;
-  border: 1px solid var(--border) !important;
-  background: var(--card) !important;
-  font-size: .78rem !important;
+  width: auto;
+  height: var(--ctrl-h);
+  min-height: var(--ctrl-h);
+  padding: 0 1.6rem 0 .6rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  font-size: .78rem;
   font-family: var(--sans);
-  color: var(--text) !important;
+  color: var(--text);
 }
 .page-head-tools .seg { height: var(--ctrl-h); align-items: center; }
 .page-head-tools .seg-btn { height: calc(var(--ctrl-h) - 6px); display: inline-flex; align-items: center; }
@@ -4088,3 +4034,68 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .barre-nom { flex: 1; }
 .barre-case { display: flex; align-items: center; gap: .35rem; font-size: .78rem; color: var(--text-muted); }
 .btn-link { background: none; border: 0; padding: 0; color: var(--primary); cursor: pointer; font: inherit; text-decoration: underline; }
+
+/* ── Barre du haut sur telephone : une seule rangee, un seul gabarit ─────── */
+/* Titulaire et arrete se partagent la place ; menu, recherche et masquage a
+   droite, carres. « Mettre a jour » et « Ajouter » deviennent des icones ; la
+   periode de comparaison passe dans le menu « ··· » (main.js). */
+.head-action svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
+.head-action { display: inline-flex; align-items: center; gap: .35rem; }
+.menu-periode { padding: .15rem 1rem .6rem; }
+.menu-periode + .settings-section-label { border-top: 1px solid var(--border); }
+.menu-periode .seg { width: 100%; }
+.menu-periode .seg-btn { flex: 1; justify-content: center; min-height: 36px; }
+@media (max-width: 780px) {
+  .page-head { padding-block: .4rem; min-height: 0; }
+  .page-head-tools { --ctrl-h: 40px; flex-wrap: nowrap; gap: .25rem; }
+  /* Le contexte (qui, quand) se lit comme un titre : texte sans cadre, a
+     gauche ; les actions en icones, a droite. Un cadre par selecteur les
+     serrait au point de n'afficher que « Fa » et « 02/09/ ». */
+  #head-filtres { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 0; }
+  /* Etiquette a la largeur de la valeur, select transparent par-dessus
+     (select-etiquette.js). */
+  .ctx-sel { position: relative; display: inline-flex; align-items: center; gap: .25rem;
+    flex: 0 1 auto; min-width: 0; height: var(--ctrl-h); padding: 0 .3rem; border-radius: 10px; }
+  .ctx-val { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 1rem; font-weight: 650; color: var(--text); }
+  .ctx-sel::after { content: ""; flex: 0 0 auto; width: 7px; height: 7px; margin: -3px .1rem 0 0;
+    border: solid var(--text-muted); border-width: 0 1.8px 1.8px 0; transform: rotate(45deg); }
+  .ctx-sel:has(#synthese-date-select) .ctx-val { font-weight: 500; color: var(--text-muted);
+    font-variant-numeric: tabular-nums; }
+  .ctx-sel:has(select:focus-visible) { outline: 2px solid var(--primary); outline-offset: -2px; }
+  @media (hover: hover) { .ctx-sel:hover { background: var(--card); } }
+  .page-head-tools .ctx-sel > select { position: absolute; inset: 0; width: 100%; height: 100%;
+    min-height: 0; margin: 0; padding: 0; opacity: 0; border: 0; }
+  /* Deja dans le menu « ··· » : un doublon n'y vaut pas sa place. */
+  #head-maj { display: none !important; }
+  .page-head-tools #snapshot-menu { margin-right: auto; }
+  .page-head-tools #snapshot-toggle,
+  .page-head-tools .head-icone,
+  .page-head-tools #mask-btn,
+  .page-head-tools .head-action { flex: 0 0 var(--ctrl-h); width: var(--ctrl-h); height: var(--ctrl-h);
+    padding: 0; justify-content: center; border-radius: 10px; }
+  .page-head-tools #snapshot-toggle { flex-basis: 34px; width: 34px; border: 0; background: transparent; }
+  /* Menu et recherche s'ancrent a l'en-tete, pas a leur bouton : accroches a
+     l'icone, ils sortaient de l'ecran par la gauche. */
+  .page-head-tools .menu-wrap, .page-head-tools .head-recherche { position: static; }
+  .page-head-tools .menu-pop, .page-head-tools .head-recherche-pop {
+    top: calc(100% + 4px); left: var(--page-gutter); right: var(--page-gutter);
+    width: auto; min-width: 0; max-height: calc(100dvh - 10rem); }
+  .page-head-tools .head-action .head-lib { position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip-path: inset(50%); white-space: nowrap; }
+  .page-head-tools .head-icone svg, .page-head-tools #mask-btn svg,
+  .page-head-tools #snapshot-toggle svg, .page-head-tools .head-action svg { width: 20px; height: 20px; }
+}
+/* Ecran large : le select s'affiche lui-meme. */
+@media (min-width: 781px) {
+  .ctx-sel { display: contents; }
+  .ctx-val { display: none; }
+}
+/* Le raccourci clavier n'a pas de sens au doigt. */
+@media (hover: none) and (pointer: coarse) {
+  html.is-masked body::before { content: "Montants masqués"; }
+}
+/* Au-dessus de la barre d'onglets du telephone, pas sur elle. */
+@media (max-width: 780px) {
+  html.is-masked body::before { bottom: calc(env(safe-area-inset-bottom, 0px) + 4.6rem); }
+}
