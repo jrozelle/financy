@@ -637,6 +637,16 @@ def impot_latent_api():
         return jsonify(impot_latent(conn, date, owner))
 
 
+@synthese_bp.route('/api/projection/epargne')
+@login_required
+def projection_epargne():
+    """Epargne mensuelle mesuree (mediane des apports externes nets des six
+    derniers mois pleins), point de depart de la projection du patrimoine."""
+    from services.contribution import epargne_mensuelle
+    with get_db() as conn:
+        return jsonify(epargne_mensuelle(conn, datetime.now().strftime('%Y-%m-%d')))
+
+
 @synthese_bp.route('/api/contribution')
 @login_required
 def contribution():

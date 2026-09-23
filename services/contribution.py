@@ -175,3 +175,26 @@ def decompose(conn, arretes, owner=None, limite=8):
         'total_hors_suivi':  round(sum(p['hors_suivi'] for p in periodes), 2),
         'total_variation':   round(sum(p['variation'] for p in periodes), 2),
     }
+
+
+def epargne_mensuelle(conn, fin, mois=6):
+    """Apports externes nets par mois sur les `mois` mois pleins avant `fin`,
+    et leur MEDIANE : un versement exceptionnel (un heritage, un contrat
+    transfere) ne doit pas etre extrapole sur dix ans, ce que ferait une
+    moyenne."""
+    from datetime import date as _d
+    a, m = int(fin[:4]), int(fin[5:7])
+    bornes = []
+    for _ in range(mois + 1):
+        bornes.append(_d(a, m, 1).isoformat())
+        m -= 1
+        if m == 0:
+            a, m = a - 1, 12
+    bornes.reverse()
+    # ]debut, fin] : le premier du mois appartient au mois precedent, a un
+    # jour pres ; sans consequence pour une mediane mensuelle.
+    parmois = [{'mois': d0[:7], 'apports': _apports(conn, d0, d1)} for d0, d1 in zip(bornes, bornes[1:])]
+    v = sorted(x['apports'] for x in parmois)
+    n = len(v)
+    mediane = (v[n // 2] if n % 2 else (v[n // 2 - 1] + v[n // 2]) / 2) if n else 0.0
+    return {'mois': parmois, 'mediane': round(mediane, 2)}

@@ -11,6 +11,7 @@ import { loadFiscalite } from './fiscalite.js';
 import { drilldownPositions } from '../drilldown.js';
 import { loadUserAlerts } from '../alerts.js';
 import { renderAllocationTargets } from '../targets.js';
+import { renderProjection } from './projection.js';
 import { toast, promptDialog } from '../dialogs.js';
 
 function _owners() {
@@ -183,6 +184,7 @@ export function renderSynthese() {
   renderSnapshotDiff(owner, isFamily);
   renderSnapshotNote(syn);
   renderWealthTarget(kpi.net, isFamily, serie('net'), dates);
+  renderProjection(posTitulaire, isFamily, kpi.net, _wealthTarget);
 }
 
 /** « Evolution par categorie » : une ligne par groupe — nom, tendance,

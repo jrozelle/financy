@@ -138,3 +138,15 @@ class TestRoutes:
         assert client.patch('/api/entites/operations/1', json={'nature': 'nimporte'}, headers=H).status_code == 400
         assert client.patch('/api/entites/operations/99', json={'nature': 'frais'}, headers=H).status_code == 404
         assert client.get('/api/entites/tresorerie').get_json()['entites'][0]['totaux']['frais'] == -10
+
+
+class TestEpargneMensuelle:
+    def test_la_mediane_ignore_un_versement_exceptionnel(self):
+        from services.contribution import epargne_mensuelle
+        with get_db() as conn:
+            for mois, montant in (('03', 100000), ('04', 3000), ('05', 3200), ('06', 2800), ('07', 3100), ('08', 2900)):
+                conn.execute("INSERT INTO flux (date, owner, envelope, type, amount) VALUES (?, 'Paul', 'PEA', 'Versement', ?)",
+                             (f'2026-{mois}-15', montant))
+            e = epargne_mensuelle(conn, '2026-09-23')
+        assert [m['apports'] for m in e['mois']] == [100000, 3000, 3200, 2800, 3100, 2900]
+        assert e['mediane'] == pytest.approx(3050)

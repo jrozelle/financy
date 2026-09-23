@@ -208,6 +208,29 @@
       </div>
 
 
+      <div class="card" id="card-projection" data-carte="projection" style="display:none">
+        <div class="card-head">
+          <div>
+            <h2>Projection</h2>
+            <p class="card-sub">Trois moteurs : le remboursement des crédits, votre épargne, le rendement. Seul le premier est certain.</p>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" id="proj-reinit">Valeurs mesurées</button>
+        </div>
+        <div class="proj-reglages">
+          <label for="proj-epargne">Épargne par mois
+            <input type="text" inputmode="decimal" id="proj-epargne" class="ref-input" aria-describedby="proj-epargne-aide"></label>
+          <label for="proj-rendement">Rendement du financier (% par an)
+            <input type="text" inputmode="decimal" id="proj-rendement" class="ref-input"></label>
+          <label for="proj-horizon">Horizon
+            <select id="proj-horizon" class="filter-select">
+              <option value="5">5 ans</option><option value="10">10 ans</option>
+              <option value="15">15 ans</option><option value="20">20 ans</option>
+            </select></label>
+        </div>
+        <p class="form-aide" id="proj-epargne-aide"></p>
+        <div id="proj-courbe" class="courbe-hote"></div>
+        <div id="proj-detail" aria-live="polite"></div>
+      </div>
       <div class="card" id="card-contribution" data-carte="contribution" style="display:none">
         <div class="card-head">
           <div>
