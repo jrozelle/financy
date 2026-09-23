@@ -2,11 +2,21 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- viewport-fit=cover : sans lui, env(safe-area-inset-*) vaut 0 et la barre
+       d'onglets mobile passe sous l'indicateur d'accueil de l'iPhone. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Connexion — Financy</title>
   <link rel="icon" href="/static/icons/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/static/icons/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <!-- Ajoutee a l'ecran d'accueil, l'application s'ouvre en plein ecran. -->
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Financy">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#f4f5f8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f1219" media="(prefers-color-scheme: dark)">
   <link rel="stylesheet" href="/static/style.css">
   <style>
     body { display:flex; align-items:center; justify-content:center; min-height:100vh; background:var(--bg); }
