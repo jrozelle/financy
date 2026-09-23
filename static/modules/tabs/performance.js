@@ -146,10 +146,11 @@ function renderHeader(d) {
     ${V.focus ? `<button type="button" class="btn btn-sm" id="perf-reset">↩ Tout afficher</button>` : ''}
     <span class="perf-meta">${d.dates.length} arrêtés · ${fmtDate(d.first_date)} → ${fmtDate(d.date)}${
       d.excluded?.length || alertes(d).length ? ` · <button type="button"
-        class="perf-excl-toggle" id="perf-excl" aria-expanded="${V.showExcluded}">${
+        class="perf-excl-toggle" id="perf-excl" aria-expanded="${V.showExcluded}" aria-controls="perf-excl-panel">${
         d.excluded.length} hors calcul${
         alertes(d).length ? ` · ${alertes(d).length} cours à vérifier` : ''} ${
         V.showExcluded ? '▴' : '▾'}</button>` : ''}</span>
+    ${panneauExclus(d)}
     <p class="form-aide perf-maille-aide" id="perf-maille-aide">${V.group === 'account'
       ? 'Un compte : une enveloppe chez un établissement, pour un titulaire. Chaque contrat a son propre rendement.'
       : 'Tous les contrats d’une même enveloppe fusionnés, titulaires et établissements confondus. Un écart avec la vue par compte signale une enveloppe qui agrège des contrats sans rapport.'}</p>`;
@@ -163,7 +164,62 @@ function renderHeader(d) {
   });
   document.getElementById('perf-excl')?.addEventListener('click', () => {
     V.showExcluded = !V.showExcluded; renderPerformance();
+    // Le rendu remplace le bouton : le focus y revient, et le panneau, juste
+    // dessous, se fait voir s'il deborde de l'ecran.
+    document.getElementById('perf-excl')?.focus();
+    if (V.showExcluded) document.getElementById('perf-excl-panel')?.scrollIntoView({ block: 'nearest' });
   });
+}
+
+/** Motif d'une alerte de cours, ecrit a la francaise. Le serveur le compose
+ *  avec des nombres bruts (« 66760.73 ») et des dates ISO : les cours, deja
+ *  convertis en euros par le modele, passent par `fmt` (et le mode discretion),
+ *  les ecarts en pourcentage prennent la virgule, les dates `fmtDate`. */
+function motifAlerte(reason) {
+  const nb = x => fmt(parseFloat(x), 2);
+  return esc(reason || '')
+    .replace(/cours du jour retenu \((\d+(?:\.\d+)?)\)/, (_, x) => `cours du jour retenu (${nb(x)})`)
+    .replace(/cours (\d+(?:\.\d+)?) contre (\d+(?:\.\d+)?) enregistré/, (_, x, y) => `cours ${nb(x)} contre ${nb(y)} enregistré`)
+    .replace(/(\d+)\.(\d+)(\s|\u00a0)%/g, '$1,$2\u00a0%')
+    .replace(/\b(\d{4}-\d{2}-\d{2})\b/g, (_, d) => fmtDate(d));
+}
+
+/** Panneau « hors calcul », deplie juste sous son bouton : rendu en bas de la
+ *  liste, il s'ouvrait 1 700 px plus bas, hors de vue. */
+function panneauExclus(d) {
+  const al = alertes(d);
+  // Les groupes ecartes, avec leur titulaire et leur etablissement : sans eux,
+  // deux comptes courants de deux titulaires se lisaient comme un doublon.
+  const exclus = (d.groups || []).filter(g => g.status !== 'ok');
+  if (!al.length && !exclus.length) return '';
+  // Replie, le panneau existe quand meme, vide et masque : `aria-controls`
+  // designe ainsi toujours un element.
+  if (!V.showExcluded) return '<div class="card perf-excl-panel" id="perf-excl-panel" hidden></div>';
+  const nClos = exclus.filter(g => g.status === 'closed').length;
+  const lib = g => `${esc(g.envelope || g.label)}${g.account_label ? ` ${esc(g.account_label)}` : ''}`;
+  const sous = g => [g.establishment, g.owner].filter(Boolean).join(' · ');
+  return `<div class="card perf-excl-panel" id="perf-excl-panel" style="flex-basis:100%">
+    ${al.length ? `<div class="perf-excluded">
+      <div class="perf-excluded-head">Valorisations à vérifier — le cours du jour et la valeur
+        enregistrée divergent ; le motif dit laquelle le modèle a retenue</div>
+      ${al.map(([lbl, a]) => `<div class="perf-excluded-row">
+        <span>${esc(a.name || a.isin)}<span class="perf-sub">${esc(lbl)}</span></span>
+        <span class="perf-excl-why">${motifAlerte(a.reason)}</span>
+        <span class="num"></span>
+      </div>`).join('')}
+    </div>` : ''}
+    ${exclus.length ? `<div class="perf-excluded">
+      <div class="perf-excluded-head">Hors calcul — ${exclus.length} compte${exclus.length > 1 ? 's' : ''}
+        sans rendement mesurable${nClos ? `, dont ${nClos} clos qui ne figure${nClos > 1 ? 'nt' : ''} plus dans la synthèse` : ''}</div>
+      ${exclus.map(g => `<div class="perf-excluded-row">
+        <span>${lib(g)}${sous(g) ? `<span class="perf-sub">${esc(sous(g))}</span>` : ''}</span>
+        <span class="perf-excl-why">${esc(g.reason || LABELS[g.status] || g.status)}${
+          g.status === 'closed' && g.last_date
+            ? ` · dernière valeur le ${fmtDate(g.last_date)}` : ''}</span>
+        <span class="num">${fmt(g.value)}</span>
+      </div>`).join('')}
+    </div>` : ''}
+  </div>`;
 }
 
 function renderKpi(d) {
@@ -182,9 +238,9 @@ function renderKpi(d) {
       sign(rend(g)?.v)],
     // Le TWR ne juge que le placement, versements neutralises : c'est la
     // mesure a comparer a un indice, ou d'un contrat a l'autre. Second plan.
-    ['kpi-mobilizable', 'Pour comparer à un indice',
+    ['kpi-mobilizable', 'Rendement hors versements (TWR)',
       g.annualisable ? pct(g.twr_annualise) : pct(g.twr),
-      g.annualisable ? 'TWR, par an' : `TWR, sur ${duree(g.days)}`,
+      `${g.annualisable ? 'par an' : `sur ${duree(g.days)}`} · comparable à un indice`,
       sign(g.annualisable ? g.twr_annualise : g.twr)],
     // La periode est nommee sur la tuile elle-meme : "de la periode" sans dire
     // laquelle obligeait a aller la chercher a l'autre bout de l'ecran.
@@ -298,28 +354,8 @@ function renderList(d) {
           ? ` · TWR ${pct(g.annualisable ? g.twr_annualise : g.twr)}` : ''}</span></div>
       <div class="perf-val">${fmt(g.value)}</div>
     </div>` : ''}
-    ${V.showExcluded && alertes(d).length ? `<div class="perf-excluded">
-      <div class="perf-excluded-head">Valorisations à vérifier — le modèle a préféré la
-        valeur enregistrée au cours du jour</div>
-      ${alertes(d).map(([lbl, a]) => `<div class="perf-excluded-row">
-        <span>${esc(a.name || a.isin)}</span>
-        <span class="perf-excl-why">${esc(a.reason)}</span>
-        <span class="num">${esc(lbl)}</span>
-      </div>`).join('')}
-    </div>` : ''}
-    ${V.showExcluded && d.excluded?.length ? `<div class="perf-excluded">
-      <div class="perf-excluded-head">Hors calcul — ${d.excluded.length} compte${
-        d.excluded.length > 1 ? 's' : ''}, présents dans la synthèse mais sans rendement mesurable</div>
-      ${d.excluded.map(e => `<div class="perf-excluded-row">
-        <span>${esc(e.label)}</span>
-        <span class="perf-excl-why">${esc(e.reason || LABELS[e.status] || e.status)}${
-          e.status === 'closed' && e.last_date
-            ? ` · dernière valeur le ${fmtDate(e.last_date)}` : ''}</span>
-        <span class="num">${fmt(e.value)}</span>
-      </div>`).join('')}
-    </div>` : ''}
     <p class="perf-note">Les pourcentages sont des rendements <strong>cumulés sur la
-    période</strong> ; « /an » signale un équivalent annualisé, affiché à partir de
+    période</strong> ; « par an » signale un équivalent annualisé, affiché à partir de
     ${d.min_days_annualise} jours d'historique seulement — extrapoler quelques semaines
     à l'année ne renseigne sur rien. Cliquez une ligne pour l'isoler, un en-tête pour
     trier.</p>`;
@@ -411,12 +447,14 @@ async function renderChart(d) {
     comp = { debut: a.date, fin: z.date, moi: z.index / a.index - 1, etf: prixDe(z.date) / p0 - 1 };
   }
   const nom = V.focus ? g.label : (d.marche ? 'Vos placements exposés aux marchés' : 'Vos placements');
+  // Un seul nom pour l'ETF, dans l'infobulle comme dans la legende.
+  const nomEtf = etf?.name || 'ETF World';
   const horsMarche = !V.focus && d.marche?.exclus
     ? `<span class="courbe-note">Hors ${d.marche.exclus} compte${d.marche.exclus > 1 ? 's' : ''} sans risque de marché — livrets, comptes, fonds euros — pour ${fmt(d.marche.exclus_valeur)}.</span>` : '';
   dessinerCourbe(hote, {
     series: [
       { nom, couleur: 'var(--primary)', points: serie.map(p => ({ date: p.date, v: p.index })), aire: true },
-      ...(bench ? [{ nom: 'ETF World', couleur: 'var(--text-muted)', points: bench, pointille: true }] : []),
+      ...(bench ? [{ nom: nomEtf, couleur: 'var(--text-muted)', points: bench, pointille: true }] : []),
     ],
     formatY: v => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(v),
     formatV: v => pct(v / 100 - 1),
@@ -432,7 +470,7 @@ async function renderChart(d) {
   const pts = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1 }).format(Math.abs(ecart));
   legende.innerHTML = `
     <span><i style="background:var(--primary)"></i>${esc(nom)} <b>${pct(comp.moi)}</b></span>
-    <span><i style="background:var(--text-muted)"></i>${esc(etf.name || 'ETF World')} <b>${pct(comp.etf)}</b></span>
+    <span><i style="background:var(--text-muted)"></i>${esc(nomEtf)} <b>${pct(comp.etf)}</b></span>
     <span class="courbe-note">${Math.abs(ecart) < 0.05 ? 'au niveau de l’ETF' : `${pts} point${Math.abs(ecart) >= 2 ? 's' : ''} ${ecart > 0 ? 'de mieux' : 'de moins'}`}
       du ${fmtDate(comp.debut)} au ${fmtDate(comp.fin)}${comp.debut !== debut ? ' — les cours de l’ETF commencent là' : ''}${
       recale ? ` (cours de l’ETF du ${fmtDate(recale.cours.date)} pour l’arrêté du ${fmtDate(recale.arrete)})` : ''}</span>

@@ -313,7 +313,12 @@ const signe = v => `<span class="${v >= 0 ? 'pv-hausse' : 'pv-baisse'}">${v >= 0
  *  revient connu n'est pas comptee a zero : la cellule dit combien de lignes
  *  le chiffre couvre, a l'ecran et non dans une infobulle. */
 function celluleGain(p) {
-  if (!p.has_holdings) return '<span class="pv-na">—</span>';
+  // Sans lignes de titres, aucun prix de revient : la cellule dit pourquoi elle
+  // est vide plutot que de laisser un blanc.
+  if (!p.has_holdings) {
+    const motif = p.entity ? 'valeur de l’entité' : 'sans lignes de titres';
+    return `<span class="pv-na">—</span><span class="pv-pct pv-motif">${motif}</span>`;
+  }
   if (!p.gain_lignes) return '<span class="pv-na">PRU inconnu</span>';
   const pct = p.gain_pct == null ? '' :
     `<span class="pv-pct">${fmtPct(p.gain_pct * 100, 1, true)}</span>`;
@@ -486,7 +491,10 @@ export function openPosModal(id = null, prefill = {}) {
     document.getElementById('pos-snapshot-date').style.visibility = 'hidden';
   } else {
     document.getElementById('pos-date').value         = S.positionsDate || today();
-    document.getElementById('pos-owner').value        = S.config.owners[0];
+    // Vu en famille, aucun titulaire n'est plus probable qu'un autre : le
+    // premier de la liste s'imposait en silence. Le champ reste a choisir,
+    // et `required` le rappelle a l'enregistrement.
+    choisirTitulaire('pos-owner', prefill.owner);
     document.getElementById('pos-category').value     = S.config.categories[0];
     document.getElementById('pos-envelope').value     = '';
     document.getElementById('pos-establishment').value= '';
@@ -518,6 +526,19 @@ export function openPosModal(id = null, prefill = {}) {
   updatePosInfo();
   document.getElementById('position-modal').classList.remove('hidden');
   document.getElementById('pos-date').focus();
+}
+
+/** Titulaire propose a la creation : celui de la vue, ou aucun en famille,
+ *  avec une option « Choisir… » que le formulaire refuse (champ requis). */
+export function choisirTitulaire(id, impose = null) {
+  const sel = document.getElementById(id);
+  if (!sel) return;
+  if (!sel.querySelector('option[value=""]')) {
+    sel.insertAdjacentHTML('afterbegin', '<option value="" disabled>Choisir le titulaire…</option>');
+  }
+  const vue = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : '';
+  const cible = impose || vue;
+  sel.value = [...sel.options].some(o => o.value === cible) ? cible : '';
 }
 
 export function onEntitySelectChange() {

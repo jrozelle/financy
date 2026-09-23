@@ -832,10 +832,10 @@ function wireEvents() {
     liquidity: 'Liquidité', mobilizable_value: 'Mobilisable',
   });
   initColumnPicker('actifs', 'actifs-col-picker', 'actifs-thead', {
-    isin: 'ISIN', name: 'Nom', establishments: 'Établissement',
+    name: 'Nom', establishments: 'Établissement',
     asset_class: 'Classe', quantity: 'Qté',
     avg_cost: 'PRU', last_price: 'Cours', market_value: 'Valeur',
-    pnl: '+/-', weight_pct: 'Poids', envelopes: 'Enveloppes',
+    pnl: '+/-', weight_pct: 'Poids',
   });
 
   // Focus traps on static modals

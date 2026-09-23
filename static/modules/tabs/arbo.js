@@ -266,7 +266,9 @@ function _cellulePv(n) {
   if (n.pvHtml != null) return n.pvHtml;
   const p = n.position;
   if (p) {
-    if (!p.has_holdings) return '';
+    // Pas de plus-value sans lignes de titres : le dire, plutot qu'une case vide.
+    if (!p.has_holdings) return `<span class="arbo-pv-na">—</span><span class="arbo-pv-note">${
+      p.entity ? 'valeur de l’entité' : 'sans lignes de titres'}</span>`;
     if (!p.gain_lignes) return '<span class="arbo-pv-na">PRU inconnu</span>';
     const partiel = p.gain_lignes < p.holdings_count
       ? `<span class="arbo-pv-note">${p.gain_lignes}/${p.holdings_count} lignes</span>` : '';

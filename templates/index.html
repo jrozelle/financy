@@ -221,7 +221,7 @@
             <input type="text" inputmode="decimal" id="proj-epargne" class="ref-input" aria-describedby="proj-epargne-aide"></label>
           <label for="proj-a-investir">Liquidités à investir en DCA
             <input type="text" inputmode="decimal" id="proj-a-investir" class="ref-input"></label>
-          <label for="proj-dca">au rythme de, par mois
+          <label for="proj-dca">Rythme mensuel du DCA
             <input type="text" inputmode="decimal" id="proj-dca" class="ref-input"></label>
           <label for="proj-rendement">Rendement du financier (% par an)
             <input type="text" inputmode="decimal" id="proj-rendement" class="ref-input"></label>
@@ -376,6 +376,7 @@
           <tbody id="flux-tbody"></tbody>
           <tfoot id="flux-tfoot"></tfoot>
         </table>
+        <div id="flux-plus" class="flux-plus" aria-live="polite" hidden></div>
       </div>
     </div>
 
@@ -598,18 +599,15 @@
         <table class="data-table">
           <thead id="actifs-thead">
             <tr>
-              <th data-sort="isin">ISIN</th>
               <th data-sort="name">Nom</th>
-              <th data-sort="establishments">Établissement</th>
               <th data-sort="asset_class">Classe</th>
+              <th data-sort="establishments">Établissement</th>
               <th class="num" data-sort="quantity">Qté</th>
               <th class="num" data-sort="avg_cost">PRU</th>
               <th class="num" data-sort="last_price">Cours</th>
               <th class="num" data-sort="market_value">Valeur</th>
               <th class="num" data-sort="pnl">+/-</th>
               <th class="num" data-sort="weight_pct">Poids</th>
-              <th data-sort="envelopes">Enveloppes</th>
-              <th>Fraîcheur</th>
             </tr>
           </thead>
           <tbody id="actifs-tbody"></tbody>
@@ -687,7 +685,7 @@
         <h2>Profil du titulaire</h2>
         <div style="margin-bottom:.75rem">
           <label style="font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Titulaire</label>
-          <select id="advisor-owner-select" style="margin-left:.5rem" aria-label="Titulaire du profil"></select>
+          <select id="advisor-owner-select" class="filter-select" style="margin-left:.5rem" aria-label="Titulaire du profil"></select>
         </div>
         <form id="advisor-profile-form">
           <div class="form-grid">
@@ -839,7 +837,7 @@
         </p>
         <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.875rem;flex-wrap:wrap">
           <button type="button" class="btn btn-primary" id="btn-proposals-refresh">Générer les propositions</button>
-          <select id="proposals-filter" style="margin-left:auto" aria-label="Afficher les propositions">
+          <select id="proposals-filter" class="filter-select" style="margin-left:auto" aria-label="Afficher les propositions">
             <option value="">Tous</option>
             <option value="pending" selected>En attente</option>
             <option value="applied">Appliquées</option>
@@ -1160,7 +1158,7 @@
           </div>
           </div>
           <div class="form-group">
-            <label for="pos-label">Libelle (affiche dans l'arbre)</label>
+            <label for="pos-label">Libellé (affiché dans l'arbre)</label>
             <input type="text" id="pos-label" placeholder="ex : Holding, Perso...">
           </div>
           <div class="form-group">
@@ -1170,21 +1168,21 @@
           <div class="form-group full-span" id="pos-mob-override-row">
             <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
               <input type="checkbox" id="pos-mob-override-check">
-              Surcharger la mobilisabilite pour cette ligne
+              Surcharger la mobilisabilité pour cette ligne
             </label>
             <div id="pos-mob-override-field" style="display:none;margin-top:.4rem;gap:1rem;align-items:center;flex-wrap:wrap">
               <div>
-                <input type="text" inputmode="decimal" id="pos-mob-override-pct" step="1" min="0" max="100" value="100" style="width:90px">
+                <input type="text" inputmode="decimal" id="pos-mob-override-pct" step="1" min="0" max="100" value="100" style="width:90px" aria-label="Part mobilisable (%)">
                 <span style="font-size:13px;color:var(--text-muted);margin-left:.25rem">% mobilisable</span>
               </div>
               <div>
-                <select id="pos-liquidity-override" style="font-size:13px">
-                  <option value="">Liquidite par defaut</option>
+                <select id="pos-liquidity-override" style="font-size:13px" aria-label="Liquidité de la ligne">
+                  <option value="">Liquidité par défaut</option>
                   <option value="J0–J1">J0-J1</option>
                   <option value="J2–J7">J2-J7</option>
                   <option value="J8–J30">J8-J30</option>
                   <option value="30J+">30J+</option>
-                  <option value="Bloqué">Bloque</option>
+                  <option value="Bloqué">Bloqué</option>
                 </select>
               </div>
             </div>
@@ -1195,7 +1193,7 @@
           <label class="snapshot-label">
             <input type="checkbox" id="pos-snapshot-check" checked>
             Créer un nouvel arrêté au
-            <input type="date" id="pos-snapshot-date" style="border:1px solid var(--border);border-radius:4px;padding:.2rem .4rem;font-size:13px">
+            <input type="date" id="pos-snapshot-date" class="ref-input">
             en copiant toutes les autres positions
           </label>
           <div class="snapshot-hint">L'arrêté d'origine reste intact.</div>
@@ -1253,7 +1251,7 @@
           </div>
           <div class="isin-ticker-row">
             <label for="isin-asset-class">Classe</label>
-            <select id="isin-asset-class" style="font-size:12px;width:110px">
+            <select id="isin-asset-class" class="filter-select" style="font-size:12px;width:110px">
               <option value="etf">ETF</option>
               <option value="opcvm">OPCVM</option>
               <option value="action">Action</option>

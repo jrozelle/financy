@@ -46,7 +46,7 @@ export async function loadPrets() {
   _prochaines(cal?.prochaines || [], prets);
   _annees(cal?.annees || []);
   document.getElementById('prets-liste').innerHTML = prets.length ? _liste(prets) : qui ? `
-    <p class="text-muted prets-vide">${esc(qui)} ne porte aucun crédit : aucune des entités dont il ou elle
+    <p class="text-muted prets-vide">Aucun crédit ne concerne ${esc(qui)} : aucune des entités dont ${esc(qui)}
       détient des parts n'est financée à crédit.</p>` : `
     <p class="text-muted prets-vide">Aucun prêt. Importez le tableau d'amortissement de votre banque (PDF Caisse d'Épargne
       ou Arkéa) : la dette de l'entité se projettera d'elle-même.</p>`;
@@ -68,16 +68,16 @@ function _liste(prets) {
       <div class="pret-nom">
         <i style="background:${COULEURS[i % COULEURS.length]}"></i>
         <span><b>${esc(p.libelle)}</b><small>${esc(p.preteur || '')}${p.taux ? ` · ${fmtPct(p.taux, 2)}` : ''}
-          · ${fmt(p.montant)} empruntés${p.part != null && p.part < 1
+          · ${fmt(p.montant)} empruntés${p.differe
+            ? ` · <b class="pret-differe">différé ${esc(p.differe.type)} jusqu’au ${fmtDate(p.differe.jusqu_au)}</b>` : ''}${p.part != null && p.part < 1
             ? ` · <b class="pret-part">part de ${esc(S.syntheseOwner)} : ${fmtPct(p.part * 100, 0)}</b>` : ''}</small></span>
       </div>
       <label class="pret-entite"><span class="sr-only">Entité de ${esc(p.libelle)}</span>
         <select class="filter-select" data-pret-entite="${p.id}">${options(p.entity)}</select></label>
       <div class="pret-chiffre"><small>Restant dû</small><b>${fmt(p.crd)}</b></div>
-      <div class="pret-chiffre"><small>${p.differe ? 'Échéance du mois' : 'Mensualité'}</small><b>${
+      <div class="pret-chiffre"><small>Mensualité</small><b>${
         p.differe ? fmt(p.echeance_du_mois) : (p.mensualite != null ? fmt(p.mensualite) : '—')}</b>${
-        p.differe ? `<small class="pret-differe">différé ${p.differe.type} jusqu'au ${fmtDate(p.differe.jusqu_au)}${
-          p.mensualite ? `, puis ${fmt(p.mensualite)}` : ''}</small>` : ''}</div>
+        p.differe && p.mensualite ? `<small class="pret-differe">puis ${fmt(p.mensualite)}</small>` : ''}</div>
       <div class="pret-chiffre"><small>Fin</small><b>${fmtDate(p.fin)}</b><small>${dans(p.fin)}</small></div>
       <div class="pret-chiffre"><small>Intérêts restants</small><b>${fmt(p.interets_restants)}</b></div>
       <div class="pret-avancement" aria-label="${fmtPct(part, 0)} remboursé">
@@ -156,7 +156,7 @@ function _rendreProchaines() {
 function _annees(liste) {
   const hote = document.getElementById('credits-annees');
   if (!hote) return;
-  if (!liste.length) { hote.innerHTML = ''; return; }
+  if (!liste.length) { hote.innerHTML = '<p class="text-muted">Aucun remboursement à venir.</p>'; return; }
   _lignesAnnees = liste.map(a => ({ ...a, _charges: a.interets + a.assurance }));
   hote.innerHTML = `<table class="data-table credits-table"><thead id="credits-annees-thead"><tr>
       <th data-sort="annee">Année</th><th class="num" data-sort="capital">Capital remboursé</th>
@@ -245,7 +245,7 @@ function _cabler() {
     }
     if (e.target.closest('#prets-annuler')) _fermerApercu();
     if (e.target.closest('#prets-definir')) ouvrirFormulaireCredit();
-    if (e.target.closest('#pf-annuler')) document.getElementById('prets-formulaire').hidden = true;
+    if (e.target.closest('#pf-annuler')) _fermerFormulaire();
     if (e.target.closest('#prets-enregistrer')) _enregistrer();
   });
   document.getElementById('prets-formulaire').addEventListener('submit', async e => {
@@ -261,12 +261,23 @@ function _cabler() {
         type_differe: v('pf-type-differe'), entity: v('pf-entite') || null,
       });
       toast('Crédit enregistré', 'success');
-      document.getElementById('prets-formulaire').hidden = true;
+      _fermerFormulaire();
       document.getElementById('prets-formulaire').reset();
       loadPrets();
     } catch {}
   });
+  // Echap referme le formulaire ou l'apercu ouvert, et rend le focus au
+  // bouton qui l'avait ouvert. Pas quand une modale ou une confirmation est
+  // au premier plan : Echap lui revient.
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (document.getElementById('tab-credits')?.classList.contains('hidden')) return;
+    if (document.querySelector('.confirm-overlay, .modal:not(.hidden), .isin-popover:not(.hidden)')) return;
+    if (!document.getElementById('prets-formulaire').hidden) _fermerFormulaire();
+    else if (!document.getElementById('prets-apercu').hidden) _fermerApercu();
+  });
   document.getElementById('prets-fichier').addEventListener('change', e => {
+    _ouvreur = document.querySelector('.prets-import-btn');
     const f = e.target.files?.[0];
     if (f) _apercu(f);
     e.target.value = '';
@@ -307,6 +318,7 @@ async function _apercu(fichier) {
         <button type="button" class="btn btn-secondary btn-sm" id="prets-annuler">Annuler</button>
       </div>`;
     hote.hidden = false;
+    document.getElementById('prets-libelle')?.focus();
   } catch (e) {
     toast(e.message, 'error');
   }
@@ -314,7 +326,27 @@ async function _apercu(fichier) {
 
 function _fermerApercu() {
   const hote = document.getElementById('prets-apercu');
+  const avait = !hote.hidden;
   hote.hidden = true; hote.innerHTML = ''; _fichier = null;
+  if (avait) _rendreFocus();
+}
+
+// Bouton qui a ouvert le formulaire ou l'apercu : le focus y revient a la
+// fermeture. L'etiquette d'import n'est pas focalisable (son champ fichier est
+// cache) : le bouton « Définir un crédit », voisin, la remplace.
+let _ouvreur = null;
+function _rendreFocus() {
+  const cible = _ouvreur?.isConnected && _ouvreur.matches('button, [tabindex]')
+    ? _ouvreur : document.getElementById('prets-definir');
+  _ouvreur = null;
+  cible?.focus();
+}
+
+function _fermerFormulaire() {
+  const f = document.getElementById('prets-formulaire');
+  if (f.hidden) return;
+  f.hidden = true;
+  _rendreFocus();
 }
 
 async function _enregistrer() {
@@ -336,6 +368,9 @@ export function ouvrirFormulaireCredit() {
   if (!f) return;
   document.getElementById('pf-entite').innerHTML = ['<option value="">Aucune entité</option>',
     ...(S.entities || []).map(e => `<option value="${esc(e.name)}">${esc(e.name)}</option>`)].join('');
+  // Le bouton de l'en-tete ou celui de la carte : on le retient avant de
+  // deplacer le focus dans le formulaire.
+  if (f.hidden) _ouvreur = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   f.hidden = false;
   document.getElementById('pf-libelle').focus();
 }

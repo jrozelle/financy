@@ -17,21 +17,33 @@ S.sort.actifs = S.sort.actifs || { key: 'market_value', dir: -1 };
 let _filter = { type: null, value: null }; // {type: 'asset_class'|'envelope', value: 'ETF'}
 const ACTIFS_COLUMNS_STORAGE_KEY = 'financy_columns_actifs';
 const ACTIFS_ESTABLISHMENTS_MIGRATION_KEY = 'financy_columns_actifs_establishments_v1';
+// Neuf colonnes plutot que douze : a 1300 px, le tableau debordait de sa carte
+// et « Fraîcheur » ne se voyait jamais. L'ISIN passe sous le nom, les
+// enveloppes sous l'etablissement, l'age du cours sous le cours lui-meme.
 const ACTIFS_TABLE_COLUMNS = [
-  { key: 'isin', label: 'ISIN' },
   { key: 'name', label: 'Nom' },
-  { key: 'establishments', label: 'Établissement' },
   { key: 'asset_class', label: 'Classe' },
+  { key: 'establishments', label: 'Établissement' },
   { key: 'quantity', label: 'Qté', num: true },
   { key: 'avg_cost', label: 'PRU', num: true },
   { key: 'last_price', label: 'Cours', num: true },
   { key: 'market_value', label: 'Valeur', num: true },
   { key: 'pnl', label: '+/-', num: true },
   { key: 'weight_pct', label: 'Poids', num: true },
-  { key: 'envelopes', label: 'Enveloppes' },
-  { key: 'freshness', label: 'Fraîcheur' },
 ];
 
+/** Quantite avec autant de decimales qu'elle en porte (huit au plus) : un
+ *  bitcoin detenu a 0,0625 s'affichait « 0 » a cote de 4 215 €, et 570,5 parts
+ *  d'ETF « 571 ». Moins de decimales permises a mesure que la quantite grandit :
+ *  le bruit d'un calcul flottant ne doit pas s'ecrire. */
+function fmtQteAdaptive(q) {
+  if (q == null) return '—';
+  const a = Math.abs(q);
+  const max = a >= 1000 ? 2 : a >= 1 ? 4 : 8;
+  let dec = 0;
+  while (dec < max && Math.abs(Math.round(q * 10 ** dec) / 10 ** dec - q) > 1e-9 * Math.max(1, a)) dec++;
+  return fmtQty(q, dec);
+}
 /** Plus-value d'une ligne, au format de Positions : montant signe, pourcentage
  *  dessous. Une plus-value nulle au centime pres n'est pas une performance
  *  mesuree : un fonds euros sans cours, ou un releve sans prix de revient dont
@@ -68,11 +80,11 @@ function boutonIsin(isin) {
 function ensureActifsTableScaffold() {
   const thead = document.getElementById('actifs-thead');
   if (!thead) return;
-  const current = [...thead.querySelectorAll('th')].map(th => th.dataset.sort || 'freshness').join('|');
+  const current = [...thead.querySelectorAll('th')].map(th => th.dataset.sort).join('|');
   const expected = ACTIFS_TABLE_COLUMNS.map(c => c.key).join('|');
   if (current === expected) return;
   thead.innerHTML = `<tr>${ACTIFS_TABLE_COLUMNS.map(col => `
-    <th${col.key !== 'freshness' ? ` data-sort="${col.key}"` : ''}${col.num ? ' class="num"' : ''}>${esc(col.label)}</th>
+    <th data-sort="${col.key}"${col.num ? ' class="num"' : ''}>${esc(col.label)}</th>
   `).join('')}</tr>`;
 }
 
@@ -170,19 +182,19 @@ function _renderTable(lines) {
   const sorted = sortArr([...filtered], S.sort.actifs.key, S.sort.actifs.dir);
   tbody.innerHTML = sorted.map(l => {
     const fresh = _freshnessBadge(l);
+    const envs = (l.envelopes || []).join(', ');
     return `<tr>
-      <td>${boutonIsin(l.isin)}</td>
-      <td class="act-nom">${esc(l.name || '—')}</td>
-      <td>${esc((l.establishments || []).join(', ') || '—')}</td>
+      <td class="act-nom"><span class="act-nom-lib">${esc(l.name || '—')}</span>
+        <span class="act-sous">${boutonIsin(l.isin)}</span></td>
       <td>${esc(l.asset_class || '—')}</td>
-      <td class="num">${fmtQty(l.quantity)}</td>
-      <td class="num">${l.avg_cost != null ? fmt(l.avg_cost) : '—'}</td>
-      <td class="num">${celluleCours(l)}</td>
+      <td class="act-etab">${esc((l.establishments || []).join(', ') || '—')}${
+        envs ? `<span class="act-sous">${esc(envs)}</span>` : ''}</td>
+      <td class="num">${fmtQteAdaptive(l.quantity)}</td>
+      <td class="num">${l.avg_cost != null ? fmt(l.avg_cost, 2) : '—'}</td>
+      <td class="num act-cours">${celluleCours(l)}<span class="act-fraicheur">${fresh}</span></td>
       <td class="num">${fmt(l.market_value)}</td>
       <td class="num">${cellulePnl(l)}</td>
       <td class="num">${fmtPct(l.weight_pct)}</td>
-      <td>${esc((l.envelopes || []).join(', ') || '—')}</td>
-      <td>${fresh}</td>
     </tr>`;
   }).join('');
   if (cards) {
@@ -196,8 +208,8 @@ function _renderTable(lines) {
         </div>
         <dl class="actif-card-metrics">
           <div><dt>Valeur</dt><dd>${fmt(l.market_value)}</dd></div>
-          <div><dt>PRU</dt><dd>${l.avg_cost != null ? fmt(l.avg_cost) : '—'}</dd></div>
-          <div><dt>Qté</dt><dd>${fmtQty(l.quantity)}</dd></div>
+          <div><dt>PRU</dt><dd>${l.avg_cost != null ? fmt(l.avg_cost, 2) : '—'}</dd></div>
+          <div><dt>Qté</dt><dd>${fmtQteAdaptive(l.quantity)}</dd></div>
           <div><dt>+/-</dt><dd>${cellulePnl(l)}</dd></div>
           <div><dt>Poids</dt><dd>${fmtPct(l.weight_pct)}</dd></div>
           <div><dt>Cours</dt><dd>${celluleCours(l)}</dd></div>

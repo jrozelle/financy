@@ -3776,7 +3776,12 @@ td.arbo-part > * { vertical-align: middle; }
 [role="region"][tabindex="0"]:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 6px; }
 
 /* Actifs : le nom cede la place aux chiffres. Complet dans la fenetre du titre. */
-#actifs-tbody td.act-nom { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#actifs-tbody td.act-nom { max-width: 240px; min-width: 150px; white-space: normal; overflow: visible; }
+#actifs-tbody td.act-etab { max-width: 170px; white-space: normal; }
+.act-nom-lib { display: block; overflow-wrap: anywhere; }
+.act-sous { display: block; font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.act-fraicheur { display: block; margin-top: 2px; }
+.act-fraicheur .h-badge-date { display: inline; margin-left: 4px; }
 
 
 /* ── Evolution par categorie : une ligne par groupe ────────────────────── */
@@ -3999,3 +4004,17 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .tab-erreur h2 { margin-bottom: .5rem; }
 .tab-erreur p { margin-bottom: 1rem; font-size: 13.5px; }
 .ent-part { font-size: .72rem; color: var(--text-muted); font-weight: 400; margin-top: 2px; white-space: nowrap; }
+@media (min-width: 641px) {
+  #flux-tbody td.fx-notes { white-space: normal; max-width: 220px; min-width: 110px; overflow-wrap: anywhere; }
+}
+#flux-tbody td.fx-actions { white-space: nowrap; text-align: right; }
+.fx-btn { display: inline-flex; align-items: center; gap: 4px; padding: .2rem .35rem; font-size: 12px; }
+.fx-marque { font-size: 10px; vertical-align: 1px; }
+.flux-plus { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1rem;
+  padding: .75rem 1rem; font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--border); }
+.flux-plus[hidden] { display: none; }
+.perf-excl-panel { flex-basis: 100%; padding: .4rem 0 .6rem; }
+.perf-excl-panel .perf-excluded:first-child { margin-top: 0; border-top: 0; }
+.perf-excluded-row .perf-sub { display: block; font-size: .72rem; color: var(--text-muted); }
+.arbo-pv-na { color: var(--text-muted); }
+.arbo-pv-note { display: block; font-size: 10.5px; color: var(--text-muted); white-space: nowrap; }

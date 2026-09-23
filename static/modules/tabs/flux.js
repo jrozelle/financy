@@ -4,6 +4,7 @@ import { fmt, fmtDate, esc, sortArr, updateSortIndicators, today, parseLocaleNum
 import { api } from '../api.js';
 import { confirmDialog, toast, closeModal } from '../dialogs.js';
 import { saveFilters, loadFilters, clearFilterKey } from '../filter-persist.js';
+import { choisirTitulaire } from './positions.js';
 
 export async function loadFlux() {
   S.flux = await api('GET', '/api/flux');
@@ -86,26 +87,71 @@ function filteredFlux() {
   );
 }
 
+// Le journal s'affiche par pages de cent : sur mobile, trois cents fiches
+// faisaient une page de 20 000 px. Filtres, tri et totaux portent toujours sur
+// l'ensemble ; seul l'affichage est limite, et le decompte le dit.
+const PAGE = 100;
+let _limite = PAGE;
+let _signature = '';
+
+/** Marqueurs fonctionnels des notes, affiches en badges. La note elle-meme
+ *  n'est pas modifiee : « [provisoire] » est lu par l'import des releves
+ *  (PROVISIONAL, routes/movements_import.py) pour redater le flux. */
+const MARQUES = {
+  import:     ['importé', 'badge-blk'],
+  provisoire: ['provisoire', 'badge-j830'],
+};
+function notesFlux(notes) {
+  if (!notes) return '—';
+  const badges = [];
+  const texte = notes.replace(/\[(import|provisoire)\]/gi, (_, m) => {
+    const [lib, cls] = MARQUES[m.toLowerCase()];
+    badges.push(`<span class="badge ${cls} fx-marque">${lib}</span>`);
+    return ' ';
+  }).replace(/\s+/g, ' ').trim();
+  return badges.join(' ') + (texte ? `${badges.length ? ' ' : ''}${esc(texte)}` : '') || '—';
+}
+
+const ICONE_EDITER = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+const ICONE_SUPPR = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>';
+
 export function renderFlux() {
   const tbody  = document.getElementById('flux-tbody');
   const tfoot  = document.getElementById('flux-tfoot');
-  const flux = sortArr(filteredFlux(), S.sort.flux.key, S.sort.flux.dir);
+  // Une colonne vide sur toutes les lignes n'apprend rien : la categorie ne
+  // s'affiche, avec son filtre, que si un flux au moins en porte une.
+  const avecCat = S.flux.some(f => f.category);
+  const thCat = document.querySelector('#flux-thead th[data-sort="category"]');
+  if (thCat) thCat.hidden = !avecCat;
+  const filtreCat = document.getElementById('flux-filter-category');
+  if (filtreCat) {
+    filtreCat.hidden = !avecCat;
+    if (!avecCat) filtreCat.value = '';
+  }
+  const nbCol = avecCat ? 9 : 8;
+  const tous = sortArr(filteredFlux(), S.sort.flux.key, S.sort.flux.dir);
   updateSortIndicators('flux-thead', 'flux');
+  const signature = JSON.stringify(['owner', 'type', 'category', 'year']
+    .map(k => document.getElementById(`flux-filter-${k}`)?.value || '').concat([S.sort.flux.key, S.sort.flux.dir]));
+  if (signature !== _signature) { _signature = signature; _limite = PAGE; }
+  const flux = tous.slice(0, _limite);
+  const plus = document.getElementById('flux-plus');
 
   // L'explication du badge « a preciser » vivait dans une infobulle, ligne a
   // ligne. Elle se lit une fois, au-dessus du tableau, avec le decompte.
   // Recalculee aussi quand le filtre ne laisse rien : sinon elle decomptait
   // encore les flux de la vue precedente.
   const note = document.getElementById('flux-note-etab');
-  if (!flux.length) {
+  if (!tous.length) {
     // Un filtre qui masque tout n'est pas un journal vide : le dire autrement.
     const msg = S.flux.length ? 'Aucun flux pour ce filtre.' : 'Aucun flux enregistré.';
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="9">${msg}</td></tr>`;
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="${nbCol}">${msg}</td></tr>`;
     if (tfoot) tfoot.innerHTML = '';
     if (note) { note.hidden = true; note.textContent = ''; }
+    if (plus) { plus.hidden = true; plus.innerHTML = ''; }
     return;
   }
-  const sansEtab = flux.filter(f => !f.establishment).length;
+  const sansEtab = tous.filter(f => !f.establishment).length;
   if (note) {
     note.hidden = !sansEtab;
     note.textContent = sansEtab
@@ -118,44 +164,59 @@ export function renderFlux() {
       <td class="fx-qui">${esc(f.owner)}</td>
       <td class="fx-env">${esc(f.envelope || '—')}</td>
       <td class="fx-etab">${f.establishment ? esc(f.establishment) : '<span class="badge badge-blk">à préciser</span>'}</td>
-      <td class="fx-cat">${esc(f.category || '—')}</td>
+      ${avecCat ? `<td class="fx-cat">${esc(f.category || '—')}</td>` : ''}
       <td class="fx-type">${esc(f.type || '—')}</td>
       <td class="num fx-montant ${signed(f) >= 0 ? 'pos' : 'neg'}">${eurSigned(signed(f))}</td>
       <td class="fx-contexte">${esc([f.owner, f.envelope, f.establishment, f.type].filter(Boolean).join(' · '))}${
         f.establishment ? '' : ' <span class="badge badge-blk">à préciser</span>'}</td>
-      <td class="fx-notes">${esc(f.notes || '—')}</td>
-      <td class="fx-actions" style="white-space:nowrap">
-        <button class="btn-icon edit" data-id="${f.id}" data-action="edit-flux">Éditer</button>
-        <button class="btn-icon del"  data-id="${f.id}" data-action="del-flux">Supprimer</button>
+      <td class="fx-notes">${notesFlux(f.notes)}</td>
+      <td class="fx-actions">
+        <button type="button" class="btn-icon edit fx-btn" data-id="${f.id}" data-action="edit-flux">${ICONE_EDITER}Éditer</button>
+        <button type="button" class="btn-icon del fx-btn" data-id="${f.id}" data-action="del-flux">${ICONE_SUPPR}Supprimer</button>
       </td>
     </tr>`).join('');
 
-  const total = flux.reduce((s, f) => s + signed(f), 0);
+  if (plus) {
+    const reste = tous.length - flux.length;
+    // Rien a dire tant qu'une page suffit.
+    plus.hidden = tous.length <= PAGE;
+    plus.innerHTML = plus.hidden ? '' : `<span>${flux.length} flux affichés sur ${tous.length}${
+      reste > 0 ? ` ; les totaux portent sur les ${tous.length}` : ''}.</span>${reste > 0
+      ? `<button type="button" class="btn btn-secondary btn-sm" id="flux-plus-btn">Afficher les ${Math.min(PAGE, reste)} suivants</button>` : ''}`;
+  }
+
+  // Les totaux portent sur tous les flux du filtre, pas sur la seule page.
+  const total = tous.reduce((s, f) => s + signed(f), 0);
   const byType  = {};
   const byOwner = {};
-  for (const f of flux) {
+  for (const f of tous) {
     const t = f.type || 'Autre';
     byType[t]   = (byType[t]   || 0) + signed(f);
     byOwner[f.owner] = (byOwner[f.owner] || 0) + signed(f);
   }
   const ownersActive = Object.keys(byOwner);
+  const avant = avecCat ? 6 : 5;
+  // En 11 px gras, l'espace fine des milliers ne se voyait plus : « +538798 € ».
+  // Le pied de tableau prend une espace insecable ordinaire.
+  const pied = v => eurSigned(v).replace(/\u202f/g, '\u00a0');
+  const stylePied = 'font-size:11px;color:var(--text-muted);white-space:normal;max-width:none';
   if (tfoot) {
     tfoot.innerHTML = `
       <tr>
-        <td colspan="6" style="font-size:11px;color:var(--text-muted)">
+        <td colspan="${avant}" style="${stylePied}">
           ${Object.entries(byType).map(([t, v]) =>
-            `${esc(t)} : <strong class="${v >= 0 ? 'pos' : 'neg'}">${eurSigned(v)}</strong>`
+            `${esc(t)} : <strong class="${v >= 0 ? 'pos' : 'neg'}">${pied(v)}</strong>`
           ).join(' &nbsp;·&nbsp; ')}
-          &nbsp;·&nbsp; solde net des flux affichés : versements et coupons, moins retraits et frais
+          &nbsp;·&nbsp; solde net des ${tous.length} flux du filtre : versements et coupons, moins retraits et frais
         </td>
         <td class="num ${total >= 0 ? 'pos' : 'neg'}" style="font-weight:700">${
           eurSigned(total)}</td>
         <td colspan="2"></td>
       </tr>
       ${ownersActive.length > 1 ? `<tr>
-        <td colspan="6" style="font-size:11px;color:var(--text-muted)">
+        <td colspan="${avant}" style="${stylePied}">
           ${ownersActive.map(o =>
-            `${esc(o)} : <strong class="${byOwner[o] >= 0 ? 'pos' : 'neg'}">${eurSigned(byOwner[o])}</strong>`
+            `${esc(o)} : <strong class="${byOwner[o] >= 0 ? 'pos' : 'neg'}">${pied(byOwner[o])}</strong>`
           ).join(' &nbsp;·&nbsp; ')}
         </td>
         <td colspan="3"></td>
@@ -163,6 +224,19 @@ export function renderFlux() {
   }
 
   tbody.addEventListener('click', onFluxTableClick);
+  plus?.addEventListener('click', onFluxPlus);
+}
+
+/** Page suivante. Le focus va a la premiere ligne ajoutee : le bouton, lui,
+ *  disparait une fois tout affiche. */
+function onFluxPlus(e) {
+  if (!e.target.closest('#flux-plus-btn')) return;
+  const deja = _limite;
+  _limite += PAGE;
+  renderFlux();
+  const ligne = document.querySelectorAll('#flux-tbody tr.fx-ligne')[deja];
+  const cible = document.getElementById('flux-plus-btn') || ligne?.querySelector('button');
+  cible?.focus();
 }
 
 function onFluxTableClick(e) {
@@ -191,7 +265,7 @@ export function openFluxModal(id = null) {
     document.getElementById('flux-notes').value    = f.notes || '';
   } else {
     document.getElementById('flux-date').value     = today();
-    document.getElementById('flux-owner').value    = S.config.owners[0];
+    choisirTitulaire('flux-owner');
     document.getElementById('flux-envelope').value = '';
     document.getElementById('flux-establishment').value = '';
     document.getElementById('flux-category').value = '';
