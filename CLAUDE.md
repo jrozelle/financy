@@ -135,11 +135,12 @@
   l'utilisateur pour le passage aux centimes : `_reconstruire_en_centimes`
   (`models.py`), qui copie, verifie ligne a ligne et n'efface l'ancienne table
   qu'une fois la copie prouvee, le tout annule au moindre ecart.
-- **Montants en centimes entiers** dans les tables converties (liste :
-  `services/montants.py`, `COLONNES`), tables `STRICT`. Le reste du code parle
+- **Montants en centimes entiers** : tout montant en euros stocke en base
+  (liste : `services/montants.py`, `COLONNES` ; migrations 21 a 26), tables
+  `STRICT`. Une nouvelle colonne de montant s'y ajoute, en `INTEGER`. Le reste du code parle
   en euros ; on convertit a la lecture et a l'ecriture (`centimes()`,
   `euros()`, `ligne_en_euros()`), jamais ailleurs. Cours unitaires, quantites,
-  taux et parts restent en `REAL`. Un test qui ecrit en SQL brut ecrit des
+  taux, parts et cout en dollars des appels au modele restent en `REAL`. Un test qui ecrit en SQL brut ecrit des
   centimes : un entier en euros passerait sans erreur, cent fois trop petit.
   Controle d'une migration : rejouer toutes les routes GET sur une copie de la
   base de prod, avant et apres, et comparer au centime.

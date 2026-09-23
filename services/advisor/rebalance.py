@@ -20,6 +20,7 @@ from typing import List, Dict, Optional
 
 from models import _holding_value_or_none
 from services.advisor.allocation import CLASSE_DE
+from services.montants import centimes, lignes_en_euros
 
 logger = logging.getLogger('financy.advisor.rebalance')
 
@@ -254,7 +255,7 @@ def replace_proposals(conn, owner, snapshot_date, proposals):
                (owner, snapshot_date, kind, label, from_ref, to_ref, amount, rationale, status)
                VALUES (?,?,?,?,?,?,?,?,?)''',
             (owner, snapshot_date, p['kind'], p['label'], p['from_ref'],
-             p['to_ref'], p['amount'], p['rationale'], p['status'])
+             p['to_ref'], centimes(p['amount']), p['rationale'], p['status'])
         )
         inserted.append(cur.lastrowid)
     return inserted
@@ -274,7 +275,7 @@ def list_proposals(conn, owner, status=None):
                ORDER BY snapshot_date DESC, status='pending' DESC, id''',
             (owner,)
         ).fetchall()
-    return [dict(r) for r in rows]
+    return lignes_en_euros('rebalance_proposals', rows)
 
 
 def update_status(conn, proposal_id, status):

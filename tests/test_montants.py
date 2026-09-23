@@ -149,3 +149,15 @@ class TestLignesDeTitres:
         assert tuple(c.execute('SELECT quantity, cost_basis, market_value FROM holdings').fetchone()) \
             == (2975.5, 1785723, 2118200)
         assert tuple(c.execute('SELECT price, market_value FROM holdings_snapshots').fetchone()) == (7.1188, 2118200)
+
+
+def test_conseil_converti():
+    c = _base_v20()
+    for v in range(21, 26):
+        getattr(models, f'_migration_{v:03d}')(c)
+    c.execute("INSERT INTO owner_profiles (owner, reserve_eur) VALUES ('Paul', 15000.5)")
+    c.execute("INSERT INTO rebalance_proposals (owner, snapshot_date, kind, label, amount) "
+              "VALUES ('Paul', '2026-09-01', 'bucket', 'x', 1234.567)")
+    models._migration_026(c)
+    assert c.execute('SELECT reserve_eur FROM owner_profiles').fetchone()[0] == 1500050
+    assert c.execute('SELECT amount FROM rebalance_proposals').fetchone()[0] == 123457

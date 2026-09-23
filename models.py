@@ -1099,6 +1099,50 @@ def _migration_025(conn):
         ) STRICT""", ('cost_basis', 'market_value'))
 
 
+def _migration_026(conn):
+    """Conseil en centimes entiers (tables STRICT) : montant vise d'un
+    objectif, reserve de precaution d'un profil, montant d'une proposition
+    d'arbitrage. Derniere etape : tous les montants en euros sont en centimes."""
+    _reconstruire_en_centimes(conn, 'owner_objectives', """
+        CREATE TABLE {t} (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner          TEXT NOT NULL,
+            label          TEXT NOT NULL,
+            target_amount  INTEGER,                -- centimes
+            horizon_years  INTEGER,
+            priority       INTEGER DEFAULT 3,      -- 1 (faible) a 5 (critique)
+            created_at     TEXT DEFAULT CURRENT_TIMESTAMP
+        ) STRICT""", ('target_amount',))
+    _reconstruire_en_centimes(conn, 'owner_profiles', """
+        CREATE TABLE {t} (
+            owner                TEXT PRIMARY KEY,
+            horizon_years        INTEGER,
+            risk_tolerance       INTEGER,
+            employment_type      TEXT,
+            has_lbo              INTEGER DEFAULT 0,
+            children_count       INTEGER DEFAULT 0,
+            main_residence_owned INTEGER DEFAULT 0,
+            pension_age          INTEGER,
+            notes                TEXT,
+            updated_at           TEXT DEFAULT CURRENT_TIMESTAMP,
+            reserve_eur          INTEGER             -- centimes
+        ) STRICT""", ('reserve_eur',))
+    _reconstruire_en_centimes(conn, 'rebalance_proposals', """
+        CREATE TABLE {t} (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner          TEXT NOT NULL,
+            snapshot_date  TEXT NOT NULL,
+            kind           TEXT NOT NULL,
+            label          TEXT NOT NULL,
+            from_ref       TEXT,
+            to_ref         TEXT,
+            amount         INTEGER,                -- centimes
+            rationale      TEXT,
+            status         TEXT DEFAULT 'pending',
+            created_at     TEXT DEFAULT CURRENT_TIMESTAMP
+        ) STRICT""", ('amount',))
+
+
 MIGRATIONS = [
     (1, _migration_001),
     (2, _migration_002),
@@ -1125,6 +1169,7 @@ MIGRATIONS = [
     (23, _migration_023),
     (24, _migration_024),
     (25, _migration_025),
+    (26, _migration_026),
 ]
 
 

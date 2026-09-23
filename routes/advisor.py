@@ -10,7 +10,7 @@ from services.advisor import macro as macro_svc
 from services.advisor import rebalance as rebalance_svc
 from services.advisor import llm as llm_svc
 from auth import login_required, csrf_protect
-from services.montants import euros, lignes_en_euros
+from services.montants import centimes, euros, ligne_en_euros, lignes_en_euros
 
 logger = logging.getLogger('financy')
 advisor_bp = Blueprint('advisor', __name__)
@@ -27,7 +27,7 @@ def _get_profile_row(conn, owner):
     row = conn.execute(
         'SELECT * FROM owner_profiles WHERE owner=?', (owner,)
     ).fetchone()
-    return dict(row) if row else None
+    return ligne_en_euros('owner_profiles', row) if row else None
 
 
 def _normalize_profile_dict(d):
@@ -48,7 +48,7 @@ def _normalize_profile_dict(d):
 def list_profiles():
     with get_db() as conn:
         rows = conn.execute('SELECT * FROM owner_profiles ORDER BY owner').fetchall()
-    return jsonify([_normalize_profile_dict(dict(r)) for r in rows])
+    return jsonify([_normalize_profile_dict(ligne_en_euros('owner_profiles', r)) for r in rows])
 
 
 @advisor_bp.route('/api/advisor/profiles/<owner>', methods=['GET'])
@@ -110,7 +110,7 @@ def upsert_profile(owner):
     elif not validate_number(reserve) or parse_number(reserve) < 0:
         return jsonify({'error': 'Réserve invalide (montant positif en euros)'}), 400
     else:
-        reserve = parse_number(reserve)
+        reserve = centimes(parse_number(reserve))
 
     with get_db() as conn:
         conn.execute(
@@ -165,7 +165,7 @@ def list_objectives(owner):
             'SELECT * FROM owner_objectives WHERE owner=? ORDER BY priority DESC, id',
             (owner,)
         ).fetchall()
-    return jsonify([dict(r) for r in rows])
+    return jsonify(lignes_en_euros('owner_objectives', rows))
 
 
 def _validate_objective(d):
@@ -201,12 +201,12 @@ def add_objective(owner):
             '''INSERT INTO owner_objectives (owner, label, target_amount, horizon_years, priority)
                VALUES (?,?,?,?,?)''',
             (owner, d['label'].strip(),
-             parse_number(d['target_amount']) if d.get('target_amount') is not None else None,
+             centimes(parse_number(d['target_amount'])) if d.get('target_amount') is not None else None,
              int(parse_number(d['horizon_years'])) if d.get('horizon_years') is not None else None,
              int(d.get('priority')) if d.get('priority') is not None else 3)
         )
         row = conn.execute('SELECT * FROM owner_objectives WHERE id=?', (cur.lastrowid,)).fetchone()
-    return jsonify(dict(row)), 201
+    return jsonify(ligne_en_euros('owner_objectives', row)), 201
 
 
 @advisor_bp.route('/api/advisor/objectives/<int:oid>', methods=['PATCH'])
@@ -224,11 +224,11 @@ def update_objective(oid):
             return jsonify({'error': 'Objectif introuvable'}), 404
         # Une mise a jour partielle se valide sur l'objectif qu'elle produit :
         # l'erreur etait calculee puis ignoree (priorite 9 acceptee).
-        err = _validate_objective({**dict(row), **d})
+        err = _validate_objective({**ligne_en_euros('owner_objectives', row), **d})
         if err:
             return jsonify({'error': err}), 400
         fields, params = [], []
-        for key, cast in (('label', str), ('target_amount', parse_number),
+        for key, cast in (('label', str), ('target_amount', lambda v: centimes(parse_number(v))),
                           ('horizon_years', int), ('priority', int)):
             if key in d:
                 val = d[key]
@@ -243,7 +243,7 @@ def update_objective(oid):
         params.append(oid)
         conn.execute(f'UPDATE owner_objectives SET {", ".join(fields)} WHERE id=?', params)
         row = conn.execute('SELECT * FROM owner_objectives WHERE id=?', (oid,)).fetchone()
-    return jsonify(dict(row))
+    return jsonify(ligne_en_euros('owner_objectives', row))
 
 
 @advisor_bp.route('/api/advisor/objectives/<int:oid>', methods=['DELETE'])
@@ -472,7 +472,7 @@ def patch_proposal(pid):
             ).fetchone()
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
-    return jsonify(dict(row))
+    return jsonify(ligne_en_euros('rebalance_proposals', row))
 
 
 # ─── Consommation LLM (phase 7) ──────────────────────────────────────────────

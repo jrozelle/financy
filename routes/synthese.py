@@ -5,7 +5,7 @@ from models import (get_db, compute_position, get_entity_map, get_holdings_map,
                     load_referential, freeze_holdings_prices, validate_date, validate_string,
                     parse_number)
 from auth import login_required, csrf_protect
-from services.montants import lignes_en_euros
+from services.montants import ligne_en_euros, lignes_en_euros
 
 synthese_bp = Blueprint('synthese', __name__)
 MAX_NOTE_LENGTH = 2000
@@ -777,7 +777,7 @@ def projection_epargne():
         excedents = []
         matrix, entites = load_matrix(conn), _entites(conn)
         for prof in conn.execute('SELECT * FROM owner_profiles').fetchall():
-            profil = _normalize_profile_dict(dict(prof))
+            profil = _normalize_profile_dict(ligne_en_euros('owner_profiles', prof))
             positions, date = _build_positions_for_owner(conn, profil['owner'], None)
             if not date:
                 continue

@@ -28,6 +28,9 @@ COLONNES = {
     'entity_snapshots':       ('gross_assets', 'debt', 'tresorerie'),
     'holdings':               ('cost_basis', 'market_value'),
     'holdings_snapshots':     ('cost_basis', 'market_value'),
+    'owner_objectives':       ('target_amount',),
+    'owner_profiles':         ('reserve_eur',),
+    'rebalance_proposals':    ('amount',),
 }
 
 
