@@ -12,7 +12,8 @@ export default defineConfig({
     target: 'es2022',
     lib: {
       entry: { credits: 'src/credits/main.ts', positions: 'src/positions/main.svelte.ts',
-               synthese: 'src/synthese/main.svelte.ts', flux: 'src/flux/main.svelte.ts' },
+               synthese: 'src/synthese/main.svelte.ts', flux: 'src/flux/main.svelte.ts',
+               entites: 'src/entites/main.svelte.ts' },
       formats: ['es'],
       fileName: (_format, nom) => `${nom}.js`,
     },

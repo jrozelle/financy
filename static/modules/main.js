@@ -798,7 +798,6 @@ function wireEvents() {
   document.getElementById('btn-backup')?.addEventListener('click', createBackup);
 
   // Tri des tableaux
-  wireSortableTable('entities-thead',  'entities',  renderEntities);
 
   // Référentiel
   document.getElementById('btn-save-referential')?.addEventListener('click', saveReferential);

@@ -1,11 +1,12 @@
 import { S } from '../state.js';
-import { fmt, fmtDate, esc, sortArr, updateSortIndicators, getColors, gridColor, destroyChart, parseLocaleNumber, fmtAxis,
+import { fmt, fmtDate, esc, getColors, gridColor, destroyChart, parseLocaleNumber, fmtAxis,
          tsJour, echelleTemps, titreDate } from '../utils.js';
 import { api, refreshEntitySelect } from '../api.js';
 import { confirmDialog, toast, closeModal } from '../dialogs.js';
 import { switchTab } from '../main.js';
 import { openPosModal } from './positions.js';
 import { montantPanneau } from '../drilldown.js';
+import { isMasked } from '../mask.js';
 
 let _entityTimelineChart = null;
 
@@ -20,91 +21,22 @@ export async function loadEntities() {
   refreshEntitySelect();
 }
 
-function snapshotsByEntity() {
-  const map = {};
-  for (const s of (S.entitySnapshots || [])) {
-    if (!map[s.entity_name]) map[s.entity_name] = [];
-    map[s.entity_name].push(s);
-  }
-  return map;
-}
-
-export function renderEntities() {
-  const tbody = document.getElementById('entities-tbody');
+// Le tableau est un ecran Svelte (frontend/src/entites/, compile dans
+// /dist/entites.js) ; ce module charge les donnees et garde la fiche d'une
+// entite et le panneau de son historique.
+export async function renderEntities() {
   // Ouverte d'office tant qu'il n'y a rien : c'est alors qu'on en a besoin.
   const aide = document.getElementById('ent-aide');
   if (aide && !S.entities.length) aide.open = true;
-  if (!tbody._cable) { tbody.addEventListener('click', onEntTableClick); tbody._cable = true; }
-  if (!S.entities.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Aucune entité. Ajoutez une SCI ou une indivision.</td></tr>';
-    return;
-  }
-  const snapMap = snapshotsByEntity();
-  updateSortIndicators('entities-thead', 'entities');
-  // Vue d'un titulaire : ses seules entites, et sa part sous chaque montant —
-  // brut a sa part de propriete, dette a sa part de dette (66 / 34 sur une
-  // residence detenue a moitie). L'entite reste montree entiere : c'est la
-  // page des entites, et la part se lit contre le tout.
-  const qui = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : null;
-  const visibles = qui ? S.entities.filter(e => (S.entityPositions || []).some(p => p.entity === e.name && p.owner === qui))
-                       : S.entities;
-  if (qui && !visibles.length) {
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">${esc(qui)} ne détient de parts dans aucune entité.</td></tr>`;
-    return;
-  }
-  tbody.innerHTML = sortArr(visibles, S.sort.entities.key, S.sort.entities.dir).map(e => {
-    const linked   = (S.entityPositions || []).filter(p => p.entity === e.name);
-    const siennes  = qui ? linked.filter(p => p.owner === qui) : [];
-    const pPart = siennes.reduce((t, p) => t + (p.ownership_pct || 0), 0);
-    const dPart = siennes.reduce((t, p) => t + (p.debt_pct ?? p.ownership_pct ?? 0), 0);
-    const part = (v, k) => qui ? `<div class="ent-part">part de ${esc(qui)} : ${fmt(v * k)} · ${Math.round(k * 100)} %</div>` : '';
-    const totalPct = linked.reduce((s, p) => s + (p.ownership_pct || 0), 0);
-    const owners   = linked.map(p =>
-      `<span class="badge badge-j27">${esc(p.owner)} ${Math.round((p.ownership_pct||0)*100)} %</span>`
-    ).join('');
-    // Moins de 100 % dans le foyer n'est pas une erreur : un bien indivis avec
-    // un frere, une SCI avec un associe. Plus de 100 %, si.
-    let repartition = '';
-    if (linked.length && totalPct > 1.01) {
-      repartition = `<div class="ent-alerte">Total ${Math.round(totalPct*100)} % : les parts dépassent l'entité</div>`;
-    } else if (linked.length && totalPct < 0.99) {
-      repartition = `<div class="ent-note">${Math.round((1 - totalPct)*100)} % hors foyer</div>`;
-    }
-    const noLink = linked.length === 0 ? '<span class="ent-note">Aucune position liée</span>' : '';
-    const nature = [e.type, e.valuation_mode && e.valuation_mode.toLowerCase()].filter(Boolean).join(' · ');
-    const snaps = snapMap[e.name] || [];
-    const lastSnap = snaps[0];
-    const snapCell = snaps.length
-      ? `<button class="btn-icon ent-histo" data-id="${e.id}" data-name="${esc(e.name)}" data-action="snap-hist">${snaps.length} valeur${snaps.length > 1 ? 's' : ''}<span>${fmtDate(lastSnap.date)}</span></button>`
-      : '<span class="ent-note">—</span>';
-    return `<tr>
-      <td class="ent-nom"><strong>${esc(e.name)}</strong>${nature ? `<div class="ent-note">${esc(nature)}</div>` : ''}${e.comment ? `<div class="ent-note">${esc(e.comment)}</div>` : ''}</td>
-      <td class="num ent-valeur" data-lib="Valeur">${fmt(e.gross_assets)}${part(e.gross_assets, pPart)}</td>
-      <td class="num ent-dette ${e.debt > 0 ? 'neg' : ''}" data-lib="Dette">${e.debt > 0 ? fmt(e.debt) : '—'}${e.debt > 0 ? part(e.debt, dPart) : ''}</td>
-      <td class="num ent-net ${e.net_assets < 0 ? 'neg' : 'pos'}">${fmt(e.net_assets)}${qui
-        ? `<div class="ent-part">part de ${esc(qui)} : ${fmt(e.gross_assets * pPart - (e.debt || 0) * dPart)}</div>` : ''}</td>
-      <td class="ent-detenteurs">${owners}${noLink}${repartition}</td>
-      <td class="ent-c-histo">${snapCell}</td>
-      <td class="ent-actions">
-        <button class="btn-icon add" data-action="add-pos-entity" data-name="${esc(e.name)}">+ Position</button>
-        <button class="btn-icon edit" data-id="${e.id}" data-action="edit-ent">Éditer</button>
-        <button class="btn-icon del"  data-id="${e.id}" data-action="del-ent" aria-label="Supprimer ${esc(e.name)}">Supprimer</button>
-      </td>
-    </tr>`;
-  }).join('');
-}
-
-function onEntTableClick(e) {
-  const btn = e.target.closest('[data-action]');
-  if (!btn) return;
-  const id = parseInt(btn.dataset.id);
-  if (btn.dataset.action === 'edit-ent')  openEntityModal(id);
-  if (btn.dataset.action === 'del-ent')   deleteEntity(id);
-  if (btn.dataset.action === 'snap-hist') showEntitySnapshots(btn.dataset.name);
-  if (btn.dataset.action === 'add-pos-entity') {
-    const entityName = btn.dataset.name;
-    switchTab('positions').then(() => openPosModal(null, { entity: entityName }));
-  }
+  const cible = document.getElementById('entites-app');
+  if (!cible) return;
+  const { afficher } = await import('/dist/entites.js');
+  afficher(cible, {
+    entites: S.entities || [], arretes: S.entitySnapshots || [], positions: S.entityPositions || [],
+    owner: S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : null, masque: isMasked(),
+    onEditer: openEntityModal, onSupprimer: deleteEntity, onHistorique: showEntitySnapshots,
+    onAjouterPosition: nom => switchTab('positions').then(() => openPosModal(null, { entity: nom })),
+  });
 }
 
 function showEntitySnapshots(entityName) {

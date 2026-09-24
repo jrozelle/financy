@@ -178,25 +178,8 @@
     </div>
 
     <div id="tab-entites" class="tab-content hidden">
-      <div class="page-header">
-        <h1>Entités (SCI / Indivision)</h1>
-      </div>
-      <div class="card card-table">
-        <table class="data-table">
-          <thead id="entities-thead">
-            <tr>
-              <th data-sort="name">Entité</th>
-              <th class="num" data-sort="gross_assets">Valeur</th>
-              <th class="num" data-sort="debt">Dette</th>
-              <th class="num" data-sort="net_assets">Net</th>
-              <th>Détenteurs</th>
-              <th>Historique</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="entities-tbody"></tbody>
-        </table>
-      </div>
+      <!-- Ecran Svelte (frontend/src/entites/), monte a la premiere visite. -->
+      <div id="entites-app"><div class="page-header"><h1>Entités (SCI / Indivision)</h1></div></div>
       <div class="card" id="tresorerie-carte">
         <div class="card-head">
           <div>
