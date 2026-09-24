@@ -2,7 +2,7 @@
 export interface Mois { mois: string; revenu: number; revenu_exceptionnel: number; echeance: number; frais: number;
                         apport: number; interne: number; autre: number }
 export interface Operation { id: number; date: string; libelle: string; nature: string; montant: number;
-                             banque: string | null; source: string }
+                             banque: string | null; compte?: string | null; source: string | null }
 export interface Part { nom: string; parts: number | null; montant_souscrit: number | null; prix_souscription: number | null;
                         prix_retrait: number | null; prix_retrait_retenu?: number | null; retrait_estime?: boolean;
                         valeur_retrait?: number | null; date_prix: string | null }

@@ -24,7 +24,7 @@ _TABLES_ENTITE = (
 # tant qu'il en reste, en disant lesquelles.
 _DEPENDANCES = (
     ('prets', 'prêt(s) — rattachez-les à une autre entité ou supprimez-les'),
-    ('entite_operations', 'opération(s) bancaire(s) importée(s)'),
+    ('entite_operations', 'opération(s) bancaire(s) importée(s) — supprimez ses relevés dans « Trésorerie et levier »'),
     ('entite_parts', 'ligne(s) de parts détenues'),
     ('entite_exercices', 'exercice(s) clos'),
 )

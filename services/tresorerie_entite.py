@@ -107,6 +107,25 @@ def enregistrer_solde_initial(conn, entite, releve, source=None):
         (entite, releve.banque or '', releve.compte or '', releve.debut, centimes(releve.solde_initial), source))
 
 
+def supprimer_releves(conn, entite, source=None):
+    """Retire les operations d'un releve importe (`source`, son nom de
+    fichier), ou de tous ceux de l'entite si `source` est None.
+
+    Le solde d'ouverture retenu venait du plus ancien releve d'un compte : si
+    c'est celui qu'on retire, il part avec lui — garde, il ouvrirait le compte
+    sur des operations absentes. Le releve suivant n'en conserve pas : il faut
+    le reimporter pour retrouver un solde d'ouverture, et la reponse le dit
+    (`soldes_retires`). Les arretes d'entite passes gardent la tresorerie
+    qu'ils ont memorisee : ce sont des faits dates."""
+    cond, params = ('entity=?', [entite]) if source is None else ('entity=? AND source=?', [entite, source])
+    ops = conn.execute(f'DELETE FROM entite_operations WHERE {cond}', params).rowcount
+    try:
+        soldes = conn.execute(f'DELETE FROM entite_soldes_initiaux WHERE {cond}', params).rowcount
+    except sqlite3.OperationalError:
+        soldes = 0                # table absente (base non migree)
+    return {'operations': ops, 'soldes_retires': soldes}
+
+
 def soldes_initiaux(conn, entite, date=None):
     """Somme des soldes d'ouverture des comptes de l'entite ouverts a `date`
     (tous si `date` est None)."""

@@ -7,9 +7,6 @@ l'historique git (`git log`), un commit par phase.
 
 - [ ] Libellés du « patrimoine financier » : cinq valeurs selon l'onglet, chacune
       juste dans son périmètre, que le libellé doit dire
-- [ ] Constats : versements PER face au plafond de déduction (revenus à saisir)
-- [ ] Suppression des opérations bancaires d'une entité (aucun écran aujourd'hui,
-      ce qui empêche de supprimer une entité qui a des relevés)
 - [ ] Soldes d'ouverture des comptes d'entité déjà importés : réimporter le premier
       relevé de chaque compte
 - [ ] CSS : échelle de tailles de police et d'espacements
@@ -28,8 +25,9 @@ l'historique git (`git log`), un commit par phase.
   ajoutés, performance), impôt latent, projection du patrimoine.
 - **Crédits** : échéanciers importés ou saisis, différés, in fine, IRA, vue
   par titulaire.
-- **Entités** : trésorerie et levier lus sur les relevés, SCPI au prix de
-  retrait, IS d'une SCI à l'IS.
+- **Entités** : trésorerie et levier lus sur les relevés (un relevé se retire,
+  avec le solde d'ouverture qui en venait), SCPI au prix de retrait, IS d'une
+  SCI à l'IS.
 - **Conseil** : constats vérifiables (plafonds, espèces dormantes, ancienneté
   des contrats, garder ou rembourser), propositions sur la part libre du
   financier, vue macro facultative.

@@ -91,6 +91,27 @@ def reclasser(oid):
     return (jsonify({'ok': True}), 200) if n else (jsonify({'error': 'Opération introuvable'}), 404)
 
 
+@tresorerie_bp.route('/api/entites/<path:entite>/releves', methods=['DELETE'])
+@login_required
+@csrf_protect
+def supprimer_releves(entite):
+    """Retire un releve importe ({"source": nom du fichier}) ou tous ceux de
+    l'entite ({"tout": true}). Sans l'un ou l'autre, rien n'est supprime."""
+    d = _corps()
+    source = d.get('source')
+    if d.get('tout') is True:
+        source = None
+    elif not isinstance(source, str) or not source or not validate_string(source, 200):
+        return jsonify({'error': 'Précisez le relevé à supprimer'}), 400
+    with get_db() as conn:
+        r = svc.supprimer_releves(conn, entite, source)
+    if not r['operations'] and not r['soldes_retires']:
+        return jsonify({'error': 'Aucun relevé correspondant'}), 404
+    logger.info('Releves supprimes — %s : %s operation(s), %s solde(s) d\'ouverture',
+                entite, r['operations'], r['soldes_retires'])
+    return jsonify(r)
+
+
 @tresorerie_bp.route('/api/entites/<path:entite>/parts', methods=['PUT'])
 @login_required
 @csrf_protect

@@ -3639,6 +3639,21 @@ td.arbo-part > * { vertical-align: middle; }
   #entities-tbody .ent-c-histo { grid-area: histo; }
   #entities-tbody .ent-actions { grid-area: actions; align-self: center; text-align: right; }
   #entities-tbody .empty-row { display: block; }
+  /* Un releve par fiche : le nom entier, puis compte et periode, puis le
+     nombre d'operations et le bouton. En tableau, « Supprimer » sortait de
+     l'ecran. */
+  #tab-entites .treso-releves tr {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .2rem .75rem;
+    grid-template-areas: "nom nom" "compte compte" "periode periode" "n action";
+    padding: .6rem 0; border-bottom: 1px solid var(--border);
+  }
+  #tab-entites .treso-releves td { display: block; padding: 0; border: 0; max-width: none; min-width: 0; }
+  #tab-entites .treso-releves .rel-nom { grid-area: nom; overflow-wrap: anywhere; white-space: normal; overflow: visible; text-overflow: clip; }
+  #tab-entites .treso-releves .rel-compte { grid-area: compte; font-size: 12px; }
+  #tab-entites .treso-releves .rel-periode { grid-area: periode; font-size: 12px; color: var(--text-muted); }
+  #tab-entites .treso-releves .rel-n { grid-area: n; text-align: left; font: inherit; font-size: 12px; color: var(--text-muted); align-self: center; }
+  #tab-entites .treso-releves .rel-n::after { content: " " attr(data-lib); }
+  #tab-entites .treso-releves .rel-action { grid-area: action; text-align: right; }
 }
 
 /* ── Import des releves (Flux) ────────────────────────────────────────── */

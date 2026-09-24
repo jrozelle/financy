@@ -145,6 +145,49 @@ class TestRoutes:
         assert client.get('/api/entites/tresorerie').get_json()['entites'][0]['totaux']['frais'] == -10
 
 
+class TestSuppressionReleves:
+    """Un releve importe se retire ; le solde d'ouverture qui en venait part
+    avec lui, et une entite dont les releves sont partis se supprime."""
+
+    def _deux_releves(self, conn):
+        conn.execute("INSERT INTO entities (name, type) VALUES ('SCI T', 'SCI')")
+        premier = _releve([('2026-01-02', 'Paul — Appro', 400.0), ('2026-01-05', 'FEDERAL FINANCE', -700.0)])
+        premier.debut, premier.solde_initial = '2026-01-01', 1000.0
+        second = _releve([('2026-02-02', 'Paul — Appro', 400.0)])
+        second.debut, second.solde_initial = '2026-02-01', 700.0
+        t.enregistrer(conn, 'SCI T', premier, 'janvier.pdf', {'Paul'})
+        t.enregistrer(conn, 'SCI T', second, 'fevrier.pdf', {'Paul'})
+
+    def test_un_releve_et_son_solde_d_ouverture(self):
+        with get_db() as conn:
+            self._deux_releves(conn)
+            assert t.soldes_initiaux(conn, 'SCI T') == 1000
+            # Le releve recent : le solde d'ouverture, venu de janvier, reste.
+            assert t.supprimer_releves(conn, 'SCI T', 'fevrier.pdf') == {'operations': 1, 'soldes_retires': 0}
+            assert t.soldes_initiaux(conn, 'SCI T') == 1000
+            # Le plus ancien : son solde d'ouverture part avec lui.
+            assert t.supprimer_releves(conn, 'SCI T', 'janvier.pdf') == {'operations': 2, 'soldes_retires': 1}
+            assert t.soldes_initiaux(conn, 'SCI T') == 0
+            assert conn.execute('SELECT COUNT(*) c FROM entite_operations').fetchone()['c'] == 0
+
+    def test_route(self, client):
+        with get_db() as conn:
+            self._deux_releves(conn)
+            eid = conn.execute("SELECT id FROM entities WHERE name='SCI T'").fetchone()['id']
+        url = '/api/entites/SCI T/releves'
+        # Ni releve ni « tout » : rien n'est supprime.
+        assert client.delete(url, json={}, headers=H).status_code == 400
+        assert client.delete(url, json={'source': 'absent.pdf'}, headers=H).status_code == 404
+        assert client.delete(url, json={'source': 'fevrier.pdf'}).status_code == 403      # CSRF
+        # La suppression de l'entite est refusee tant qu'elle a des releves, et dit ou aller.
+        r = client.delete(f'/api/entities/{eid}', headers=H)
+        assert r.status_code == 409 and 'Trésorerie et levier' in r.get_json()['error']
+        assert client.delete(url, json={'source': 'fevrier.pdf'}, headers=H).get_json() == {'operations': 1, 'soldes_retires': 0}
+        assert client.delete(url, json={'tout': True}, headers=H).get_json() == {'operations': 2, 'soldes_retires': 1}
+        assert client.get('/api/entites/tresorerie').get_json()['entites'] == []
+        assert client.delete(f'/api/entities/{eid}', headers=H).status_code == 204
+
+
 class TestEpargneMensuelle:
     def test_la_mediane_ignore_un_versement_exceptionnel(self):
         from services.contribution import epargne_mensuelle

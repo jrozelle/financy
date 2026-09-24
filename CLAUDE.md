@@ -92,7 +92,9 @@
   defaut de prix publie, souscription moins 10 %), pas au prix d'achat qui
   cache les frais d'entree. Sa tresorerie vient de ses releves
   (`entite_operations`) et chaque arrete d'entite memorise la part incluse
-  (`entity_snapshots.tresorerie`) pour ne jamais la recompter. Un compte dont le
+  (`entity_snapshots.tresorerie`) pour ne jamais la recompter. Un releve se
+  retire par son fichier (`supprimer_releves`) avec le solde d'ouverture qui
+  en venait ; les arretes passes gardent leur tresorerie memorisee. Un compte dont le
   libelle ou la categorie porte le nom d'une entite est SA tresorerie : il entre
   dans son net, jamais dans l'epargne du titulaire.
 - **Anciennete fiscale = date d'effet du contrat** (table `contrats`), jamais la

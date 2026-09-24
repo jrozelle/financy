@@ -12,6 +12,7 @@
   import PartsEntite from './PartsEntite.svelte';
   import FiscalEntite from './FiscalEntite.svelte';
   import OperationsEntite from './OperationsEntite.svelte';
+  import RelevesEntite from './RelevesEntite.svelte';
   import { MOIS_COURTS, moisLib, virgule, type Bloc } from './donnees-tresorerie';
 
   let { b, idx, natures, onRecharger }: {
@@ -134,6 +135,7 @@
   <PartsEntite {b} {idx} {onRecharger} />
   <FiscalEntite {b} {idx} {onRecharger} />
   <OperationsEntite {b} {idx} {natures} {onRecharger} />
+  <RelevesEntite {b} {onRecharger} />
 </section>
 
 {#snippet kpi(lib: string, val: string, sous: string)}
