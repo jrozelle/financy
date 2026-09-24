@@ -26,3 +26,4 @@ export declare function fmtSigned(v: number, dec?: number): string;
 export declare function fmtQty(n: number | null | undefined, dec?: number): string;
 export declare function getColors(): string[];
 export declare function chartBorderColor(): string;
+export declare function gridColor(): string;

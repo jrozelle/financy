@@ -21,7 +21,7 @@ import { openHoldingsModal, wireHoldingsEvents, confirmCloseHoldings } from './t
 import { loadPrets, ouvrirFormulaireCredit } from './tabs/prets.js';
 import { loadTresorerie } from './tabs/tresorerie.js';
 import { wireIsinPopoverEvents, closeIsinPopover } from './isin-popover.js';
-import { loadAdvisor, wireAdvisorEvents } from './tabs/advisor.js';
+import { loadAdvisor, renderAdvisor } from './tabs/advisor.js';
 import { loadActifs, wireActifsEvents } from './tabs/actifs.js';
 import { loadFlux, renderFlux, openFluxModal, saveFlux, deleteFlux } from './tabs/flux.js';
 import { loadEntities, renderEntities, openEntityModal, saveEntity, updateEntInfo, deleteEntity } from './tabs/entities.js';
@@ -836,7 +836,6 @@ function wireEvents() {
   // Holdings + popover ISIN + advisor + actifs
   wireHoldingsEvents();
   wireIsinPopoverEvents();
-  wireAdvisorEvents();
   wireActifsEvents();
   wireSettingsEvents();
 
@@ -1005,6 +1004,7 @@ function _redessinerSansRecharger(tab) {
   if (tab === 'positions' && S.positions?.length) { renderPositions(); return true; }
   if (tab === 'flux' && S.flux?.length) { renderFlux(); return true; }
   if (tab === 'performance') { renderPerformance(); return true; }
+  if (tab === 'conseil')     { renderAdvisor(); return true; }
   return false;
 }
 
