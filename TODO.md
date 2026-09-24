@@ -24,7 +24,7 @@ l'historique git (`git log`), un commit par phase.
       widgets, Flux et l'import — puis les écrans simples. Crédits, Positions,
       toute la Synthèse (cartes et grille), Flux (journal et import) et
       l'onglet Entités (tableau, trésorerie et levier), Actifs, Performance,
-      Conseil et Outils sont faits ; restent Référentiel et Import
+      Conseil, Outils et Référentiel sont faits ; reste Import
 
 ## Fait, en bref
 

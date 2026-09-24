@@ -5,4 +5,5 @@ export declare const S: {
   entities: { name: string; type?: string | null; debt?: number | null }[] | null;
   positions: unknown[];
   sort: Record<string, { key: string | null; dir: number }>;
+  config: { owners?: string[]; categories?: string[]; liquidity_order?: string[]; [cle: string]: unknown } | null;
 };

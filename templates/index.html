@@ -195,82 +195,8 @@
 
     <!-- ── RÉFÉRENTIEL ───────────────────────────────────────────────────── -->
     <div id="tab-referentiel" class="tab-content hidden">
-      <div class="page-header">
-        <h1>Référentiel</h1>
-        <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
-          <div id="ref-save-status" style="font-size:13px"></div>
-          <select id="ref-template-select" class="filter-select" style="width:auto">
-            <option value="">Charger un modèle…</option>
-          </select>
-          <button class="btn btn-primary" id="btn-save-referential">Enregistrer le référentiel</button>
-        </div>
-      </div>
-      <p class="text-muted" style="margin-bottom:1.25rem;font-size:13px">
-        Modifiez les listes et valeurs utilisées dans toute l'application. Les changements prennent effet après enregistrement.
-      </p>
-      <div id="ref-template-preview" class="card" style="display:none;margin-bottom:1.25rem;border:2px solid var(--primary);background:var(--primary-light)"></div>
-
-      <div class="two-col">
-        <div class="card">
-          <h2>Titulaires</h2>
-          <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
-            Personnes dont les patrimoines sont suivis. Une suppression n'efface pas les positions existantes.
-          </p>
-          <div id="ref-owners-chips"></div>
-        </div>
-        <div class="card">
-          <h2>Types d'entités</h2>
-          <div id="ref-entity-types" style="margin-bottom:1.25rem"></div>
-          <h2>Modes de valorisation <span class="text-muted" style="font-size:11px;font-weight:400">(label documentaire)</span></h2>
-          <div id="ref-valuation-modes" style="margin-bottom:1.25rem"></div>
-          <h2>Types de flux</h2>
-          <div id="ref-flux-types"></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>Catégories d'actifs &amp; mobilisabilité</h2>
-        <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
-          Le % mobilisable est appliqué au net attribué positif pour estimer la liquidité disponible par catégorie.
-        </p>
-        <div class="table-scroll" tabindex="0" role="region" aria-label="Tableau défilant">
-          <table class="data-table">
-            <thead><tr>
-              <th>Catégorie</th>
-              <th class="num">% Mobilisable</th>
-              <th></th>
-            </tr></thead>
-            <tbody id="ref-categories-body"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>Alertes</h2>
-        <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
-          Affichées dans Synthèse quand le seuil est franchi. Stockées localement dans votre navigateur.
-        </p>
-        <div id="ref-alerts-list" style="margin-bottom:.75rem"></div>
-        <button class="btn btn-secondary btn-sm" id="btn-add-alert">+ Ajouter une alerte</button>
-      </div>
-
-      <div class="card">
-        <h2>Enveloppes &amp; liquidité</h2>
-        <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
-          La liquidité détermine la classe d'horizon de disponibilité. La friction indique les contraintes de sortie (fiscale, frais, décote probable…).
-        </p>
-        <div class="table-scroll" tabindex="0" role="region" aria-label="Tableau défilant">
-          <table class="data-table">
-            <thead><tr>
-              <th>Enveloppe</th>
-              <th>Liquidité</th>
-              <th>Friction</th>
-              <th></th>
-            </tr></thead>
-            <tbody id="ref-envelopes-body"></tbody>
-          </table>
-        </div>
-      </div>
+      <!-- Ecran Svelte (frontend/src/referentiel/), monte a la premiere visite. -->
+      <div id="referentiel-app"><div class="page-header"><h1>Référentiel</h1></div></div>
     </div>
 
     <!-- ── ACTIFS (vue consolidée holdings) ───────────────────────────── -->

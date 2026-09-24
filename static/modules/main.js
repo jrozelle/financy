@@ -26,7 +26,7 @@ import { loadActifs, wireActifsEvents } from './tabs/actifs.js';
 import { loadFlux, renderFlux, openFluxModal, saveFlux, deleteFlux } from './tabs/flux.js';
 import { loadEntities, renderEntities, openEntityModal, saveEntity, updateEntInfo, deleteEntity } from './tabs/entities.js';
 import { importXlsx, importJson, exportJson, resetDb, initDemoToggle, createBackup, updateDemoBadge } from './tabs/import-export.js';
-import { loadReferential, saveReferential, initTemplateSelect } from './tabs/referentiel.js';
+import { loadReferential, renderReferential } from './tabs/referentiel.js';
 import { loadTimeline, renderOutils, loadSchedulerStatus } from './tabs/tools.js';
 import { loadPerformance, renderPerformance } from './tabs/performance.js';
 import { wireGlobalSearch, resetSearchCache } from './search.js';
@@ -800,8 +800,6 @@ function wireEvents() {
   // Tri des tableaux
 
   // Référentiel
-  document.getElementById('btn-save-referential')?.addEventListener('click', saveReferential);
-  initTemplateSelect();
 
   // Tools
 
@@ -1002,6 +1000,7 @@ function _redessinerSansRecharger(tab) {
   if (tab === 'performance') { renderPerformance(); return true; }
   if (tab === 'conseil')     { renderAdvisor(); return true; }
   if (tab === 'tools')       { renderOutils(); return true; }
+  if (tab === 'referentiel') { renderReferential(); return true; }
   return false;
 }
 
