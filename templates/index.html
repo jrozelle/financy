@@ -48,7 +48,7 @@
          Masque des que la colonne tient a l'ecran. -->
     <button type="button" class="fin-rail-item fin-rail-plus" id="rail-plus"
             aria-expanded="false" aria-controls="fin-rail">
-      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span class="fin-rail-lib">Plus</span>
+      <svg class="ic-plus" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg><svg class="ic-fermer" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg><span class="fin-rail-lib">Plus</span>
     </button>
 
     <div class="fin-rail-foot">
@@ -101,6 +101,7 @@
               <div class="settings-section-label">Données</div>
               <button type="button" class="settings-item" role="menuitem" id="actifs-refresh-prices">Rafraîchir les cours</button>
               <button type="button" class="settings-item" role="menuitem" id="btn-open-wealth-target">Objectif de patrimoine</button>
+              <button type="button" class="settings-item" role="menuitem" id="btn-perso-synthese">Personnaliser la synthèse</button>
               <button type="button" class="settings-item" role="menuitem" id="btn-print">Imprimer la synthèse</button>
             </div>
           </div>
@@ -1371,6 +1372,10 @@
           </div>
         </div>
         <div class="modal-actions">
+          <!-- Comme pour une position : supprimer depuis la fiche, et pas d'un
+               bouton pose a cote de « Editer » sur chaque ligne, ou le pouce
+               tombait sur le mauvais. -->
+          <button type="button" class="btn btn-danger-quiet hidden" id="flux-supprimer">Supprimer</button>
           <button type="button" class="btn btn-secondary" data-close="flux-modal">Annuler</button>
           <button type="submit" class="btn btn-primary">Enregistrer</button>
         </div>
@@ -1421,6 +1426,7 @@
           La nouvelle valorisation sera enregistrée à la date d'aujourd'hui. Les arrêtés passés conservent leurs valeurs d'origine — l'historique reste intact.
         </div>
         <div class="modal-actions">
+          <button type="button" class="btn btn-danger-quiet hidden" id="ent-supprimer">Supprimer</button>
           <button type="button" class="btn btn-secondary" data-close="entity-modal">Annuler</button>
           <button type="submit" class="btn btn-primary">Enregistrer</button>
         </div>

@@ -3,6 +3,7 @@ import { initMask, toggleMask, isMasked, onMaskChange } from './mask.js';
 import { wireTodo } from './todo.js';
 import { wireReglages, estUnReglage, ouvrir as ouvrirReglages } from './reglages.js';
 import { initBarreMobile } from './barre-mobile.js';
+import { basculerEdition } from './widgets.js';
 import { etiqueter, dateCourte } from './select-etiquette.js';
 import { fmtDate, esc, applyChartTheme, refreshChartsTheme } from './utils.js';
 import { api, buildSelects } from './api.js';
@@ -23,8 +24,8 @@ import { loadTresorerie, initTresorerie } from './tabs/tresorerie.js';
 import { wireIsinPopoverEvents, closeIsinPopover } from './isin-popover.js';
 import { loadAdvisor, wireAdvisorEvents } from './tabs/advisor.js';
 import { loadActifs, wireActifsEvents } from './tabs/actifs.js';
-import { loadFlux, renderFlux, openFluxModal, saveFlux, persistFluxFilters, clearFluxFilters, wireFluxImport } from './tabs/flux.js';
-import { loadEntities, renderEntities, openEntityModal, saveEntity, updateEntInfo } from './tabs/entities.js';
+import { loadFlux, renderFlux, openFluxModal, saveFlux, persistFluxFilters, clearFluxFilters, wireFluxImport, deleteFlux } from './tabs/flux.js';
+import { loadEntities, renderEntities, openEntityModal, saveEntity, updateEntInfo, deleteEntity } from './tabs/entities.js';
 import { importXlsx, importJson, exportJson, resetDb, initDemoToggle, createBackup, updateDemoBadge } from './tabs/import-export.js';
 import { loadReferential, saveReferential, initTemplateSelect } from './tabs/referentiel.js';
 import { loadTimeline, wireSimulation, triggerAutoSnapshot, triggerPricesRefresh, loadSchedulerStatus } from './tabs/tools.js';
@@ -339,6 +340,7 @@ function _majBoutonAjouter(tab) {
   // « Periode / 1 an » ne regle que la synthese : ailleurs, il n'agissait sur
   // rien.
   document.getElementById('seg-periode')?.classList.toggle('hidden', tab !== 'synthese');
+  document.getElementById('btn-perso-synthese')?.classList.toggle('hidden', tab !== 'synthese');
   if (maj) {
     maj.classList.toggle('hidden', !MISE_A_JOUR.has(tab));
     maj.classList.toggle('btn-primary', !a);
@@ -498,6 +500,7 @@ function wireEvents() {
   wireSyntheseMenu();
 
   document.getElementById('btn-print')?.addEventListener('click', () => window.print());
+  document.getElementById('btn-perso-synthese')?.addEventListener('click', () => basculerEdition());
 
   // Global owner filter
   document.getElementById('global-owner-filter')?.addEventListener('change', _onGlobalOwnerChange);
@@ -535,6 +538,12 @@ function wireEvents() {
   // Positions buttons
   document.getElementById('pos-supprimer')?.addEventListener('click', () => {
     if (S.editPosId) deletePosition(S.editPosId);
+  });
+  document.getElementById('flux-supprimer')?.addEventListener('click', () => {
+    if (S.editFluxId) deleteFlux(S.editFluxId);
+  });
+  document.getElementById('ent-supprimer')?.addEventListener('click', () => {
+    if (S.editEntityId) deleteEntity(S.editEntityId);
   });
   document.getElementById('head-ajouter')?.addEventListener('click', () => {
     AJOUTS[S.currentTab]?.ouvrir();
@@ -678,14 +687,30 @@ function wireEvents() {
     plus?.setAttribute('aria-expanded', String(ouvert));
     if (libPlus) libPlus.textContent = ouvert ? 'Fermer' : 'Plus';
   };
+  // Safari iOS ignore `overflow: hidden` sur le body : la page defilait sous
+  // la feuille. On la fige en place (position fixe decalee du defilement
+  // courant), et on la rend au meme endroit a la fermeture.
+  let defilement = 0;
+  const figerPage = fige => {
+    const b = document.body;
+    if (fige) {
+      defilement = window.scrollY;
+      b.style.top = `-${defilement}px`;
+      b.classList.add('rail-ouvert');
+    } else if (b.classList.contains('rail-ouvert')) {
+      b.classList.remove('rail-ouvert');
+      b.style.top = '';
+      window.scrollTo(0, defilement);
+    }
+  };
   const replierRail = () => {
     rail?.classList.remove('is-open');
-    document.body.classList.remove('rail-ouvert');
+    figerPage(false);
     majPlus(false);
   };
   plus?.addEventListener('click', () => {
     const ouvert = rail.classList.toggle('is-open');
-    document.body.classList.toggle('rail-ouvert', ouvert);
+    figerPage(ouvert);
     majPlus(ouvert);
   });
   // Choisir une destination referme la feuille ; le bouton lui-meme la bascule.

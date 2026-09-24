@@ -273,8 +273,10 @@ export function openFluxModal(id = null) {
     document.getElementById('flux-amount').value   = '';
     document.getElementById('flux-notes').value    = '';
   }
+  document.getElementById('flux-supprimer')?.classList.toggle('hidden', !id);
   document.getElementById('flux-modal').classList.remove('hidden');
-  document.getElementById('flux-amount').focus();
+  // Au doigt, le focus ouvrirait le clavier sur la fiche encore invisible.
+  if (!matchMedia('(pointer: coarse)').matches) document.getElementById('flux-amount').focus();
 }
 
 export async function saveFlux(e) {
@@ -304,6 +306,7 @@ export async function deleteFlux(id) {
   const label = f ? `${f.type || 'Flux'} — ${eurSigned(signed(f))} (${f.owner})` : `Flux #${id}`;
   if (!await confirmDialog('Supprimer ce flux ?', `<strong>${esc(label)}</strong><br>Cette action est irréversible.`)) return;
   await api('DELETE', `/api/flux/${id}`);
+  document.getElementById('flux-modal')?.classList.add('hidden');
   toast('Flux supprimé');
   await loadFlux();
 }

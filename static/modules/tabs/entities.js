@@ -187,8 +187,9 @@ export function openEntityModal(id = null) {
   updateEntInfo();
   const warn = document.getElementById('ent-retro-warning');
   if (warn) warn.style.display = id ? '' : 'none';
+  document.getElementById('ent-supprimer')?.classList.toggle('hidden', !id);
   document.getElementById('entity-modal').classList.remove('hidden');
-  document.getElementById('ent-name').focus();
+  if (!matchMedia('(pointer: coarse)').matches) document.getElementById('ent-name').focus();
 }
 
 export function updateEntInfo() {
@@ -306,6 +307,7 @@ export async function deleteEntity(id) {
       return;
     }
   }
+  document.getElementById('entity-modal')?.classList.add('hidden');
   toast('Entité supprimée');
   await loadEntities();
   refreshEntitySelect();

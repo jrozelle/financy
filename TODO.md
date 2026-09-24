@@ -15,11 +15,12 @@ l'historique git (`git log`), un commit par phase.
 - [ ] Soldes d'ouverture des comptes d'entité déjà importés : réimporter le premier
       relevé de chaque compte
 - [ ] CSS : échelle de tailles de police et d'espacements
-- [ ] Téléphone, suite de l'audit iPhone : vue Tableau des positions (colonne
-      figée peu utile, arbre par défaut ?), échéanciers des crédits en lignes
-      sur deux niveaux, « Supprimer » rangé dans la fiche (entités, crédits,
-      flux), barre d'actions collante dans les modales, synthèse longue
-      (cartes secondaires repliées), feuille « Plus » avec sa croix en tête
+- [ ] Téléphone : synthèse longue (onze écrans) — cartes secondaires repliées
+      par défaut ? La personnalisation est désormais dans le menu « ··· »
+- [ ] Préférences de lecture en base plutôt que dans le navigateur (colonnes,
+      filtres, tri et regroupement de l'arbre, angle de la répartition,
+      hypothèses de projection) ; mode discrétion et densité restent par
+      appareil
 
 ## Fait, en bref
 

@@ -163,7 +163,8 @@ function _rendreProchaines() {
   if (!tbody) return;
   const { key, dir } = S.sort.credits_prochaines;
   tbody.innerHTML = sortArr(_lignesProchaines, key, dir).map(e => `<tr><td>${fmtDate(e.date)}</td>
-      <td><i class="pastille" style="background:${_couleurPret(e.pret_id)}"></i>${esc(e.pret || '')}</td>
+      <td><i class="pastille" style="background:${_couleurPret(e.pret_id)}"></i>${esc(e.pret || '')}
+        <span class="cr-detail">${e.capital < 0 ? `différé (+${fmt(-e.capital)})` : `capital ${fmt(e.capital)}`} · intérêts ${fmt(e._charges)}</span></td>
       <td class="num">${e.capital < 0 ? `<span class="text-muted">différé (+${fmt(-e.capital)})</span>` : fmt(e.capital)}</td>
       <td class="num">${fmt(e._charges)}</td>
       <td class="num"><b>${fmt(e._total)}</b></td></tr>`).join('');
@@ -187,7 +188,8 @@ function _rendreAnnees() {
   const tbody = document.getElementById('credits-annees-tbody');
   if (!tbody) return;
   const { key, dir } = S.sort.credits_annees;
-  tbody.innerHTML = sortArr(_lignesAnnees, key, dir).map(a => `<tr><td>${a.annee}</td><td class="num">${fmt(a.capital)}</td>
+  tbody.innerHTML = sortArr(_lignesAnnees, key, dir).map(a => `<tr><td>${a.annee}</td><td class="num">${fmt(a.capital)}
+      <span class="cr-detail">intérêts ${fmt(a._charges)}</span></td>
       <td class="num">${fmt(a._charges)}</td><td class="num"><b>${fmt(a.crd_fin)}</b></td></tr>`).join('');
   updateSortIndicators('credits-annees-thead', 'credits_annees');
 }

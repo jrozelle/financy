@@ -107,6 +107,14 @@ function _bouton() {
   tab.appendChild(b);
 }
 
+/** Entre dans l'edition (ou en sort) : depuis le menu « ··· », le bouton du
+ *  bas de page etait a onze ecrans du haut sur telephone. */
+export function basculerEdition() {
+  if (!onglet()) return;
+  _bouton();
+  if (_edition) _quitter(); else { _entrer(); window.scrollTo({ top: 0 }); }
+}
+
 function _entrer() {
   _edition = true;
   const tab = onglet();

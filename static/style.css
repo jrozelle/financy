@@ -2708,7 +2708,17 @@ body { padding-left: var(--rail-w); }
   .fin-rail.is-open .fin-rail-item svg { width: 19px; height: 19px; }
   .fin-rail.is-open .fin-rail-item.active { background: var(--rail-hover); }
 
-  body.rail-ouvert { overflow: hidden; }
+  body.rail-ouvert { position: fixed; inset-inline: 0; overflow: hidden; }
+  /* Deplie, le bouton « Plus » devient la croix de la feuille, en haut a
+     droite ; il restait au milieu de la liste, apres Conseil. */
+  .fin-rail .fin-rail-plus .ic-fermer { display: none; }
+  .fin-rail.is-open .fin-rail-plus {
+    position: absolute; top: calc(.6rem + env(safe-area-inset-top, 0px)); right: .6rem;
+    width: 44px; height: 44px; padding: 0; justify-content: center; border-radius: 10px;
+  }
+  .fin-rail.is-open .fin-rail-plus .ic-plus,
+  .fin-rail.is-open .fin-rail-plus .fin-rail-lib { display: none; }
+  .fin-rail.is-open .fin-rail-plus .ic-fermer { display: block; width: 22px; height: 22px; }
 }
 
 /* ═══ Barre du haut ═════════════════════════════════════════════════════ */
@@ -3924,6 +3934,15 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
     padding-top: calc(1.5rem + env(safe-area-inset-top, 0px));
     padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
   }
+  /* Enregistrer se trouvait deux ecrans plus bas : la barre d'actions reste
+     collee au bas de la fiche, au-dessus de l'indicateur d'accueil. */
+  .modal-content .modal-actions {
+    position: sticky; bottom: calc(-1.5rem - env(safe-area-inset-bottom, 0px)); z-index: 5;
+    margin: 1.25rem -1.5rem calc(-1.5rem - env(safe-area-inset-bottom, 0px));
+    padding: .75rem 1.5rem calc(.75rem + env(safe-area-inset-bottom, 0px));
+    background: var(--card); border-top: 1px solid var(--border);
+  }
+  .modal-content .modal-actions .btn { min-height: 44px; }
 }
 /* Le toast passe au-dessus de la barre d'onglets mobile, pas dessus. */
 @media (max-width: 780px) {
@@ -4155,4 +4174,48 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   input[type="checkbox"], input[type="radio"] { width: 22px; height: 22px; }
   /* La feuille « Plus » ne laisse pas defiler la page derriere elle. */
   .fin-rail.is-open { overscroll-behavior: contain; }
+}
+/* Positions en tableau, au telephone : ce qui dit quel compte (titulaire,
+   etablissement, enveloppe), puis le net. Le detail vit dans l'arborescence
+   (vue par defaut) et sur grand ecran ; ici il repoussait la valeur hors de
+   l'ecran, derriere six colonnes. */
+@media (max-width: 640px) {
+  #tab-positions .data-table [data-pos-col="category"],
+  #tab-positions .data-table [data-pos-col="gross_attributed"],
+  #tab-positions .data-table [data-pos-col="debt_attributed"],
+  #tab-positions .data-table [data-pos-col="gain_attributed"],
+  #tab-positions .data-table [data-pos-col="liquidity"],
+  #tab-positions .data-table [data-pos-col="mobilizable_value"] { display: none; }
+  /* La largeur minimale faite pour dix colonnes n'a plus d'objet a cinq. */
+  #tab-positions .data-table { min-width: 0; }
+  /* Les listes s'empilent : le « x » se retrouvait seul sur une ligne
+     entiere, sans rien dire. Le libelle revient. (!important : la regle
+     d'origine en porte.) */
+  #btn-clear-filters { font-size: .85rem !important; padding: 0 .75rem !important; min-height: 44px; }
+  #btn-clear-filters::before { content: none; }
+  #tab-positions .data-table [data-pos-col="establishment"],
+  #tab-positions .data-table [data-pos-col="envelope"],
+  #tab-positions .data-table [data-pos-col="establishment"] *,
+  #tab-positions .data-table [data-pos-col="envelope"] * { white-space: normal; max-width: 7.5rem; }
+}
+/* Echeanciers des credits au telephone : cinq colonnes dont une de
+   libelles longs ; capital et interets passent sous le credit, en seconde
+   ligne, et le total reste en colonne. */
+.cr-detail { display: none; }
+@media (max-width: 640px) {
+  .credits-table .cr-detail { display: block; margin-top: .15rem; font-size: 11px; color: var(--text-muted);
+    white-space: normal; }
+  #credits-prochaines th:nth-child(3), #credits-prochaines td:nth-child(3),
+  #credits-prochaines th:nth-child(4), #credits-prochaines td:nth-child(4),
+  #credits-annees th:nth-child(3), #credits-annees td:nth-child(3) { display: none; }
+  #credits-prochaines td:nth-child(2) { white-space: normal; }
+  .credits-table th { white-space: normal; }
+}
+/* Au doigt, supprimer passe par la fiche (bouton « Supprimer » en bas a
+   gauche) : sur chaque ligne, il touchait le bouton « Editer ». */
+@media (max-width: 640px) and (pointer: coarse) {
+  #flux-tbody .btn-icon.del, [data-action="del-ent"], [data-action="del-pos"] { display: none; }
+  /* Credits : pas de fiche ; la suppression s'ecarte des chiffres, seule en
+     bas de la carte. */
+  #prets-liste [data-pret-suppr] { display: block; margin: .75rem 0 0 auto; }
 }
