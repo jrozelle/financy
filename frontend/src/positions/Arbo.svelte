@@ -30,6 +30,7 @@
   import { NATURES, natureDe } from '/static/modules/categories.js';
   import { lirePref, ecrirePref } from '/static/modules/preferences.js';
   import type { Noeud, Position, Titre } from './types';
+  import ListeACocher from './ListeACocher.svelte';
 
   let { positions = [] }: { positions: Position[] } = $props();
 
@@ -62,19 +63,35 @@
   type Filtre = { etablissements: string[]; enveloppes: string[] };
   let filtre = $state<Filtre>({ etablissements: [], enveloppes: [],
     ...lireJson<Partial<Filtre>>(lirePref(CLE_FILTRE), {}) });
-  let panneauFiltre = $state(false);
 
-  // Colonnes facultatives, que la vue Tableau montrait : liquidite (par
-  // compte : un groupe en melange plusieurs) et mobilisable (s'additionne).
+  // Colonnes au choix : toutes sauf le nom et les actions. Liquidite (par
+  // compte : un groupe en melange plusieurs) et mobilisable (s'additionne),
+  // que montrait la vue Tableau, sont masquees par defaut.
   const CLE_COLONNES = 'financy_columns_positions';
-  let colonnes = $state<{ liquidite: boolean; mobilisable: boolean }>({ liquidite: false, mobilisable: false,
-    ...lireJson(lirePref(CLE_COLONNES), {}) });
-  let panneauColonnes = $state(false);
-  function basculerColonne(c: 'liquidite' | 'mobilisable') {
+  type Colonne = 'part' | 'valeur' | 'dette' | 'net' | 'pv' | 'liquidite' | 'mobilisable';
+  const COLONNES: { cle: Colonne; libelle: string; aide: string; defaut: boolean }[] = [
+    { cle: 'part', libelle: 'Part du brut · du net', defaut: true,
+      aide: 'Poids de chaque ligne ; la barre distingue le net (plein) de la dette (hachuré)' },
+    { cle: 'valeur', libelle: 'Valeur', defaut: true, aide: 'Valeur brute, à la part détenue' },
+    { cle: 'dette', libelle: 'Dette', defaut: true, aide: 'Capital restant dû, à la part portée' },
+    { cle: 'net', libelle: 'Net', defaut: true, aide: 'Valeur moins dette ; toujours affiché sur téléphone' },
+    { cle: 'pv', libelle: 'Plus-value', defaut: true, aide: 'Latente, sur les lignes de titres au prix de revient connu' },
+    { cle: 'liquidite', libelle: 'Liquidité', defaut: false,
+      aide: "Délai pour récupérer l'argent de chaque compte, de J0–J1 à bloqué" },
+    { cle: 'mobilisable', libelle: 'Mobilisable', defaut: false,
+      aide: 'Ce que vous pourriez retirer, décote de la catégorie appliquée' },
+  ];
+  let colonnes = $state<Record<Colonne, boolean>>({
+    ...Object.fromEntries(COLONNES.map(c => [c.cle, c.defaut])) as Record<Colonne, boolean>,
+    ...lireJson<Partial<Record<Colonne, boolean>>>(lirePref(CLE_COLONNES), {}),
+  });
+  function basculerColonne(c: Colonne) {
     colonnes = { ...colonnes, [c]: !colonnes[c] };
     ecrirePref(CLE_COLONNES, JSON.stringify(colonnes));
   }
-  const nbColonnes = $derived(7 + Number(colonnes.liquidite) + Number(colonnes.mobilisable));
+  // Nom et actions, plus la colonne Net, toujours rendue (le telephone ne
+  // montre qu'elle) : masquee, elle ne l'est que sur grand ecran.
+  const nbColonnes = $derived(3 + COLONNES.filter(c => c.cle !== 'net' && colonnes[c.cle]).length)
   const etabDe = (p: Position) => p.establishment || p.entity || 'Sans établissement';
   const envDe = (p: Position) => p.envelope || 'Sans enveloppe';
   function compter(valeurs: string[]) {
@@ -452,18 +469,18 @@
         style:width="{(plein * 100).toFixed(2)}%" style:background={couleur}></i>{#if plein < 1}<i class="arbo-lev"
         style:width="{((1 - plein) * 100).toFixed(2)}%" style:background={couleur}></i>{/if}</span></span>
     </td>
-    <td class="arbo-part" role="gridcell">
+    {#if colonnes.part}<td class="arbo-part" role="gridcell">
       <span class="arbo-barre" aria-hidden="true"><span class="arbo-barre-long" style:width={largeur}><i
         style:width="{(plein * 100).toFixed(2)}%" style:background={couleur}></i>{#if plein < 1}<i class="arbo-lev"
         style:width="{((1 - plein) * 100).toFixed(2)}%" style:background={couleur}></i>{/if}</span></span>
       <span class="arbo-part-txt"><span>{fmtPct(part, part < 10 ? 1 : 0)}</span><span
         class="arbo-part-net">net {fmtPct(partNet, Math.abs(partNet) < 10 ? 1 : 0)}</span></span>
-    </td>
-    <td class="num arbo-valeur" role="gridcell">{fmt(n.brut)}</td>
-    <td class="num arbo-dette" class:is-dette={n.dette} role="gridcell">{n.dette ? fmt(n.dette) : '—'}</td>
-    <td class="num arbo-net" class:is-negatif={net < 0} role="gridcell">{fmt(net)}
+    </td>{/if}
+    {#if colonnes.valeur}<td class="num arbo-valeur" role="gridcell">{fmt(n.brut)}</td>{/if}
+    {#if colonnes.dette}<td class="num arbo-dette" class:is-dette={n.dette} role="gridcell">{n.dette ? fmt(n.dette) : '—'}</td>{/if}
+    <td class="num arbo-net" class:is-negatif={net < 0} class:masque-bureau={!colonnes.net} role="gridcell">{fmt(net)}
       <span class="arbo-pv-mobile">{@render pv(n)}</span></td>
-    <td class="num arbo-pv" role="gridcell">{@render pv(n)}</td>
+    {#if colonnes.pv}<td class="num arbo-pv" role="gridcell">{@render pv(n)}</td>{/if}
     {#if colonnes.liquidite}<td class="arbo-liq" role="gridcell">{#if n.position}{@html liqBadge(n.position.liquidity)}{/if}</td>{/if}
     {#if colonnes.mobilisable}<td class="num arbo-mob" role="gridcell">{n.gainTitre !== undefined ? '' : fmt(n.mob)}</td>{/if}
     <td class="arbo-actions" role="gridcell">
@@ -519,36 +536,21 @@
               onclick={() => changerGroupe(g)}>{lib}</button>
     {/each}
   </div>
-  <button type="button" class="arbo-bouton arbo-filtrer" id="arbo-filtrer" aria-expanded={panneauFiltre}
-          aria-controls="arbo-filtres" class:actif={nbFiltres > 0}
-          onclick={() => { panneauFiltre = !panneauFiltre; panneauColonnes = false; }}>Filtrer{#if nbFiltres}<span
-          class="arbo-filtrer-n">{nbFiltres}</span>{/if}</button>
-  <button type="button" class="arbo-bouton arbo-colonnes-btn" id="arbo-colonnes-btn" aria-expanded={panneauColonnes}
-          aria-controls="arbo-colonnes" onclick={() => { panneauColonnes = !panneauColonnes; panneauFiltre = false; }}>Colonnes</button>
+  <ListeACocher id="arbo-filtres" libelle="Filtrer" compteur={nbFiltres} onEffacer={effacerFiltre}
+    sections={[
+      { cle: 'etablissements', titre: 'Établissements',
+        choix: choixEtabs.map(([v, nb]) => ({ valeur: v, libelle: v, nb, coche: etabsActifs.includes(v) })) },
+      { cle: 'enveloppes', titre: 'Enveloppes',
+        choix: choixEnvs.map(([v, nb]) => ({ valeur: v, libelle: v, nb, coche: envsActives.includes(v) })) },
+    ]}
+    onBasculer={(sec, v) => basculerFiltre(sec as 'etablissements' | 'enveloppes', v)} />
+  <ListeACocher id="arbo-colonnes" libelle="Colonnes"
+    sections={[{ cle: 'colonnes', titre: 'Colonnes affichées', choix: COLONNES.map(c =>
+      ({ valeur: c.cle, libelle: c.libelle, aide: c.aide, coche: colonnes[c.cle] })) }]}
+    onBasculer={(_s, v) => basculerColonne(v as Colonne)} />
   <span class="arbo-espace"></span>
   <button type="button" class="arbo-bouton" id="arbo-deplier" onclick={toutDeplier}>Tout déplier</button>
   <button type="button" class="arbo-bouton" id="arbo-replier" onclick={toutReplier}>Tout replier</button>
-</div>
-<div id="arbo-colonnes" class="arbo-filtres arbo-colonnes" hidden={!panneauColonnes}>
-  <fieldset class="arbo-filtre-groupe">
-    <legend>Colonnes facultatives</legend>
-    <label class="arbo-filtre-choix"><input type="checkbox" checked={colonnes.liquidite}
-      onchange={() => basculerColonne('liquidite')}><span>Liquidité</span><span class="arbo-filtre-nb">délai de sortie</span></label>
-    <label class="arbo-filtre-choix"><input type="checkbox" checked={colonnes.mobilisable}
-      onchange={() => basculerColonne('mobilisable')}><span>Mobilisable</span><span class="arbo-filtre-nb">disponible après décote</span></label>
-  </fieldset>
-</div>
-<div id="arbo-filtres" class="arbo-filtres" hidden={!panneauFiltre}>
-  {#each [['etablissements', 'Établissements', choixEtabs, etabsActifs], ['enveloppes', 'Enveloppes', choixEnvs, envsActives]] as [liste, titre, choix, actifs] (liste)}
-    <fieldset class="arbo-filtre-groupe">
-      <legend>{titre}</legend>
-      {#each choix as [v, nb] (v)}
-        <label class="arbo-filtre-choix"><input type="checkbox" checked={(actifs as string[]).includes(v as string)}
-          onchange={() => basculerFiltre(liste as 'etablissements' | 'enveloppes', v as string)}>
-          <span>{v}</span><span class="arbo-filtre-nb">{nb}</span></label>
-      {/each}
-    </fieldset>
-  {/each}
 </div>
 {#if nbFiltres}
   <!-- Un filtre ne se fait jamais oublier : ce qu'il retient reste ecrit. -->
@@ -566,11 +568,11 @@
         <thead>
           <tr>
             {@render entete('nom', 'Nom', '')}
-            {@render entete('brut', 'Part du brut · du net', 'arbo-part')}
-            {@render entete('brut', 'Valeur', 'num arbo-valeur', true)}
-            {@render entete('dette', 'Dette', 'num arbo-dette')}
-            {@render entete('net', 'Net', 'num arbo-net')}
-            {@render entete('pv', 'Plus-value', 'num arbo-pv')}
+            {#if colonnes.part}{@render entete('brut', 'Part du brut · du net', 'arbo-part', !colonnes.valeur)}{/if}
+            {#if colonnes.valeur}{@render entete('brut', 'Valeur', 'num arbo-valeur', true)}{/if}
+            {#if colonnes.dette}{@render entete('dette', 'Dette', 'num arbo-dette')}{/if}
+            {@render entete('net', 'Net', colonnes.net ? 'num arbo-net' : 'num arbo-net masque-bureau')}
+            {#if colonnes.pv}{@render entete('pv', 'Plus-value', 'num arbo-pv')}{/if}
             {#if colonnes.liquidite}<th scope="col" class="arbo-liq">Liquidité</th>{/if}
             {#if colonnes.mobilisable}{@render entete('mob', 'Mobilisable', 'num arbo-mob')}{/if}
             <th scope="col" class="arbo-actions"><span class="sr-only">Actions</span></th>
@@ -580,11 +582,11 @@
         <tfoot>
           <tr>
             <td>Patrimoine{q || nbFiltres ? ' (filtré)' : ''}</td>
-            <td class="arbo-part"></td>
-            <td class="num arbo-valeur">{fmt(vue.total.brut)}</td>
-            <td class="num arbo-dette" class:is-dette={vue.total.dette}>{vue.total.dette ? fmt(vue.total.dette) : '—'}</td>
-            <td class="num arbo-net">{fmt(vue.total.brut - vue.total.dette)}</td>
-            <td class="num arbo-pv">{#if vue.total.mesures}<span class={vue.total.gain >= 0 ? 'pv-hausse' : 'pv-baisse'}>{signe(vue.total.gain)}</span>{/if}</td>
+            {#if colonnes.part}<td class="arbo-part"></td>{/if}
+            {#if colonnes.valeur}<td class="num arbo-valeur">{fmt(vue.total.brut)}</td>{/if}
+            {#if colonnes.dette}<td class="num arbo-dette" class:is-dette={vue.total.dette}>{vue.total.dette ? fmt(vue.total.dette) : '—'}</td>{/if}
+            <td class="num arbo-net" class:masque-bureau={!colonnes.net}>{fmt(vue.total.brut - vue.total.dette)}</td>
+            {#if colonnes.pv}<td class="num arbo-pv">{#if vue.total.mesures}<span class={vue.total.gain >= 0 ? 'pv-hausse' : 'pv-baisse'}>{signe(vue.total.gain)}</span>{/if}</td>{/if}
             {#if colonnes.liquidite}<td class="arbo-liq"></td>{/if}
             {#if colonnes.mobilisable}<td class="num arbo-mob">{fmt(vue.total.mob)}</td>{/if}
             <td class="arbo-actions"></td>

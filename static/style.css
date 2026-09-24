@@ -4149,31 +4149,57 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
      bas de la carte. */
   #prets-liste [data-pret-suppr] { display: block; margin: .75rem 0 0 auto; }
 }
-/* ── Filtre de l'arborescence : etablissements et enveloppes ──────────── */
-.arbo-filtrer { display: inline-flex; align-items: center; gap: .35rem; }
-.arbo-filtrer.actif { border-color: var(--primary); color: var(--primary); }
-.arbo-filtrer-n { min-width: 18px; height: 18px; padding: 0 .3rem; box-sizing: border-box; border-radius: 9px;
-  display: inline-grid; place-items: center; font-size: .68rem; font-weight: 600;
-  background: var(--primary); color: var(--card); }
-.arbo-filtres {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: .5rem 1.5rem;
-  padding: .75rem 1rem; border-bottom: 1px solid var(--border); background: var(--bg);
-}
-.arbo-filtres[hidden] { display: none; }
-.arbo-filtre-groupe { margin: 0; padding: 0; border: 0; min-width: 0;
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: .1rem .75rem; align-content: start; }
-.arbo-filtre-groupe legend { grid-column: 1 / -1; padding: 0 0 .35rem; font-size: .64rem; font-weight: 600;
-  letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); }
-.arbo-filtre-choix { display: flex; align-items: center; gap: .45rem; min-height: 32px; font-size: .84rem;
-  color: var(--text); cursor: pointer; min-width: 0; }
-.arbo-filtre-choix span:first-of-type { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.arbo-filtre-nb { font-family: var(--mono); font-size: .72rem; color: var(--text-muted); }
 .arbo-filtre-actif { margin: 0; padding: .5rem 1rem; border-bottom: 1px solid var(--border);
   font-size: .8rem; color: var(--text-muted); }
 .arbo-filtre-actif .btn-link { margin-left: .4rem; }
-@media (max-width: 640px) {
-  .arbo-filtres { padding: .6rem; grid-template-columns: 1fr; }
-  .arbo-filtre-choix { min-height: 44px; }
-}
 .arbo-liq { width: 1%; white-space: nowrap; }
 .arbo-mob { color: var(--text-muted); }
+/* ── Liste a cocher en surimpression (filtre, colonnes de l'arbre) ─────── */
+.lac { position: relative; display: inline-flex; }
+.lac-bouton { display: inline-flex; align-items: center; gap: .35rem; }
+.lac-bouton svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2;
+  stroke-linecap: round; stroke-linejoin: round; transition: transform .15s ease; }
+.lac-bouton[aria-expanded="true"] svg { transform: rotate(180deg); }
+.lac-bouton.actif { border-color: var(--primary); color: var(--primary); }
+.lac-n { min-width: 18px; height: 18px; padding: 0 .3rem; box-sizing: border-box; border-radius: 9px;
+  display: inline-grid; place-items: center; font-size: .68rem; font-weight: 600;
+  background: var(--primary); color: var(--card); }
+.lac-pop {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 40;
+  width: 300px; max-width: calc(100vw - 2 * var(--page-gutter));
+  display: flex; flex-direction: column;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+}
+.lac-liste { max-height: min(60vh, 420px); overflow-y: auto; overscroll-behavior: contain; padding: .25rem 0; }
+.lac-section { margin: 0; padding: 0; border: 0; min-width: 0; }
+.lac-section + .lac-section { border-top: 1px solid var(--border); margin-top: .25rem; padding-top: .25rem; }
+.lac-section legend { width: 100%; box-sizing: border-box; padding: .5rem .9rem .3rem; font-size: .64rem; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); }
+.lac-choix { display: flex; align-items: center; gap: .6rem; min-height: 36px; padding: .15rem .9rem;
+  cursor: pointer; font-size: .86rem; color: var(--text); }
+.lac-choix.avec-aide { align-items: flex-start; padding-block: .45rem; }
+.lac-choix.avec-aide input { margin-top: .15rem; }
+@media (hover: hover) { .lac-choix:hover { background: var(--card-hover); } }
+.lac-choix input { flex: none; margin: 0; }
+.lac-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .1rem; }
+.lac-libelle { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lac-aide { font-size: .76rem; color: var(--text-muted); line-height: 1.35; white-space: normal; }
+.lac-nb { flex: none; font-size: .74rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.lac-pied { display: flex; justify-content: space-between; align-items: center; gap: .5rem;
+  padding: .5rem .9rem; border-top: 1px solid var(--border); }
+@media (max-width: 640px) {
+  /* Au telephone, la liste s'ancre a la barre d'outils, gouttieres de part
+     et d'autre : accrochee a son bouton, elle sortait de l'ecran. */
+  .arbo-barre-outils { position: relative; }
+  .lac { position: static; }
+  .lac-pop { left: .6rem; right: .6rem; width: auto; max-width: none; }
+  .lac-choix { min-height: 44px; }
+}
+/* Net masque par l'utilisateur : sur grand ecran seulement, c'est le seul
+   montant que montre le telephone. */
+@media (min-width: 641px) { .arbo .masque-bureau { display: none; } }
+@media (max-width: 640px) {
+  /* La liste s'arrete au-dessus de la barre d'onglets. */
+  .lac-liste { max-height: min(45vh, 420px); }
+}
