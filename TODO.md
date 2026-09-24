@@ -23,8 +23,8 @@ l'historique git (`git log`), un commit par phase.
       aux bugs d'interface — Positions (arbre et tableau), Synthèse et ses
       widgets, Flux et l'import — puis les écrans simples. Crédits, Positions,
       toute la Synthèse (cartes et grille), Flux (journal et import) et
-      l'onglet Entités (tableau, trésorerie et levier) sont faits ; restent
-      les écrans simples
+      l'onglet Entités (tableau, trésorerie et levier) et Actifs sont faits ;
+      restent Performance, Conseil, Outils, Référentiel et Import
 
 ## Fait, en bref
 

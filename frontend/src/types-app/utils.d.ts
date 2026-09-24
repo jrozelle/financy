@@ -23,3 +23,6 @@ export declare function esc(s: unknown): string;
 export declare function fluxSigned(f: { type?: string | null; amount?: number | null }): number;
 /** Montant avec son signe explicite (« +1 200 € »). */
 export declare function fmtSigned(v: number, dec?: number): string;
+export declare function fmtQty(n: number | null | undefined, dec?: number): string;
+export declare function getColors(): string[];
+export declare function chartBorderColor(): string;

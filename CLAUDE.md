@@ -170,7 +170,7 @@
 - Frontend modulaire : `static/modules/` (un module par onglet dans `tabs/`)
 - Ecrans Svelte 5 + TypeScript dans `frontend/` (Credits, Positions, toute la
   Synthese, grille de widgets comprise, Flux et son import, Entites avec
-  leur tresorerie),
+  leur tresorerie, Actifs),
   compiles par Vite dans `frontend_dist/` (hors git), servis sous `/dist/`,
   construits dans l'image (etape `node` du Dockerfile) : un changement d'ecran
   Svelte demande un rebuild, comme du Python. Un ecran reprend le balisage et
@@ -179,7 +179,8 @@
   un montant ecrit par `fmt()` ne suit pas seul le mode discretion : la carte
   recoit `masque` et redessine sous `{#key masque}`. Svelte retire l'espace
   en tete d'un bloc `{#if}` et entre deux cellules : une espace voulue
-  s'ecrit `{' '}`. Types des modules existants
+  s'ecrit `{' '}`. Chart.js reste la variable globale du gabarit
+  (`types-app/chart-global.d.ts`). Types des modules existants
   dans `frontend/src/types-app/`. Avant de remplacer un ecran : texte
   et structure compares a l'ancien, sur une copie de la base, au caractere
   pres.

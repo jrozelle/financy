@@ -275,65 +275,8 @@
 
     <!-- ── ACTIFS (vue consolidée holdings) ───────────────────────────── -->
     <div id="tab-actifs" class="tab-content hidden">
-      <div class="page-header">
-        <h1>Actifs</h1>
-      </div>
-
-      <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:1rem">
-        <div class="kpi-card"><div class="kpi-label">Valorisation totale</div><div class="kpi-value" id="actifs-kpi-value">—</div></div>
-        <div class="kpi-card"><div class="kpi-label">Prix de revient</div><div class="kpi-value" id="actifs-kpi-cost">—</div></div>
-        <div class="kpi-card"><div class="kpi-label">+/- latent</div><div class="kpi-value" id="actifs-kpi-pnl">—</div></div>
-        <div class="kpi-card"><div class="kpi-label">Lignes</div><div class="kpi-value" id="actifs-kpi-count">—</div></div>
-      </div>
-
-      <!-- Rapprochement des quantites avec le journal des operations. Vide
-           tant que le controle n'a rien a dire. -->
-      <div id="reconcile-panel"></div>
-
-      <div class="charts-row" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
-        <div class="card">
-          <h2>Par classe d'actif</h2>
-          <div style="position:relative;height:240px"><canvas id="actifs-chart-class"></canvas></div>
-        </div>
-        <div class="card">
-          <h2>Par enveloppe</h2>
-          <div style="position:relative;height:240px"><canvas id="actifs-chart-envelope"></canvas></div>
-        </div>
-      </div>
-
-      <div class="card card-table">
-        <table class="data-table">
-          <thead id="actifs-thead">
-            <tr>
-              <th data-sort="name">Nom</th>
-              <th data-sort="asset_class">Classe</th>
-              <th data-sort="establishments">Établissement</th>
-              <th class="num" data-sort="quantity">Qté</th>
-              <th class="num" data-sort="avg_cost">PRU</th>
-              <th class="num" data-sort="last_price">Cours</th>
-              <th class="num" data-sort="market_value">Valeur</th>
-              <th class="num" data-sort="pnl">+/-</th>
-              <th class="num" data-sort="weight_pct">Poids</th>
-            </tr>
-          </thead>
-          <tbody id="actifs-tbody"></tbody>
-        </table>
-        <div id="actifs-cards" class="actifs-card-list"></div>
-        <div id="actifs-empty" class="empty-state" style="padding:2rem 1rem;text-align:center;display:none">
-          <div style="margin-bottom:.4rem;opacity:.5" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8"
-                 stroke-linecap="round" stroke-linejoin="round" focusable="false">
-              <path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-6"/>
-            </svg>
-          </div>
-          <h3 style="font-size:14px;margin-bottom:.4rem">Aucune ligne d'actif</h3>
-          <p class="text-muted" style="font-size:12.5px;margin-bottom:1rem">
-            Pour voir vos ETF, actions et fonds euros ici, ajoutez des lignes
-            dans une position depuis l'onglet Positions.
-          </p>
-          <button class="btn btn-primary btn-sm" data-tab-switch="positions">Aller aux positions</button>
-        </div>
-      </div>
+      <!-- Ecran Svelte (frontend/src/actifs/), monte a la premiere visite. -->
+      <div id="actifs-app"><div class="page-header"><h1>Actifs</h1></div></div>
     </div>
 
     <!-- ── CONSEIL PATRIMONIAL ─────────────────────────────────────────── -->
