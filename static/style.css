@@ -3936,7 +3936,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .arbo-pv-note { display: block; font-size: 10.5px; color: var(--text-muted); white-space: nowrap; }
 .credits-autres { margin: .5rem 0 0; font-size: .8rem; color: var(--text-muted); }
 
-/* ── Synthese personnalisable (modules/widgets.js) ──────────────────────── */
+/* ── Synthese personnalisable (frontend/src/synthese/Synthese.svelte) ───── */
 #tab-synthese [data-carte][data-rang] { order: var(--w-rang); }
 @media (min-width: 1201px) {
   #tab-synthese [data-carte][data-largeur] { grid-column: span var(--w-largeur); }
@@ -3972,6 +3972,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .w-poignee svg { display: block; width: 14px; height: 14px; }
 .w-nom { font-weight: 600; color: var(--text); padding: 0 .3rem; }
 .w-vide { position: absolute; left: .8rem; bottom: .5rem; font-size: 11px; color: var(--text-muted); }
+/* Le message d'une carte vide ne se montre que sur une carte vide. */
+#tab-synthese.w-edition [data-carte]:not([style*="display: none"]) > .w-vide { display: none; }
 .w-bord { position: absolute; top: 0; right: -6px; width: 12px; height: 100%; cursor: ew-resize; touch-action: none; z-index: 4; }
 .w-bord::after { content: ''; position: absolute; top: 50%; left: 4px; width: 4px; height: 32px; margin-top: -16px;
   border-radius: 2px; background: var(--primary); opacity: .55; }

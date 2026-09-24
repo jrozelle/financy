@@ -376,8 +376,9 @@ export function wireDrilldownEvents() {
     }),
     'kpi-mobilizable': () => drilldownMobilizable(),
   };
-  document.querySelector('.kpi-grid[data-carte="chiffres"]')?.addEventListener('click', e => {
-    const carte = e.target.closest('.kpi-card');
+  // Delegation sur l'onglet : la grille (Svelte) n'existe qu'apres le premier rendu.
+  document.getElementById('tab-synthese')?.addEventListener('click', e => {
+    const carte = e.target.closest('.kpi-grid[data-carte="chiffres"] .kpi-card');
     if (!carte || !S.synthese?.date) return;
     // Les commandes de la grille de widgets (poignee, largeur) ne sont pas un clic sur le chiffre.
     if (e.target.closest('.w-commandes, .w-bord')) return;

@@ -4,7 +4,6 @@ import { wireTodo } from './todo.js';
 import { wireReglages, estUnReglage, ouvrir as ouvrirReglages } from './reglages.js';
 import { initBarreMobile } from './barre-mobile.js';
 import { chargerPreferences, lirePref } from './preferences.js';
-import { basculerEdition } from './widgets.js';
 import { etiqueter, dateCourte } from './select-etiquette.js';
 import { fmtDate, esc, applyChartTheme, refreshChartsTheme } from './utils.js';
 import { api, buildSelects } from './api.js';
@@ -15,7 +14,7 @@ import { loadUserAlertsAsync, saveUserAlerts } from './alerts.js';
 import { loadTargets, saveTargets } from './targets.js';
 import { wireSortableTable } from './utils.js';
 
-import { loadSynthese, renderSynthese, loadHistorique, wireSyntheseMenu } from './tabs/synthese.js';
+import { loadSynthese, renderSynthese, loadHistorique, wireSyntheseMenu, basculerEdition } from './tabs/synthese.js';
 import { loadPositions, renderPositions, openPosModal, duplicateSnapshot, renameSnapshot, deleteSnapshot,
          onEntitySelectChange, updatePosInfo, savePosition, deletePosition } from './tabs/positions.js';
 import { openHoldingsModal, wireHoldingsEvents, confirmCloseHoldings } from './tabs/holdings.js';

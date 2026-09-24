@@ -4,7 +4,6 @@ import { api } from '../api.js';
 import { loadTodo, renderTodo } from '../todo.js';
 import { loadUserAlerts } from '../alerts.js';
 import { isMasked } from '../mask.js';
-import { appliquerDisposition } from '../widgets.js';
 import { toast, promptDialog } from '../dialogs.js';
 
 function _owners() {
@@ -77,75 +76,42 @@ function _clearSyntheseEmpty() {
 
 /** Redessine la synthese deja chargee. `cache` : reutilise les reponses
  *  deja recues (bascule du mode discretion) au lieu de tout redemander. */
+// Les cartes et leur grille sont un ecran Svelte (frontend/src/synthese/) :
+// ce module charge les donnees, calcule les totaux, et les lui passe.
 let _svelte = null;
-async function _cartesSvelte({ chiffres, repartition, comptes, cache = false }) {
-  try {
-    _svelte ??= await import('/dist/synthese.js');
-  } catch {
-    // Clone sans compilation : le dire dans la carte des chiffres.
-    const hote = document.querySelector('.kpi-grid[data-carte="chiffres"]');
-    if (hote && !hote.querySelector('.carte-non-compilee')) hote.insertAdjacentHTML('beforeend',
+let _cartes = null;
+
+async function _moduleSvelte() {
+  try { return (_svelte ??= await import('/dist/synthese.js')); }
+  catch {
+    // Clone sans compilation : le dire plutot qu'un onglet vide.
+    const tab = document.getElementById('tab-synthese');
+    if (tab && !tab.querySelector('.carte-non-compilee')) tab.insertAdjacentHTML('beforeend',
       `<p class="card text-muted carte-non-compilee">Écrans de la synthèse non compilés :
         <code>cd frontend &amp;&amp; npm install &amp;&amp; npm run build</code>.</p>`);
-    return;
+    return null;
   }
-  const g = document.querySelector('.kpi-grid[data-carte="chiffres"]');
-  if (g) {
-    _svelte.afficherChiffres(g, chiffres);
-    // Au premier montage, l'objectif avait ete ecrit dans l'ancien element
-    // (le chargement du module est asynchrone) : on le reecrit dans le neuf.
-  }
-  const r = document.getElementById('repartition-card');
-  if (r) _svelte.afficherRepartition(r, repartition);
-  const c = document.getElementById('comptes-card');
-  if (c) _svelte.rechargerComptes(c, comptes.owner, comptes.date);
-  // D'ou vient la hausse, Impot latent : ecrans Svelte (lot 2).
-  const h = document.getElementById('card-contribution');
-  if (h) _svelte.rechargerContribution(h, isMasked(), cache, comptes.owner, S.syntheseDate, S.dates?.[0] || null);
-  const f = document.getElementById('fiscalite-card');
-  if (f) _svelte.rechargerFiscalite(f, isMasked(), comptes.owner, S.syntheseDate);
-  _evolutionSvelte();
 }
 
-/** Evolution du net, evolution par groupe, ce qui a bouge (lot 3a). Aussi
- *  appelee quand l'historique se recharge seul (loadHistorique). */
-function _evolutionSvelte() {
-  if (!_svelte) return;
-  const owner = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : null;
-  const masque = isMasked();
-  const h = document.querySelector('.card[data-carte="historique"]');
-  if (h) _svelte.afficherHistoriqueNet(h, { historique: S.historique || [], owner, masque });
-  const g = document.getElementById('synthese-history-detail-card');
-  if (g) _svelte.afficherEvolutionGroupes(g, { owner, arretes: (S.historique || []).length, masque });
-  const m = document.querySelector('.card[data-carte="mouvements"]');
-  if (m) _svelte.afficherMouvements(m, { owner, famille: !owner, date: S.syntheseDate, masque });
-}
-
-/** Liquidite, entites, ecart a la cible, note de l'arrete (lot 3b). */
-async function _cartes3b({ liqFiltered, posTitulaire, owner, syn }) {
-  try { _svelte ??= await import('/dist/synthese.js'); } catch { return; }
-  const masque = isMasked();
-  const l = document.querySelector('.card[data-carte="liquidite"]');
-  if (l) _svelte.afficherLiquidite(l, { parLiquidite: liqFiltered, positions: posTitulaire, masque });
-  const e = document.getElementById('entities-synthese-card');
-  if (e) _svelte.afficherEntites(e, { entites: S.entities || [], owner, masque,
-    positions: Object.values(syn._positions_cache || {}).flat() });
-  const c = document.querySelector('.card[data-carte="cible"]');
-  if (c) _svelte.afficherCible(c, { synthese: syn, owner, categories: S.config?.categories || [] });
-  _noteSvelte(syn);
+async function _afficher(cartes, { cache = false } = {}) {
+  _cartes = cartes;
+  const m = await _moduleSvelte();
+  const tab = document.getElementById('tab-synthese');
+  if (!m || !tab) return;
+  m.afficherSynthese(tab, cartes);
+  m.rechargerSynthese({ owner: cartes.owner, date: S.syntheseDate, dernier: S.dates?.[0] || null, cache });
 }
 
 async function _noteSvelte(syn) {
-  try { _svelte ??= await import('/dist/synthese.js'); } catch { return; }
+  const m = await _moduleSvelte();
   const n = document.getElementById('snapshot-note-bar');
-  if (n) _svelte.afficherNote(n, { note: syn.snapshot_note || null,
+  if (m && n) m.afficherNote(n, { note: syn.snapshot_note || null,
     onModifier: () => openSnapshotNoteEditor(syn.date, syn.snapshot_note) });
 }
 
-async function _projectionSvelte(props) {
-  try { _svelte ??= await import('/dist/synthese.js'); } catch { return; }
-  const hote = document.getElementById('card-projection');
-  if (hote) _svelte.afficherProjection(hote, props);
+/** Entrer dans la personnalisation (ou en sortir), depuis le menu « ··· ». */
+export async function basculerEdition() {
+  (await _moduleSvelte())?.basculerEdition();
 }
 
 export function renderSynthese({ cache = false } = {}) {
@@ -198,30 +164,37 @@ export function renderSynthese({ cache = false } = {}) {
         return byLiq;
       })();
 
-  // Chiffres de tete, Repartition et Vos comptes : ecrans Svelte
-  // (frontend/src/synthese/), montes dans leurs elements.
-  _cartesSvelte({
+  renderEntityWarnings(syn.entity_warnings || [], { cache });
+  const posTitulaire = isFamily ? Object.values(S.synthese._positions_cache || {}).flat()
+                                : (S.synthese._positions_cache?.[owner] || []);
+  const qui = isFamily ? null : owner;
+  const masque = isMasked();
+  _afficher({
+    owner: qui, masque,
     chiffres: { kpi, owner, famille: isFamily, date: S.syntheseDate, variation: variation || null,
                 variationAn: yoyVariation || null, surAn: S.periodeComparaison === 'an',
                 series: { net: serie('net'), gross: serie('gross'), debt: serie('debt'), mob: serie('mob') },
                 dates, objectif: _wealthTarget, immo, court: liqFiltered['J0–J1'] || 0 },
-    repartition: { synthese: syn, owner, masque: isMasked() },
-    comptes: { owner, date: S.syntheseDate },
-    cache,
-  });
-
-  renderEntityWarnings(syn.entity_warnings || [], { cache });
-  const posTitulaire = isFamily ? Object.values(S.synthese._positions_cache || {}).flat()
-                                : (S.synthese._positions_cache?.[owner] || []);
-  _cartes3b({ liqFiltered, posTitulaire, owner, syn });
-  _projectionSvelte({ positions: posTitulaire, famille: isFamily, net: kpi.net, objectif: _wealthTarget,
-                     masque: isMasked() });
-  appliquerDisposition();
+    repartition: { synthese: syn, owner },
+    historique: { historique: S.historique || [], owner: qui },
+    evolution: { owner: qui, arretes: (S.historique || []).length },
+    mouvements: { owner: qui, famille: isFamily, date: S.syntheseDate },
+    liquidite: { parLiquidite: liqFiltered, positions: posTitulaire },
+    entites: { entites: S.entities || [], owner, positions: Object.values(syn._positions_cache || {}).flat() },
+    cible: { synthese: syn, owner, categories: S.config?.categories || [] },
+    projection: { positions: posTitulaire, famille: isFamily, net: kpi.net, objectif: _wealthTarget },
+  }, { cache });
+  _noteSvelte(syn);
 }
 
 export async function loadHistorique() {
   S.historique = await api('GET', '/api/historique');
-  if (S.currentTab === 'synthese') _evolutionSvelte();
+  // Les deux cartes d'evolution suivent l'historique recharge.
+  if (S.currentTab === 'synthese' && _cartes) {
+    _afficher({ ..._cartes,
+      historique: { ..._cartes.historique, historique: S.historique },
+      evolution: { ..._cartes.evolution, arretes: S.historique.length } }, { cache: true });
+  }
 }
 
 

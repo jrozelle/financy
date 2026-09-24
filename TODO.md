@@ -22,8 +22,8 @@ l'historique git (`git log`), un commit par phase.
       comparé à l'ancien sur une copie de la base ; d'abord les plus exposés
       aux bugs d'interface — Positions (arbre et tableau), Synthèse et ses
       widgets, Flux et l'import — puis les écrans simples. Crédits et Positions
-      sont faits, ainsi que toutes les cartes de la Synthèse ; reste la grille de
-      widgets (lot 4), puis Flux et l'import
+      sont faits, ainsi que toute la Synthèse (cartes et grille) ; reste Flux et
+      l'import, puis les écrans simples
 
 ## Fait, en bref
 
