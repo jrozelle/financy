@@ -18,14 +18,6 @@ l'historique git (`git log`), un commit par phase.
 - [ ] Téléphone : synthèse longue (onze écrans) — cartes secondaires repliées
       par défaut ? La personnalisation est désormais dans le menu « ··· »
 
-- [ ] Svelte : porter les écrans un par un, un déploiement par écran, chacun
-      comparé à l'ancien sur une copie de la base ; d'abord les plus exposés
-      aux bugs d'interface — Positions (arbre et tableau), Synthèse et ses
-      widgets, Flux et l'import — puis les écrans simples. Crédits, Positions,
-      toute la Synthèse (cartes et grille), Flux (journal et import) et
-      l'onglet Entités (tableau, trésorerie et levier), Actifs, Performance,
-      Conseil, Outils et Référentiel sont faits ; reste Import
-
 ## Fait, en bref
 
 - **Socle** (avril 2026) : positions datées par arrêté, entités (SCI,
@@ -46,6 +38,11 @@ l'historique git (`git log`), un commit par phase.
 - **Interface** : synthèse personnalisable (widgets), barre du bas du téléphone
   au choix, mode discrétion, thème sombre, application installable, tris et
   accessibilité clavier.
+- **Svelte** (septembre 2026) : tous les onglets et trois écrans des Réglages
+  (Référentiel, Outils, Import / Export) portés un par un en Svelte 5 + TypeScript, chacun comparé à l'ancien sur une
+  copie de la base, au bureau et sur téléphone, puis déployé ; restent en
+  JavaScript les Préférences, les fenêtres (fiche d'une position, d'un flux,
+  d'un titre) et les modules partagés.
 - **Hygiène** (septembre 2026) : revue complète (calculs, cohérence, interface,
   CSS), dépôt public purgé des données réelles, clé d'API hors de la base,
   rotation des sauvegardes.

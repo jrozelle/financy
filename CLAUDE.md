@@ -168,10 +168,12 @@
   en prod, en ajouter une)
 - Routes : blueprints dans `routes/`
 - Frontend modulaire : `static/modules/` (un module par onglet dans `tabs/`)
-- Ecrans Svelte 5 + TypeScript dans `frontend/` (Credits, Positions, toute la
-  Synthese, grille de widgets comprise, Flux et son import, Entites avec
-  leur tresorerie, Actifs, Performance,
-  Conseil, Outils, Referentiel),
+- Ecrans Svelte 5 + TypeScript dans `frontend/` : tous les onglets et les
+  ecrans des Reglages (Referentiel, Outils, Import / Export) ; les Preferences,
+  les fenetres (fiches d'une position, d'un flux, d'un titre) et les modules partages
+  restent en JavaScript dans `static/modules/`. Chaque ecran est
+  une entree de `vite.config.ts`, monte par le module de son onglet
+  (`afficher(cible, props)`),
   compiles par Vite dans `frontend_dist/` (hors git), servis sous `/dist/`,
   construits dans l'image (etape `node` du Dockerfile) : un changement d'ecran
   Svelte demande un rebuild, comme du Python. Un ecran reprend le balisage et

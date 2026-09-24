@@ -4,3 +4,4 @@ export declare function api<T = unknown>(methode: string, chemin: string, corps?
                                  options?: { silent?: boolean }): Promise<T>;
 export declare function buildSelects(): void;
 export declare function refreshEntitySelect(): void;
+export declare function getCsrfToken(): string;

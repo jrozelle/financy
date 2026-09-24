@@ -25,7 +25,7 @@ import { loadAdvisor, renderAdvisor } from './tabs/advisor.js';
 import { loadActifs, wireActifsEvents } from './tabs/actifs.js';
 import { loadFlux, renderFlux, openFluxModal, saveFlux, deleteFlux } from './tabs/flux.js';
 import { loadEntities, renderEntities, openEntityModal, saveEntity, updateEntInfo, deleteEntity } from './tabs/entities.js';
-import { importXlsx, importJson, exportJson, resetDb, initDemoToggle, createBackup, updateDemoBadge } from './tabs/import-export.js';
+import { initDemoToggle, updateDemoBadge } from './tabs/import-export.js';
 import { loadReferential, renderReferential } from './tabs/referentiel.js';
 import { loadTimeline, renderOutils, loadSchedulerStatus } from './tabs/tools.js';
 import { loadPerformance, renderPerformance } from './tabs/performance.js';
@@ -791,11 +791,6 @@ function wireEvents() {
   );
 
   // Import / Export / Reset
-  document.getElementById('btn-import').addEventListener('click', importXlsx);
-  document.getElementById('btn-import-json').addEventListener('click', importJson);
-  document.getElementById('btn-export').addEventListener('click', exportJson);
-  document.getElementById('btn-reset').addEventListener('click', resetDb);
-  document.getElementById('btn-backup')?.addEventListener('click', createBackup);
 
   // Tri des tableaux
 
