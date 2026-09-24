@@ -26,7 +26,7 @@
    */
   import { api } from '/static/modules/api.js';
   import { S } from '/static/modules/state.js';
-  import { fmt, fmtPct } from '/static/modules/utils.js';
+  import { fmt, fmtPct, liqBadge } from '/static/modules/utils.js';
   import { NATURES, natureDe } from '/static/modules/categories.js';
   import { lirePref, ecrirePref } from '/static/modules/preferences.js';
   import type { Noeud, Position, Titre } from './types';
@@ -40,7 +40,7 @@
   const CLE_OUVERTS = 'financy_arbo_ouverts';
   const CLE_TRI = 'financy_arbo_tri';
   type Groupe = 'nature' | 'titulaire' | 'etablissement' | 'plat';
-  type Tri = { col: 'nom' | 'brut' | 'dette' | 'net' | 'pv'; sens: number };
+  type Tri = { col: 'nom' | 'brut' | 'dette' | 'net' | 'pv' | 'mob'; sens: number };
 
   const lireJson = <T,>(texte: string | null, defaut: T): T => {
     try { return texte ? JSON.parse(texte) : defaut; } catch { return defaut; }
@@ -63,6 +63,18 @@
   let filtre = $state<Filtre>({ etablissements: [], enveloppes: [],
     ...lireJson<Partial<Filtre>>(lirePref(CLE_FILTRE), {}) });
   let panneauFiltre = $state(false);
+
+  // Colonnes facultatives, que la vue Tableau montrait : liquidite (par
+  // compte : un groupe en melange plusieurs) et mobilisable (s'additionne).
+  const CLE_COLONNES = 'financy_columns_positions';
+  let colonnes = $state<{ liquidite: boolean; mobilisable: boolean }>({ liquidite: false, mobilisable: false,
+    ...lireJson(lirePref(CLE_COLONNES), {}) });
+  let panneauColonnes = $state(false);
+  function basculerColonne(c: 'liquidite' | 'mobilisable') {
+    colonnes = { ...colonnes, [c]: !colonnes[c] };
+    ecrirePref(CLE_COLONNES, JSON.stringify(colonnes));
+  }
+  const nbColonnes = $derived(7 + Number(colonnes.liquidite) + Number(colonnes.mobilisable));
   const etabDe = (p: Position) => p.establishment || p.entity || 'Sans établissement';
   const envDe = (p: Position) => p.envelope || 'Sans enveloppe';
   function compter(valeurs: string[]) {
@@ -128,9 +140,9 @@
 
   // ── Construction des noeuds ────────────────────────────────────────────
   function somme(noeuds: Noeud[]) {
-    const n = { brut: 0, dette: 0, gain: 0, mesures: 0 };
+    const n = { brut: 0, dette: 0, gain: 0, mesures: 0, mob: 0 };
     noeuds.forEach(x => {
-      n.brut += x.brut; n.dette += x.dette;
+      n.brut += x.brut; n.dette += x.dette; n.mob += x.mob || 0;
       if (x.mesures) { n.gain += x.gain; n.mesures += x.mesures; }
     });
     return n;
@@ -147,7 +159,7 @@
       sous: [p.label, avecEtab ? p.establishment : null, cat].filter(Boolean).join(' · '),
       chip: avecTitulaire ? INITIALES(p.owner) : '',
       brut: p.gross_attributed || 0, dette: p.debt_attributed || 0,
-      gain: p.gain_attributed || 0, mesures: p.gain_lignes ? 1 : 0,
+      gain: p.gain_attributed || 0, mesures: p.gain_lignes ? 1 : 0, mob: p.mobilizable_value || 0,
       titres: !!p.holdings_count, enfants: [],
     };
   }
@@ -163,7 +175,7 @@
         if (!parEntite.has(p.entity)) {
           const e = (S.entities || []).find(x => x.name === p.entity);
           const noeud: Noeud = { cle: `e${p.entity}`, niveau: 1, nom: p.entity, sous: e?.type || 'Entité', chip: '',
-                                 brut: 0, dette: 0, gain: 0, mesures: 0, enfants: [] };
+                                 brut: 0, dette: 0, gain: 0, mesures: 0, mob: 0, enfants: [] };
           parEntite.set(p.entity, noeud);
           comptes.push(noeud);
         }
@@ -187,7 +199,7 @@
       ps.filter(p => p.owner === qui).forEach(p => {
         const nom = p.establishment || p.entity || 'Sans établissement';
         if (!etabs.has(nom)) etabs.set(nom, { cle: `t${qui}|${nom}`, niveau: 1, nom, sous: '', chip: '', enfants: [],
-          brut: 0, dette: 0, gain: 0, mesures: 0,
+          brut: 0, dette: 0, gain: 0, mesures: 0, mob: 0,
           contexte: { owner: qui, establishment: p.establishment || null, entity: p.establishment ? null : p.entity } });
         const f = feuille(p, 2, { avecEtab: false, avecTitulaire: false });
         f.couleur = couleurNature(p);
@@ -211,7 +223,7 @@
     ps.forEach(p => {
       const nom = p.establishment || p.entity || 'Sans établissement';
       if (!etabs.has(nom)) etabs.set(nom, { cle: `e${nom}`, niveau: 0, nom, sous: '', chip: '', enfants: [],
-        brut: 0, dette: 0, gain: 0, mesures: 0,
+        brut: 0, dette: 0, gain: 0, mesures: 0, mob: 0,
         contexte: { owner: p.owner, establishment: p.establishment || null, entity: p.establishment ? null : p.entity } });
       const f = feuille(p, 1, { avecEtab: false });
       f.couleur = couleurNature(p);
@@ -252,6 +264,7 @@
     net: n => n.brut - n.dette,
     pv: n => (n.position ? (n.position.gain_lignes ? n.position.gain_attributed : null)
                          : (n.mesures ? n.gain : null)),
+    mob: n => n.mob,
   };
   function trier(noeuds: Noeud[]): Noeud[] {
     const cle = CLES_TRI[tri.col] || CLES_TRI.brut;
@@ -380,7 +393,7 @@
       const connu = !!cb && !(mv != null && Math.abs(cb - mv) < 0.01);
       return {
         cle: `h${t.id}`, niveau: n.niveau + 1, nom: t.name || t.isin, sous: t.isin && t.name ? t.isin : '',
-        chip: '', brut: v, dette: 0, gain: 0, mesures: 0, enfants: [],
+        chip: '', brut: v, dette: 0, gain: 0, mesures: 0, mob: 0, enfants: [],
         gainTitre: connu ? ((t.effective_value ?? mv ?? 0) - cb!) * pct : null,
       };
     });
@@ -451,6 +464,8 @@
     <td class="num arbo-net" class:is-negatif={net < 0} role="gridcell">{fmt(net)}
       <span class="arbo-pv-mobile">{@render pv(n)}</span></td>
     <td class="num arbo-pv" role="gridcell">{@render pv(n)}</td>
+    {#if colonnes.liquidite}<td class="arbo-liq" role="gridcell">{#if n.position}{@html liqBadge(n.position.liquidity)}{/if}</td>{/if}
+    {#if colonnes.mobilisable}<td class="num arbo-mob" role="gridcell">{n.gainTitre !== undefined ? '' : fmt(n.mob)}</td>{/if}
     <td class="arbo-actions" role="gridcell">
       {#if n.position}
         {@const p = n.position}
@@ -477,7 +492,7 @@
       {#if Array.isArray(titres.get(n.position.id))}
         {#each noeudsTitres(n) as t (t.cle)}{@render ligne(t, total, totalNet, couleur)}{/each}
       {:else}
-        <tr class="arbo-l{n.niveau + 1}" aria-level={n.niveau + 2}><td class="arbo-nom" colspan="7">
+        <tr class="arbo-l{n.niveau + 1}" aria-level={n.niveau + 2}><td class="arbo-nom" colspan={nbColonnes}>
           <div class="arbo-nom-in arbo-attente" style:--niv={n.niveau + 1}><span class="arbo-chevron-vide"></span>Chargement des lignes…</div></td></tr>
       {/if}
     {/if}
@@ -506,10 +521,22 @@
   </div>
   <button type="button" class="arbo-bouton arbo-filtrer" id="arbo-filtrer" aria-expanded={panneauFiltre}
           aria-controls="arbo-filtres" class:actif={nbFiltres > 0}
-          onclick={() => panneauFiltre = !panneauFiltre}>Filtrer{#if nbFiltres}<span class="arbo-filtrer-n">{nbFiltres}</span>{/if}</button>
+          onclick={() => { panneauFiltre = !panneauFiltre; panneauColonnes = false; }}>Filtrer{#if nbFiltres}<span
+          class="arbo-filtrer-n">{nbFiltres}</span>{/if}</button>
+  <button type="button" class="arbo-bouton arbo-colonnes-btn" id="arbo-colonnes-btn" aria-expanded={panneauColonnes}
+          aria-controls="arbo-colonnes" onclick={() => { panneauColonnes = !panneauColonnes; panneauFiltre = false; }}>Colonnes</button>
   <span class="arbo-espace"></span>
   <button type="button" class="arbo-bouton" id="arbo-deplier" onclick={toutDeplier}>Tout déplier</button>
   <button type="button" class="arbo-bouton" id="arbo-replier" onclick={toutReplier}>Tout replier</button>
+</div>
+<div id="arbo-colonnes" class="arbo-filtres arbo-colonnes" hidden={!panneauColonnes}>
+  <fieldset class="arbo-filtre-groupe">
+    <legend>Colonnes facultatives</legend>
+    <label class="arbo-filtre-choix"><input type="checkbox" checked={colonnes.liquidite}
+      onchange={() => basculerColonne('liquidite')}><span>Liquidité</span><span class="arbo-filtre-nb">délai de sortie</span></label>
+    <label class="arbo-filtre-choix"><input type="checkbox" checked={colonnes.mobilisable}
+      onchange={() => basculerColonne('mobilisable')}><span>Mobilisable</span><span class="arbo-filtre-nb">disponible après décote</span></label>
+  </fieldset>
 </div>
 <div id="arbo-filtres" class="arbo-filtres" hidden={!panneauFiltre}>
   {#each [['etablissements', 'Établissements', choixEtabs, etabsActifs], ['enveloppes', 'Enveloppes', choixEnvs, envsActives]] as [liste, titre, choix, actifs] (liste)}
@@ -544,6 +571,8 @@
             {@render entete('dette', 'Dette', 'num arbo-dette')}
             {@render entete('net', 'Net', 'num arbo-net')}
             {@render entete('pv', 'Plus-value', 'num arbo-pv')}
+            {#if colonnes.liquidite}<th scope="col" class="arbo-liq">Liquidité</th>{/if}
+            {#if colonnes.mobilisable}{@render entete('mob', 'Mobilisable', 'num arbo-mob')}{/if}
             <th scope="col" class="arbo-actions"><span class="sr-only">Actions</span></th>
           </tr>
         </thead>
@@ -556,6 +585,8 @@
             <td class="num arbo-dette" class:is-dette={vue.total.dette}>{vue.total.dette ? fmt(vue.total.dette) : '—'}</td>
             <td class="num arbo-net">{fmt(vue.total.brut - vue.total.dette)}</td>
             <td class="num arbo-pv">{#if vue.total.mesures}<span class={vue.total.gain >= 0 ? 'pv-hausse' : 'pv-baisse'}>{signe(vue.total.gain)}</span>{/if}</td>
+            {#if colonnes.liquidite}<td class="arbo-liq"></td>{/if}
+            {#if colonnes.mobilisable}<td class="num arbo-mob">{fmt(vue.total.mob)}</td>{/if}
             <td class="arbo-actions"></td>
           </tr>
         </tfoot>

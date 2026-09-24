@@ -3473,7 +3473,7 @@ td.arbo-part > * { vertical-align: middle; }
    plus-value dessous. Le reste se lit en vue Tableau. */
 @media (max-width: 640px) {
   .arbo thead, .arbo .arbo-part, .arbo .arbo-valeur, .arbo .arbo-dette,
-  .arbo .arbo-pv, .arbo .arbo-actions { display: none; }
+  .arbo .arbo-pv, .arbo .arbo-liq, .arbo .arbo-mob, .arbo .arbo-actions { display: none; }
   .arbo-nom { min-width: 0; }
   .arbo td { padding: .5rem .6rem; }
   .arbo-nom-in { padding-left: calc(var(--niv, 0) * .9rem); }
@@ -4175,3 +4175,5 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   .arbo-filtres { padding: .6rem; grid-template-columns: 1fr; }
   .arbo-filtre-choix { min-height: 44px; }
 }
+.arbo-liq { width: 1%; white-space: nowrap; }
+.arbo-mob { color: var(--text-muted); }

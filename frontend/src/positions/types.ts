@@ -6,6 +6,7 @@ export interface Position {
   gross_attributed: number; debt_attributed: number; net_attributed: number;
   gain_attributed: number | null; gain_pct: number | null; gain_lignes: number; holdings_count: number;
   has_holdings: boolean;
+  liquidity: string | null; mobilizable_value: number;
 }
 
 /** Une ligne de titres (/api/positions/<id>/holdings). */
@@ -20,7 +21,7 @@ export interface Titre {
 export interface Noeud {
   cle: string; niveau: number; visuel?: number; nom: string; sous: string; chip: string;
   couleur?: string; pastille?: boolean;
-  brut: number; dette: number; gain: number; mesures: number;
+  brut: number; dette: number; gain: number; mesures: number; mob: number;
   enfants: Noeud[]; position?: Position; titres?: boolean;
   contexte?: { owner: string | null; establishment: string | null; entity: string | null };
   /** Ligne de titres : plus-value deja calculee (null = PRU inconnu). */
