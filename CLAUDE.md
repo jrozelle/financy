@@ -159,6 +159,10 @@
   600), via `services/settings.py`
 - Mode démo (`is_demo_mode()`) : aucun appel réseau (providers et LLM mockés)
 - Uploads : limite de taille, vérif MIME, stockage temporaire purgé
+- Adresse du client : `adresse_client()` (`auth.py`), jamais `request.remote_addr`
+  directement — derrière un proxy, c'est celle du proxy. `X-Forwarded-For` ne
+  se lit que depuis les proxies de `FINANCY_PROXIES_DE_CONFIANCE`, de droite à
+  gauche
 
 ## Architecture
 - Stack : Python 3.12 / Flask 3 / SQLite, vanilla JS + Chart.js, templates serveur ;

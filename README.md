@@ -75,6 +75,7 @@ Dans `.env` (voir `.env.example`) :
 | `DB_PATH` | `patrimoine.db` | Base SQLite |
 | `HOST` / `PORT` | `0.0.0.0` / `5017` | Adresse d'écoute |
 | `SESSION_TIMEOUT_MINUTES` | `60` | Inactivité avant déconnexion |
+| `FINANCY_PROXIES_DE_CONFIANCE` | *(vide)* | Derrière un reverse proxy : ses adresses ou son réseau (`10.0.0.0/24`, séparés par des virgules). L'adresse du client est alors lue dans `X-Forwarded-For`, pour que la limite des tentatives de connexion compte par client et non pour le proxy entier |
 | `FLASK_ENV` | `development` | `production` coupe le débogage et exige des cookies sécurisés |
 | `PRICE_PROVIDER` | `yahoo` | Source des cours ; `mock` n'appelle aucun réseau |
 | `SCHEDULER_ENABLED` | `false` | Rafraîchissement quotidien des cours (`SCHEDULER_HOUR`, `SCHEDULER_MINUTE`, `SCHEDULER_TZ`) |
@@ -93,7 +94,7 @@ Dans `.env` (voir `.env.example`) :
 
 ## Sécurité
 
-- Mot de passe comparé en temps constant, tentatives de connexion limitées
+- Mot de passe comparé en temps constant, tentatives de connexion limitées par client, y compris derrière un reverse proxy
 - Sessions à durée limitée, régénérées à la connexion
 - Protection CSRF sur toute écriture, entrées validées côté serveur
 - En-têtes de sécurité (CSP, X-Frame-Options, Referrer-Policy), cookies HttpOnly et SameSite

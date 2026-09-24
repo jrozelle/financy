@@ -13,7 +13,7 @@ except ImportError:
     pass  # python-dotenv optionnel — variables d'env directes
 
 from flask import Flask, render_template, session, request, redirect, url_for, jsonify
-from auth import AUTH_PASSWORD, login_required, csrf_protect
+from auth import AUTH_PASSWORD, login_required, csrf_protect, adresse_client
 from models import init_db, set_demo_mode, get_db_path, DEMO_DB_PATH
 from routes import all_blueprints
 from services.backups import create_db_backup
@@ -108,7 +108,7 @@ def login_page():
     if not AUTH_PASSWORD:
         return redirect(url_for('index'))
     if request.method == 'POST':
-        ip = request.remote_addr
+        ip = adresse_client()
         if _is_rate_limited(ip):
             logger.warning('Login rate limited — IP %s', ip)
             return render_template('login.html', error='Trop de tentatives. Réessayez dans quelques minutes.',

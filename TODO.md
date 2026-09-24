@@ -8,8 +8,6 @@ l'historique git (`git log`), un commit par phase.
 - [ ] Libellés du « patrimoine financier » : cinq valeurs selon l'onglet, chacune
       juste dans son périmètre, que le libellé doit dire
 - [ ] Constats : versements PER face au plafond de déduction (revenus à saisir)
-- [ ] Limitation des tentatives de connexion derrière le reverse proxy (lire
-      l'adresse transmise par le proxy, et seulement la sienne)
 - [ ] Suppression des opérations bancaires d'une entité (aucun écran aujourd'hui,
       ce qui empêche de supprimer une entité qui a des relevés)
 - [ ] Soldes d'ouverture des comptes d'entité déjà importés : réimporter le premier
