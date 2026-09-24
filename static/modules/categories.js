@@ -1,7 +1,7 @@
 /**
  * Classement des categories en poches patrimoniales.
  *
- * Miroir de MACRO_BUCKETS dans `routes/synthese.py` — les deux doivent rester
+ * Miroir de MACRO_BUCKETS dans `services/categories.py` — les deux doivent rester
  * synchronises. Ce module existe pour qu'il n'y ait qu'UNE copie cote client :
  * elle vivait dans synthese.js, et toute autre vue qui en avait besoin devait
  * la recopier.

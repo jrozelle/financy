@@ -174,12 +174,35 @@ class TestAllocation:
         # Seed positions (Alice devient Personne 1 par defaut)
         _make_position(client, owner='Personne 1', category='Actions', envelope='PEA',
                        value=50000)
-        _make_position(client, owner='Personne 1', category='Cash', envelope='Livret A',
+        _make_position(client, owner='Personne 1', category='Cash & dépôts', envelope='Livret A',
                        value=50000)
+        # « Autre » est du patrimoine autre pour la synthese : le conseil ne le
+        # compte pas dans le financier, il le decompte a part.
+        _make_position(client, owner='Personne 1', category='Autre', envelope='Autre', value=20000)
         r = client.get('/api/advisor/profiles/Personne 1/allocation')
         data = r.get_json()
-        assert data['total_eur'] == 100000
+        assert data['total_eur'] == 100000 and data['financier_eur'] == 100000
+        assert {'category': 'Autre', 'montant': 20000} in data['exclus']
         assert 'Actions' in data['target']
         assert 'Actions' in data['actual']
         assert data['actual']['Actions'] == 0.5
         assert len(data['gap']) > 0
+
+
+def test_financier_du_conseil_est_celui_de_la_synthese():
+    """Une seule definition : toute categorie de la poche financiere entre
+    dans le calcul du conseil, toute autre en est decomptee."""
+    from services.categories import MACRO_BUCKETS, FINANCIER
+    from services.advisor.allocation import allocation_financiere, CLASSE_DE
+    assert set(CLASSE_DE) == MACRO_BUCKETS[FINANCIER]
+    toutes = sorted({c for cats in MACRO_BUCKETS.values() for c in cats} | {'Inconnue'})
+    positions = [{'category': c, 'net_attributed': 1000, 'mobilizable_value': 1000, 'owner': 'A'} for c in toutes]
+    r = allocation_financiere({'horizon_years': 10, 'risk_tolerance': 3}, positions)
+    assert r['total_eur'] == 1000 * len(MACRO_BUCKETS[FINANCIER])
+    assert {e['category'] for e in r['exclus']} == set(toutes) - MACRO_BUCKETS[FINANCIER]
+    # La tresorerie d'une societe est du financier pour la synthese, hors calcul ici.
+    r = allocation_financiere({'horizon_years': 10, 'risk_tolerance': 3},
+                              [{'category': 'Cash & dépôts', 'net_attributed': 500, 'label': 'SCI Exemple'},
+                               {'category': 'Actions', 'net_attributed': 1500, 'mobilizable_value': 1500}],
+                              entites=('SCI Exemple',))
+    assert (r['total_eur'], r['financier_eur']) == (1500, 2000)

@@ -5,8 +5,6 @@ l'historique git (`git log`), un commit par phase.
 
 ## Ouvert
 
-- [ ] Libellés du « patrimoine financier » : cinq valeurs selon l'onglet, chacune
-      juste dans son périmètre, que le libellé doit dire
 - [ ] Soldes d'ouverture des comptes d'entité déjà importés : réimporter le premier
       relevé de chaque compte
 - [ ] CSS : échelle de tailles de police et d'espacements

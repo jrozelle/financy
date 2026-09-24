@@ -140,7 +140,7 @@
 
 {#key masque}
 <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:1rem">
-  <div class="kpi-card"><div class="kpi-label">Valorisation totale</div><div class="kpi-value" id="actifs-kpi-value">{t ? fmt(t.market_value || 0) : '—'}</div></div>
+  <div class="kpi-card"><div class="kpi-label">Valeur des lignes de titres</div><div class="kpi-value" id="actifs-kpi-value">{t ? fmt(t.market_value || 0) : '—'}</div></div>
   <div class="kpi-card"><div class="kpi-label">Prix de revient</div><div class="kpi-value" id="actifs-kpi-cost">{t?.cost_basis ? fmt(t.cost_basis) : '—'}</div></div>
   <div class="kpi-card"><div class="kpi-label">+/- latent</div><div class="kpi-value" id="actifs-kpi-pnl"
     style:color={t?.pnl != null ? (t.pnl >= 0 ? 'var(--success)' : 'var(--danger)') : null}>{t?.pnl != null

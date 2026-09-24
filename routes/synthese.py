@@ -14,24 +14,8 @@ MAX_WEALTH_TARGET = 1e12
 
 # Regroupement des categories de positions en 3 poches patrimoniales pour la
 # synthese brut/net. Toute categorie non listee tombe dans "Patrimoine autre".
-MACRO_ORDER = ['Patrimoine financier', 'Patrimoine immobilier', 'Patrimoine autre']
-MACRO_BUCKETS = {
-    'Patrimoine financier': {
-        'Cash & dépôts', 'Monétaire', 'Obligations', 'Actions',
-        'Fond Euro', 'Produits Structurés', 'Crypto',
-    },
-    'Patrimoine immobilier': {'Immobilier', 'SCPI'},
-    # 'Société' est l'ancien nom de 'Parts sociales' : les deux sont listes,
-    # une base non migree restant classee comme avant.
-    'Patrimoine autre': {'Objets de valeur', 'Société', 'Parts sociales', 'Autre'},
-}
-
-
-def _macro_bucket(category):
-    for bucket, cats in MACRO_BUCKETS.items():
-        if category in cats:
-            return bucket
-    return 'Patrimoine autre'
+# Les poches viennent de services/categories.py, seule definition du financier.
+from services.categories import MACRO_ORDER, MACRO_BUCKETS, macro_bucket as _macro_bucket  # noqa: E402,F401
 
 
 @synthese_bp.route('/api/synthese')

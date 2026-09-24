@@ -119,8 +119,11 @@
       </table>
     </div>
     <!-- Ce qui est hors du calcul ne disparait pas : il est decompte ici. -->
-    <p class="advisor-perimetre" id="advisor-perimetre">{#key masque}{#if avecProfil && donnees && avecEcarts}{@const exclus = (donnees.exclus || []).map(e => `${e.category} ${fmt(e.montant)}`).join(', ')}Calcul sur le patrimoine financier : {fmt(donnees.total_eur)}{donnees.bloque_eur
-      ? `, dont ${fmt(donnees.bloque_eur)} bloqués (contrat nanti, PER, produit structuré) : ils comptent dans l'exposition, mais les propositions n'y touchent pas` : ''}.{exclus
-      ? ` Hors calcul, car ils ne s'arbitrent pas : ${exclus}.` : ''}{/if}{/key}</p>
+    <!-- Le montant se raccorde a celui de la synthese : meme patrimoine
+         financier (services/categories.py), moins la tresorerie des societes. -->
+    <p class="advisor-perimetre" id="advisor-perimetre">{#key masque}{#if avecProfil && donnees && avecEcarts}{@const treso = (donnees.exclus || []).find(e => e.category === 'Trésorerie de société')?.montant || 0}{@const exclus = (donnees.exclus || []).filter(e => e.category !== 'Trésorerie de société').map(e => `${e.category} ${fmt(e.montant)}`).join(', ')}Calcul sur le patrimoine financier arbitrable : {fmt(donnees.total_eur)}{donnees.bloque_eur
+      ? `, dont ${fmt(donnees.bloque_eur)} bloqués (contrat nanti, PER, produit structuré) : ils comptent dans l'exposition, mais les propositions n'y touchent pas` : ''}.{treso && donnees.financier_eur
+      ? ` C'est le patrimoine financier de la synthèse (${fmt(donnees.financier_eur)}), moins ${fmt(treso)} de trésorerie de société.` : ''}{exclus
+      ? ` Hors du patrimoine financier, donc du calcul : ${exclus}.` : ''}{/if}{/key}</p>
   </div>
 </div>

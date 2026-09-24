@@ -36,6 +36,10 @@
   facultative sur un element deja explicite.
 - Un element ecarte d'un calcul ne disparait jamais sans explication : il figure
   dans un decompte, et le detail est consultable (statut, valeur, date).
+- Un montant dit son perimetre. « Patrimoine financier » designe la poche de la
+  synthese et elle seule ; un montant plus etroit porte son propre nom (« valeur
+  mesuree », « lignes de titres », « arbitrable ») et se raccorde a elle quand
+  l'ecran le permet.
 - Colonnes de liste triables au clic, avec `aria-sort` et acces clavier.
 - **Preferences de lecture en base** (colonnes, filtres, tris, vues, angle de
   la repartition, hypotheses de projection) : `lirePref` / `ecrirePref` de
@@ -125,9 +129,11 @@
 - Les constats ne s'appuient que sur des faits verifiables et ne citent aucun
   taux de marche : le seul taux cite est celui d'un contrat. Pas de conseil
   generique : un « verifiez » sans chiffre n'est pas une proposition.
-- Les propositions d'arbitrage portent sur le seul patrimoine FINANCIER
-  (immobilier, objets, parts de societe et tresorerie d'entite hors calcul,
-  decomptes), ranges dans les classes de la cible par `CLASSE_DE`, et ne
+- Les propositions d'arbitrage portent sur le seul patrimoine FINANCIER, celui
+  de la synthese — une seule definition, `services/categories.py` (miroir JS
+  `static/modules/categories.js`) — moins la tresorerie d'entite (immobilier,
+  objets, parts de societe, « Autre » et tresorerie hors calcul, decomptes),
+  ranges dans les classes de la cible par `CLASSE_DE`, et ne
   puisent que dans la part libre : un contrat nanti, un PER, un produit
   structure comptent dans l'exposition sans etre proposes. Sans reserve
   declaree, les livrets reglementes sont gardes.

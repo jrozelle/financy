@@ -221,7 +221,7 @@
     {#if g}
       {@const comptes = g.accounts || (d.groups || []).filter(x => x.status === 'ok').length}
       {@const r = rend(g)}
-      {@render tuile('', `Valeur au ${fmtDate(d.date)}`, fmt(g.value),
+      {@render tuile('', `Valeur mesurée au ${fmtDate(d.date)}`, fmt(g.value),
         focus ? g.label : `${comptes} compte${comptes > 1 ? 's' : ''} mesuré${comptes > 1 ? 's' : ''}`)}
       {@render tuile('kpi-gross', 'Rendement de votre argent', r ? pct(r.v) : '—',
         r ? `${r.sub} · selon la date de vos versements` : 'historique insuffisant', sign(r?.v))}

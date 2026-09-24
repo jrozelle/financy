@@ -25,6 +25,8 @@ import json
 import logging
 from typing import Dict, List, Tuple, Optional
 
+from services.categories import est_financier
+
 logger = logging.getLogger('financy.advisor')
 
 
@@ -226,8 +228,8 @@ CLASSE_DE = {
 
 # Ni la residence, ni une SCPI a credit, ni un tableau, ni les parts de sa
 # propre societe ne s'arbitrent contre un ETF. Les compter faussait toutes les
-# proportions : la cible s'applique au seul patrimoine financier.
-HORS_PERIMETRE = {'Immobilier', 'SCPI', 'Objets de valeur', 'Parts sociales', 'Société'}
+# proportions : la cible s'applique au seul patrimoine financier, celui de la
+# synthese (services/categories.py) — tout le reste est decompte a part.
 
 LIVRETS_REGLEMENTES = {'Livret A', 'LDDS', 'LEP'}
 
@@ -259,7 +261,7 @@ def allocation_financiere(profile: dict, positions: List[dict], matrix=None, ent
         net = max(0.0, p.get('net_attributed') or 0)
         if not net:
             continue
-        if cat in HORS_PERIMETRE:
+        if not est_financier(cat):
             exclus[cat] = exclus.get(cat, 0) + net
             continue
         # Un compte au nom d'une entite declaree est la tresorerie de la
@@ -281,6 +283,9 @@ def allocation_financiere(profile: dict, positions: List[dict], matrix=None, ent
             reglementes += net
 
     total = sum(c['actual_eur'] for c in classes.values())
+    # Le financier de la synthese, pour que l'ecran raccorde les deux montants :
+    # la seule difference est la tresorerie des societes.
+    financier = total + exclus.get('Trésorerie de société', 0)
     gap = []
     for cle in sorted(set(cible) | set(classes)):
         c = classes.get(cle, {'actual_eur': 0.0, 'libre_eur': 0.0, 'bloque_eur': 0.0,
@@ -305,6 +310,7 @@ def allocation_financiere(profile: dict, positions: List[dict], matrix=None, ent
         'actual': {g['category']: g['actual_pct'] for g in gap if g['actual_eur']},
         'gap': gap,
         'total_eur': round(total, 2),
+        'financier_eur': round(financier, 2),
         'bloque_eur': round(sum(g['bloque_eur'] for g in gap), 2),
         'exclus': [{'category': k, 'montant': round(v, 2)} for k, v in sorted(exclus.items(), key=lambda kv: -kv[1])],
         'reglementes_eur': round(reglementes, 2),
