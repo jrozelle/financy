@@ -2,3 +2,5 @@
 // a l'execution par son URL. Seule la partie utilisee par les ecrans Svelte.
 export declare function toast(message: string, type?: 'success' | 'error'): void;
 export declare function confirmDialog(titre: string, corps: string): Promise<boolean>;
+export declare function promptDialog(titre: string, options?: { defaultValue?: string; placeholder?: string;
+  inputType?: string; confirmText?: string }): Promise<string | null>;

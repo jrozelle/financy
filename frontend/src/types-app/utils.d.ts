@@ -8,6 +8,7 @@ export declare function fmtPct(n: number | null | undefined, dec?: number, signe
 export declare function liqBadge(liq: string | null | undefined): string;
 export declare function fmtAxis(n: number): string;
 export declare function parseLocaleNumber(s: string, defaut?: number): number;
+export declare function parseLocaleNumber(s: string, defaut: null): number | null;
 export declare function today(): string;
 /** Tri stable, valeurs absentes en bas dans les deux sens. */
 export declare function sortArr<T>(liste: T[], cle: string | null, sens: number): T[];

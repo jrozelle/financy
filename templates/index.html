@@ -180,18 +180,8 @@
     <div id="tab-entites" class="tab-content hidden">
       <!-- Ecran Svelte (frontend/src/entites/), monte a la premiere visite. -->
       <div id="entites-app"><div class="page-header"><h1>Entités (SCI / Indivision)</h1></div></div>
-      <div class="card" id="tresorerie-carte">
-        <div class="card-head">
-          <div>
-            <h2>Trésorerie et levier</h2>
-            <p class="card-sub">Ce que chaque entité reçoit, rembourse et coûte, lu sur ses relevés bancaires.</p>
-          </div>
-          <button type="button" class="btn btn-secondary btn-sm" id="treso-importer">Importer des relevés</button>
-          <input type="file" id="treso-fichiers" accept="application/pdf" multiple hidden>
-        </div>
-        <div class="prets-apercu" id="treso-apercu" hidden></div>
-        <div id="tresorerie-entites"></div>
-      </div>
+      <!-- Ecran Svelte (frontend/src/entites/Tresorerie.svelte), monte a la premiere visite. -->
+      <div id="tresorerie-app"></div>
       <details class="card ent-aide" id="ent-aide">
         <summary>Comment fonctionnent les entités ?</summary>
         <p class="text-muted">
