@@ -47,9 +47,9 @@
   {#key masque}
   {#if charge && donnees}
     {#if !donnees.from_date}
-      <p class="text-muted" style="font-size:13px">Aucun arrêté précédent à comparer.</p>
+      <p class="text-muted" style="font-size:var(--fs-sm)">Aucun arrêté précédent à comparer.</p>
     {:else if !mouvements.length}
-      <p class="text-muted" style="font-size:13px">Aucun mouvement depuis le {fmtDate(donnees.from_date)}.</p>
+      <p class="text-muted" style="font-size:var(--fs-sm)">Aucun mouvement depuis le {fmtDate(donnees.from_date)}.</p>
     {:else}
       {@const d = donnees}
       <p class="mv-total">Variation nette

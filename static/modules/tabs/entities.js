@@ -63,7 +63,7 @@ function showEntitySnapshots(entityName) {
   const showChart = snaps.length >= 2;
   document.getElementById('dd-body').innerHTML = `
     ${showChart ? '<div style="position:relative;height:200px;margin-bottom:1rem"><canvas id="entity-timeline-canvas"></canvas></div>' : ''}
-    <p style="font-size:13px;color:var(--text-muted);margin-bottom:.75rem">
+    <p style="font-size:var(--fs-sm);color:var(--text-muted);margin-bottom:.75rem">
       Chaque modification de valeur crée une entrée datée. L'historique est utilisé pour reconstituer la valorisation aux dates passées.
     </p>
     <div class="table-scroll" tabindex="0" role="region" aria-label="Valeurs enregistrées">

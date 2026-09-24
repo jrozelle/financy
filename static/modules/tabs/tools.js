@@ -81,7 +81,7 @@ export async function triggerPricesRefresh(onlyStale = false) {
       const items = stats.divergent.map(d =>
         `<li>${esc(d.isin)} (${esc(d.ticker)}) : ${d.old_price.toFixed(2)} → ${d.new_price.toFixed(2)} — <strong>ignore, verifiez le ticker</strong></li>`
       ).join('');
-      divergentHtml = `<div style="color:var(--warning);margin-top:.5rem;font-size:12px">Cours divergents (>50%) ignores :<ul style="margin:.25rem 0">${items}</ul></div>`;
+      divergentHtml = `<div style="color:var(--warning);margin-top:.5rem;font-size:var(--fs-xs)">Cours divergents (>50%) ignores :<ul style="margin:.25rem 0">${items}</ul></div>`;
     }
     if (resultEl) {
       resultEl.innerHTML = `Provider <strong>${esc(stats.provider)}</strong> — ${parts.join(' · ')}${divergentHtml}`;

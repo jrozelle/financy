@@ -53,7 +53,7 @@
 
 <div class="card" id="adv-objectives">
   <h2>Objectifs</h2>
-  <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
+  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem">
     Projets patrimoniaux multi-horizons. Pris en compte pour affiner l'allocation cible en phase ultérieure.
   </p>
   <!-- svelte-ignore a11y_no_noninteractive_tabindex : zone defilante, atteignable au clavier -->

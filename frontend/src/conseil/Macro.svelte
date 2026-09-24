@@ -60,11 +60,11 @@
 
 <div class="card" id="adv-macro">
   <h2>Vue macroéconomique</h2>
-  <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
+  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem">
     Synthèse générée par Claude (sans web search) ou éditée à la main.
     Utilisée comme contexte pour les propositions d'arbitrage.
   </p>
-  <div id="macro-empty" class="text-muted" style="font-size:13px;margin-bottom:.875rem" style:display={charge && !snap ? null : 'none'}>
+  <div id="macro-empty" class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem" style:display={charge && !snap ? null : 'none'}>
     Aucun arrêté pour le moment.
   </div>
   <div id="macro-content" class="form-grid" style="margin-bottom:.875rem" style:display={snap ? null : 'none'}>
@@ -83,10 +83,10 @@
     <div class="form-group full-span" style="grid-column:1 / -1">
       <label for="macro-summary">Synthèse</label>
       <textarea id="macro-summary" rows="4" maxlength="4000" bind:value={f.synthese}
-        style="border:1px solid var(--border);border-radius:6px;padding:.5rem .75rem;font-size:13px;background:var(--card);color:var(--text);font-family:inherit;resize:vertical"></textarea>
+        style="border:1px solid var(--border);border-radius:6px;padding:.5rem .75rem;font-size:var(--fs-sm);background:var(--card);color:var(--text);font-family:inherit;resize:vertical"></textarea>
     </div>
   </div>
-  <div id="macro-meta" class="text-muted" style="font-size:11.5px;margin-bottom:.5rem">{snap ? `Source : ${snap.source === 'manual' ? 'manuelle' : 'LLM'} · ${snap.date || ''}` : ''}</div>
+  <div id="macro-meta" class="text-muted" style="font-size:var(--fs-xs);margin-bottom:.5rem">{snap ? `Source : ${snap.source === 'manual' ? 'manuelle' : 'LLM'} · ${snap.date || ''}` : ''}</div>
   <div style="display:flex;gap:.5rem;flex-wrap:wrap">
     <button type="button" class="btn btn-primary" id="btn-macro-refresh" class:is-loading={enCours} disabled={enCours || (charge && !llm.dispo)}
       title={charge ? (llm.dispo ? (llm.mock ? 'Mode mock : reponse fictive' : 'Appel Claude API') : 'ANTHROPIC_API_KEY absente') : undefined}

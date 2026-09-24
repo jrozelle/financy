@@ -291,7 +291,7 @@ function _renderHistoryRows() {
   const lignes = key ? sortArr(_hist, key, dir) : [..._hist].reverse();
   tbody.innerHTML = lignes.map(h => {
     const deltaStr = h.delta != null
-      ? `<span style="color:${h.delta >= 0 ? 'var(--success)' : 'var(--danger)'};font-size:11px">${h.delta >= 0 ? '+' : ''}${fmt(h.delta)}</span>`
+      ? `<span style="color:${h.delta >= 0 ? 'var(--success)' : 'var(--danger)'};font-size:var(--fs-2xs)">${h.delta >= 0 ? '+' : ''}${fmt(h.delta)}</span>`
       : '';
     return `<tr>
       <td>${fmtDate(h.date)}</td>

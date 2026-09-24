@@ -5,9 +5,7 @@ l'historique git (`git log`), un commit par phase.
 
 ## Ouvert
 
-- [ ] Soldes d'ouverture des comptes d'entité déjà importés : réimporter le premier
-      relevé de chaque compte
-- [ ] CSS : échelle de tailles de police et d'espacements
+- [ ] CSS : échelle d'espacements (les tailles de texte sont faites : paliers `--fs-*`)
 - [ ] Téléphone : synthèse longue (onze écrans) — cartes secondaires repliées
       par défaut ? La personnalisation est désormais dans le menu « ··· »
 

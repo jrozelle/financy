@@ -144,6 +144,10 @@
 ## Code
 - Pas d'emojis dans le code
 - Dark mode cohérent dans toutes les nouvelles modales et popovers
+- Tailles de texte : les paliers `--fs-*` de `:root` (`static/style.css`), jamais
+  une valeur brute — y compris dans un `style=` en ligne ou un ecran Svelte. Une
+  taille manquante prend le palier le plus proche. Seule exception : les 16 px
+  `!important` des champs sur telephone, qui empechent le zoom d'iOS.
 - Toutes les migrations DB sont idempotentes (`CREATE IF NOT EXISTS`, `ALTER` dans try/except)
 - Jamais de `DROP` ou `ALTER` destructif. Seule exception, levee par
   l'utilisateur pour le passage aux centimes : `_reconstruire_en_centimes`

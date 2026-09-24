@@ -63,7 +63,7 @@
   <div id="advisor-adjustments" class="advisor-adjustments">
     {#if !avecProfil}
       <div class="empty-state" style="padding:1rem 0">
-        <p class="text-muted" style="font-size:12.5px;margin-bottom:.75rem">
+        <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.75rem">
           Enregistrez un profil (horizon + tolérance au risque) pour calculer
           l'allocation cible et générer des propositions d'arbitrage.
         </p>
@@ -75,7 +75,7 @@
       {#if donnees.adjustments?.length}
         {#each donnees.adjustments as a, i (i)}<div class="advisor-adjustment-item">{a}</div>{/each}
       {:else}
-        <div class="text-muted" style="font-size:12.5px">Profil standard : aucun ajustement contextuel appliqué.</div>
+        <div class="text-muted" style="font-size:var(--fs-sm)">Profil standard : aucun ajustement contextuel appliqué.</div>
       {/if}
     {/if}
   </div>

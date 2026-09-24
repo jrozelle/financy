@@ -84,10 +84,10 @@ function _summaryHtml(data) {
       <div class="isin-summary-grid">
         <div class="isin-summary-item">
           <div class="isin-summary-label">Type</div>
-          <div class="isin-summary-value" style="font-size:13px">Non coté (manuel)</div>
+          <div class="isin-summary-value" style="font-size:var(--fs-sm)">Non coté (manuel)</div>
         </div>
       </div>
-      <div class="text-muted" style="font-size:12.5px">
+      <div class="text-muted" style="font-size:var(--fs-sm)">
         Fonds euros ou actif custom : pas de cours de marché. La valorisation est saisie à la main.
       </div>`;
   }
@@ -118,21 +118,21 @@ function _summaryHtml(data) {
       </div>
       <div class="isin-summary-item">
         <div class="isin-summary-label">Fraîcheur</div>
-        <div class="isin-summary-value" style="font-size:13px">
+        <div class="isin-summary-value" style="font-size:var(--fs-sm)">
           <span class="h-badge ${freshClass}">${freshLabel}</span>
-          <span class="text-muted" style="font-size:11px">${data.last_price_date ? ' ' + fmtDate(data.last_price_date) : ''}</span>
+          <span class="text-muted" style="font-size:var(--fs-2xs)">${data.last_price_date ? ' ' + fmtDate(data.last_price_date) : ''}</span>
         </div>
       </div>
       <div class="isin-summary-item">
         <div class="isin-summary-label">Points</div>
-        <div class="isin-summary-value" style="font-size:13px">${data.points.length}</div>
+        <div class="isin-summary-value" style="font-size:var(--fs-sm)">${data.points.length}</div>
       </div>
     </div>`;
 }
 
 function _holdingHtml(h) {
   if (!h || !h.quantity) {
-    return '<div class="text-muted" style="font-size:12.5px">Aucune ligne avec cet ISIN.</div>';
+    return '<div class="text-muted" style="font-size:var(--fs-sm)">Aucune ligne avec cet ISIN.</div>';
   }
   const pru = h.cost_basis && h.quantity ? (h.cost_basis / h.quantity) : null;
   const pnl = h.pnl;
@@ -145,16 +145,16 @@ function _holdingHtml(h) {
       const label = [p.establishment, p.envelope, p.category].filter(Boolean).join(' / ');
       const pct = h.current_value && p.market_value != null ? fmtPct(p.market_value / h.current_value * 100) : '—';
       return `<tr>
-        <td style="font-size:12px">${esc(label)}</td>
-        <td class="num" style="font-size:12px">${fmtQty(p.quantity || 0, 2)}</td>
-        <td class="num" style="font-size:12px">${p.market_value != null ? fmt(p.market_value) : '—'}</td>
-        <td class="num" style="font-size:12px;color:var(--text-muted)">${pct}</td>
+        <td style="font-size:var(--fs-xs)">${esc(label)}</td>
+        <td class="num" style="font-size:var(--fs-xs)">${fmtQty(p.quantity || 0, 2)}</td>
+        <td class="num" style="font-size:var(--fs-xs)">${p.market_value != null ? fmt(p.market_value) : '—'}</td>
+        <td class="num" style="font-size:var(--fs-xs);color:var(--text-muted)">${pct}</td>
       </tr>`;
     }).join('');
     posHtml = `
       <div style="margin-top:.75rem">
-        <div style="font-size:12px;font-weight:600;margin-bottom:.25rem">Detention par enveloppe</div>
-        <table style="width:100%;font-size:12px">
+        <div style="font-size:var(--fs-xs);font-weight:600;margin-bottom:.25rem">Detention par enveloppe</div>
+        <table style="width:100%;font-size:var(--fs-xs)">
           <thead><tr>
             <th style="text-align:left;font-weight:600">Enveloppe</th>
             <th style="text-align:right;font-weight:600">Qty</th>

@@ -195,7 +195,7 @@
 <div class="page-header">
   <h1>Référentiel</h1>
   <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
-    <div id="ref-save-status" style="font-size:13px" class={statut.classe || undefined}>{statut.texte}</div>
+    <div id="ref-save-status" style="font-size:var(--fs-sm)" class={statut.classe || undefined}>{statut.texte}</div>
     <select id="ref-template-select" class="filter-select" style="width:auto" bind:value={modele} onchange={choisirModele}>
       {#if modeles}
         <option value="">Parcourir les modèles…</option>
@@ -208,7 +208,7 @@
     <button class="btn btn-primary" id="btn-save-referential" disabled={enCours} onclick={enregistrer}>{enCours ? 'Enregistrement…' : 'Enregistrer le référentiel'}</button>
   </div>
 </div>
-<p class="text-muted" style="margin-bottom:1.25rem;font-size:13px">
+<p class="text-muted" style="margin-bottom:1.25rem;font-size:var(--fs-sm)">
   Modifiez les listes et valeurs utilisées dans toute l'application. Les changements prennent effet après enregistrement.
 </p>
 <div id="ref-template-preview" class="card" style="margin-bottom:1.25rem;border:2px solid var(--primary);background:var(--primary-light)"
@@ -230,7 +230,7 @@
 <div class="two-col">
   <div class="card">
     <h2>Titulaires</h2>
-    <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
+    <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem">
       Personnes dont les patrimoines sont suivis. Une suppression n'efface pas les positions existantes.
     </p>
     <div id="ref-owners-chips">
@@ -254,7 +254,7 @@
   <div class="card">
     <h2>Types d'entités</h2>
     <div id="ref-entity-types" style="margin-bottom:1.25rem">{@render liste('ref-entity-types', 'entity_types', 'Type d\'entité')}</div>
-    <h2>Modes de valorisation <span class="text-muted" style="font-size:11px;font-weight:400">(label documentaire)</span></h2>
+    <h2>Modes de valorisation <span class="text-muted" style="font-size:var(--fs-2xs);font-weight:400">(label documentaire)</span></h2>
     <div id="ref-valuation-modes" style="margin-bottom:1.25rem">{@render liste('ref-valuation-modes', 'valuation_modes', 'Mode de valorisation')}</div>
     <h2>Types de flux</h2>
     <div id="ref-flux-types">{@render liste('ref-flux-types', 'flux_types', 'Type de flux')}</div>
@@ -263,7 +263,7 @@
 
 <div class="card">
   <h2>Catégories d'actifs &amp; mobilisabilité</h2>
-  <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
+  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem">
     Le % mobilisable est appliqué au net attribué positif pour estimer la liquidité disponible par catégorie.
   </p>
   <!-- svelte-ignore a11y_no_noninteractive_tabindex : zone defilante, atteignable au clavier -->
@@ -306,12 +306,12 @@
 
 <div class="card">
   <h2>Alertes</h2>
-  <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
+  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem">
     Affichées dans Synthèse quand le seuil est franchi. Stockées localement dans votre navigateur.
   </p>
   <div id="ref-alerts-list" style="margin-bottom:.75rem">
     {#if !alertes.length}
-      <p class="text-muted" style="font-size:12.5px">Aucune alerte configurée.</p>
+      <p class="text-muted" style="font-size:var(--fs-sm)">Aucune alerte configurée.</p>
     {:else}
       {#each alertes as a, i (i)}
         {@const avecCat = a.metric === 'cat_pct' || a.metric === 'cat_abs'}
@@ -352,7 +352,7 @@
 
 <div class="card">
   <h2>Enveloppes &amp; liquidité</h2>
-  <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
+  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem">
     La liquidité détermine la classe d'horizon de disponibilité. La friction indique les contraintes de sortie (fiscale, frais, décote probable…).
   </p>
   <!-- svelte-ignore a11y_no_noninteractive_tabindex : zone defilante, atteignable au clavier -->

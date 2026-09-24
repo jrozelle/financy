@@ -224,8 +224,8 @@
         <path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-6"/>
       </svg>
     </div>
-    <h3 style="font-size:14px;margin-bottom:.4rem">Aucune ligne d'actif</h3>
-    <p class="text-muted" style="font-size:12.5px;margin-bottom:1rem">
+    <h3 style="font-size:var(--fs-base);margin-bottom:.4rem">Aucune ligne d'actif</h3>
+    <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:1rem">
       Pour voir vos ETF, actions et fonds euros ici, ajoutez des lignes
       dans une position depuis l'onglet Positions.
     </p>

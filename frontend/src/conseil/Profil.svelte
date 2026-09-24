@@ -48,7 +48,7 @@
 <div class="card" id="adv-profile">
   <h2>Profil du titulaire</h2>
   <div style="margin-bottom:.75rem">
-    <label for="advisor-owner-select" style="font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Titulaire</label>
+    <label for="advisor-owner-select" style="font-size:var(--fs-xs);color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Titulaire</label>
     <select id="advisor-owner-select" class="filter-select" style="margin-left:.5rem" aria-label="Titulaire du profil" bind:value={proprietaire}>
       {#each titulaires as o (o)}<option value={o}>{o}</option>{/each}
     </select>

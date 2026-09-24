@@ -133,7 +133,7 @@
 
 <div class="card">
   <h2>Timeline patrimoniale</h2>
-  <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
+  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem">
     Frise chronologique des arrêtés, flux et événements.
   </p>
   <div id="timeline-body">
@@ -160,7 +160,7 @@
 
 <div class="card">
   <h2>Projection / Simulation</h2>
-  <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
+  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem">
     Simulez l'évolution d'un capital avec un versement mensuel régulier.
   </p>
   <form id="simulation-form" onsubmit={simuler}>
@@ -200,7 +200,7 @@
 
 <div class="card">
   <h2>Arrêté automatique</h2>
-  <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
+  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem">
     Duplique le dernier arrêté à la date du jour. Utile pour garder un historique régulier sans modifier manuellement les positions.
   </p>
   <button class="btn btn-secondary" id="btn-auto-snapshot" onclick={() => triggerAutoSnapshot()}>Créer un arrêté aujourd'hui</button>
@@ -208,7 +208,7 @@
 
 <div class="card">
   <h2>Cours de marché</h2>
-  <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
+  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem">
     Rafraîchit automatiquement les derniers cours des ISIN cotés (actions, ETF, OPCVM). Les fonds euros et actifs non cotés sont ignorés.
   </p>
   <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
@@ -216,6 +216,6 @@
     <button class="btn btn-secondary" id="btn-refresh-prices-stale" onclick={() => triggerPricesRefresh(true)}>Rafraîchir uniquement les périmés (&gt;20h)</button>
   </div>
   <!-- Remplis par tools.js (triggerPricesRefresh, loadSchedulerStatus) : Svelte n'y touche pas. -->
-  <div id="prices-refresh-result" style="margin-top:1rem;font-size:12.5px"></div>
-  <div id="scheduler-status" style="margin-top:.75rem;font-size:12px;color:var(--text-muted)"></div>
+  <div id="prices-refresh-result" style="margin-top:1rem;font-size:var(--fs-sm)"></div>
+  <div id="scheduler-status" style="margin-top:.75rem;font-size:var(--fs-xs);color:var(--text-muted)"></div>
 </div>

@@ -57,7 +57,7 @@ export async function openTargetsModal() {
         <label>${esc(cat)}</label>
         <input class="target-input" type="text" inputmode="decimal" min="0" max="100" step="1"
                data-cat="${esc(cat)}" value="${targets[cat] || ''}">
-        <span style="font-size:12px;color:var(--text-muted)">%</span>
+        <span style="font-size:var(--fs-xs);color:var(--text-muted)">%</span>
       </div>`).join('');
   document.getElementById('targets-modal').classList.remove('hidden');
 }

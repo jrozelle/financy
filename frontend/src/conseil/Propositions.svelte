@@ -50,7 +50,7 @@
 
 <div class="card" id="adv-proposals">
   <h2>Propositions d'arbitrage</h2>
-  <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
+  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem">
     Ce qui rapprocherait le patrimoine financier de la cible du profil, en ne puisant
     que dans l'argent libre, et les leviers fiscaux chiffrés.
   </p>
@@ -64,7 +64,7 @@
       <option value="dismissed">Écartées</option>
     </select>
   </div>
-  <div id="proposals-empty" class="text-muted" style="font-size:13px;font-style:italic" style:display={liste && !liste.length ? null : 'none'}>
+  <div id="proposals-empty" class="text-muted" style="font-size:var(--fs-sm);font-style:italic" style:display={liste && !liste.length ? null : 'none'}>
     Aucune proposition. Cliquez « Générer » pour les calculer.
   </div>
   <div id="proposals-list" class="proposals-list">

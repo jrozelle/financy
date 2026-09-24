@@ -203,7 +203,7 @@
         <div class="alert alert-success">
           Base vidée — <strong>{(reset.total || 0).toLocaleString('fr-FR')}</strong> ligne(s) supprimée(s).
           {#if reset.backup?.filename}<br>Backup automatique : <strong>{reset.backup.filename}</strong> ({reset.backup.size_kb} Ko).{/if}
-          {#if lignes.length}<ul style="margin:.4rem 0 0 1.1rem;font-size:12.5px">{#each lignes as [t, n] (t)}<li>{n.toLocaleString('fr-FR')} {LIBELLES[t] || t}</li>{/each}</ul>{/if}
+          {#if lignes.length}<ul style="margin:.4rem 0 0 1.1rem;font-size:var(--fs-sm)">{#each lignes as [t, n] (t)}<li>{n.toLocaleString('fr-FR')} {LIBELLES[t] || t}</li>{/each}</ul>{/if}
         </div>
       {/if}
     </div>

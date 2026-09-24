@@ -54,7 +54,7 @@ function _renderSyntheseEmpty() {
   card.innerHTML = `
     <div style="text-align:center;padding:1.5rem .5rem">
       <h2 style="margin-bottom:.5rem">Aucun arrêté pour le moment</h2>
-      <p class="text-muted" style="font-size:13.5px;margin-bottom:1.25rem;line-height:1.6">
+      <p class="text-muted" style="font-size:var(--fs-base);margin-bottom:1.25rem;line-height:1.6">
         Commencez par ajouter une position ou importer un fichier existant
         pour que votre patrimoine s'affiche ici.
       </p>

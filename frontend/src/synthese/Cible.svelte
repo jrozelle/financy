@@ -58,7 +58,7 @@
   <h2 style="margin:0">Écart à la cible</h2>
 <p class="card-sub">Le trait marque l’allocation visée</p>
   <div style="display:flex;align-items:center;gap:.5rem">
-    <span id="alloc-mode-switch"><span style="display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;font-size:12px;vertical-align:middle">
+    <span id="alloc-mode-switch"><span style="display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;font-size:var(--fs-xs);vertical-align:middle">
       {#each ['net', 'brut'] as m (m)}
         <button type="button" data-alloc-mode={m} onclick={() => mode = m as 'net' | 'brut'}
                 style="padding:.2rem .6rem;border:none;cursor:pointer;background:{m === mode ? 'var(--primary)' : 'transparent'};color:{m === mode ? 'var(--on-accent)' : 'var(--text)'}">{m === 'net' ? 'Net' : 'Brut'}</button>
@@ -69,9 +69,9 @@
 </div>
 <div id="allocation-targets">
   {#if lignes === null}
-    <p class="text-muted" style="font-size:13px">Aucune donnée.</p>
+    <p class="text-muted" style="font-size:var(--fs-sm)">Aucune donnée.</p>
   {:else if !lignes.length}
-    <p class="text-muted" style="font-size:13px">Cliquez sur "Modifier cibles" pour configurer.</p>
+    <p class="text-muted" style="font-size:var(--fs-sm)">Cliquez sur "Modifier cibles" pour configurer.</p>
   {:else}
     <div class="cible-liste">
       {#each lignes as r (r.cat)}
