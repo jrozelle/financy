@@ -20,6 +20,7 @@ import { natureDe } from '../categories.js';
 import { dessinerCourbe } from '../courbe.js';
 import { fmt, fmtPct, parseLocaleNumber } from '../utils.js';
 import { isMasked, onMaskChange } from '../mask.js';
+import { lirePref, ecrirePref } from '../preferences.js';
 
 // v2 : l'epargne a change de sens (nouvelle, et non plus versements) ; un
 // reglage memorise sous l'ancienne cle y reinjecterait le rythme du DCA.
@@ -29,10 +30,10 @@ let _mesure = null;
 let _crd = null;
 
 function _reglages() {
-  try { return JSON.parse(localStorage.getItem(CLE)) || {}; } catch { return {}; }
+  try { return JSON.parse(lirePref(CLE)) || {}; } catch { return {}; }
 }
 function _memoriser(r) {
-  try { localStorage.setItem(CLE, JSON.stringify(r)); } catch { /* session privee */ }
+  ecrirePref(CLE, JSON.stringify(r));
 }
 
 /** Restant du des prets AMORTISSABLES a une date, interpole entre les points

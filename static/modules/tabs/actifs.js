@@ -7,6 +7,7 @@ import { triggerPricesRefresh } from './tools.js';
 import { saveFilters, loadFilters } from '../filter-persist.js';
 import { reapplyColumns } from '../column-picker.js';
 import { loadReconcile } from './reconcile.js';
+import { lirePref, ecrirePref } from '../preferences.js';
 
 let _classChart = null;
 let _envelopeChart = null;
@@ -90,29 +91,34 @@ function ensureActifsTableScaffold() {
 
 function ensureEstablishmentColumnPreference() {
   try {
-    if (localStorage.getItem(ACTIFS_ESTABLISHMENTS_MIGRATION_KEY)) return;
-    const saved = JSON.parse(localStorage.getItem(ACTIFS_COLUMNS_STORAGE_KEY) || '{}');
+    if (lirePref(ACTIFS_ESTABLISHMENTS_MIGRATION_KEY)) return;
+    const saved = JSON.parse(lirePref(ACTIFS_COLUMNS_STORAGE_KEY) || '{}');
     saved.establishments = true;
-    localStorage.setItem(ACTIFS_COLUMNS_STORAGE_KEY, JSON.stringify(saved));
-    localStorage.setItem(ACTIFS_ESTABLISHMENTS_MIGRATION_KEY, '1');
+    ecrirePref(ACTIFS_COLUMNS_STORAGE_KEY, JSON.stringify(saved));
+    ecrirePref(ACTIFS_ESTABLISHMENTS_MIGRATION_KEY, '1');
   } catch {}
 }
 
-// Restore tri et filtre chart depuis localStorage au premier load
-(function _restoreActifsState() {
+// Tri et filtre du graphique restaures au premier chargement de l'onglet —
+// pas a celui du module : les preferences arrivent de la base au demarrage.
+let _etatRestaure = false;
+function _restoreActifsState() {
+  if (_etatRestaure) return;
+  _etatRestaure = true;
   const saved = loadFilters('actifs');
   if (saved.sortCol) S.sort.actifs.key = saved.sortCol;
   if (typeof saved.sortDesc === 'boolean') S.sort.actifs.dir = saved.sortDesc ? -1 : 1;
   if (saved.filter && saved.filter.type && saved.filter.value) {
     _filter = { type: saved.filter.type, value: saved.filter.value };
   }
-})();
+}
 
 function _persist() {
   saveFilters('actifs', { sortCol: S.sort.actifs.key, sortDesc: S.sort.actifs.dir === -1, filter: _filter });
 }
 
 export async function loadActifs() {
+  _restoreActifsState();
   ensureEstablishmentColumnPreference();
   ensureActifsTableScaffold();
   // Ne pas reinitialiser _filter : il a ete restaure au boot et maintenu

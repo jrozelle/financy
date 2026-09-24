@@ -9,6 +9,8 @@
 
 import { esc } from './utils.js';
 
+import { lirePref, ecrirePref } from './preferences.js';
+
 const STORAGE_PREFIX = 'financy_columns_';
 
 export function initColumnPicker(key, buttonId, theadId, columns) {
@@ -93,9 +95,9 @@ export function reapplyColumns(key, theadId) {
 }
 
 function _save(key, state) {
-  try { localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(state)); } catch {}
+  ecrirePref(STORAGE_PREFIX + key, JSON.stringify(state));
 }
 
 function _load(key) {
-  try { return JSON.parse(localStorage.getItem(STORAGE_PREFIX + key) || '{}'); } catch { return {}; }
+  try { return JSON.parse(lirePref(STORAGE_PREFIX + key) || '{}'); } catch { return {}; }
 }

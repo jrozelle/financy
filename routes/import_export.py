@@ -367,7 +367,7 @@ _TECHNIQUES = {'id', 'created_at', 'updated_at'}
 _CLE_POSITION = ('date', 'owner', 'category', 'envelope', 'establishment', 'entity', 'label')
 # Configuration exportable ; les reglages (cle API) n'en sont pas.
 _CONFIG_EXPORTEE = ('referential', 'allocation_targets', 'user_alerts', 'wealth_target',
-                    'benchmark_isin')
+                    'benchmark_isin', 'synthese_disposition', 'barre_mobile', 'preferences')
 
 
 def _vide(v):

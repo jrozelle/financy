@@ -8,19 +8,17 @@
  * avec les options disponibles (owner qui existe encore, etc.).
  */
 
+import { lirePref, ecrirePref, effacerPref } from './preferences.js';
+
 const PREFIX = 'financy_filters_';
 
 export function saveFilters(tab, obj) {
-  try {
-    localStorage.setItem(PREFIX + tab, JSON.stringify(obj || {}));
-  } catch {
-    // quota plein ou storage inaccessible : pas bloquant
-  }
+  ecrirePref(PREFIX + tab, JSON.stringify(obj || {}));
 }
 
 export function loadFilters(tab) {
   try {
-    const raw = localStorage.getItem(PREFIX + tab);
+    const raw = lirePref(PREFIX + tab);
     return raw ? JSON.parse(raw) : {};
   } catch {
     return {};
@@ -28,9 +26,7 @@ export function loadFilters(tab) {
 }
 
 export function clearFilterKey(tab) {
-  try {
-    localStorage.removeItem(PREFIX + tab);
-  } catch {}
+  effacerPref(PREFIX + tab);
 }
 
 /**

@@ -3,6 +3,7 @@ import { initMask, toggleMask, isMasked, onMaskChange } from './mask.js';
 import { wireTodo } from './todo.js';
 import { wireReglages, estUnReglage, ouvrir as ouvrirReglages } from './reglages.js';
 import { initBarreMobile } from './barre-mobile.js';
+import { chargerPreferences, lirePref } from './preferences.js';
 import { basculerEdition } from './widgets.js';
 import { etiqueter, dateCourte } from './select-etiquette.js';
 import { fmtDate, esc, applyChartTheme, refreshChartsTheme } from './utils.js';
@@ -47,6 +48,9 @@ function _lsSet(cle, valeur) {
 // ─── Init ─────────────────────────────────────────────────────────────────
 
 async function init() {
+  // Avant tout rendu : colonnes, filtres, tris et vues viennent de la base.
+  await chargerPreferences();
+  S.positionsView = lirePref('financy_positionsView') || 'tree';
   initMask();
   wireTodo(switchTab);   // la zone « À traiter » renvoie vers l'onglet concerne
   wireReglages(chargerEcranReglage);

@@ -14,6 +14,7 @@
  */
 import { S } from '../state.js';
 import { fmt, esc, fmtPct } from '../utils.js';
+import { lirePref, ecrirePref } from '../preferences.js';
 
 const ANGLES = [
   { cle: 'macro',    libelle: 'Poche',     source: 'totals_by_macro' },
@@ -49,10 +50,10 @@ function partDe(cle, nom, t, owner, isFamille) {
            : { gross: 0, net: 0, debt: 0 };
 }
 
-let _angle = 'macro';
-try { _angle = localStorage.getItem('financy_repartition') || 'macro'; } catch { /* session privee */ }
+let _angle = null;   // lu au premier rendu : la preference arrive de la base au demarrage
 
 export function renderRepartition() {
+  _angle ??= lirePref('financy_repartition') || 'macro';
   const hote = document.getElementById('repartition-card');
   if (!hote || !S.synthese) return;
 
@@ -88,7 +89,7 @@ export function renderRepartition() {
   hote.querySelectorAll('[data-angle]').forEach(b => {
     b.addEventListener('click', () => {
       _angle = b.dataset.angle;
-      try { localStorage.setItem('financy_repartition', _angle); } catch { /* idem */ }
+      ecrirePref('financy_repartition', _angle);
       renderRepartition();
     });
   });

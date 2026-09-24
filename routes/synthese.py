@@ -1,4 +1,5 @@
 import json
+import re
 from flask import Blueprint, jsonify, request
 from datetime import datetime
 from models import (get_db, compute_position, get_entity_map, get_holdings_map,
@@ -644,6 +645,62 @@ def ecrire_barre_mobile():
     with get_db() as conn:
         conn.execute('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)', (CLE_BARRE, json.dumps(propre)))
     return jsonify(propre)
+
+
+# ─── Preferences de lecture ─────────────────────────────────────────────────
+# Colonnes, filtres, tris, angle de la repartition, hypotheses de projection :
+# des choix de lecture, reglés une fois et retrouves sur tous les appareils.
+# Ce qui depend de l'appareil (mode discretion, densite, noeuds ouverts de
+# l'arbre) reste dans le navigateur. Valeurs textuelles, comme localStorage
+# qu'elles remplacent (static/modules/preferences.js).
+
+CLE_PREFERENCES = 'preferences'
+_CLE_PREF = re.compile(r'^financy_[A-Za-z0-9_]{1,60}$')
+MAX_PREF_VALEUR = 4000
+MAX_PREF_CLES = 100
+
+
+def _lire_preferences(conn):
+    r = conn.execute('SELECT value FROM config WHERE key=?', (CLE_PREFERENCES,)).fetchone()
+    try:
+        d = json.loads(r['value']) if r else {}
+    except ValueError:
+        return {}
+    return d if isinstance(d, dict) else {}
+
+
+@synthese_bp.route('/api/preferences', methods=['GET'])
+@login_required
+def lire_preferences():
+    with get_db() as conn:
+        return jsonify(_lire_preferences(conn))
+
+
+@synthese_bp.route('/api/preferences', methods=['PATCH'])
+@login_required
+@csrf_protect
+def modifier_preferences():
+    """Fusionne {cle: valeur} ; une valeur null efface la cle."""
+    d = request.get_json(silent=True)
+    if not isinstance(d, dict) or not d:
+        return jsonify({'error': 'Objet {cle: valeur} attendu'}), 400
+    for cle, valeur in d.items():
+        if not isinstance(cle, str) or not _CLE_PREF.match(cle):
+            return jsonify({'error': f'Préférence inconnue : {str(cle)[:60]}'}), 400
+        if valeur is not None and (not isinstance(valeur, str) or len(valeur) > MAX_PREF_VALEUR):
+            return jsonify({'error': f'{cle} : texte de {MAX_PREF_VALEUR} caractères au plus'}), 400
+    with get_db() as conn:
+        prefs = _lire_preferences(conn)
+        for cle, valeur in d.items():
+            if valeur is None:
+                prefs.pop(cle, None)
+            else:
+                prefs[cle] = valeur
+        if len(prefs) > MAX_PREF_CLES:
+            return jsonify({'error': f'{MAX_PREF_CLES} préférences au plus'}), 400
+        conn.execute('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)',
+                     (CLE_PREFERENCES, json.dumps(prefs)))
+    return jsonify(prefs)
 
 
 @synthese_bp.route('/api/wealth-target', methods=['PUT'])

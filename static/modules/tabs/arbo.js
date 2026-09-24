@@ -29,6 +29,7 @@ import { S } from '../state.js';
 import { api } from '../api.js';
 import { fmt, esc, fmtPct } from '../utils.js';
 import { NATURES, natureDe } from '../categories.js';
+import { lirePref, ecrirePref } from '../preferences.js';
 
 const CLE_GROUPE = 'financy_arbo_groupe';
 const CLE_OUVERTS = 'financy_arbo_ouverts';
@@ -40,20 +41,28 @@ let _recherche = '';
 let _tri = { col: 'brut', sens: -1 };
 const _lignesTitres = new Map();  // id position -> holdings, ou 'chargement'
 
-try {
-  _groupe = localStorage.getItem(CLE_GROUPE) || 'nature';
-  const o = localStorage.getItem(CLE_OUVERTS);
-  if (o) _ouverts = new Set(JSON.parse(o));
-  const t = localStorage.getItem(CLE_TRI);
-  if (t) _tri = { ..._tri, ...JSON.parse(t) };
-} catch { /* session privee : on garde les valeurs par defaut */ }
+// Lu au premier rendu, pas au chargement du module : les preferences
+// partagees (regroupement, tri) arrivent de la base pendant le demarrage.
+// Les noeuds ouverts restent propres a l'appareil.
+let _reglagesLus = false;
+function _lireReglages() {
+  if (_reglagesLus) return;
+  _reglagesLus = true;
+  try {
+    _groupe = lirePref(CLE_GROUPE) || 'nature';
+    const o = localStorage.getItem(CLE_OUVERTS);
+    if (o) _ouverts = new Set(JSON.parse(o));
+    const t = lirePref(CLE_TRI);
+    if (t) _tri = { ..._tri, ...JSON.parse(t) };
+  } catch { /* session privee : on garde les valeurs par defaut */ }
+}
 
 function _memoriser() {
+  ecrirePref(CLE_GROUPE, _groupe);
+  ecrirePref(CLE_TRI, JSON.stringify(_tri));
   try {
-    localStorage.setItem(CLE_GROUPE, _groupe);
-    localStorage.setItem(CLE_TRI, JSON.stringify(_tri));
     if (_ouverts) localStorage.setItem(CLE_OUVERTS, JSON.stringify([..._ouverts]));
-  } catch { /* idem */ }
+  } catch { /* session privee */ }
 }
 
 /** Une lettre par titulaire ; deux quand deux prenoms commencent pareil
@@ -375,6 +384,7 @@ async function _chargerTitres(id) {
 let _dernier = null;
 
 export function renderArbo(positions) {
+  _lireReglages();
   _dernier = { positions };
   _calculerInitiales(S.positions || positions);
   const hote = document.getElementById('positions-tree-body');

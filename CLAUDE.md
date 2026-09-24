@@ -37,6 +37,12 @@
 - Un element ecarte d'un calcul ne disparait jamais sans explication : il figure
   dans un decompte, et le detail est consultable (statut, valeur, date).
 - Colonnes de liste triables au clic, avec `aria-sort` et acces clavier.
+- **Preferences de lecture en base** (colonnes, filtres, tris, vues, angle de
+  la repartition, hypotheses de projection) : `lirePref` / `ecrirePref` de
+  `static/modules/preferences.js`, cles `financy_*` listees dans `PARTAGEES`,
+  lues au premier rendu et non au chargement du module. `localStorage` direct
+  seulement pour ce qui depend de l'appareil : mode discretion, densite,
+  noeuds ouverts de l'arbre.
 - Chart.js : jamais d'echelle `category` pour une serie temporelle — les points
   seraient equidistants et la pente faussee. Echelle numerique sur l'epoch, et
   toutes les series alignees sur la meme liste d'abscisses (les trous a `null`),

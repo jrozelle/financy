@@ -17,10 +17,6 @@ l'historique git (`git log`), un commit par phase.
 - [ ] CSS : échelle de tailles de police et d'espacements
 - [ ] Téléphone : synthèse longue (onze écrans) — cartes secondaires repliées
       par défaut ? La personnalisation est désormais dans le menu « ··· »
-- [ ] Préférences de lecture en base plutôt que dans le navigateur (colonnes,
-      filtres, tri et regroupement de l'arbre, angle de la répartition,
-      hypothèses de projection) ; mode discrétion et densité restent par
-      appareil
 
 ## Fait, en bref
 

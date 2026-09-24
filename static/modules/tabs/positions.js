@@ -8,6 +8,7 @@ import { refreshDates, ecrireContexte } from '../main.js';
 import { saveFilters, loadFilters, clearFilterKey, applyIfValid } from '../filter-persist.js';
 import { renderArbo, oublierTitres } from './arbo.js';
 import { reapplyColumns } from '../column-picker.js';
+import { ecrirePref } from '../preferences.js';
 
 const POSITION_FILTER_COLUMNS = {
   'filter-owner': 'owner',
@@ -211,7 +212,7 @@ export function renderPosViewToggle() {
     const btn = e.target.closest('.view-toggle-btn');
     if (!btn) return;
     S.positionsView = btn.dataset.view;
-    localStorage.setItem('financy_positionsView', S.positionsView);
+    ecrirePref('financy_positionsView', S.positionsView);
     renderPositions();
   });
   place(toggle);
