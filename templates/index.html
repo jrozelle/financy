@@ -281,22 +281,8 @@
 
     <!-- ── CONSEIL PATRIMONIAL ─────────────────────────────────────────── -->
     <div id="tab-performance" class="tab-content hidden">
-      <div id="perf-empty" class="empty-state hidden">
-        <p>Deux arrêtés au minimum sont nécessaires pour mesurer une performance.</p>
-        <p class="text-muted">Ajoutez des arrêtés de positions, et des flux pour distinguer
-        les versements du rendement.</p>
-      </div>
-      <div id="perf-body">
-        <div class="kpi-grid" id="perf-kpi"></div>
-        <div id="perf-controls"></div>
-        <div class="card">
-          <h2>Vos placements face au marché</h2>
-          <p class="card-sub">Part exposée aux marchés, base 100 au premier arrêté, versements neutralisés (TWR). Choisissez un compte dans la liste pour le voir seul.</p>
-          <div id="perf-courbe" class="courbe-hote"></div>
-          <div id="perf-legende" class="courbe-legende" aria-live="polite"></div>
-        </div>
-        <div class="card" id="perf-list"></div>
-      </div>
+      <!-- Ecran Svelte (frontend/src/performance/), monte a la premiere visite. -->
+      <div id="perf-app"></div>
     </div>
 
     <div id="tab-conseil" class="tab-content hidden">
