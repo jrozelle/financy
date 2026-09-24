@@ -17,6 +17,19 @@ cp .env.example .env            # DB_PATH=financy_dev.db, FINANCY_PASSWORD=...
 Passer par `python -m pip` : le `pip` du venv peut pointer vers un interpréteur
 disparu après une mise à jour de Python.
 
+Les écrans réécrits en Svelte (onglet Crédits pour l'instant) se compilent à
+part, avec Node :
+
+```bash
+cd frontend
+npm install
+npm run build        # une fois ; `npm run dev` recompile a chaque modification
+npm run check        # types (svelte-check)
+```
+
+Le bundle va dans `frontend_dist/` (ignoré par git), servi par Flask sous
+`/dist/`. En prod, l'image le compile elle-même (étape `node` du Dockerfile).
+
 Pour travailler sans données réelles, activer le **mode démo** dans les
 réglages : base fictive `demo.db`, cours et modèle de langage simulés, aucun
 appel réseau. Régénérer la base de démo : `./venv/bin/python generate_demo.py`.
@@ -53,6 +66,7 @@ Les gabarits ne se rechargent pas à chaud : redémarrer après un changement de
 | `routes/` | Un blueprint par domaine ; `@login_required` partout, `@csrf_protect` sur toute écriture |
 | `services/` | Logique métier : prêts, trésorerie d'entité, contribution, fiscalité, contrats, conseil (`advisor/`), lecteurs de documents (`parsers/`) |
 | `static/modules/` | Front en modules ES, un module par onglet dans `tabs/` |
+| `frontend/` | Écrans en Svelte 5 + TypeScript (Vite) ; ils réutilisent les modules de `static/modules/` par leur URL |
 | `templates/index.html` | L'application (page unique) ; `login.html` |
 | `tests/` | Pytest, un fichier par domaine |
 

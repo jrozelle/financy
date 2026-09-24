@@ -45,3 +45,7 @@ CLAUDE.local.md
 
 # Secrets (cle d API) : a cote de la base, jamais versionnes
 secrets.json
+
+# Front compile (frontend/ -> frontend_dist/, construit dans l'image)
+node_modules/
+frontend_dist/

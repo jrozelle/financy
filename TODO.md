@@ -18,6 +18,11 @@ l'historique git (`git log`), un commit par phase.
 - [ ] Téléphone : synthèse longue (onze écrans) — cartes secondaires repliées
       par défaut ? La personnalisation est désormais dans le menu « ··· »
 
+- [ ] Svelte : porter les écrans un par un, un déploiement par écran, chacun
+      comparé à l'ancien sur une copie de la base ; d'abord les plus exposés
+      aux bugs d'interface — Positions (arbre et tableau), Synthèse et ses
+      widgets, Flux et l'import — puis les écrans simples. Crédits est fait
+
 ## Fait, en bref
 
 - **Socle** (avril 2026) : positions datées par arrêté, entités (SCI,

@@ -7,3 +7,6 @@ tests/
 __pycache__
 *.pyc
 docker-compose.yml
+node_modules
+frontend/node_modules
+frontend_dist

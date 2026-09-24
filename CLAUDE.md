@@ -161,12 +161,22 @@
 - Uploads : limite de taille, vérif MIME, stockage temporaire purgé
 
 ## Architecture
-- Stack : Python 3.12 / Flask 3 / SQLite, vanilla JS + Chart.js, templates serveur
+- Stack : Python 3.12 / Flask 3 / SQLite, vanilla JS + Chart.js, templates serveur ;
+  Svelte 5 + TypeScript pour les ecrans reecrits (`frontend/`)
 - Modèles et migrations : `models.py` (liste `MIGRATIONS`, une fonction
   `_migration_NNN` par version ; ne jamais modifier une migration deja executee
   en prod, en ajouter une)
 - Routes : blueprints dans `routes/`
 - Frontend modulaire : `static/modules/` (un module par onglet dans `tabs/`)
+- Ecrans Svelte 5 + TypeScript dans `frontend/` (Credits pour l'instant),
+  compiles par Vite dans `frontend_dist/` (hors git), servis sous `/dist/`,
+  construits dans l'image (etape `node` du Dockerfile) : un changement d'ecran
+  Svelte demande un rebuild, comme du Python. Un ecran reprend le balisage et
+  les classes de celui qu'il remplace (style.css s'applique tel quel) et
+  importe les modules existants par leur URL (`/static/modules/api.js`...),
+  types dans `frontend/src/types-app/`. Avant de remplacer un ecran : texte
+  et structure compares a l'ancien, sur une copie de la base, au caractere
+  pres.
 - Services metier : `services/` — `prets.py` (echeanciers, IRA, projection),
   `tresorerie_entite.py` (releves, levier, parts, IS d'une entite),
   `contribution.py` (d'ou vient la hausse, epargne nouvelle), `fiscalite.py`

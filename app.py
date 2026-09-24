@@ -242,6 +242,20 @@ def security_headers(response):
     return response
 
 
+# ─── Ecrans compiles (Svelte, frontend/) ─────────────────────────────────────
+# Hors de static/ : en prod, static/ est monte depuis le depot par-dessus
+# l'image, et masquerait le bundle compile dans l'image.
+FRONTEND_DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'frontend_dist')
+
+
+@app.route('/dist/<path:fichier>')
+def frontend_dist(fichier):
+    from flask import send_from_directory
+    reponse = send_from_directory(FRONTEND_DIST, fichier)
+    reponse.headers['Cache-Control'] = 'no-cache'
+    return reponse
+
+
 # ─── Initialisation DB (nécessaire pour Gunicorn et dev) ─────────────────────
 
 init_db()
