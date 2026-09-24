@@ -1,10 +1,8 @@
 import { S } from '../state.js';
-import { natureDe } from '../categories.js';
-import { fmt, fmtDate, esc, parseLocaleNumber, fmtPct } from '../utils.js';
+import { fmt, fmtDate, parseLocaleNumber, fmtPct } from '../utils.js';
 import { api } from '../api.js';
 import { loadTodo, renderTodo } from '../todo.js';
 import { loadUserAlerts } from '../alerts.js';
-import { renderAllocationTargets } from '../targets.js';
 import { isMasked } from '../mask.js';
 import { appliquerDisposition } from '../widgets.js';
 import { toast, promptDialog } from '../dialogs.js';
@@ -96,7 +94,6 @@ async function _cartesSvelte({ chiffres, repartition, comptes, cache = false }) 
     _svelte.afficherChiffres(g, chiffres);
     // Au premier montage, l'objectif avait ete ecrit dans l'ancien element
     // (le chargement du module est asynchrone) : on le reecrit dans le neuf.
-    if (_argsObjectif) renderWealthTarget(..._argsObjectif);
   }
   const r = document.getElementById('repartition-card');
   if (r) _svelte.afficherRepartition(r, repartition);
@@ -122,6 +119,27 @@ function _evolutionSvelte() {
   if (g) _svelte.afficherEvolutionGroupes(g, { owner, arretes: (S.historique || []).length, masque });
   const m = document.querySelector('.card[data-carte="mouvements"]');
   if (m) _svelte.afficherMouvements(m, { owner, famille: !owner, date: S.syntheseDate, masque });
+}
+
+/** Liquidite, entites, ecart a la cible, note de l'arrete (lot 3b). */
+async function _cartes3b({ liqFiltered, posTitulaire, owner, syn }) {
+  try { _svelte ??= await import('/dist/synthese.js'); } catch { return; }
+  const masque = isMasked();
+  const l = document.querySelector('.card[data-carte="liquidite"]');
+  if (l) _svelte.afficherLiquidite(l, { parLiquidite: liqFiltered, positions: posTitulaire, masque });
+  const e = document.getElementById('entities-synthese-card');
+  if (e) _svelte.afficherEntites(e, { entites: S.entities || [], owner, masque,
+    positions: Object.values(syn._positions_cache || {}).flat() });
+  const c = document.querySelector('.card[data-carte="cible"]');
+  if (c) _svelte.afficherCible(c, { synthese: syn, owner, categories: S.config?.categories || [] });
+  _noteSvelte(syn);
+}
+
+async function _noteSvelte(syn) {
+  try { _svelte ??= await import('/dist/synthese.js'); } catch { return; }
+  const n = document.getElementById('snapshot-note-bar');
+  if (n) _svelte.afficherNote(n, { note: syn.snapshot_note || null,
+    onModifier: () => openSnapshotNoteEditor(syn.date, syn.snapshot_note) });
 }
 
 async function _projectionSvelte(props) {
@@ -186,7 +204,7 @@ export function renderSynthese({ cache = false } = {}) {
     chiffres: { kpi, owner, famille: isFamily, date: S.syntheseDate, variation: variation || null,
                 variationAn: yoyVariation || null, surAn: S.periodeComparaison === 'an',
                 series: { net: serie('net'), gross: serie('gross'), debt: serie('debt'), mob: serie('mob') },
-                dates, objectif: !!_wealthTarget, immo, court: liqFiltered['J0–J1'] || 0 },
+                dates, objectif: _wealthTarget, immo, court: liqFiltered['J0–J1'] || 0 },
     repartition: { synthese: syn, owner, masque: isMasked() },
     comptes: { owner, date: S.syntheseDate },
     cache,
@@ -195,12 +213,7 @@ export function renderSynthese({ cache = false } = {}) {
   renderEntityWarnings(syn.entity_warnings || [], { cache });
   const posTitulaire = isFamily ? Object.values(S.synthese._positions_cache || {}).flat()
                                 : (S.synthese._positions_cache?.[owner] || []);
-  renderLiqBars(liqFiltered, posTitulaire);
-  renderEntitiesSynthese();
-  renderAllocationTargets();
-  renderSnapshotNote(syn);
-  _argsObjectif = [kpi.net, isFamily, serie('net'), dates];
-  renderWealthTarget(..._argsObjectif);
+  _cartes3b({ liqFiltered, posTitulaire, owner, syn });
   _projectionSvelte({ positions: posTitulaire, famille: isFamily, net: kpi.net, objectif: _wealthTarget,
                      masque: isMasked() });
   appliquerDisposition();
@@ -283,149 +296,7 @@ function evalUserAlerts() {
   }).filter(Boolean);
 }
 
-function renderEntitiesSynthese() {
-  const card = document.getElementById('entities-synthese-card');
-  if (!S.entities.length) { card.style.display = 'none'; return; }
-  card.style.display = '';
-
-  const owner    = S.syntheseOwner;
-  const isFamily = owner === 'Famille';
-  const cache    = S.synthese?._positions_cache || {};
-
-  const allPositions = Object.values(cache).flat();
-
-  // Vue d'un titulaire : ses seules entites. Lister les autres a « 0 € 0 % »
-  // n'apprenait rien.
-  const entites = isFamily ? S.entities
-    : S.entities.filter(e => allPositions.some(p => p.entity === e.name && p.owner === owner));
-  if (!entites.length) { card.style.display = 'none'; return; }
-  const rows = entites.map(e => {
-    const linked = allPositions.filter(p => p.entity === e.name);
-    const familyNet  = linked.reduce((s, p) => s + (p.net_attributed || 0), 0);
-    const familyGross= linked.reduce((s, p) => s + (p.gross_attributed || 0), 0);
-    const familyDebt = linked.reduce((s, p) => s + (p.debt_attributed || 0), 0);
-    const familyPct  = e.gross_assets > 0 ? fmtPct(familyGross / e.gross_assets * 100, 0) : '—';
-
-    const ownerNet   = !isFamily
-      ? linked.filter(p => p.owner === owner).reduce((s, p) => s + (p.net_attributed || 0), 0)
-      : null;
-    const siennes    = linked.filter(p => p.owner === owner);
-    const ownerPct   = !isFamily && e.gross_assets > 0
-      ? siennes.reduce((s, p) => s + (p.ownership_pct || 0), 0) : null;
-    // Le net suit aussi la part de DETTE, qui peut differer de la propriete :
-    // la dire, sinon « 50 % » ne colle pas au montant.
-    const ownerDebtPct = !isFamily && e.debt > 0
-      ? siennes.reduce((s, p) => s + (p.debt_pct ?? p.ownership_pct ?? 0), 0) : null;
-
-    return { e, familyGross, familyDebt, familyNet, familyPct, ownerNet, ownerPct, ownerDebtPct };
-  });
-
-  const personCol = !isFamily
-    ? `<th style="text-align:right">${esc(owner)}</th>` : '';
-
-  document.getElementById('entities-synthese').innerHTML = `
-    <table class="owners-table">
-      <thead><tr>
-        <th>Entité</th>
-        <th>Type</th>
-        <th style="text-align:right">Actif brut total</th>
-        <th style="text-align:right">Dette totale</th>
-        <th style="text-align:right">Net total</th>
-        <th style="text-align:right">Quote-part famille</th>
-        ${personCol}
-      </tr></thead>
-      <tbody>${rows.map(({ e, familyGross, familyDebt, familyNet, familyPct, ownerNet, ownerPct, ownerDebtPct }) => `
-        <tr>
-          <td><strong>${esc(e.name)}</strong></td>
-          <td>${esc(e.type || '—')}</td>
-          <td style="text-align:right">${fmt(e.gross_assets)}</td>
-          <td style="text-align:right">${e.debt > 0 ? fmt(e.debt) : '—'}</td>
-          <td style="text-align:right;font-weight:600" class="${e.net_assets >= 0 ? 'pos' : 'neg'}">${fmt(e.net_assets)}</td>
-          <td style="text-align:right">
-            ${fmt(familyNet)}
-            <span style="font-size:11px;color:var(--text-muted);margin-left:4px">${familyPct !== '—' ? familyPct : ''}</span>
-          </td>
-          ${!isFamily ? `<td style="text-align:right;font-weight:700;color:var(--primary)">
-            ${fmt(ownerNet)}
-            ${ownerPct !== null ? `<span style="font-size:11px;color:var(--text-muted);margin-left:4px">${fmtPct(ownerPct * 100, 0)}${
-              ownerDebtPct !== null && Math.abs(ownerDebtPct - ownerPct) > 0.005 ? ` du bien, ${fmtPct(ownerDebtPct * 100, 0)} de la dette` : ''}</span>` : ''}
-          </td>` : ''}
-        </tr>`).join('')}
-      </tbody>
-    </table>`;
-}
-
-/** « Si vous aviez besoin d'argent » : ce qui est disponible, par delai.
- *
- *  Les montants sont CUMULES : sous une semaine, on dispose aussi de ce qui
- *  etait deja mobilisable sous 24 h. Afficher des tranches disjointes obligeait
- *  a les additionner de tete pour repondre a la seule question qui compte —
- *  « de combien je dispose d'ici la ? ».
- */
-function renderLiqBars(byLiq, positions = []) {
-  // Trois delais cumules, puis ce qui ne se mobilise pas. La ligne « Au-dela »
-  // repetait le cumul du mois — rien n'est classe au-dela — et n'apprenait
-  // rien ; la question utile est l'inverse : combien reste immobilise.
-  const DELAIS = [
-    { cles: ['J0–J1'], libelle: 'Sous 24 heures' },
-    { cles: ['J0–J1', 'J2–J7'], libelle: 'Sous une semaine' },
-    { cles: ['J0–J1', 'J2–J7', 'J8–J30'], libelle: 'Sous un mois' },
-  ];
-  if (byLiq['30J+']) DELAIS.push({ cles: ['J0–J1', 'J2–J7', 'J8–J30', '30J+'], libelle: 'Au-delà d’un mois' });
-  const cumule = d => d.cles.reduce((s, k) => s + (byLiq[k] || 0), 0);
-  const mobilisable = ['J0–J1', 'J2–J7', 'J8–J30', '30J+'].reduce((s, k) => s + (byLiq[k] || 0), 0);
-  // « Bloque » = le FINANCIER qui ne se mobilise pas : PER, contrat nanti,
-  // epargne bloquee, decote de sortie. L'immobilier et les biens n'y sont pas —
-  // on ne les mobilise pas en un mois, cela va sans dire — et y compter la
-  // residence principale noyait les 30 000 € d'un PER dans 700 000 €.
-  const financier = positions.filter(p => ['liq', 'fin'].includes(natureDe(p.category, p.envelope)));
-  const bloque = financier.reduce((s, p) => s + Math.max(0, (p.net_attributed || 0) - (p.mobilizable_value || 0)), 0);
-  const horsFinancier = positions.filter(p => !financier.includes(p))
-    .reduce((s, p) => s + (p.net_attributed || 0), 0);
-  const base = Math.max(mobilisable + bloque, 1);
-
-  const ligne = (libelle, valeur, couleur, cls = '') => `
-    <div class="dispo-ligne ${cls}">
-      <span class="dispo-n">${libelle}</span>
-      <span class="dispo-v">${fmt(valeur)}</span>
-      <span class="dispo-track"><span class="dispo-fill"
-            style="width:${Math.min(100, (valeur / base) * 100).toFixed(1)}%;background:${couleur}"></span></span>
-    </div>`;
-
-  document.getElementById('liquidity-bars').innerHTML = `
-    <div class="dispo">
-      ${DELAIS.map(d => ligne(d.libelle, cumule(d), 'var(--chart-1)')).join('')}
-      ${bloque >= 1 ? ligne('Ce qui reste bloqué', bloque, 'var(--text-muted)', 'dispo-bloque') : ''}
-    </div>
-    ${mobilisable || bloque ? `<p class="dispo-note">Délais cumulés : chaque ligne inclut la précédente.
-      « Bloqué » : le patrimoine financier qui ne se mobilise pas — épargne retraite, contrat nanti,
-      décote de sortie.${Math.abs(horsFinancier) >= 1 ? ` Immobilier, biens et sociétés, hors de ce décompte :
-      ${fmt(horsFinancier)} de net.` : ''}</p>` : ''}`;
-}
-
-
 // ─── Snapshot notes ──────────────────────────────────────────────────────
-
-function renderSnapshotNote(syn) {
-  const bar = document.getElementById('snapshot-note-bar');
-  if (!bar) return;
-  const note = syn.snapshot_note;
-  const date = syn.date;
-
-  if (!note) {
-    bar.style.display = 'none';
-    bar.innerHTML = '';
-  } else {
-    bar.style.display = '';
-    bar.innerHTML = `<div class="snapshot-note">
-      <span class="snapshot-note-icon">Note</span>
-      <span class="snapshot-note-text">${esc(note)}</span>
-      <button type="button" class="btn-link" id="btn-edit-snapshot-note"
-              aria-label="Modifier la note de l’arrêté">Modifier</button>
-    </div>`;
-    bar.querySelector('#btn-edit-snapshot-note')?.addEventListener('click', () => openSnapshotNoteEditor(date, note));
-  }
-}
 
 /** Menu de l'arrete : « Note de l'arrete » et « Objectif de patrimoine ».
  *  Cables une fois au demarrage — poses dans renderSynthese, ils restaient
@@ -456,7 +327,7 @@ async function openSnapshotNoteEditor(date, currentNote) {
   await api('PUT', '/api/snapshot-notes', { date, notes: note });
   if (S.synthese?.date === date) {
     S.synthese.snapshot_note = note || null;
-    renderSnapshotNote(S.synthese);
+    _noteSvelte(S.synthese);
   }
   toast(note ? 'Note enregistrée' : 'Note supprimée');
 }
@@ -465,9 +336,6 @@ async function openSnapshotNoteEditor(date, currentNote) {
 
 let _wealthTarget = null;
 let _wealthTargetCharge = false;
-// Derniers arguments de renderWealthTarget : l'objectif modifie se redessine
-// pour le titulaire affiche, pas pour la famille par defaut.
-let _argsObjectif = null;
 
 export async function loadWealthTarget() {
   try {
@@ -475,64 +343,6 @@ export async function loadWealthTarget() {
     _wealthTarget = data?.target || null;
     _wealthTargetCharge = true;
   } catch { _wealthTarget = null; }
-}
-
-/** « 12 j », « 3 mois », « 1 an » : la duree qui separe deux arretes. */
-function renderWealthTarget(currentNet, isFamily = true, valeurs = [], dates = []) {
-  const bar = document.getElementById('wealth-target-bar');
-  if (!bar) return;
-
-  const hoteBut = document.getElementById('kpi-hero-goal');
-  // L'objectif vise le patrimoine de la famille : sous un titulaire, la jauge
-  // melangeait son net a la progression de la famille.
-  if (!_wealthTarget || !isFamily) {
-    bar.style.display = 'none';
-    bar.innerHTML = '';
-    if (hoteBut) { hoteBut.innerHTML = ''; hoteBut.className = ''; }
-    return;
-  }
-
-  const target = _wealthTarget;
-  const pct = target > 0 ? Math.min((currentNet / target) * 100, 100) : 0;
-  const cls = pct >= 100 ? 'pos' : '';
-
-  bar.style.display = '';
-  // L'objectif rejoint le chiffre qu'il vise : une trajectoire n'a de sens
-  // qu'accolee au montant qu'elle projette, pas dans un bandeau separe en haut
-  // de page. Le bandeau disparait donc, la jauge vit dans le heros.
-  bar.style.display = 'none';
-  bar.innerHTML = '';
-
-  const hote = document.getElementById('kpi-hero-goal');
-  if (!hote) return;
-
-  // Rythme observe sur l'historique : de quoi dire QUAND l'objectif tombe, et
-  // pas seulement ou l'on en est.
-  let projection = '';
-  if (valeurs.length >= 2 && currentNet < target) {
-    const jours = (Date.parse(dates[dates.length - 1]) - Date.parse(dates[0])) / 864e5;
-    const progression = (valeurs[valeurs.length - 1] || 0) - (valeurs[0] || 0);
-    if (jours > 30 && progression > 0) {
-      const restant = (target - currentNet) / (progression / jours);
-      if (restant < 3650) {
-        const quand = new Date(Date.now() + restant * 864e5);
-        const opts = quand.getFullYear() === new Date().getFullYear()
-          ? { day: 'numeric', month: 'short' } : { month: 'short', year: 'numeric' };
-        projection = `Atteint le <b>${quand.toLocaleDateString('fr-FR', opts)}</b> au rythme actuel`;
-        if (!opts.day) projection = projection.replace('Atteint le', 'Atteint en');
-      }
-    }
-  } else if (currentNet >= target) {
-    projection = '<b>Objectif atteint</b>';
-  }
-
-  hote.className = 'hero-goal';
-  hote.innerHTML = `
-    <div class="g-track"><span class="g-fill" style="width:${pct.toFixed(1)}%"></span></div>
-    <div class="g-foot">
-      <span>Objectif <b>${fmt(target)}</b></span>
-      <span>${projection || `Reste <b>${fmt(Math.max(target - currentNet, 0))}</b>`}</span>
-    </div>`;
 }
 
 async function openWealthTargetEditor() {
@@ -545,6 +355,6 @@ async function openWealthTargetEditor() {
   if (val.trim() && (isNaN(target) || target <= 0)) { toast('Montant invalide', 'error'); return; }
   await api('PUT', '/api/wealth-target', { target });
   _wealthTarget = target;
-  if (_argsObjectif && S.synthese) renderWealthTarget(..._argsObjectif);
+  if (S.synthese) renderSynthese({ cache: true });
   toast(target ? 'Objectif enregistré' : 'Objectif supprimé');
 }

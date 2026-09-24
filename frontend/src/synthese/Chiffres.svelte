@@ -4,8 +4,8 @@
    * dettes, mobilisable). Chacun avec sa variation sur la periode choisie
    * dans l'en-tete, sa tendance, et un sous-titre qui le situe.
    *
-   * `#kpi-hero-goal` reste vide ici : l'objectif de patrimoine y ecrit
-   * (static/modules/tabs/synthese.js), le temps que sa carte soit portee.
+   * Sous le net, l'objectif de patrimoine (famille seulement) : une jauge,
+   * et quand il tombe au rythme observe sur l'historique.
    */
   import { fmt, fmtDate, fmtPct, kpiDelta, sparkline } from '/static/modules/utils.js';
 
@@ -15,7 +15,7 @@
     owner: string; famille: boolean; date: string | null;
     variation: Variation | null; variationAn: Variation | null; surAn: boolean;
     series: { net: (number | null)[]; gross: (number | null)[]; debt: (number | null)[]; mob: (number | null)[] };
-    dates: string[]; objectif: boolean;
+    dates: string[]; objectif: number | null;
     immo: number; court: number;
   }
   let p: Props = $props();
@@ -59,6 +59,30 @@
                                dates[debut] <= cible ? '1 an' : `depuis le ${fmtDate(dates[debut])}`);
     return out;
   });
+  // L'objectif vise le patrimoine de la famille : sous un titulaire, la jauge
+  // melangerait son net a la progression de la famille.
+  const but = $derived.by(() => {
+    const cible = p.objectif, net = p.kpi.net;
+    if (!cible || !p.famille) return null;
+    const pct = cible > 0 ? Math.min((net / cible) * 100, 100) : 0;
+    let quand: { prefixe: string; date: string } | null = null, atteint = false;
+    const v = p.series.net, d = p.dates;
+    if (v.length >= 2 && net < cible) {
+      const jours = (Date.parse(d[d.length - 1]) - Date.parse(d[0])) / 864e5;
+      const progression = (v[v.length - 1] || 0) - (v[0] || 0);
+      if (jours > 30 && progression > 0) {
+        const restant = (cible - net) / (progression / jours);
+        if (restant < 3650) {
+          const date = new Date(Date.now() + restant * 864e5);
+          const cetteAnnee = date.getFullYear() === new Date().getFullYear();
+          quand = { prefixe: cetteAnnee ? 'Atteint le' : 'Atteint en',
+                    date: date.toLocaleDateString('fr-FR', cetteAnnee ? { day: 'numeric', month: 'short' } : { month: 'short', year: 'numeric' }) };
+        }
+      }
+    } else if (net >= cible) atteint = true;
+    return { cible, pct, quand, atteint, reste: Math.max(cible - net, 0) };
+  });
+
   const spark = (serie: (number | null)[], couleur = 'var(--primary)') => sparkline(serie, { couleur, dates: p.dates });
 </script>
 
@@ -66,7 +90,12 @@
   <div class="kpi-label" id="kpi-net-label">{p.famille ? 'Patrimoine net famille' : `Patrimoine net — ${p.owner}`}</div>
   <div class="kpi-value" id="kpi-net">{fmt(p.kpi.net)}{#if pastilles.length}<div class="hero-puces">{#each pastilles as x, i (i)}<span
     class="puce puce--{x.sens}">{x.montant}{x.pct}<small>{x.duree}</small></span>{/each}</div>{/if}</div>
-  <div id="kpi-hero-goal"></div>
+  <div id="kpi-hero-goal" class={but ? 'hero-goal' : ''}>{#if but}
+    <div class="g-track"><span class="g-fill" style:width="{but.pct.toFixed(1)}%"></span></div>
+    <div class="g-foot">
+      <span>Objectif <b>{fmt(but.cible)}</b></span>
+      <span>{#if but.atteint}<b>Objectif atteint</b>{:else if but.quand}{but.quand.prefixe} <b>{but.quand.date}</b> au rythme actuel{:else}Reste <b>{fmt(but.reste)}</b>{/if}</span>
+    </div>{/if}</div>
   <div id="kpi-hero-spark">{#if !(p.famille && p.objectif)}{@html spark(p.series.net)}{/if}</div>
 </div>
 <div class="kpi-card clickable kpi-gross">
