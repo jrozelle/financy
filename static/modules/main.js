@@ -23,7 +23,7 @@ import { loadTresorerie, initTresorerie } from './tabs/tresorerie.js';
 import { wireIsinPopoverEvents, closeIsinPopover } from './isin-popover.js';
 import { loadAdvisor, wireAdvisorEvents } from './tabs/advisor.js';
 import { loadActifs, wireActifsEvents } from './tabs/actifs.js';
-import { loadFlux, renderFlux, openFluxModal, saveFlux, persistFluxFilters, clearFluxFilters, wireFluxImport, deleteFlux } from './tabs/flux.js';
+import { loadFlux, renderFlux, openFluxModal, saveFlux, deleteFlux } from './tabs/flux.js';
 import { loadEntities, renderEntities, openEntityModal, saveEntity, updateEntInfo, deleteEntity } from './tabs/entities.js';
 import { importXlsx, importJson, exportJson, resetDb, initDemoToggle, createBackup, updateDemoBadge } from './tabs/import-export.js';
 import { loadReferential, saveReferential, initTemplateSelect } from './tabs/referentiel.js';
@@ -780,27 +780,6 @@ function wireEvents() {
 
   // Synthèse — évolution groupée
 
-  // Flux buttons
-  ['flux-filter-owner','flux-filter-type','flux-filter-category','flux-filter-year'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('change', () => {
-      if (id === 'flux-filter-owner') {
-        const val = el.value;
-        S.syntheseOwner = val || 'Famille';
-        ecrireContexte();
-        const globalSel = document.getElementById('global-owner-filter');
-        if (globalSel) globalSel.value = S.syntheseOwner;
-      }
-      persistFluxFilters();
-      renderFlux();
-    });
-  });
-  const btnClearFlux = document.getElementById('btn-clear-flux-filters');
-  if (btnClearFlux) btnClearFlux.addEventListener('click', () => {
-    clearFluxFilters();
-    renderFlux();
-  });
-
   // Targets
   wireTargetsEvents();
 
@@ -819,7 +798,6 @@ function wireEvents() {
   document.getElementById('btn-backup')?.addEventListener('click', createBackup);
 
   // Tri des tableaux
-  wireSortableTable('flux-thead',      'flux',      renderFlux);
   wireSortableTable('entities-thead',  'entities',  renderEntities);
 
   // Référentiel
@@ -858,7 +836,6 @@ function wireEvents() {
 
   // Holdings + popover ISIN + advisor + actifs
   wireHoldingsEvents();
-  wireFluxImport();
   wireIsinPopoverEvents();
   wireAdvisorEvents();
   wireActifsEvents();

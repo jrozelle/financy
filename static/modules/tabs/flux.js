@@ -1,53 +1,19 @@
 import { S } from '../state.js';
-import { fmt, fmtDate, esc, sortArr, updateSortIndicators, today, parseLocaleNumber,
-         fluxSigned as signed, fmtSigned as eurSigned } from '../utils.js';
+import { esc, today, parseLocaleNumber, fluxSigned as signed, fmtSigned as eurSigned } from '../utils.js';
 import { api } from '../api.js';
 import { confirmDialog, toast, closeModal } from '../dialogs.js';
-import { saveFilters, loadFilters, clearFilterKey } from '../filter-persist.js';
+import { isMasked } from '../mask.js';
 import { choisirTitulaire } from './positions.js';
+
+// Le journal et l'import sont un ecran Svelte (frontend/src/flux/, compile
+// dans /dist/flux.js) ; ce module charge les donnees et garde la fiche d'un
+// flux, partagee avec la recherche et le bouton d'ajout.
 
 export async function loadFlux() {
   S.flux = await api('GET', '/api/flux');
-  populateFluxFilters();
-  // Sync filtre local avec le selecteur global
-  const globalOwner = S.syntheseOwner;
-  if (globalOwner && globalOwner !== 'Famille') {
-    const sel = document.getElementById('flux-filter-owner');
-    if (sel) {
-      // Ajouter l'option si elle n'existe pas (personne sans flux)
-      if (![...sel.options].some(o => o.value === globalOwner)) {
-        sel.add(new Option(globalOwner, globalOwner));
-      }
-      sel.value = globalOwner;
-    }
-  }
-  renderFlux();
-}
-
-function populateFluxFilters() {
-  const owners = [...new Set(S.flux.map(f => f.owner))].sort();
-  const types  = [...new Set(S.flux.map(f => f.type).filter(Boolean))].sort();
-  const cats   = [...new Set(S.flux.map(f => f.category).filter(Boolean))].sort();
-  const years  = [...new Set(S.flux.map(f => f.date?.slice(0, 4)).filter(Boolean))].sort().reverse();
-  const globalOwner = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : '';
-
-  const saved = loadFilters('flux');
-  const sel = (id, placeholder, opts, savedKey) => {
-    const cur = id === 'flux-filter-owner'
-      ? globalOwner
-      : document.getElementById(id)?.value || saved[savedKey] || '';
-    document.getElementById(id).innerHTML =
-      `<option value="">${placeholder}</option>` +
-      opts.map(o => `<option value="${esc(o)}"${o === cur ? ' selected' : ''}>${esc(o)}</option>`).join('');
-  };
-  sel('flux-filter-owner',    'Tous les titulaires',   owners, 'owner');
-  sel('flux-filter-type',     'Tous les types',        types,  'type');
-  sel('flux-filter-category', 'Toutes les catégories', cats,   'category');
-  sel('flux-filter-year',     'Toutes les années',     years,  'year');
-
-  // Suggestions d'etablissements : ceux deja vus dans les flux et dans les
-  // positions, pour eviter les variantes d'orthographe qui creeraient des
-  // comptes fantomes ("BoursoBank" vs "Boursorama").
+  // Suggestions d'etablissements de la fiche : ceux deja vus dans les flux et
+  // dans les positions, pour eviter les variantes d'orthographe qui
+  // creeraient des comptes fantomes ("BoursoBank" vs "Boursorama").
   const dl = document.getElementById('flux-etab-list');
   if (dl) {
     const known = new Set([
@@ -56,195 +22,42 @@ function populateFluxFilters() {
     ]);
     dl.innerHTML = [...known].sort().map(e => `<option value="${esc(e)}">`).join('');
   }
+  await renderFlux();
 }
 
-export function persistFluxFilters() {
-  saveFilters('flux', {
-    type:     document.getElementById('flux-filter-type')?.value     || '',
-    category: document.getElementById('flux-filter-category')?.value || '',
-    year:     document.getElementById('flux-filter-year')?.value     || '',
+/** Personnes proposees a l'import.
+ *
+ *  Le referentiel et les donnees peuvent diverger — une base de test annonce
+ *  "Personne 1..4" alors que les positions sont au nom de leur vrai proprietaire.
+ *  Importer sous un nom absent des positions creerait des flux orphelins,
+ *  invisibles dans la performance. On propose donc l'union des deux, et le choix
+ *  reste affiche et modifiable avant l'enregistrement.
+ */
+function _ownerChoices() {
+  const seen = new Set([
+    ...(S.config?.owners || []),
+    ...S.flux.map(f => f.owner).filter(Boolean),
+    ...(S.positions || []).map(p => p.owner).filter(Boolean),
+  ]);
+  return [...seen].sort();
+}
+
+/** Priorite au titulaire de l'en-tete, puis a une personne ayant deja des
+ *  flux (donc rattachable), en dernier recours au referentiel. */
+function _defaultOwner(global) {
+  return global || S.flux.map(f => f.owner).find(Boolean) || _ownerChoices()[0] || '';
+}
+
+export async function renderFlux() {
+  const cible = document.getElementById('flux-app');
+  if (!cible) return;
+  const { afficher } = await import('/dist/flux.js');
+  const owner = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : null;
+  afficher(cible, {
+    flux: S.flux || [], owner, masque: isMasked(),
+    titulaires: _ownerChoices(), titulaireDefaut: _defaultOwner(owner),
+    onEditer: openFluxModal, onSupprimer: deleteFlux, onEnregistre: loadFlux,
   });
-}
-
-export function clearFluxFilters() {
-  ['flux-filter-type', 'flux-filter-category', 'flux-filter-year']
-    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-  const owner = document.getElementById('flux-filter-owner');
-  if (owner) owner.value = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : '';
-  clearFilterKey('flux');
-}
-
-function filteredFlux() {
-  const owner = document.getElementById('flux-filter-owner')?.value;
-  const type  = document.getElementById('flux-filter-type')?.value;
-  const cat   = document.getElementById('flux-filter-category')?.value;
-  const year  = document.getElementById('flux-filter-year')?.value;
-  return S.flux.filter(f =>
-    (!owner || f.owner    === owner) &&
-    (!type  || f.type     === type)  &&
-    (!cat   || f.category === cat)   &&
-    (!year  || f.date?.startsWith(year))
-  );
-}
-
-// Le journal s'affiche par pages de cent : sur mobile, trois cents fiches
-// faisaient une page de 20 000 px. Filtres, tri et totaux portent toujours sur
-// l'ensemble ; seul l'affichage est limite, et le decompte le dit.
-const PAGE = 100;
-let _limite = PAGE;
-let _signature = '';
-
-/** Marqueurs fonctionnels des notes, affiches en badges. La note elle-meme
- *  n'est pas modifiee : « [provisoire] » est lu par l'import des releves
- *  (PROVISIONAL, routes/movements_import.py) pour redater le flux. */
-const MARQUES = {
-  import:     ['importé', 'badge-blk'],
-  provisoire: ['provisoire', 'badge-j830'],
-};
-function notesFlux(notes) {
-  if (!notes) return '—';
-  const badges = [];
-  const texte = notes.replace(/\[(import|provisoire)\]/gi, (_, m) => {
-    const [lib, cls] = MARQUES[m.toLowerCase()];
-    badges.push(`<span class="badge ${cls} fx-marque">${lib}</span>`);
-    return ' ';
-  }).replace(/\s+/g, ' ').trim();
-  return badges.join(' ') + (texte ? `${badges.length ? ' ' : ''}${esc(texte)}` : '') || '—';
-}
-
-const ICONE_EDITER = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
-const ICONE_SUPPR = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>';
-
-export function renderFlux() {
-  const tbody  = document.getElementById('flux-tbody');
-  const tfoot  = document.getElementById('flux-tfoot');
-  // Une colonne vide sur toutes les lignes n'apprend rien : la categorie ne
-  // s'affiche, avec son filtre, que si un flux au moins en porte une.
-  const avecCat = S.flux.some(f => f.category);
-  const thCat = document.querySelector('#flux-thead th[data-sort="category"]');
-  if (thCat) thCat.hidden = !avecCat;
-  const filtreCat = document.getElementById('flux-filter-category');
-  if (filtreCat) {
-    filtreCat.hidden = !avecCat;
-    if (!avecCat) filtreCat.value = '';
-  }
-  const nbCol = avecCat ? 9 : 8;
-  const tous = sortArr(filteredFlux(), S.sort.flux.key, S.sort.flux.dir);
-  updateSortIndicators('flux-thead', 'flux');
-  const signature = JSON.stringify(['owner', 'type', 'category', 'year']
-    .map(k => document.getElementById(`flux-filter-${k}`)?.value || '').concat([S.sort.flux.key, S.sort.flux.dir]));
-  if (signature !== _signature) { _signature = signature; _limite = PAGE; }
-  const flux = tous.slice(0, _limite);
-  const plus = document.getElementById('flux-plus');
-
-  // L'explication du badge « a preciser » vivait dans une infobulle, ligne a
-  // ligne. Elle se lit une fois, au-dessus du tableau, avec le decompte.
-  // Recalculee aussi quand le filtre ne laisse rien : sinon elle decomptait
-  // encore les flux de la vue precedente.
-  const note = document.getElementById('flux-note-etab');
-  if (!tous.length) {
-    // Un filtre qui masque tout n'est pas un journal vide : le dire autrement.
-    const msg = S.flux.length ? 'Aucun flux pour ce filtre.' : 'Aucun flux enregistré.';
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="${nbCol}">${msg}</td></tr>`;
-    if (tfoot) tfoot.innerHTML = '';
-    if (note) { note.hidden = true; note.textContent = ''; }
-    if (plus) { plus.hidden = true; plus.innerHTML = ''; }
-    return;
-  }
-  const sansEtab = tous.filter(f => !f.establishment).length;
-  if (note) {
-    note.hidden = !sansEtab;
-    note.textContent = sansEtab
-      ? `${sansEtab} flux sans établissement (« à préciser ») : chacun est réparti au prorata entre les comptes de son enveloppe, ce qui fausse le rendement de chaque compte. Éditez-les pour indiquer l'établissement.`
-      : '';
-  }
-  tbody.innerHTML = flux.map(f => `
-    <tr class="fx-ligne">
-      <td class="fx-date">${fmtDate(f.date)}</td>
-      <td class="fx-qui">${esc(f.owner)}</td>
-      <td class="fx-env">${esc(f.envelope || '—')}</td>
-      <td class="fx-etab">${f.establishment ? esc(f.establishment) : '<span class="badge badge-blk">à préciser</span>'}</td>
-      ${avecCat ? `<td class="fx-cat">${esc(f.category || '—')}</td>` : ''}
-      <td class="fx-type">${esc(f.type || '—')}</td>
-      <td class="num fx-montant ${signed(f) >= 0 ? 'pos' : 'neg'}">${eurSigned(signed(f))}</td>
-      <td class="fx-contexte">${esc([f.owner, f.envelope, f.establishment, f.type].filter(Boolean).join(' · '))}${
-        f.establishment ? '' : ' <span class="badge badge-blk">à préciser</span>'}</td>
-      <td class="fx-notes">${notesFlux(f.notes)}</td>
-      <td class="fx-actions">
-        <button type="button" class="btn-icon edit fx-btn" data-id="${f.id}" data-action="edit-flux">${ICONE_EDITER}Éditer</button>
-        <button type="button" class="btn-icon del fx-btn" data-id="${f.id}" data-action="del-flux">${ICONE_SUPPR}Supprimer</button>
-      </td>
-    </tr>`).join('');
-
-  if (plus) {
-    const reste = tous.length - flux.length;
-    // Rien a dire tant qu'une page suffit.
-    plus.hidden = tous.length <= PAGE;
-    plus.innerHTML = plus.hidden ? '' : `<span>${flux.length} flux affichés sur ${tous.length}${
-      reste > 0 ? ` ; les totaux portent sur les ${tous.length}` : ''}.</span>${reste > 0
-      ? `<button type="button" class="btn btn-secondary btn-sm" id="flux-plus-btn">Afficher les ${Math.min(PAGE, reste)} suivants</button>` : ''}`;
-  }
-
-  // Les totaux portent sur tous les flux du filtre, pas sur la seule page.
-  const total = tous.reduce((s, f) => s + signed(f), 0);
-  const byType  = {};
-  const byOwner = {};
-  for (const f of tous) {
-    const t = f.type || 'Autre';
-    byType[t]   = (byType[t]   || 0) + signed(f);
-    byOwner[f.owner] = (byOwner[f.owner] || 0) + signed(f);
-  }
-  const ownersActive = Object.keys(byOwner);
-  const avant = avecCat ? 6 : 5;
-  // En 11 px gras, l'espace fine des milliers ne se voyait plus : « +538798 € ».
-  // Le pied de tableau prend une espace insecable ordinaire.
-  const pied = v => eurSigned(v).replace(/\u202f/g, '\u00a0');
-  const stylePied = 'font-size:11px;color:var(--text-muted);white-space:normal;max-width:none';
-  if (tfoot) {
-    tfoot.innerHTML = `
-      <tr>
-        <td colspan="${avant}" style="${stylePied}">
-          ${Object.entries(byType).map(([t, v]) =>
-            `${esc(t)} : <strong class="${v >= 0 ? 'pos' : 'neg'}">${pied(v)}</strong>`
-          ).join(' &nbsp;·&nbsp; ')}
-          &nbsp;·&nbsp; solde net des ${tous.length} flux du filtre : versements et coupons, moins retraits et frais
-        </td>
-        <td class="num ${total >= 0 ? 'pos' : 'neg'}" style="font-weight:700">${
-          eurSigned(total)}</td>
-        <td colspan="2"></td>
-      </tr>
-      ${ownersActive.length > 1 ? `<tr>
-        <td colspan="${avant}" style="${stylePied}">
-          ${ownersActive.map(o =>
-            `${esc(o)} : <strong class="${byOwner[o] >= 0 ? 'pos' : 'neg'}">${pied(byOwner[o])}</strong>`
-          ).join(' &nbsp;·&nbsp; ')}
-        </td>
-        <td colspan="3"></td>
-      </tr>` : ''}`;
-  }
-
-  tbody.addEventListener('click', onFluxTableClick);
-  plus?.addEventListener('click', onFluxPlus);
-}
-
-/** Page suivante. Le focus va a la premiere ligne ajoutee : le bouton, lui,
- *  disparait une fois tout affiche. */
-function onFluxPlus(e) {
-  if (!e.target.closest('#flux-plus-btn')) return;
-  const deja = _limite;
-  _limite += PAGE;
-  renderFlux();
-  const ligne = document.querySelectorAll('#flux-tbody tr.fx-ligne')[deja];
-  const cible = document.getElementById('flux-plus-btn') || ligne?.querySelector('button');
-  cible?.focus();
-}
-
-function onFluxTableClick(e) {
-  const btn = e.target.closest('[data-action]');
-  if (!btn) return;
-  const id = parseInt(btn.dataset.id);
-  if (btn.dataset.action === 'edit-flux') openFluxModal(id);
-  if (btn.dataset.action === 'del-flux')  deleteFlux(id);
 }
 
 export function openFluxModal(id = null) {
@@ -309,251 +122,4 @@ export async function deleteFlux(id) {
   document.getElementById('flux-modal')?.classList.add('hidden');
   toast('Flux supprimé');
   await loadFlux();
-}
-
-// ─── Import d'avis d'operes et de releves d'especes ────────────────────────
-// Deux temps : on lit et on montre, l'utilisateur valide, on ecrit. Rien n'est
-// insere sans confirmation, et un document deja importe est ecarte.
-
-let _staged = null;   // resultat du dernier apercu, en attente de validation
-
-const _fmtDate = d => d ? d.split('-').reverse().join('/') : '—';
-const _eur = v => v == null ? '—' : fmt(v, 2);
-
-export function wireFluxImport() {
-  const zone = document.getElementById('flux-drop');
-  const input = document.getElementById('flux-drop-input');
-  if (!zone || !input) return;
-  zone.addEventListener('click', () => input.click());
-  zone.addEventListener('keydown', ev => {
-    if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); input.click(); }
-  });
-  ['dragenter', 'dragover'].forEach(e => zone.addEventListener(e, ev => {
-    ev.preventDefault(); zone.classList.add('is-over');
-  }));
-  ['dragleave', 'drop'].forEach(e => zone.addEventListener(e, ev => {
-    ev.preventDefault(); zone.classList.remove('is-over');
-  }));
-  zone.addEventListener('drop', ev => _preview([...(ev.dataTransfer?.files || [])]));
-  input.addEventListener('change', ev => {
-    _preview([...ev.target.files]);
-    ev.target.value = '';   // permet de redeposer le meme fichier
-  });
-}
-
-/** Personnes proposees a l'import.
- *
- *  Le referentiel et les donnees peuvent divergier — une base de test annonce
- *  "Personne 1..4" alors que les positions sont au nom de leur vrai proprietaire.
- *  Importer sous un nom absent des positions creerait des flux orphelins,
- *  invisibles dans la performance. On propose donc l'union des deux, et le choix
- *  reste affiche et modifiable avant l'enregistrement.
- */
-function _ownerChoices() {
-  const seen = new Set([
-    ...(S.config?.owners || []),
-    ...S.flux.map(f => f.owner).filter(Boolean),
-    ...(S.positions || []).map(p => p.owner).filter(Boolean),
-  ]);
-  return [...seen].sort();
-}
-
-function _defaultOwner() {
-  const global = (S.syntheseOwner && S.syntheseOwner !== 'Famille') ? S.syntheseOwner : null;
-  const choices = _ownerChoices();
-  // Priorite au filtre global, puis a une personne ayant deja des flux (donc
-  // rattachable), en dernier recours au referentiel.
-  const withFlux = S.flux.map(f => f.owner).filter(Boolean);
-  return global || withFlux[0] || choices[0] || '';
-}
-
-function _owner() {
-  return document.getElementById('flux-import-owner')?.value || _staged?.owner || _defaultOwner();
-}
-
-/** Etablissement propose : celui que le parseur a devine s'il figure deja dans
- *  les positions, sinon le premier connu. Une variante d'orthographe creerait un
- *  compte distinct de celui des positions, et les flux ne s'y rattacheraient pas. */
-function _defaultEtab(summary) {
-  const known = summary?.known_establishments || [];
-  const devine = _staged?.data?.transactions?.[0]?.establishment
-              || _staged?.data?.flux?.[0]?.establishment;
-  if (known.includes(devine)) return devine;
-  // « BoursoBank » dans le document, « Boursorama » dans les positions : meme
-  // racine, meme banque. Le premier connu par ordre alphabetique, lui, n'avait
-  // aucun rapport (« Biens personnels »).
-  const racine = x => (x || '').toLowerCase().normalize('NFD').replace(/[^a-z]/g, '').slice(0, 5);
-  return known.find(k => devine && racine(k) === racine(devine)) || '';
-}
-
-/** '' : l'etablissement lu dans chaque document. */
-function _etabsLus(d) {
-  return [...new Set([...d.transactions, ...d.flux].map(x => x.establishment).filter(Boolean))];
-}
-
-function _etabsDuDocumentConnus(d) {
-  const connus = new Set(d.summary?.known_establishments || []);
-  return [...d.transactions, ...d.flux].every(x => !x.establishment || connus.has(x.establishment));
-}
-
-function _etab() {
-  const sel = document.getElementById('flux-import-etab');
-  return sel ? sel.value : (_staged?.etab ?? '');
-}
-
-async function _send(files, step, owner = null, etab = null) {
-  const fd = new FormData();
-  fd.append('owner', owner || _owner());
-  const e = etab !== null ? etab : _etab();
-  if (e) fd.append('establishment', e);
-  files.forEach(f => fd.append('files', f));
-  const meta = document.querySelector('meta[name="csrf-token"]');
-  const res = await fetch(`/api/import/movements?step=${step}`, {
-    method: 'POST', body: fd,
-    headers: meta ? { 'X-CSRF-Token': meta.content } : {},
-  });
-  const data = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(data?.error || `Import refusé (${res.status})`);
-  return data;
-}
-
-/** L'apercu se calcule avec le titulaire et l'etablissement qui seront
- *  ecrits : les doublons et les flux provisoires a corriger en dependent. Il
- *  se relance donc a chaque changement de ces deux listes — sans quoi le
- *  compte du bouton ne disait pas ce qui serait enregistre. */
-async function _preview(files, owner = _defaultOwner(), etab = '') {
-  const pdfs = files.filter(f => f.type === 'application/pdf' || /\.pdf$/i.test(f.name));
-  if (!pdfs.length) { toast('Déposez des fichiers PDF', 'error'); return; }
-  // Le serveur refuse un envoi de plus de 10 Mo : mieux vaut le dire avant
-  // d'envoyer, avec de quoi decouper le lot.
-  const LOT_MAX = 10 * 1024 * 1024;
-  const poids = pdfs.reduce((t, f) => t + f.size, 0);
-  if (poids > LOT_MAX) {
-    toast(`${pdfs.length} fichiers, ${(poids / 1048576).toFixed(1).replace('.', ',')} Mo : 10 Mo au plus par envoi. Déposez-les en plusieurs fois.`, 'error');
-    return;
-  }
-  const zone = document.getElementById('flux-drop');
-  zone.classList.add('is-busy');
-  try {
-    const d = await _send(pdfs, 'preview', owner, etab);
-    // Ce que dit le document se lit sur l'apercu sans etablissement impose ;
-    // un apercu relance le garde.
-    const doc = etab ? _staged?.doc : { connus: _etabsDuDocumentConnus(d), lus: _etabsLus(d) };
-    _staged = { files: pdfs, data: d, owner, etab, doc };
-    // Un etablissement lu dans un document mais absent des positions (une
-    // variante d'orthographe) creerait un compte fantome : on impose alors le
-    // plus probable des etablissements connus, et l'apercu le reflete.
-    if (!etab && !doc.connus) {
-      const devine = _defaultEtab(d.summary);
-      if (devine) return _preview(pdfs, owner, devine);
-    }
-    _renderReport(d, pdfs.length);
-  } catch (e) {
-    toast(e.message, 'error');
-  } finally {
-    zone.classList.remove('is-busy');
-  }
-}
-
-function _renderReport(d, nfiles) {
-  const host = document.getElementById('flux-import-report');
-  if (!host) return;
-  const s = d.summary;
-  const lines = [
-    ...d.transactions.map(t => ({
-      dup: t.duplicate, reason: t.duplicate_reason, date: t.date,
-      kind: t.side === 'ACHAT' ? 'Achat' : 'Vente',
-      label: `${t.name || t.isin || '?'}${t.envelope ? ' · ' + t.envelope : ''}`,
-      amount: t.net_eur, warn: t.warnings,
-    })),
-    ...d.flux.map(f => ({
-      dup: f.duplicate, reason: f.duplicate_reason, date: f.date,
-      kind: f.flux_type, label: f.label || '', amount: f.net_eur, warn: f.warnings,
-      corrige: f.corrects ? f.correction_reason : null,
-    })),
-  ].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-
-  const total = s.transactions + s.flux + (s.corrections || 0);
-  const orphelines = s.unresolved_envelopes || [];
-  host.className = 'import-report';
-  host.innerHTML = `
-    <h3>${nfiles} fichier${nfiles > 1 ? 's' : ''} lu${nfiles > 1 ? 's' : ''}</h3>
-    <div class="import-tally">
-      <span><b>${s.transactions}</b> opération${s.transactions > 1 ? 's' : ''} de titres</span>
-      <span><b>${s.flux}</b> flux de trésorerie</span>
-      ${s.corrections ? `<span><b>${s.corrections}</b> flux provisoire${s.corrections > 1 ? 's' : ''} attesté${s.corrections > 1 ? 's' : ''}, redaté${s.corrections > 1 ? 's' : ''}</span>` : ''}
-      ${s.duplicates ? `<span class="text-muted"><b>${s.duplicates}</b> déjà enregistré${s.duplicates > 1 ? 's' : ''}, ignoré${s.duplicates > 1 ? 's' : ''}</span>` : ''}
-      ${s.warnings ? `<span class="negative"><b>${s.warnings}</b> à vérifier</span>` : ''}
-      ${s.unknown_isins?.length ? `<span><b>${s.unknown_isins.length}</b> valeur${s.unknown_isins.length > 1 ? 's' : ''} à créer</span>` : ''}
-      ${s.rejected?.length ? `<span class="negative"><b>${s.rejected.length}</b> non reconnu${s.rejected.length > 1 ? 's' : ''}</span>` : ''}
-    </div>
-    ${!_staged.doc?.connus ? `<p class="import-alerte">Le document nomme ${_staged.doc.lus.map(e => `« ${esc(e)} »`).join(', ') || 'un établissement'},
-      absent de vos positions. ${_staged.etab ? `Rattaché à <b>${esc(_staged.etab)}</b> : changez-le ci-dessous s'il ne correspond pas.`
-        : 'Choisissez ci-dessous l’établissement de vos positions qui lui correspond.'}</p>` : ''}
-    ${orphelines.length ? `<p class="import-alerte">${orphelines.length > 1 ? 'Enveloppes' : 'Enveloppe'} sans compte correspondant dans vos positions :
-      <b>${orphelines.map(esc).join(', ')}</b>. Les flux seraient enregistrés sans compte à neutraliser, et le
-      rendement de ce compte ne les verrait pas. Créez le compte, ou vérifiez l'orthographe, avant d'enregistrer.</p>` : ''}
-    ${s.rejected?.length ? `<div class="import-lines">${s.rejected.map(r =>
-      `<div class="import-line"><span>—</span><span class="negative">rejeté</span>
-       <span>${esc(r.file)} — ${esc(r.reason)}</span><span></span></div>`).join('')}</div>` : ''}
-    ${lines.length ? `<div class="import-lines">${lines.map(l => `
-      <div class="import-line ${l.dup ? 'is-dup' : ''}">
-        <span>${_fmtDate(l.date)}</span>
-        <span>${esc(l.kind || '')}</span>
-        <span>${esc(l.label)}${l.dup ? ` <span class="badge badge-blk">${esc(l.reason || 'doublon')}</span>` : ''}${
-          l.corrige ? ` <span class="badge badge-j27">${esc(l.corrige)}</span>` : ''}${
-          l.warn?.length ? ` <span class="badge badge-30">à vérifier</span><span class="import-avert">${esc(l.warn.join(' · '))}</span>` : ''}</span>
-        <span class="num">${_eur(l.amount)}</span>
-      </div>`).join('')}</div>` : ''}
-    <div class="import-actions">
-      <button class="btn btn-primary" id="flux-import-go" ${total && (_staged.doc?.connus || _staged.etab) ? '' : 'disabled'}>
-        ${total ? `Enregistrer ${total} mouvement${total > 1 ? 's' : ''}` : 'Rien à enregistrer'}</button>
-      <button class="btn" id="flux-import-cancel">Annuler</button>
-      <label class="import-owner">Au nom de
-        <select id="flux-import-owner" class="filter-select">
-          ${_ownerChoices().map(o =>
-            `<option value="${esc(o)}"${o === _staged.owner ? ' selected' : ''}>${esc(o)}</option>`).join('')}
-        </select>
-      </label>
-      <label class="import-owner">Établissement
-        <select id="flux-import-etab" class="filter-select">
-          ${_staged.doc?.connus ? `<option value=""${_staged.etab ? '' : ' selected'}>Selon le document</option>`
-            : `<option value=""${_staged.etab ? '' : ' selected'} disabled>Choisir…</option>`}
-          ${(s.known_establishments || []).map(e =>
-            `<option value="${esc(e)}"${e === _staged.etab ? ' selected' : ''}>${esc(e)}</option>`).join('')}
-        </select>
-      </label>
-    </div>`;
-  host.classList.remove('hidden');
-  document.getElementById('flux-import-cancel').addEventListener('click', _clear);
-  document.getElementById('flux-import-go').addEventListener('click', _commit);
-  const relancer = () => _preview(_staged.files,
-    document.getElementById('flux-import-owner').value, document.getElementById('flux-import-etab').value);
-  document.getElementById('flux-import-owner').addEventListener('change', relancer);
-  document.getElementById('flux-import-etab').addEventListener('change', relancer);
-}
-
-function _clear() {
-  _staged = null;
-  const host = document.getElementById('flux-import-report');
-  if (host) { host.classList.add('hidden'); host.innerHTML = ''; }
-}
-
-async function _commit() {
-  if (!_staged) return;
-  const btn = document.getElementById('flux-import-go');
-  btn.disabled = true;
-  btn.textContent = 'Enregistrement…';
-  try {
-    const d = await _send(_staged.files, 'commit', _owner(), _etab());
-    const i = d.inserted;
-    const corr = i.corrections ? `, ${i.corrections} flux provisoire${i.corrections > 1 ? 's' : ''} redaté${i.corrections > 1 ? 's' : ''}` : '';
-    toast(`${i.flux} flux et ${i.transactions} opération${i.transactions > 1 ? 's' : ''} enregistré${i.transactions > 1 ? 's' : ''}${corr}`, 'success');
-    _clear();
-    await loadFlux();
-  } catch (e) {
-    toast(e.message, 'error');
-    btn.disabled = false;
-    btn.textContent = 'Réessayer';
-  }
 }

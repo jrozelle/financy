@@ -163,46 +163,8 @@
 
     <!-- ── FLUX ─────────────────────────────────────────────────────────── -->
     <div id="tab-flux" class="tab-content hidden">
-      <div class="page-toolbar">
-        <div class="page-header">
-          <h1>Flux externes</h1>
-        </div>
-        <div id="flux-drop" class="dropzone" tabindex="0" role="button"
-             aria-label="Importer des avis d'opérés ou des relevés d'espèces">
-          <input type="file" id="flux-drop-input" accept="application/pdf" multiple hidden>
-          <span class="dropzone-main"><span class="dz-souris">Déposez ici</span><span class="dz-doigt">Choisissez</span> vos avis d'opérés ou relevés d'espèces</span>
-          <span class="dropzone-sub">PDF BoursoBank · plusieurs fichiers acceptés · rien n'est écrit avant votre validation</span>
-        </div>
-        <div id="flux-import-report" class="hidden"></div>
-        <div class="filters-bar" id="flux-filters">
-          <select id="flux-filter-owner" class="filter-select hidden" aria-hidden="true" tabindex="-1"><option value="">Tous les titulaires</option></select>
-          <select id="flux-filter-type"  class="filter-select" aria-label="Type de flux"><option value="">Tous les types</option></select>
-          <select id="flux-filter-category" class="filter-select" aria-label="Catégorie"><option value="">Toutes les catégories</option></select>
-          <select id="flux-filter-year"  class="filter-select" aria-label="Année"><option value="">Toutes les années</option></select>
-          <button class="btn btn-secondary btn-sm" id="btn-clear-flux-filters">Effacer filtres</button>
-        </div>
-      </div>
-      <p id="flux-note-etab" class="import-alerte" hidden></p>
-      <div class="card card-table">
-        <table class="data-table">
-          <thead id="flux-thead">
-            <tr>
-              <th data-sort="date">Date</th>
-              <th data-sort="owner">Titulaire</th>
-              <th data-sort="envelope">Enveloppe</th>
-              <th data-sort="establishment">Établissement</th>
-              <th data-sort="category">Catégorie</th>
-              <th data-sort="type">Type</th>
-              <th class="num" data-sort="amount">Montant</th>
-              <th>Notes</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="flux-tbody"></tbody>
-          <tfoot id="flux-tfoot"></tfoot>
-        </table>
-        <div id="flux-plus" class="flux-plus" aria-live="polite" hidden></div>
-      </div>
+      <!-- Ecran Svelte (frontend/src/flux/), monte a la premiere visite. -->
+      <div id="flux-app"><div class="page-toolbar"><div class="page-header"><h1>Flux externes</h1></div></div></div>
     </div>
 
     <!-- ── ENTITÉS ──────────────────────────────────────────────────────── -->

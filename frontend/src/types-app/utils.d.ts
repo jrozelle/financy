@@ -18,3 +18,7 @@ export declare function kpiDelta(variation: Record<string, unknown> | null | und
 export declare function sparkline(valeurs: (number | null | undefined)[],
   options?: { couleur?: string; hauteur?: number; dates?: string[] | null }): string;
 export declare function esc(s: unknown): string;
+/** Montant signe d'un flux selon son type (versement +, retrait −...). */
+export declare function fluxSigned(f: { type?: string | null; amount?: number | null }): number;
+/** Montant avec son signe explicite (« +1 200 € »). */
+export declare function fmtSigned(v: number, dec?: number): string;
