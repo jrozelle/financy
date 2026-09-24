@@ -168,7 +168,8 @@
   en prod, en ajouter une)
 - Routes : blueprints dans `routes/`
 - Frontend modulaire : `static/modules/` (un module par onglet dans `tabs/`)
-- Ecrans Svelte 5 + TypeScript dans `frontend/` (Credits, Positions),
+- Ecrans Svelte 5 + TypeScript dans `frontend/` (Credits, Positions, et les
+  cartes de la Synthese au fil des lots : chiffres, Repartition, Vos comptes),
   compiles par Vite dans `frontend_dist/` (hors git), servis sous `/dist/`,
   construits dans l'image (etape `node` du Dockerfile) : un changement d'ecran
   Svelte demande un rebuild, comme du Python. Un ecran reprend le balisage et

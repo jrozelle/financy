@@ -351,10 +351,8 @@ export function wireDrilldownEvents() {
     }
   });
 
-  // KPI cards
-  ['kpi-net','kpi-gross','kpi-debt','kpi-mobilizable'].forEach(id => {
-    document.getElementById(id).closest('.kpi-card').classList.add('clickable');
-  });
+  // Cartes des chiffres de tete : delegation sur la grille, qui reste en
+  // place quand l'ecran (Svelte) redessine ses cartes.
 
   const _filterByOwner = positions => {
     const owner = S.syntheseOwner;
@@ -367,27 +365,23 @@ export function wireDrilldownEvents() {
   };
   const _showOwner = () => !S.syntheseOwner || S.syntheseOwner === 'Famille';
 
-  document.getElementById('kpi-net').closest('.kpi-card').addEventListener('click', () => {
-    if (!S.synthese?.date) return;
-    api('GET', `/api/positions?date=${S.syntheseDate}`).then(pos =>
-      drilldownPositions(_filterByOwner(pos), 'Patrimoine net', _ownerLabel(), { showOwner: _showOwner() })
-    );
-  });
-  document.getElementById('kpi-gross').closest('.kpi-card').addEventListener('click', () => {
-    if (!S.synthese?.date) return;
-    api('GET', `/api/positions?date=${S.syntheseDate}`).then(positions => {
-      drilldownPositions(_filterByOwner(positions), 'Actifs bruts', _ownerLabel(), { showOwner: _showOwner(), valueField: 'gross_attributed' });
-    });
-  });
-  document.getElementById('kpi-debt').closest('.kpi-card').addEventListener('click', () => {
-    if (!S.synthese?.date) return;
-    api('GET', `/api/positions?date=${S.syntheseDate}`).then(positions => {
+  const ouvrir = {
+    'kpi-hero': () => api('GET', `/api/positions?date=${S.syntheseDate}`).then(pos =>
+      drilldownPositions(_filterByOwner(pos), 'Patrimoine net', _ownerLabel(), { showOwner: _showOwner() })),
+    'kpi-gross': () => api('GET', `/api/positions?date=${S.syntheseDate}`).then(positions =>
+      drilldownPositions(_filterByOwner(positions), 'Actifs bruts', _ownerLabel(), { showOwner: _showOwner(), valueField: 'gross_attributed' })),
+    'kpi-debt': () => api('GET', `/api/positions?date=${S.syntheseDate}`).then(positions => {
       const withDebt = _filterByOwner(positions).filter(p => p.debt_attributed > 0);
       drilldownPositions(withDebt, 'Dettes', _ownerLabel(), { showOwner: _showOwner(), valueField: 'debt_attributed', neg: true });
-    });
-  });
-  document.getElementById('kpi-mobilizable').closest('.kpi-card').addEventListener('click', () => {
-    if (!S.synthese?.date) return;
-    drilldownMobilizable();
+    }),
+    'kpi-mobilizable': () => drilldownMobilizable(),
+  };
+  document.querySelector('.kpi-grid[data-carte="chiffres"]')?.addEventListener('click', e => {
+    const carte = e.target.closest('.kpi-card');
+    if (!carte || !S.synthese?.date) return;
+    // Les commandes de la grille de widgets (poignee, largeur) ne sont pas un clic sur le chiffre.
+    if (e.target.closest('.w-commandes, .w-bord')) return;
+    const cle = Object.keys(ouvrir).find(c => carte.classList.contains(c));
+    if (cle) ouvrir[cle]();
   });
 }

@@ -11,3 +11,10 @@ export declare function parseLocaleNumber(s: string, defaut?: number): number;
 export declare function today(): string;
 /** Tri stable, valeurs absentes en bas dans les deux sens. */
 export declare function sortArr<T>(liste: T[], cle: string | null, sens: number): T[];
+/** Variation d'un indicateur (HTML deja echappe), vide sans variation. */
+export declare function kpiDelta(variation: Record<string, unknown> | null | undefined, cleDelta: string,
+  clePct?: string | null, options?: { invert?: boolean; label?: string | null }): string;
+/** Mini-courbe SVG (HTML), placee a la date de chaque point si `dates`. */
+export declare function sparkline(valeurs: (number | null | undefined)[],
+  options?: { couleur?: string; hauteur?: number; dates?: string[] | null }): string;
+export declare function esc(s: unknown): string;

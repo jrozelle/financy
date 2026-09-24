@@ -18,7 +18,7 @@
   import { toast, confirmDialog } from '/static/modules/dialogs.js';
   import { dessinerCourbe, type Serie } from '/static/modules/courbe.js';
   import PretCarte from './PretCarte.svelte';
-  import EnTeteTri from './EnTeteTri.svelte';
+  import EnTeteTri from '../commun/EnTeteTri.svelte';
   import type { ApercuImport, Calendrier, Pret, Projection, Resume, AutreDette } from './types';
 
   const COULEURS = ['var(--nature-immo)', 'var(--nature-liq)', 'var(--nature-biens)', 'var(--nature-fin)'];
