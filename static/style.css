@@ -3425,8 +3425,23 @@ td.arbo-part > * { vertical-align: middle; }
   background: var(--border); overflow: hidden; }
 .arbo-barre i { display: block; height: 100%; border-radius: 3px; }
 .arbo tr:not(.arbo-l0) .arbo-barre i { opacity: .55; }
-.arbo-part-txt { display: inline-block; width: 3rem; text-align: right; font-family: var(--mono);
-  font-size: .74rem; color: var(--text-muted); }
+.arbo-part-txt { display: inline-flex; flex-direction: column; align-items: flex-end; width: 4.4rem;
+  text-align: right; font-family: var(--mono); font-size: .74rem; color: var(--text-muted); line-height: 1.25; }
+/* Part du brut en tete, part du net dessous ; dans la barre, le plein dit le
+   net, le hachure la part financee par la dette (comme la carte Repartition). */
+.arbo-part-net { font-size: .66rem; opacity: .85; }
+.arbo-barre-long { display: flex; height: 100%; }
+.arbo-barre-long i { flex: none; }
+.arbo-barre-long i:first-child { border-radius: 3px 0 0 3px; }
+.arbo-barre-long i:only-child { border-radius: 3px; }
+.arbo-lev {
+  border-radius: 0 3px 3px 0; opacity: .34;
+  background-image: repeating-linear-gradient(45deg, transparent, transparent 2px,
+                    rgba(255,255,255,.55) 2px, rgba(255,255,255,.55) 4px);
+}
+.arbo tr:not(.arbo-l0) .arbo-barre .arbo-lev { opacity: .22; }
+.arbo-part { width: 200px; }
+.arbo-barre { width: calc(100% - 4.8rem); }
 .arbo-barre--mobile { display: none; }
 
 .arbo-dette { color: var(--text-muted); }
@@ -4133,4 +4148,30 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   /* Credits : pas de fiche ; la suppression s'ecarte des chiffres, seule en
      bas de la carte. */
   #prets-liste [data-pret-suppr] { display: block; margin: .75rem 0 0 auto; }
+}
+/* ── Filtre de l'arborescence : etablissements et enveloppes ──────────── */
+.arbo-filtrer { display: inline-flex; align-items: center; gap: .35rem; }
+.arbo-filtrer.actif { border-color: var(--primary); color: var(--primary); }
+.arbo-filtrer-n { min-width: 18px; height: 18px; padding: 0 .3rem; box-sizing: border-box; border-radius: 9px;
+  display: inline-grid; place-items: center; font-size: .68rem; font-weight: 600;
+  background: var(--primary); color: var(--card); }
+.arbo-filtres {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: .5rem 1.5rem;
+  padding: .75rem 1rem; border-bottom: 1px solid var(--border); background: var(--bg);
+}
+.arbo-filtres[hidden] { display: none; }
+.arbo-filtre-groupe { margin: 0; padding: 0; border: 0; min-width: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: .1rem .75rem; align-content: start; }
+.arbo-filtre-groupe legend { grid-column: 1 / -1; padding: 0 0 .35rem; font-size: .64rem; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); }
+.arbo-filtre-choix { display: flex; align-items: center; gap: .45rem; min-height: 32px; font-size: .84rem;
+  color: var(--text); cursor: pointer; min-width: 0; }
+.arbo-filtre-choix span:first-of-type { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arbo-filtre-nb { font-family: var(--mono); font-size: .72rem; color: var(--text-muted); }
+.arbo-filtre-actif { margin: 0; padding: .5rem 1rem; border-bottom: 1px solid var(--border);
+  font-size: .8rem; color: var(--text-muted); }
+.arbo-filtre-actif .btn-link { margin-left: .4rem; }
+@media (max-width: 640px) {
+  .arbo-filtres { padding: .6rem; grid-template-columns: 1fr; }
+  .arbo-filtre-choix { min-height: 44px; }
 }

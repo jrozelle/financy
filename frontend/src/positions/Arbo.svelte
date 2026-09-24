@@ -54,6 +54,41 @@
   let recherche = $state('');
   let saisie = $state('');
   let fermesRecherche = $state(new Set<string>());
+
+  // Filtre par etablissement et par enveloppe : plusieurs valeurs possibles
+  // dans chaque liste (OU), les deux listes se combinent (ET). Memorise en
+  // base, comme les autres choix de lecture.
+  const CLE_FILTRE = 'financy_filters_positions';
+  type Filtre = { etablissements: string[]; enveloppes: string[] };
+  let filtre = $state<Filtre>({ etablissements: [], enveloppes: [],
+    ...lireJson<Partial<Filtre>>(lirePref(CLE_FILTRE), {}) });
+  let panneauFiltre = $state(false);
+  const etabDe = (p: Position) => p.establishment || p.entity || 'Sans établissement';
+  const envDe = (p: Position) => p.envelope || 'Sans enveloppe';
+  function compter(valeurs: string[]) {
+    const m = new Map<string, number>();
+    valeurs.forEach(v => m.set(v, (m.get(v) || 0) + 1));
+    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0], 'fr'));
+  }
+  const choixEtabs = $derived(compter(positions.map(etabDe)));
+  const choixEnvs = $derived(compter(positions.map(envDe)));
+  // Une valeur memorisee absente de cet arrete (compte ferme) ne filtre pas :
+  // elle viderait l'arbre sans raison visible.
+  const etabsActifs = $derived(filtre.etablissements.filter(v => choixEtabs.some(([c]) => c === v)));
+  const envsActives = $derived(filtre.enveloppes.filter(v => choixEnvs.some(([c]) => c === v)));
+  const nbFiltres = $derived(etabsActifs.length + envsActives.length);
+  const filtrees = $derived(positions.filter(p =>
+    (!etabsActifs.length || etabsActifs.includes(etabDe(p))) &&
+    (!envsActives.length || envsActives.includes(envDe(p)))));
+  function basculerFiltre(liste: 'etablissements' | 'enveloppes', v: string) {
+    const actuelle = filtre[liste];
+    filtre = { ...filtre, [liste]: actuelle.includes(v) ? actuelle.filter(x => x !== v) : [...actuelle, v] };
+    ecrirePref(CLE_FILTRE, JSON.stringify(filtre));
+  }
+  function effacerFiltre() {
+    filtre = { etablissements: [], enveloppes: [] };
+    ecrirePref(CLE_FILTRE, JSON.stringify(filtre));
+  }
   let titres = $state(new Map<number, Titre[] | 'chargement'>());
 
   function memoriser() {
@@ -205,9 +240,9 @@
     });
   }
 
-  const racinesBrutes = () => groupe === 'titulaire' ? parTitulaire(positions)
-    : groupe === 'etablissement' ? parEtablissement(positions)
-    : groupe === 'plat' ? aPlat(positions) : parNature(positions);
+  const racinesBrutes = () => groupe === 'titulaire' ? parTitulaire(filtrees)
+    : groupe === 'etablissement' ? parEtablissement(filtrees)
+    : groupe === 'plat' ? aPlat(filtrees) : parNature(filtrees);
 
   // ── Tri ────────────────────────────────────────────────────────────────
   const CLES_TRI: Record<Tri['col'], (n: Noeud) => string | number | null> = {
@@ -373,13 +408,17 @@
   {/if}
 {/snippet}
 
-{#snippet ligne(n: Noeud, total: number, couleurHeritee?: string)}
+{#snippet ligne(n: Noeud, total: number, totalNet: number, couleurHeritee?: string)}
   {@const couleur = n.couleur || couleurHeritee || 'var(--primary)'}
   {@const peut = ouvrable(n)}
   {@const ouvert = peut && estOuvert(n)}
   {@const part = total ? n.brut / total * 100 : 0}
   {@const net = n.brut - n.dette}
+  {@const partNet = totalNet ? net / totalNet * 100 : 0}
   {@const largeur = `${Math.max(.6, part).toFixed(2)}%`}
+  <!-- Dans la longueur du brut : le plein ce qui revient (le net), le hachure
+       ce que finance la dette — la lecture de la carte Repartition. -->
+  {@const plein = n.brut > 0 ? Math.max(0, Math.min(1, net / n.brut)) : 1}
   <tr class="arbo-l{n.visuel ?? n.niveau}" aria-level={n.niveau + 1}
       aria-expanded={peut ? ouvert : undefined} data-cle={n.cle}>
     <td class="arbo-nom" role="gridcell">
@@ -396,11 +435,16 @@
         </span>
         {#if n.chip}<span class="arbo-chip">{n.chip}</span>{/if}
       </div>
-      <span class="arbo-barre arbo-barre--mobile" aria-hidden="true"><i style:width={largeur} style:background={couleur}></i></span>
+      <span class="arbo-barre arbo-barre--mobile" aria-hidden="true"><span class="arbo-barre-long" style:width={largeur}><i
+        style:width="{(plein * 100).toFixed(2)}%" style:background={couleur}></i>{#if plein < 1}<i class="arbo-lev"
+        style:width="{((1 - plein) * 100).toFixed(2)}%" style:background={couleur}></i>{/if}</span></span>
     </td>
     <td class="arbo-part" role="gridcell">
-      <span class="arbo-barre" aria-hidden="true"><i style:width={largeur} style:background={couleur}></i></span>
-      <span class="arbo-part-txt">{fmtPct(part, part < 10 ? 1 : 0)}</span>
+      <span class="arbo-barre" aria-hidden="true"><span class="arbo-barre-long" style:width={largeur}><i
+        style:width="{(plein * 100).toFixed(2)}%" style:background={couleur}></i>{#if plein < 1}<i class="arbo-lev"
+        style:width="{((1 - plein) * 100).toFixed(2)}%" style:background={couleur}></i>{/if}</span></span>
+      <span class="arbo-part-txt"><span>{fmtPct(part, part < 10 ? 1 : 0)}</span><span
+        class="arbo-part-net">net {fmtPct(partNet, Math.abs(partNet) < 10 ? 1 : 0)}</span></span>
     </td>
     <td class="num arbo-valeur" role="gridcell">{fmt(n.brut)}</td>
     <td class="num arbo-dette" class:is-dette={n.dette} role="gridcell">{n.dette ? fmt(n.dette) : '—'}</td>
@@ -428,10 +472,10 @@
   </tr>
   {#if ouvert}
     {#if n.enfants.length}
-      {#each n.enfants as e (e.cle)}{@render ligne(e, total, couleur)}{/each}
+      {#each n.enfants as e (e.cle)}{@render ligne(e, total, totalNet, couleur)}{/each}
     {:else if n.titres && n.position}
       {#if Array.isArray(titres.get(n.position.id))}
-        {#each noeudsTitres(n) as t (t.cle)}{@render ligne(t, total, couleur)}{/each}
+        {#each noeudsTitres(n) as t (t.cle)}{@render ligne(t, total, totalNet, couleur)}{/each}
       {:else}
         <tr class="arbo-l{n.niveau + 1}" aria-level={n.niveau + 2}><td class="arbo-nom" colspan="7">
           <div class="arbo-nom-in arbo-attente" style:--niv={n.niveau + 1}><span class="arbo-chevron-vide"></span>Chargement des lignes…</div></td></tr>
@@ -460,10 +504,31 @@
               onclick={() => changerGroupe(g)}>{lib}</button>
     {/each}
   </div>
+  <button type="button" class="arbo-bouton arbo-filtrer" id="arbo-filtrer" aria-expanded={panneauFiltre}
+          aria-controls="arbo-filtres" class:actif={nbFiltres > 0}
+          onclick={() => panneauFiltre = !panneauFiltre}>Filtrer{#if nbFiltres}<span class="arbo-filtrer-n">{nbFiltres}</span>{/if}</button>
   <span class="arbo-espace"></span>
   <button type="button" class="arbo-bouton" id="arbo-deplier" onclick={toutDeplier}>Tout déplier</button>
   <button type="button" class="arbo-bouton" id="arbo-replier" onclick={toutReplier}>Tout replier</button>
 </div>
+<div id="arbo-filtres" class="arbo-filtres" hidden={!panneauFiltre}>
+  {#each [['etablissements', 'Établissements', choixEtabs, etabsActifs], ['enveloppes', 'Enveloppes', choixEnvs, envsActives]] as [liste, titre, choix, actifs] (liste)}
+    <fieldset class="arbo-filtre-groupe">
+      <legend>{titre}</legend>
+      {#each choix as [v, nb] (v)}
+        <label class="arbo-filtre-choix"><input type="checkbox" checked={(actifs as string[]).includes(v as string)}
+          onchange={() => basculerFiltre(liste as 'etablissements' | 'enveloppes', v as string)}>
+          <span>{v}</span><span class="arbo-filtre-nb">{nb}</span></label>
+      {/each}
+    </fieldset>
+  {/each}
+</div>
+{#if nbFiltres}
+  <!-- Un filtre ne se fait jamais oublier : ce qu'il retient reste ecrit. -->
+  <p class="arbo-filtre-actif">Filtré : {[...etabsActifs, ...envsActives].join(' · ')}
+    — {filtrees.length} compte{filtrees.length > 1 ? 's' : ''} sur {positions.length}
+    <button type="button" class="btn-link" onclick={effacerFiltre}>Effacer</button></p>
+{/if}
 <div id="positions-tree-body">
   {#if !vue.racines.length}
     <p class="arbo-vide">{q ? `Aucun compte ne correspond à « ${recherche} ».` : 'Aucune position pour cet arrêté.'}</p>
@@ -474,7 +539,7 @@
         <thead>
           <tr>
             {@render entete('nom', 'Nom', '')}
-            {@render entete('brut', 'Part du brut', 'arbo-part')}
+            {@render entete('brut', 'Part du brut · du net', 'arbo-part')}
             {@render entete('brut', 'Valeur', 'num arbo-valeur', true)}
             {@render entete('dette', 'Dette', 'num arbo-dette')}
             {@render entete('net', 'Net', 'num arbo-net')}
@@ -482,10 +547,10 @@
             <th scope="col" class="arbo-actions"><span class="sr-only">Actions</span></th>
           </tr>
         </thead>
-        <tbody>{#each vue.racines as r (r.cle)}{@render ligne(r, vue.total.brut)}{/each}</tbody>
+        <tbody>{#each vue.racines as r (r.cle)}{@render ligne(r, vue.total.brut, vue.total.brut - vue.total.dette)}{/each}</tbody>
         <tfoot>
           <tr>
-            <td>Patrimoine{q ? ' (filtré)' : ''}</td>
+            <td>Patrimoine{q || nbFiltres ? ' (filtré)' : ''}</td>
             <td class="arbo-part"></td>
             <td class="num arbo-valeur">{fmt(vue.total.brut)}</td>
             <td class="num arbo-dette" class:is-dette={vue.total.dette}>{vue.total.dette ? fmt(vue.total.dette) : '—'}</td>
