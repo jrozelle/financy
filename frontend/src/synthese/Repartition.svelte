@@ -16,7 +16,7 @@
     by_owner?: Record<string, unknown>; by_owner_gross?: Record<string, number> }>;
   type Synthese = Record<string, unknown>;
 
-  let { synthese, owner }: { synthese: Synthese | null; owner: string | null } = $props();
+  let { synthese, owner, masque = false }: { synthese: Synthese | null; owner: string | null; masque?: boolean } = $props();
 
   const ANGLES = [
     { cle: 'macro', libelle: 'Poche', source: 'totals_by_macro' },
@@ -63,6 +63,8 @@
   }
 </script>
 
+<!-- Le mode discretion change l'ecriture des montants : on redessine. -->
+{#key masque}
 <div class="card-head">
   <div>
     <h2>Répartition</h2>
@@ -126,3 +128,4 @@
 {:else}
   <p class="rep-vide">Aucune position à cet arrêté.</p>
 {/if}
+{/key}

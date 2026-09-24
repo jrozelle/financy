@@ -3,5 +3,5 @@
 export interface Serie { nom: string; couleur: string; points: { date: string; v: number }[];
                          aire?: boolean; pointille?: boolean }
 export declare function dessinerCourbe(hote: HTMLElement, options: {
-  series: Serie[]; formatY: (v: number) => string; formatV: (v: number) => string; aide?: string;
+  series: Serie[]; formatY?: (v: number) => string; formatV: (v: number) => string; aide?: string;
 }): void;

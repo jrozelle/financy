@@ -4,12 +4,10 @@ import { dessinerCourbe } from '../courbe.js';
 import { fmt, fmtDate, esc, parseLocaleNumber, sparkline, fmtPct } from '../utils.js';
 import { api } from '../api.js';
 import { loadTodo, renderTodo } from '../todo.js';
-import { loadContribution, redessinerContribution } from './contribution.js';
-import { loadFiscalite } from './fiscalite.js';
 import { drilldownPositions } from '../drilldown.js';
 import { loadUserAlerts } from '../alerts.js';
 import { renderAllocationTargets } from '../targets.js';
-import { renderProjection } from './projection.js';
+import { isMasked } from '../mask.js';
 import { appliquerDisposition } from '../widgets.js';
 import { toast, promptDialog } from '../dialogs.js';
 
@@ -84,7 +82,7 @@ function _clearSyntheseEmpty() {
 /** Redessine la synthese deja chargee. `cache` : reutilise les reponses
  *  deja recues (bascule du mode discretion) au lieu de tout redemander. */
 let _svelte = null;
-async function _cartesSvelte({ chiffres, repartition, comptes }) {
+async function _cartesSvelte({ chiffres, repartition, comptes, cache = false }) {
   try {
     _svelte ??= await import('/dist/synthese.js');
   } catch {
@@ -106,6 +104,17 @@ async function _cartesSvelte({ chiffres, repartition, comptes }) {
   if (r) _svelte.afficherRepartition(r, repartition);
   const c = document.getElementById('comptes-card');
   if (c) _svelte.rechargerComptes(c, comptes.owner, comptes.date);
+  // D'ou vient la hausse, Impot latent : ecrans Svelte (lot 2).
+  const h = document.getElementById('card-contribution');
+  if (h) _svelte.rechargerContribution(h, isMasked(), cache, comptes.owner, S.syntheseDate, S.dates?.[0] || null);
+  const f = document.getElementById('fiscalite-card');
+  if (f) _svelte.rechargerFiscalite(f, isMasked(), comptes.owner, S.syntheseDate);
+}
+
+async function _projectionSvelte(props) {
+  try { _svelte ??= await import('/dist/synthese.js'); } catch { return; }
+  const hote = document.getElementById('card-projection');
+  if (hote) _svelte.afficherProjection(hote, props);
 }
 
 export function renderSynthese({ cache = false } = {}) {
@@ -165,12 +174,11 @@ export function renderSynthese({ cache = false } = {}) {
                 variationAn: yoyVariation || null, surAn: S.periodeComparaison === 'an',
                 series: { net: serie('net'), gross: serie('gross'), debt: serie('debt'), mob: serie('mob') },
                 dates, objectif: !!_wealthTarget, immo, court: liqFiltered['J0–J1'] || 0 },
-    repartition: { synthese: syn, owner },
+    repartition: { synthese: syn, owner, masque: isMasked() },
     comptes: { owner, date: S.syntheseDate },
+    cache,
   });
 
-  if (cache) redessinerContribution(); else loadContribution();
-  loadFiscalite();
   renderEntityWarnings(syn.entity_warnings || [], { cache });
   renderHistChart({ cache });
   renderSyntheseHistory({ cache });
@@ -183,7 +191,8 @@ export function renderSynthese({ cache = false } = {}) {
   renderSnapshotNote(syn);
   _argsObjectif = [kpi.net, isFamily, serie('net'), dates];
   renderWealthTarget(..._argsObjectif);
-  renderProjection(posTitulaire, isFamily, kpi.net, _wealthTarget);
+  _projectionSvelte({ positions: posTitulaire, famille: isFamily, net: kpi.net, objectif: _wealthTarget,
+                     masque: isMasked() });
   appliquerDisposition();
 }
 

@@ -6,6 +6,9 @@ import { mount } from 'svelte';
 import Chiffres from './Chiffres.svelte';
 import Repartition from './Repartition.svelte';
 import Comptes from './Comptes.svelte';
+import Contribution from './Contribution.svelte';
+import Projection from './Projection.svelte';
+import Fiscalite from './Fiscalite.svelte';
 
 type Props = Record<string, any>;
 const montes = new Map<HTMLElement, { props: Props; instance: any }>();
@@ -29,4 +32,14 @@ export const afficherChiffres = (hote: HTMLElement, props: Props) => afficher(Ch
 export const afficherRepartition = (hote: HTMLElement, props: Props) => afficher(Repartition, hote, props);
 export async function rechargerComptes(hote: HTMLElement, owner: string | null, date: string | null) {
   await afficher(Comptes, hote, { hote }).recharger(owner, date);
+}
+export async function rechargerContribution(hote: HTMLElement, masque: boolean, cache: boolean,
+                                           owner: string | null, consulte: string | null, dernier: string | null) {
+  const instance = afficher(Contribution, hote, { hote, masque });
+  // Bascule du mode discretion : on redessine sans redemander.
+  if (!cache) await instance.recharger(owner, consulte, dernier);
+}
+export const afficherProjection = (hote: HTMLElement, props: Props) => afficher(Projection, hote, { hote, ...props });
+export async function rechargerFiscalite(hote: HTMLElement, masque: boolean, owner: string | null, date: string | null) {
+  await afficher(Fiscalite, hote, { hote, masque }).recharger(owner, date);
 }
