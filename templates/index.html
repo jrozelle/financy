@@ -292,65 +292,8 @@
 
     <!-- ── OUTILS ──────────────────────────────────────────────────────── -->
     <div id="tab-tools" class="tab-content hidden">
-      <div class="page-header"><h1>Outils</h1></div>
-
-      <div class="card">
-        <h2>Timeline patrimoniale</h2>
-        <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
-          Frise chronologique des arrêtés, flux et événements.
-        </p>
-        <div id="timeline-body"></div>
-      </div>
-
-      <div class="card">
-        <h2>Projection / Simulation</h2>
-        <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
-          Simulez l'évolution d'un capital avec un versement mensuel régulier.
-        </p>
-        <form id="simulation-form">
-          <div class="form-grid" style="margin-bottom:1rem">
-            <div class="form-group">
-              <label for="sim-initial">Capital initial (€)</label>
-              <input type="text" inputmode="decimal" id="sim-initial" value="10000" min="0" step="100">
-            </div>
-            <div class="form-group">
-              <label for="sim-monthly">Versement mensuel (€)</label>
-              <input type="text" inputmode="decimal" id="sim-monthly" value="500" min="0" step="50">
-            </div>
-            <div class="form-group">
-              <label for="sim-rate">Rendement annuel (%)</label>
-              <input type="text" inputmode="decimal" id="sim-rate" value="5" min="-20" max="50" step="0.5">
-            </div>
-            <div class="form-group">
-              <label for="sim-years">Durée (années)</label>
-              <input type="text" inputmode="numeric" id="sim-years" value="10" min="1" max="50">
-            </div>
-          </div>
-          <button type="submit" class="btn btn-primary">Simuler</button>
-        </form>
-        <div id="simulation-result" style="margin-top:1.25rem"></div>
-      </div>
-
-      <div class="card">
-        <h2>Arrêté automatique</h2>
-        <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
-          Duplique le dernier arrêté à la date du jour. Utile pour garder un historique régulier sans modifier manuellement les positions.
-        </p>
-        <button class="btn btn-secondary" id="btn-auto-snapshot">Créer un arrêté aujourd'hui</button>
-      </div>
-
-      <div class="card">
-        <h2>Cours de marché</h2>
-        <p class="text-muted" style="font-size:12.5px;margin-bottom:.875rem">
-          Rafraîchit automatiquement les derniers cours des ISIN cotés (actions, ETF, OPCVM). Les fonds euros et actifs non cotés sont ignorés.
-        </p>
-        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-          <button class="btn btn-primary" id="btn-refresh-prices">Rafraîchir les cours</button>
-          <button class="btn btn-secondary" id="btn-refresh-prices-stale">Rafraîchir uniquement les périmés (&gt;20h)</button>
-        </div>
-        <div id="prices-refresh-result" style="margin-top:1rem;font-size:12.5px"></div>
-        <div id="scheduler-status" style="margin-top:.75rem;font-size:12px;color:var(--text-muted)"></div>
-      </div>
+      <!-- Ecran Svelte (frontend/src/outils/), monte a la premiere visite. -->
+      <div id="outils-app"><div class="page-header"><h1>Outils</h1></div></div>
     </div>
 
     <!-- ── IMPORT / EXPORT ──────────────────────────────────────────────── -->

@@ -27,3 +27,6 @@ export declare function fmtQty(n: number | null | undefined, dec?: number): stri
 export declare function getColors(): string[];
 export declare function chartBorderColor(): string;
 export declare function gridColor(): string;
+export declare function tsJour(d: string): number;
+export declare function echelleTemps(dates: string[], options?: { jour?: boolean; taille?: number; max?: number }): Record<string, unknown>;
+export declare function titreDate(items: { parsed: { x: number } }[]): string;

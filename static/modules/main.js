@@ -27,7 +27,7 @@ import { loadFlux, renderFlux, openFluxModal, saveFlux, deleteFlux } from './tab
 import { loadEntities, renderEntities, openEntityModal, saveEntity, updateEntInfo, deleteEntity } from './tabs/entities.js';
 import { importXlsx, importJson, exportJson, resetDb, initDemoToggle, createBackup, updateDemoBadge } from './tabs/import-export.js';
 import { loadReferential, saveReferential, initTemplateSelect } from './tabs/referentiel.js';
-import { loadTimeline, wireSimulation, triggerAutoSnapshot, triggerPricesRefresh, loadSchedulerStatus } from './tabs/tools.js';
+import { loadTimeline, renderOutils, loadSchedulerStatus } from './tabs/tools.js';
 import { loadPerformance, renderPerformance } from './tabs/performance.js';
 import { wireGlobalSearch, resetSearchCache } from './search.js';
 import { wireMiseAJour, ouvrir as ouvrirMiseAJour } from './mise-a-jour.js';
@@ -804,10 +804,6 @@ function wireEvents() {
   initTemplateSelect();
 
   // Tools
-  wireSimulation();
-  document.getElementById('btn-auto-snapshot')?.addEventListener('click', triggerAutoSnapshot);
-  document.getElementById('btn-refresh-prices')?.addEventListener('click', () => triggerPricesRefresh(false));
-  document.getElementById('btn-refresh-prices-stale')?.addEventListener('click', () => triggerPricesRefresh(true));
 
   // Position form
   document.getElementById('position-form').addEventListener('submit', savePosition);
@@ -1005,6 +1001,7 @@ function _redessinerSansRecharger(tab) {
   if (tab === 'flux' && S.flux?.length) { renderFlux(); return true; }
   if (tab === 'performance') { renderPerformance(); return true; }
   if (tab === 'conseil')     { renderAdvisor(); return true; }
+  if (tab === 'tools')       { renderOutils(); return true; }
   return false;
 }
 
