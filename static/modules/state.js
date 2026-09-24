@@ -12,9 +12,6 @@ export const S = {
   historique:    [],
   entities:        [],
   entitySnapshots: [],
-  // L'arborescence par defaut ; la preference, partagee entre appareils, est
-  // relue au demarrage une fois chargee (main.js).
-  positionsView:   'tree',
   currentTab:      'synthese',
   editPosId:       null,
   editFluxId:      null,

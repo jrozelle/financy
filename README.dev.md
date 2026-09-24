@@ -17,7 +17,7 @@ cp .env.example .env            # DB_PATH=financy_dev.db, FINANCY_PASSWORD=...
 Passer par `python -m pip` : le `pip` du venv peut pointer vers un interpréteur
 disparu après une mise à jour de Python.
 
-Les écrans réécrits en Svelte (onglet Crédits pour l'instant) se compilent à
+Les écrans réécrits en Svelte (Crédits, Positions) se compilent à
 part, avec Node :
 
 ```bash

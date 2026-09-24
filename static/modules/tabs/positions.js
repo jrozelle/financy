@@ -1,65 +1,15 @@
 import { S } from '../state.js';
-import { fmt, fmtDate, esc, liqBadge, sortArr, updateSortIndicators, today, parseLocaleNumber, fmtPct } from '../utils.js';
+import { fmt, fmtDate, esc, today, parseLocaleNumber, fmtPct } from '../utils.js';
 import { api } from '../api.js';
 import { confirmDialog, promptDialog, toast, closeModal } from '../dialogs.js';
 import { loadSynthese, loadHistorique } from './synthese.js';
-import { openHoldingsModal } from './holdings.js';
 import { refreshDates, ecrireContexte } from '../main.js';
-import { saveFilters, loadFilters, clearFilterKey, applyIfValid } from '../filter-persist.js';
-import { renderArbo, oublierTitres } from './arbo.js';
-import { reapplyColumns } from '../column-picker.js';
-import { ecrirePref } from '../preferences.js';
 
-const POSITION_FILTER_COLUMNS = {
-  'filter-owner': 'owner',
-  'filter-establishment': 'establishment',
-  'filter-envelope': 'envelope',
-};
-const POSITION_STICKY_COLUMNS = [
-  'owner',
-  'establishment',
-  'envelope',
-  'category',
-  'gross_attributed',
-  'net_attributed',
-  'mobilizable_value',
-];
-// Les libelles parlent la langue de l'utilisateur, pas celle du modele :
-// « attribue » designait la part detenue (ownership_pct), ce que dit deja le
-// badge de pourcentage a cote du montant.
-const POSITION_TABLE_COLUMNS = [
-  { key: 'owner', label: 'Titulaire' },
-  { key: 'establishment', label: 'Établissement / Entité' },
-  { key: 'envelope', label: 'Enveloppe' },
-  { key: 'category', label: 'Catégorie' },
-  { key: 'gross_attributed', label: 'Valeur', num: true },
-  { key: 'debt_attributed', label: 'Dette', num: true },
-  { key: 'net_attributed', label: 'Net', num: true },
-  { key: 'gain_attributed', label: 'Plus-value', num: true },
-  { key: 'liquidity', label: 'Liquidité' },
-  { key: 'mobilizable_value', label: 'Mobilisable', num: true },
-  { key: 'actions', label: '' },
-];
-
-export function ensurePositionsTableScaffold() {
-  const thead = document.getElementById('positions-thead');
-  if (thead) {
-    const current = [...thead.querySelectorAll('[data-pos-col]')].map(th => th.dataset.posCol).join('|');
-    const expected = POSITION_TABLE_COLUMNS.map(c => c.key).join('|');
-    if (current !== expected) {
-      thead.innerHTML = `<tr>${POSITION_TABLE_COLUMNS.map(col => `
-        <th data-pos-col="${col.key}"${col.key !== 'actions' ? ` data-sort="${col.key}"` : ''}${col.num ? ' class="num"' : ''}>${esc(col.label)}</th>
-      `).join('')}</tr>`;
-    }
-  }
-
-  const envelope = document.getElementById('filter-envelope');
-  const establishment = document.getElementById('filter-establishment');
-  if (envelope && establishment && envelope.previousElementSibling !== establishment) {
-    envelope.parentElement.insertBefore(establishment, envelope);
-  }
-}
-
+// L'onglet n'a plus qu'une vue, l'arborescence (frontend/src/positions/,
+// compilee dans /dist/positions.js) : le tableau faisait double emploi, et
+// « A plat » classe tous les comptes sur un rang. Ce module garde la fiche
+// d'une position et les actions sur l'arrete.
+let _arbo = null;
 
 let _snapshotEnsured = false;
 async function ensureTodaySnapshot() {
@@ -72,275 +22,34 @@ async function ensureTodaySnapshot() {
 }
 
 export async function loadPositions() {
-  ensurePositionsTableScaffold();
   if (!S.positionsDate && S.dates.length) S.positionsDate = S.dates[0];
   if (!S.positionsDate) {
-    renderPositionsEmpty('Aucune donnée. Importez votre fichier Excel ou ajoutez une position.');
+    S.positions = [];
+    await renderPositions();
     return;
   }
   S.positions = await api('GET', `/api/positions?date=${S.positionsDate}`);
-  oublierTitres();          // des positions rechargees : leurs lignes aussi
-  populateFilters();
-  // Sync filtre local avec le selecteur global
-  const globalOwner = S.syntheseOwner;
-  if (globalOwner && globalOwner !== 'Famille') {
-    document.getElementById('filter-owner').value = globalOwner;
-  }
-  renderPositions();
+  _arbo?.oublierTitres();      // des positions rechargees : leurs lignes aussi
+  await renderPositions();
 }
 
-function populateFilters() {
-  const owners    = [...new Set(S.positions.map(p => p.owner))].sort();
-  const envelopes = [...new Set(S.positions.map(p => p.envelope).filter(Boolean))].sort();
-  const estabs    = [...new Set(S.positions.map(p => p.establishment).filter(Boolean))].sort();
-  const globalOwner = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : '';
-
-  // Priorite : valeurs courantes DOM > filtres persistes en localStorage
-  const saved = loadFilters('positions');
-  const cur = {
-    owner:         globalOwner,
-    envelope:      document.getElementById('filter-envelope').value      || saved.envelope      || '',
-    establishment: document.getElementById('filter-establishment').value || saved.establishment || '',
-  };
-
-  fillFilter('filter-owner',         'Tous les titulaires',        owners);
-  fillFilter('filter-envelope',      'Toutes les enveloppes',      envelopes);
-  fillFilter('filter-establishment', 'Tous les établissements',    estabs);
-
-  applyIfValid('filter-owner',         cur.owner);
-  applyIfValid('filter-envelope',      cur.envelope);
-  applyIfValid('filter-establishment', cur.establishment);
-}
-
-export function persistPositionFilters() {
-  saveFilters('positions', {
-    envelope:      document.getElementById('filter-envelope')?.value      || '',
-    establishment: document.getElementById('filter-establishment')?.value || '',
-  });
-}
-
-function fillFilter(id, placeholder, options) {
-  document.getElementById(id).innerHTML =
-    `<option value="">${placeholder}</option>` +
-    options.map(o => `<option value="${esc(o)}">${esc(o)}</option>`).join('');
-}
-
-export function clearFilters() {
-  document.getElementById('filter-owner').value         = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : '';
-  document.getElementById('filter-envelope').value      = '';
-  document.getElementById('filter-establishment').value = '';
-  clearFilterKey('positions');
-  renderPositions();
-}
-
+/** Les positions vues par le titulaire de l'en-tete. */
 function filteredPositions() {
-  const owner  = document.getElementById('filter-owner').value;
-  const env    = document.getElementById('filter-envelope').value;
-  const estab  = document.getElementById('filter-establishment').value;
-  return S.positions.filter(p =>
-    (!owner  || p.owner         === owner) &&
-    (!env    || p.envelope      === env)   &&
-    (!estab  || p.establishment === estab)
-  );
+  const qui = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : '';
+  return (S.positions || []).filter(p => !qui || p.owner === qui);
 }
 
-function _activeFilteredColumns() {
-  return new Set(Object.entries(POSITION_FILTER_COLUMNS)
-    .filter(([id]) => !!document.getElementById(id)?.value)
-    .map(([, col]) => col));
-}
-
-function _applyPositionTableContext() {
-  const table = document.getElementById('positions-table');
-  if (!table) return;
-  const hiddenByFilter = _activeFilteredColumns();
-  const hasContextHiddenCols = hiddenByFilter.size > 0;
-
-  table.classList.toggle('has-context-hidden-cols', hasContextHiddenCols);
-  table.closest('.card-table')?.classList.toggle('is-context-filtered', hasContextHiddenCols);
-
-  table.querySelectorAll('[data-pos-col]').forEach(cell => {
-    const hide = hiddenByFilter.has(cell.dataset.posCol);
-    cell.classList.toggle('context-hidden-col', hide);
-    cell.classList.remove('mobile-sticky-col');
-  });
-
-  const stickyCol = POSITION_STICKY_COLUMNS.find(col => {
-    if (hiddenByFilter.has(col)) return false;
-    const th = table.querySelector(`#positions-thead [data-pos-col="${col}"]`);
-    return th && th.style.display !== 'none';
-  });
-  if (!stickyCol) return;
-  table.querySelectorAll(`[data-pos-col="${stickyCol}"]`).forEach(cell => {
-    if (cell.style.display !== 'none') cell.classList.add('mobile-sticky-col');
-  });
-}
-
-function renderPositionsEmpty(msg) {
-  document.getElementById('positions-tbody').innerHTML =
-    `<tr class="empty-row"><td colspan="10">${esc(msg)}</td></tr>`;
-  document.getElementById('positions-tfoot').innerHTML = '';
-}
-
-export function renderPosViewToggle() {
-  // En arbre, la barre du haut ne portait plus que ce bascule : une carte
-  // entiere pour deux boutons. Il rejoint la barre d'outils de l'arbre.
-  const isTree = S.positionsView === 'tree';
-  const place = toggle => {
-    // Meme place dans les deux vues : en bout de barre, a droite. En tableau
-    // il passait en tete, et changeait de cote a chaque bascule.
-    const hote = isTree ? document.querySelector('#positions-tree-wrap .arbo-barre-outils')
-                        : document.getElementById('positions-filters');
-    if (hote && toggle.parentElement !== hote) hote.appendChild(toggle);
-    document.querySelector('#tab-positions .positions-toolbar')?.classList.toggle('hidden', isTree);
-  };
-  const existing = document.getElementById('pos-view-toggle');
-  if (existing) {
-    existing.querySelectorAll('.view-toggle-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.view === S.positionsView);
-    });
-    place(existing);
-    return;
+export async function renderPositions() {
+  const hote = document.getElementById('positions-tree-wrap');
+  if (!hote) return;
+  try {
+    const { afficher } = await import('/dist/positions.js');
+    _arbo = afficher(hote, filteredPositions());
+  } catch {
+    // Clone sans compilation : dire quoi faire plutot qu'un onglet vide.
+    hote.innerHTML = `<p class="text-muted">L'écran Positions n'est pas compilé :
+      <code>cd frontend &amp;&amp; npm install &amp;&amp; npm run build</code>, puis rechargez la page.</p>`;
   }
-  const toggle = document.createElement('div');
-  toggle.id = 'pos-view-toggle';
-  toggle.className = 'analyse-view-toggle';
-  toggle.innerHTML = `
-    <button class="view-toggle-btn ${S.positionsView === 'table' ? 'active' : ''}" data-view="table">&#9776; Tableau</button>
-    <button class="view-toggle-btn ${S.positionsView === 'tree'  ? 'active' : ''}" data-view="tree">&#9638; Arborescence</button>`;
-  toggle.addEventListener('click', e => {
-    const btn = e.target.closest('.view-toggle-btn');
-    if (!btn) return;
-    S.positionsView = btn.dataset.view;
-    ecrirePref('financy_positionsView', S.positionsView);
-    renderPositions();
-  });
-  place(toggle);
-}
-
-export function renderPositions() {
-  ensurePositionsTableScaffold();
-  const isTree = S.positionsView === 'tree';
-  document.getElementById('positions-table-wrap').style.display = isTree ? 'none' : '';
-  document.getElementById('positions-tree-wrap').style.display  = isTree ? '' : 'none';
-  document.getElementById('positions-filters').style.display    = isTree ? 'none' : '';
-  renderPosViewToggle();
-  const thead = document.getElementById('positions-thead');
-  if (thead && !thead.dataset.contextBound) {
-    thead.dataset.contextBound = '1';
-    thead.addEventListener('columns:changed', _applyPositionTableContext);
-  }
-
-  if (isTree) {
-    renderArbo(filteredPositions());
-    return;
-  }
-
-  const positions = sortArr(filteredPositions(), S.sort.positions.key, S.sort.positions.dir);
-  updateSortIndicators('positions-thead', 'positions');
-  if (!positions.length) {
-    renderPositionsEmpty(S.positions.length ? 'Aucune position pour ce filtre.' : 'Aucune position pour cet arrêté.');
-    reapplyColumns('positions', 'positions-thead');
-    _applyPositionTableContext();
-    return;
-  }
-
-  document.getElementById('positions-tbody').innerHTML = positions.map(p => {
-    const ownPct  = p.ownership_pct ?? 1;
-    const debtPct = p.debt_pct ?? 1;
-    const pctBadge = ownPct < 0.999
-      ? `<span class="badge badge-j27" style="margin-left:4px;font-size:10px;vertical-align:middle">${fmtPct(ownPct * 100, 0)}</span>`
-      : '';
-    const debtBadge = p.debt_attributed > 0 && debtPct < 0.999
-      ? `<span class="badge badge-30" style="margin-left:4px;font-size:10px;vertical-align:middle">${fmtPct(debtPct * 100, 0)}</span>`
-      : '';
-    const entitySub = p.entity
-      ? `<div style="font-size:11px;color:var(--text-muted);margin-top:1px">↳ ${esc(p.entity)}</div>` : '';
-    // La note s'affiche sous le libelle : derriere une icone a infobulle, elle
-    // ne se lisait ni au clavier, ni sur mobile.
-    const notesMark = p.notes
-      ? `<div class="pos-notes">${esc(p.notes)}</div>` : '';
-    const holdingsBadge = p.holdings_count
-      ? `<span class="badge badge-j27" style="margin-left:4px;font-size:10px;vertical-align:middle">${p.holdings_count} ligne${p.holdings_count > 1 ? 's' : ''}</span>`
-      : '';
-    return `<tr>
-      <td data-pos-col="owner"><strong>${esc(p.owner)}</strong></td>
-      <td data-pos-col="establishment">${esc(p.establishment || '—')}${entitySub}</td>
-      <td data-pos-col="envelope">${esc(p.envelope || '—')}</td>
-      <td data-pos-col="category">${esc(p.label || p.category)}${holdingsBadge}${notesMark}</td>
-      <td data-pos-col="gross_attributed" class="num">${fmt(p.gross_attributed)}${pctBadge}</td>
-      <td data-pos-col="debt_attributed" class="num ${p.debt_attributed > 0 ? 'neg' : ''}">${p.debt_attributed > 0 ? fmt(p.debt_attributed) : '—'}${debtBadge}</td>
-      <td data-pos-col="net_attributed" class="num ${p.net_attributed < 0 ? 'neg' : ''}">${fmt(p.net_attributed)}</td>
-      <td data-pos-col="gain_attributed" class="num">${celluleGain(p)}</td>
-      <td data-pos-col="liquidity">${liqBadge(p.liquidity)}</td>
-      <td data-pos-col="mobilizable_value" class="num">${fmt(p.mobilizable_value)}${p.mobilizable_pct_override != null ? `<div class="pos-override">surchargé : ${fmtPct(p.mobilizable_pct_override * 100, 0)}</div>` : ''}</td>
-      <td data-pos-col="actions" style="white-space:nowrap">
-        <button class="btn-icon" data-id="${p.id}" data-action="manage-holdings" title="Gérer les lignes">Lignes</button>
-        <button class="btn-icon edit" data-id="${p.id}" data-action="edit-pos">Éditer</button>
-        <button class="btn-icon del"  data-id="${p.id}" data-action="del-pos">Supprimer</button>
-      </td>
-    </tr>`;
-  }).join('');
-
-  const totGross = positions.reduce((s, p) => s + (p.gross_attributed || 0), 0);
-  const totDebt  = positions.reduce((s, p) => s + (p.debt_attributed  || 0), 0);
-  const totNet   = positions.reduce((s, p) => s + (p.net_attributed   || 0), 0);
-  const totMob   = positions.reduce((s, p) => s + (p.mobilizable_value|| 0), 0);
-  const mesurees = positions.filter(p => p.gain_lignes);
-  const totGain  = mesurees.reduce((s, p) => s + (p.gain_attributed || 0), 0);
-  document.getElementById('positions-tfoot').innerHTML = `
-    <tr>
-      <td data-pos-col="owner">TOTAL</td>
-      <td data-pos-col="establishment"></td>
-      <td data-pos-col="envelope"></td>
-      <td data-pos-col="category"></td>
-      <td data-pos-col="gross_attributed" class="num">${fmt(totGross)}</td>
-      <td data-pos-col="debt_attributed" class="num neg">${totDebt > 0 ? fmt(totDebt) : '—'}</td>
-      <td data-pos-col="net_attributed" class="num">${fmt(totNet)}</td>
-      <td data-pos-col="gain_attributed" class="num">${mesurees.length ? signe(totGain) : '—'}</td>
-      <td data-pos-col="liquidity"></td>
-      <td data-pos-col="mobilizable_value" class="num">${fmt(totMob)}</td>
-      <td data-pos-col="actions"></td>
-    </tr>`;
-
-  reapplyColumns('positions', 'positions-thead');
-  _applyPositionTableContext();
-  document.getElementById('positions-tbody').addEventListener('click', onPosTableClick);
-}
-
-const signe = v => `<span class="${v >= 0 ? 'pv-hausse' : 'pv-baisse'}">${v >= 0 ? '+' : '−'}${fmt(Math.abs(v))}</span>`;
-
-/** Plus-value d'une position a lignes de titres. Une ligne sans prix de
- *  revient connu n'est pas comptee a zero : la cellule dit combien de lignes
- *  le chiffre couvre, a l'ecran et non dans une infobulle. */
-function celluleGain(p) {
-  // Sans lignes de titres, aucun prix de revient : la cellule dit pourquoi elle
-  // est vide plutot que de laisser un blanc.
-  if (!p.has_holdings) {
-    const motif = p.entity ? 'valeur de l’entité' : 'sans lignes de titres';
-    return `<span class="pv-na">—</span><span class="pv-pct pv-motif">${motif}</span>`;
-  }
-  if (!p.gain_lignes) return '<span class="pv-na">PRU inconnu</span>';
-  const pct = p.gain_pct == null ? '' :
-    `<span class="pv-pct">${fmtPct(p.gain_pct * 100, 1, true)}</span>`;
-  const partiel = p.gain_lignes < p.holdings_count
-    ? `<span class="pv-partiel">${p.gain_lignes}/${p.holdings_count} lignes</span>` : '';
-  return `${signe(p.gain_attributed)}${pct}${partiel}`;
-}
-
-function onPosTableClick(e) {
-  const btn = e.target.closest('[data-action]');
-  if (!btn) return;
-  const id = parseInt(btn.dataset.id);
-  if (btn.dataset.action === 'edit-pos')         openPosModal(id);
-  if (btn.dataset.action === 'del-pos')          deletePosition(id);
-  if (btn.dataset.action === 'manage-holdings')  _openHoldingsForPosition(id);
-}
-
-function _openHoldingsForPosition(id) {
-  const p = S.positions.find(x => x.id === id);
-  const label = p ? `${p.envelope || p.category} (${p.owner})` : '';
-  openHoldingsModal(id, label);
 }
 
 /** Date du snapshot sur lequel agissent les actions du menu global.

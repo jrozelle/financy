@@ -16,9 +16,8 @@ import { loadTargets, saveTargets } from './targets.js';
 import { wireSortableTable } from './utils.js';
 
 import { loadSynthese, renderSynthese, renderSyntheseHistory, loadHistorique, wireSyntheseMenu } from './tabs/synthese.js';
-import { loadPositions, renderPositions, clearFilters, openPosModal, duplicateSnapshot, renameSnapshot, deleteSnapshot,
-         onEntitySelectChange, updatePosInfo, savePosition, deletePosition,
-         persistPositionFilters, ensurePositionsTableScaffold } from './tabs/positions.js';
+import { loadPositions, renderPositions, openPosModal, duplicateSnapshot, renameSnapshot, deleteSnapshot,
+         onEntitySelectChange, updatePosInfo, savePosition, deletePosition } from './tabs/positions.js';
 import { openHoldingsModal, wireHoldingsEvents, confirmCloseHoldings } from './tabs/holdings.js';
 import { loadPrets, ouvrirFormulaireCredit } from './tabs/prets.js';
 import { loadTresorerie, initTresorerie } from './tabs/tresorerie.js';
@@ -50,7 +49,6 @@ function _lsSet(cle, valeur) {
 async function init() {
   // Avant tout rendu : colonnes, filtres, tris et vues viennent de la base.
   await chargerPreferences();
-  S.positionsView = lirePref('financy_positionsView') || 'tree';
   initMask();
   wireTodo(switchTab);   // la zone « À traiter » renvoie vers l'onglet concerne
   wireReglages(chargerEcranReglage);
@@ -557,25 +555,6 @@ function wireEvents() {
   document.getElementById('btn-duplicate').addEventListener('click', duplicateSnapshot);
   document.getElementById('btn-rename-snapshot')?.addEventListener('click', renameSnapshot);
   document.getElementById('btn-delete-snapshot')?.addEventListener('click', deleteSnapshot);
-  document.getElementById('filter-owner').addEventListener('change', () => {
-    const val = document.getElementById('filter-owner').value;
-    S.syntheseOwner = val || 'Famille';
-    ecrireContexte();
-    persistPositionFilters();
-    resetSearchCache();
-    const globalSel = document.getElementById('global-owner-filter');
-    if (globalSel) globalSel.value = S.syntheseOwner;
-    renderPositions();
-  });
-  document.getElementById('filter-envelope').addEventListener('change', () => {
-    persistPositionFilters();
-    renderPositions();
-  });
-  document.getElementById('filter-establishment').addEventListener('change', () => {
-    persistPositionFilters();
-    renderPositions();
-  });
-  document.getElementById('btn-clear-filters').addEventListener('click', clearFilters);
 
   // Tree delegation
   document.getElementById('positions-tree-wrap').addEventListener('click', ev => {
@@ -842,8 +821,6 @@ function wireEvents() {
   document.getElementById('btn-backup')?.addEventListener('click', createBackup);
 
   // Tri des tableaux
-  ensurePositionsTableScaffold();
-  wireSortableTable('positions-thead', 'positions', renderPositions);
   wireSortableTable('flux-thead',      'flux',      renderFlux);
   wireSortableTable('entities-thead',  'entities',  renderEntities);
 
@@ -890,12 +867,6 @@ function wireEvents() {
   wireSettingsEvents();
 
   // Column pickers
-  initColumnPicker('positions', 'positions-col-picker', 'positions-thead', {
-    owner: 'Titulaire', establishment: 'Établissement', envelope: 'Enveloppe',
-    category: 'Catégorie', gross_attributed: 'Valeur',
-    debt_attributed: 'Dette', net_attributed: 'Net', gain_attributed: 'Plus-value',
-    liquidity: 'Liquidité', mobilizable_value: 'Mobilisable',
-  });
   initColumnPicker('actifs', 'actifs-col-picker', 'actifs-thead', {
     name: 'Nom', establishments: 'Établissement',
     asset_class: 'Classe', quantity: 'Qté',

@@ -21,7 +21,8 @@ l'historique git (`git log`), un commit par phase.
 - [ ] Svelte : porter les écrans un par un, un déploiement par écran, chacun
       comparé à l'ancien sur une copie de la base ; d'abord les plus exposés
       aux bugs d'interface — Positions (arbre et tableau), Synthèse et ses
-      widgets, Flux et l'import — puis les écrans simples. Crédits est fait
+      widgets, Flux et l'import — puis les écrans simples. Crédits et Positions
+      sont faits
 
 ## Fait, en bref
 

@@ -11,7 +11,7 @@ export default defineConfig({
     emptyOutDir: true,
     target: 'es2022',
     lib: {
-      entry: { credits: 'src/credits/main.ts' },
+      entry: { credits: 'src/credits/main.ts', positions: 'src/positions/main.svelte.ts' },
       formats: ['es'],
       fileName: (_format, nom) => `${nom}.js`,
     },

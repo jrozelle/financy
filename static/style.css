@@ -759,28 +759,6 @@ input[type="file"] {
     margin: 0;
     min-width: max-content;
   }
-  #tab-positions .header-actions {
-    width: auto;
-    flex-wrap: nowrap;
-  }
-  #tab-positions #pos-view-toggle {
-    margin-left: 0 !important;
-  }
-  #tab-positions .filters-bar {
-    display: grid;
-    grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto;
-    gap: .65rem;
-    margin-bottom: 0;
-    min-width: 0;
-  }
-  #tab-positions .filters-bar .filter-select {
-    width: 100%;
-    min-width: 0;
-  }
-  #tab-positions .positions-toolbar .btn,
-  #tab-positions .positions-toolbar select {
-    min-height: 36px;
-  }
   #tab-flux .page-header {
     display: none !important;
   }
@@ -1235,7 +1213,6 @@ input[type="file"] {
 .tab-btn[data-tab="referentiel"],
 #btn-edit-targets,
 .analyse-view-toggle,
-#pos-view-toggle,
 #btn-add-snapshot-note,
 .page-header .btn,
 .page-header,
@@ -2086,18 +2063,9 @@ kbd {
   .view-toggle-btn {
     justify-content: center;
   }
-  #pos-view-toggle {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin: 0 !important;
-    padding: 3px;
-    border-radius: 10px;
-  }
   #actifs-col-picker {
     width: 100%;
   }
-  #tab-positions .filters-bar,
   #tab-flux .filters-bar {
     margin-top: -.15rem;
   }
@@ -2140,7 +2108,6 @@ kbd {
     padding: .7rem .85rem;
     font-size: 13.5px;
   }
-  #tab-positions .data-table,
   #tab-flux .data-table,
   #tab-entites .data-table {
     min-width: 620px;
@@ -2187,9 +2154,6 @@ kbd {
 .tab-content:not(#tab-synthese) .btn {
     font-size: 13.5px;
   }
-  #tab-positions .header-actions {
-    grid-template-columns: 1fr 1fr;
-  }
   #btn-duplicate {
     font-size: 13px;
   }
@@ -2197,12 +2161,10 @@ kbd {
 
 /* ── Mobile tables: keep real tables, preserve all columns ──────────────── */
 @media (max-width: 780px) {
-  #tab-positions .data-table { min-width: 980px; }
   #tab-flux .data-table { min-width: 820px; }
   #tab-entites .data-table { min-width: 1120px; }
   #advisor-objectives-table { min-width: 680px; }
 
-  #tab-positions .card-table,
   #tab-flux .card-table,
   #tab-entites .card-table,
   .advisor-objectives-wrap,
@@ -2212,8 +2174,6 @@ kbd {
     overscroll-behavior-inline: contain;
   }
 
-  #tab-positions .data-table th,
-  #tab-positions .data-table td,
   #tab-flux .data-table th,
   #tab-flux .data-table td,
   #tab-entites .data-table th,
@@ -2221,25 +2181,12 @@ kbd {
     white-space: nowrap;
   }
 
-  #tab-positions .data-table th:first-child,
-  #tab-positions .data-table td:first-child,
-  #tab-positions .data-table .mobile-sticky-col {
-    position: sticky;
-    left: 0;
-    z-index: 2;
-    background: var(--card);
-    box-shadow: 1px 0 0 var(--border);
-  }
-
-  #tab-positions .data-table thead th:first-child,
-  #tab-positions .data-table thead .mobile-sticky-col,
   #tab-flux .data-table thead th:first-child,
   #tab-entites .data-table thead th:first-child {
     z-index: 3;
     background: var(--bg);
   }
 
-  #tab-positions .data-table td:not(.num),
   #tab-flux .data-table td:not(.num),
   #tab-entites .data-table td:not(.num) {
     max-width: 240px;
@@ -2260,21 +2207,6 @@ kbd {
   }
   #tab-positions .positions-toolbar > .page-header {
     margin: 0 0 .45rem !important;
-  }
-  #tab-positions .filters-bar {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 42px !important;
-    align-items: stretch;
-    margin-top: 0 !important;
-  }
-  #btn-clear-filters {
-    min-width: 42px !important;
-    padding: 0 !important;
-    font-size: 0 !important;
-  }
-  #btn-clear-filters::before {
-    content: "×";
-    font-size: 22px;
-    line-height: 1;
   }
   #tab-flux .filters-bar {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
@@ -3561,8 +3493,6 @@ td.arbo-part > * { vertical-align: middle; }
   .head-complement { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   /* Le bascule Tableau / Arborescence, dans la barre de l'arbre, a la taille
      de ses voisins — les regles generales des onglets l'etirent a 42 px. */
-  #positions-tree-wrap #pos-view-toggle { display: inline-flex; padding: 2px; }
-  #positions-tree-wrap #pos-view-toggle .view-toggle-btn { width: auto !important; min-height: 30px; font-size: .76rem; padding: 0 .6rem; }
 }
 
 /* ── Courbe d'evolution (modules/courbe.js) ───────────────────────────── */
@@ -3798,9 +3728,6 @@ td.arbo-part > * { vertical-align: middle; }
 .dispo-bloque { margin-top: .35rem; padding-top: .45rem; border-top: 1px dashed var(--border); }
 
 /* Bascule Tableau / Arborescence : a droite, dans les deux vues. */
-#tab-positions #positions-filters { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
-#tab-positions #positions-filters > .filter-select { flex: 1 1 14rem; width: auto; }
-#tab-positions #positions-filters > #pos-view-toggle { margin-left: auto; width: auto; flex: none; }
 
 /* D'ou vient la hausse : colonne survolee, total de la bulle. */
 .contrib-zone { cursor: default; outline: none; }
@@ -4180,23 +4107,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
    (vue par defaut) et sur grand ecran ; ici il repoussait la valeur hors de
    l'ecran, derriere six colonnes. */
 @media (max-width: 640px) {
-  #tab-positions .data-table [data-pos-col="category"],
-  #tab-positions .data-table [data-pos-col="gross_attributed"],
-  #tab-positions .data-table [data-pos-col="debt_attributed"],
-  #tab-positions .data-table [data-pos-col="gain_attributed"],
-  #tab-positions .data-table [data-pos-col="liquidity"],
-  #tab-positions .data-table [data-pos-col="mobilizable_value"] { display: none; }
   /* La largeur minimale faite pour dix colonnes n'a plus d'objet a cinq. */
-  #tab-positions .data-table { min-width: 0; }
   /* Les listes s'empilent : le « x » se retrouvait seul sur une ligne
      entiere, sans rien dire. Le libelle revient. (!important : la regle
      d'origine en porte.) */
-  #btn-clear-filters { font-size: .85rem !important; padding: 0 .75rem !important; min-height: 44px; }
-  #btn-clear-filters::before { content: none; }
-  #tab-positions .data-table [data-pos-col="establishment"],
-  #tab-positions .data-table [data-pos-col="envelope"],
-  #tab-positions .data-table [data-pos-col="establishment"] *,
-  #tab-positions .data-table [data-pos-col="envelope"] * { white-space: normal; max-width: 7.5rem; }
 }
 /* Echeanciers des credits au telephone : cinq colonnes dont une de
    libelles longs ; capital et interets passent sous le credit, en seconde
@@ -4214,7 +4128,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 /* Au doigt, supprimer passe par la fiche (bouton « Supprimer » en bas a
    gauche) : sur chaque ligne, il touchait le bouton « Editer ». */
 @media (max-width: 640px) and (pointer: coarse) {
-  #flux-tbody .btn-icon.del, [data-action="del-ent"], [data-action="del-pos"] { display: none; }
+  #flux-tbody .btn-icon.del,
+  #flux-tbody .btn-icon.del, [data-action="del-ent"] { display: none; }
   /* Credits : pas de fiche ; la suppression s'ecarte des chiffres, seule en
      bas de la carte. */
   #prets-liste [data-pret-suppr] { display: block; margin: .75rem 0 0 auto; }

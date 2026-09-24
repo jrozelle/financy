@@ -17,7 +17,7 @@ import { api } from './api.js';
 // Cles partagees entre appareils (les autres restent dans le navigateur).
 const PARTAGEES = [
   /^financy_filters_/, /^financy_columns_/, /^financy_arbo_(groupe|tri)$/,
-  /^financy_repartition$/, /^financy_positionsView$/, /^financy_projection_v2$/,
+  /^financy_repartition$/, /^financy_projection_v2$/,
 ];
 const partagee = cle => PARTAGEES.some(r => r.test(cle));
 

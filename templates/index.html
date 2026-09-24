@@ -286,57 +286,10 @@
           <h1>Positions</h1>
           <div class="header-actions"></div>
         </div>
-        <div class="filters-bar" id="positions-filters">
-          <select id="filter-owner" class="filter-select hidden" aria-hidden="true" tabindex="-1">
-            <option value="">Tous les titulaires</option>
-          </select>
-          <select id="filter-establishment" class="filter-select">
-            <option value="">Tous les établissements</option>
-          </select>
-          <select id="filter-envelope" class="filter-select">
-            <option value="">Toutes les enveloppes</option>
-          </select>
-          <button class="btn btn-secondary btn-sm" id="btn-clear-filters">Effacer filtres</button>
-        </div>
       </div>
-      <div id="positions-table-wrap" class="card card-table">
-        <table class="data-table" id="positions-table">
-          <thead id="positions-thead">
-            <tr>
-              <th data-sort="owner" data-pos-col="owner">Titulaire</th>
-              <th data-sort="establishment" data-pos-col="establishment">Établissement / Entité</th>
-              <th data-sort="envelope" data-pos-col="envelope">Enveloppe</th>
-              <th data-sort="category" data-pos-col="category">Catégorie</th>
-              <th class="num" data-sort="gross_attributed" data-pos-col="gross_attributed">Valeur</th>
-              <th class="num" data-sort="debt_attributed" data-pos-col="debt_attributed">Dette</th>
-              <th class="num" data-sort="net_attributed" data-pos-col="net_attributed">Net</th>
-              <th class="num" data-sort="gain_attributed" data-pos-col="gain_attributed">Plus-value</th>
-              <th data-sort="liquidity" data-pos-col="liquidity">Liquidité</th>
-              <th class="num" data-sort="mobilizable_value" data-pos-col="mobilizable_value">Mobilisable</th>
-              <th data-pos-col="actions"></th>
-            </tr>
-          </thead>
-          <tbody id="positions-tbody"></tbody>
-          <tfoot id="positions-tfoot"></tfoot>
-        </table>
-      </div>
-      <div id="positions-tree-wrap" class="card" style="display:none">
-        <div class="arbo-barre-outils">
-          <label class="sr-only" for="arbo-recherche">Rechercher un compte</label>
-          <input type="search" id="arbo-recherche" class="arbo-recherche" placeholder="Rechercher un compte…" autocomplete="off">
-          <span class="arbo-lib">Regrouper par</span>
-          <div class="seg" role="group" aria-label="Regrouper par" id="arbo-groupes">
-            <button type="button" class="seg-btn" data-arbo-groupe="nature" aria-pressed="true">Nature</button>
-            <button type="button" class="seg-btn" data-arbo-groupe="titulaire" aria-pressed="false">Titulaire</button>
-            <button type="button" class="seg-btn" data-arbo-groupe="etablissement" aria-pressed="false">Établissement</button>
-            <button type="button" class="seg-btn" data-arbo-groupe="plat" aria-pressed="false">À plat</button>
-          </div>
-          <span class="arbo-espace"></span>
-          <button type="button" class="arbo-bouton" id="arbo-deplier">Tout déplier</button>
-          <button type="button" class="arbo-bouton" id="arbo-replier">Tout replier</button>
-        </div>
-        <div id="positions-tree-body"></div>
-      </div>
+      <!-- Arborescence en Svelte (frontend/src/positions/), montee au premier
+           rendu ; le conteneur reste, main.js y delegue les actions. -->
+      <div id="positions-tree-wrap" class="card"></div>
     </div>
 
     <!-- ── FLUX ─────────────────────────────────────────────────────────── -->
@@ -1459,10 +1412,6 @@
             <div id="pref-barre"></div>
           </div>
           <h3>Colonnes</h3>
-          <div class="pref-ligne">
-            <div><b>Positions</b><p>Colonnes affichées dans le tableau des positions</p></div>
-            <div id="pref-col-positions"><button type="button" class="settings-item" id="positions-col-picker">Choisir</button></div>
-          </div>
           <div class="pref-ligne">
             <div><b>Actifs</b><p>Colonnes affichées dans le tableau des actifs</p></div>
             <div id="pref-col-actifs"><button type="button" class="settings-item" id="actifs-col-picker">Choisir</button></div>
