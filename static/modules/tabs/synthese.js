@@ -1,10 +1,8 @@
 import { S } from '../state.js';
 import { natureDe } from '../categories.js';
-import { dessinerCourbe } from '../courbe.js';
-import { fmt, fmtDate, esc, parseLocaleNumber, sparkline, fmtPct } from '../utils.js';
+import { fmt, fmtDate, esc, parseLocaleNumber, fmtPct } from '../utils.js';
 import { api } from '../api.js';
 import { loadTodo, renderTodo } from '../todo.js';
-import { drilldownPositions } from '../drilldown.js';
 import { loadUserAlerts } from '../alerts.js';
 import { renderAllocationTargets } from '../targets.js';
 import { isMasked } from '../mask.js';
@@ -109,6 +107,21 @@ async function _cartesSvelte({ chiffres, repartition, comptes, cache = false }) 
   if (h) _svelte.rechargerContribution(h, isMasked(), cache, comptes.owner, S.syntheseDate, S.dates?.[0] || null);
   const f = document.getElementById('fiscalite-card');
   if (f) _svelte.rechargerFiscalite(f, isMasked(), comptes.owner, S.syntheseDate);
+  _evolutionSvelte();
+}
+
+/** Evolution du net, evolution par groupe, ce qui a bouge (lot 3a). Aussi
+ *  appelee quand l'historique se recharge seul (loadHistorique). */
+function _evolutionSvelte() {
+  if (!_svelte) return;
+  const owner = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : null;
+  const masque = isMasked();
+  const h = document.querySelector('.card[data-carte="historique"]');
+  if (h) _svelte.afficherHistoriqueNet(h, { historique: S.historique || [], owner, masque });
+  const g = document.getElementById('synthese-history-detail-card');
+  if (g) _svelte.afficherEvolutionGroupes(g, { owner, arretes: (S.historique || []).length, masque });
+  const m = document.querySelector('.card[data-carte="mouvements"]');
+  if (m) _svelte.afficherMouvements(m, { owner, famille: !owner, date: S.syntheseDate, masque });
 }
 
 async function _projectionSvelte(props) {
@@ -180,14 +193,11 @@ export function renderSynthese({ cache = false } = {}) {
   });
 
   renderEntityWarnings(syn.entity_warnings || [], { cache });
-  renderHistChart({ cache });
-  renderSyntheseHistory({ cache });
   const posTitulaire = isFamily ? Object.values(S.synthese._positions_cache || {}).flat()
                                 : (S.synthese._positions_cache?.[owner] || []);
   renderLiqBars(liqFiltered, posTitulaire);
   renderEntitiesSynthese();
   renderAllocationTargets();
-  renderSnapshotDiff(owner, isFamily, { cache });
   renderSnapshotNote(syn);
   _argsObjectif = [kpi.net, isFamily, serie('net'), dates];
   renderWealthTarget(..._argsObjectif);
@@ -196,159 +206,13 @@ export function renderSynthese({ cache = false } = {}) {
   appliquerDisposition();
 }
 
-/** « Evolution par categorie » : une ligne par groupe — nom, tendance,
- *  valeur, variation. Sept aires empilees ne se lisaient pas : l'epaisseur
- *  d'une bande qui flotte sur les autres ne se mesure pas a l'oeil, et une
- *  poche de 5 % n'y etait qu'un lisere. Ici chaque ligne a son echelle, et
- *  les chiffres se lisent sans survol. */
-let _jetonHistoire = 0;
-let _histoireCache = null;
-
-export async function renderSyntheseHistory(opts) {
-  const cache = !!(opts && opts.cache === true);
-  const card = document.getElementById('synthese-history-detail-card');
-  const hote = document.getElementById('evolution-groupes');
-  if (!card || !hote) return;
-  if (S.historique.length < 2) { card.style.display = 'none'; return; }
-  card.style.display = '';
-
-  const groupBy = document.getElementById('synthese-history-group').value;
-  const owner   = S.syntheseOwner === 'Famille' ? null : S.syntheseOwner;
-  const url     = `/api/historique?group_by=${groupBy}${owner ? `&owner=${encodeURIComponent(owner)}` : ''}`;
-  // Changer vite de titulaire ou de regroupement : seule la derniere ecrit.
-  const jeton = ++_jetonHistoire;
-  let history;
-  if (cache && _histoireCache?.url === url) history = _histoireCache.history;
-  else {
-    history = await api('GET', url);
-    if (jeton !== _jetonHistoire) return;
-    _histoireCache = { url, history };
-  }
-  if (history.length < 2) { card.style.display = 'none'; return; }
-
-  const d0 = history[0].date, d1 = history[history.length - 1].date;
-  const groupes = [...new Set(history.flatMap(h => Object.keys(h.by_group || {})))];
-  const lignes = groupes.map(g => {
-    const serie = history.map(h => h.by_group?.[g] || 0);
-    const debut = serie[0], fin = serie[serie.length - 1];
-    return { g, serie, debut, fin, delta: fin - debut };
-  }).filter(l => l.serie.some(v => Math.abs(v) >= 1))
-    .sort((a, b) => Math.abs(b.fin) - Math.abs(a.fin));
-  const totalFin = lignes.reduce((t, l) => t + Math.max(0, l.fin), 0);
-
-  const sous = document.getElementById('evolution-groupes-sous');
-  if (sous) sous.textContent = `Du ${fmtDate(d0)} au ${fmtDate(d1)} · une ligne ouvre sa composition`;
-  hote.innerHTML = lignes.map(l => {
-    const pct = l.debut ? (l.delta / Math.abs(l.debut)) * 100 : null;
-    const sens = Math.abs(l.delta) < 1 ? 'evg-stable' : l.delta > 0 ? 'pos' : 'neg';
-    const part = totalFin > 0 && l.fin > 0 ? fmtPct(l.fin / totalFin * 100, 0) : '';
-    return `<button type="button" class="evg-ligne" data-groupe="${esc(l.g)}">
-      <span class="evg-nom">${esc(l.g)}${part ? `<span class="evg-part">${part}</span>` : ''}</span>
-      <span class="evg-spark">${sparkline(l.serie, { couleur: l.delta < 0 ? 'var(--danger)' : 'var(--primary)', dates: history.map(h => h.date) })}</span>
-      <span class="evg-valeur">${fmt(l.fin)}</span>
-      <span class="evg-delta ${sens}">${Math.abs(l.delta) < 1 ? 'stable'
-        : `${l.delta > 0 ? '+' : '−'}${fmt(Math.abs(l.delta))}${pct != null && isFinite(pct) ? `<small>${fmtPct(pct, 1, true)}</small>` : ''}`}</span>
-    </button>`;
-  }).join('');
-
-  hote.onclick = e => {
-    const b = e.target.closest('.evg-ligne');
-    if (!b) return;
-    const group = b.dataset.groupe;
-    api('GET', `/api/positions?date=${d1}`).then(positions => {
-      let filtered = owner ? positions.filter(p => p.owner === owner) : positions;
-      if (groupBy === 'category')      filtered = filtered.filter(p => p.category === group);
-      else if (groupBy === 'envelope')  filtered = filtered.filter(p => (p.envelope || 'Autre') === group);
-      drilldownPositions(filtered, `${group} — ${fmtDate(d1)}`, `Évolution par ${groupBy === 'category' ? 'catégorie' : 'enveloppe'}`, { showOwner: !owner });
-    });
-  };
-}
-
 export async function loadHistorique() {
   S.historique = await api('GET', '/api/historique');
-  if (S.currentTab === 'synthese') renderHistChart();
+  if (S.currentTab === 'synthese') _evolutionSvelte();
 }
 
 
 
-/** « Evolution du patrimoine net » : la courbe du titulaire choisi, et sous
- *  elle ce qui explique la variation — l'epargne versee, puis l'effet des
- *  marches. Comparer ce patrimoine a un indice serait trompeur : il grossit
- *  aussi de ce qu'on y verse. La comparaison a un ETF vit dans Performance,
- *  ou le TWR neutralise les versements.
- *
- *  Le titulaire se lit dans S : appelee sans argument apres un rechargement
- *  de l'historique, l'ancienne version revenait a la famille sous un filtre
- *  nominatif. */
-function renderHistChart({ cache = false } = {}) {
-  const hote = document.getElementById('evolution-courbe');
-  if (!hote || !S.historique.length) return;
-  const owner = S.syntheseOwner && S.syntheseOwner !== 'Famille' ? S.syntheseOwner : null;
-  const points = S.historique.map(h => ({
-    date: h.date, v: owner ? (h.by_owner?.[owner] || 0) : h.family_net,
-  }));
-  const qui = owner || 'Famille';
-  const debut = points[0], fin = points[points.length - 1];
-  dessinerCourbe(hote, {
-    series: [{ nom: `Patrimoine net — ${qui}`, couleur: 'var(--primary)', points, aire: true }],
-    formatV: v => fmt(v),
-    aide: `Patrimoine net ${qui} : ${fmt(debut.v)} le ${fmtDate(debut.date)}, ${fmt(fin.v)} le ${fmtDate(fin.date)}.`,
-    onPoint: date => api('GET', `/api/positions?date=${date}`).then(positions => {
-      const lignes = owner ? positions.filter(p => p.owner === owner) : positions;
-      drilldownPositions(lignes, `${qui} — ${fmtDate(date)}`, 'Composition à cette date', { showOwner: !owner });
-    }),
-  });
-  const sous = document.getElementById('evolution-sous');
-  if (sous) sous.textContent = `${points.length} arrêtés · du ${fmtDate(debut.date)} au ${fmtDate(fin.date)}`;
-  _legendeEvolution(owner, debut, fin, { cache });
-}
-
-let _legendeJeton = 0;
-let _legendeRequete = null;
-async function _legendeEvolution(owner, debut, fin, { cache = false } = {}) {
-  const hote = document.getElementById('evolution-legende');
-  if (!hote) return;
-  // Changer vite de titulaire lance deux requetes : seule la derniere ecrit.
-  const jeton = ++_legendeJeton;
-  const variation = fin.v - debut.v;
-  const pct = debut.v ? variation / Math.abs(debut.v) * 100 : null;
-  let decompo = '';
-  try {
-    const q = new URLSearchParams({ limit: '40' });
-    if (owner) q.set('owner', owner);
-    // La courbe se dessine deux fois au chargement — apres la synthese, puis
-    // apres l'historique, qui arrivent dans un ordre variable. La meme
-    // decomposition, demandee a quelques millisecondes d'intervalle, est
-    // partagee plutot que redemandee.
-    const cle = `${q}|${debut.date}|${fin.date}`;
-    const perimee = !cache && Date.now() - (_legendeRequete?.t || 0) > 2000;
-    if (!_legendeRequete || _legendeRequete.cle !== cle || perimee) {
-      _legendeRequete = { cle, t: Date.now(), p: api('GET', `/api/contribution?${q}`, null, { silent: true }) };
-    }
-    const d = await _legendeRequete.p;
-    if (jeton !== _legendeJeton) return;
-    // L'epargne, le capital et les marches expliquent la variation seulement
-    // s'ils couvrent la meme periode : au-dela de 40 arretes, le serveur
-    // tronque, et les chiffres ne s'additionneraient plus.
-    const du = d.periodes?.[0]?.debut, au = d.periodes?.[d.periodes.length - 1]?.fin;
-    if (d.periodes?.length && du === debut.date && au === fin.date) {
-      decompo = `<span><i style="background:var(--chart-4)"></i>Épargne nouvelle <b>${fmtSigne(d.total_epargne)}</b></span>`
-              + (Math.abs(d.total_capital || 0) >= 1
-                  ? `<span><i style="background:var(--chart-2)"></i>Capital remboursé <b>${fmtSigne(d.total_capital)}</b></span>` : '')
-              + `<span><i style="background:var(--chart-1)"></i>Marchés <b>${fmtSigne(d.total_performance)}</b></span>`
-              + (Math.abs(d.total_hors_suivi || 0) >= 1
-                  ? `<span><i style="background:var(--text-muted)"></i>Comptes ajoutés ou retirés <b>${fmtSigne(d.total_hors_suivi)}</b></span>` : '');
-    }
-  } catch { /* la decomposition est un plus : sans elle, la courbe reste lisible */ }
-  if (jeton !== _legendeJeton) return;
-  hote.innerHTML = `
-    <span>Variation <b>${fmtSigne(variation)}</b>${
-      pct != null ? ` <b>${fmtPct(pct, 1, true)}</b>` : ''}</span>
-    ${decompo}
-    <span class="courbe-note">Chaque arrêté ouvre sa composition</span>`;
-}
-
-const fmtSigne = v => `${v >= 0 ? '+' : '−'}${fmt(Math.abs(v))}`;
 
 /** Un pourcentage de controle : entier s'il l'est, une decimale sinon —
  *  100,5 % de detention ne doit pas s'arrondir a 101 %. */
@@ -539,79 +403,6 @@ function renderLiqBars(byLiq, positions = []) {
       ${fmt(horsFinancier)} de net.` : ''}</p>` : ''}`;
 }
 
-let _jetonDiff = 0;
-let _diffCache = null;
-
-async function renderSnapshotDiff(owner, isFamily, { cache = false } = {}) {
-  const el = document.getElementById('snapshot-diff');
-  if (!el) return;
-  const params = new URLSearchParams({ date: S.syntheseDate || '' });
-  if (!isFamily && owner) params.set('owner', owner);
-  const cle = String(params);
-  const jeton = ++_jetonDiff;
-  let data;
-  if (cache && _diffCache?.cle === cle) data = _diffCache.data;
-  else {
-    try { data = await api('GET', `/api/snapshot-diff?${params}`, null, { silent: true }); }
-    catch { if (jeton === _jetonDiff) el.innerHTML = ''; return; }
-    if (jeton !== _jetonDiff) return;
-    _diffCache = { cle, data };
-  }
-  if (!data || !data.from_date) {
-    el.innerHTML = '<p class="text-muted" style="font-size:13px">Aucun arrêté précédent à comparer.</p>';
-    return;
-  }
-  const moves = (data.movements || []).filter(m => Math.abs(m.delta) >= 1 || m.status !== 'changed');
-  if (!moves.length) {
-    el.innerHTML = `<p class="text-muted" style="font-size:13px">Aucun mouvement depuis le ${fmtDate(data.from_date)}.</p>`;
-    return;
-  }
-  const t = data.totals || {};
-  const badge = s => s === 'new' ? ' <span class="h-badge h-badge-fresh">nouveau</span>'
-    : s === 'closed' ? ' <span class="h-badge h-badge-expired">clôturé</span>' : '';
-  // On lit un compte puis son chiffre, comme partout ailleurs : libelle a
-  // gauche, montant a droite, aligne en colonne.
-  const VISIBLES = 6;
-  const ligne = (m, i) => `
-        <div class="mv-item"${i >= VISIBLES ? ' data-mv-reste hidden' : ''}>
-          <button type="button" class="mv-ligne" aria-expanded="false">
-            <span class="mv-ou">${esc(m.label || '—')}${badge(m.status)}</span>
-            <span class="mv-montant ${m.delta >= 0 ? 'pos' : 'neg'}">${
-              m.delta >= 0 ? '+' : '−'}${fmt(Math.abs(m.delta))}</span>
-            <span class="mv-qui">${esc([m.owner, m.establishment].filter(Boolean).join(' · '))}</span>
-          </button>
-          <p class="mv-detail" hidden>${
-            m.status === 'new' ? `Ouvert depuis le ${fmtDate(data.from_date)} : ${fmt(m.net_after)} au ${fmtDate(data.to_date)}`
-            : m.status === 'closed' ? `${fmt(m.net_before)} au ${fmtDate(data.from_date)}, absent au ${fmtDate(data.to_date)}`
-            : `${fmt(m.net_before)} au ${fmtDate(data.from_date)} → ${fmt(m.net_after)} au ${fmtDate(data.to_date)}${
-                m.net_before ? ` (${fmtPct((m.net_after / m.net_before - 1) * 100, 1, true)})` : ''}`}</p>
-        </div>`;
-  el.innerHTML = `
-    <p class="mv-total">Variation nette
-      <b class="${(t.delta || 0) >= 0 ? 'pos' : 'neg'}">${(t.delta || 0) >= 0 ? '+' : ''}${
-        fmt(t.delta || 0)}</b> depuis le ${fmtDate(data.from_date)}</p>
-    <div class="mv-liste">${moves.map(ligne).join('')}</div>
-    ${moves.length > VISIBLES ? `<button type="button" class="btn-link mv-plus" aria-expanded="false">
-      Voir les ${moves.length - VISIBLES} autres comptes</button>` : ''}`;
-  // L'avant et l'apres ne sont plus affiches d'office : ils se deplient au
-  // clic, a l'ecran, plutot que de dormir dans une infobulle.
-  el.onclick = e => {
-    const b = e.target.closest('.mv-ligne');
-    if (b) {
-      const ouvert = b.getAttribute('aria-expanded') === 'true';
-      b.setAttribute('aria-expanded', String(!ouvert));
-      b.nextElementSibling.hidden = ouvert;
-      return;
-    }
-    const plus = e.target.closest('.mv-plus');
-    if (plus) {
-      const ouvert = plus.getAttribute('aria-expanded') === 'true';
-      el.querySelectorAll('[data-mv-reste]').forEach(x => { x.hidden = ouvert; });
-      plus.setAttribute('aria-expanded', String(!ouvert));
-      plus.textContent = ouvert ? `Voir les ${moves.length - VISIBLES} autres comptes` : 'Réduire';
-    }
-  };
-}
 
 // ─── Snapshot notes ──────────────────────────────────────────────────────
 

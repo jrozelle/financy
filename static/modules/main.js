@@ -15,7 +15,7 @@ import { loadUserAlertsAsync, saveUserAlerts } from './alerts.js';
 import { loadTargets, saveTargets } from './targets.js';
 import { wireSortableTable } from './utils.js';
 
-import { loadSynthese, renderSynthese, renderSyntheseHistory, loadHistorique, wireSyntheseMenu } from './tabs/synthese.js';
+import { loadSynthese, renderSynthese, loadHistorique, wireSyntheseMenu } from './tabs/synthese.js';
 import { loadPositions, renderPositions, openPosModal, duplicateSnapshot, renameSnapshot, deleteSnapshot,
          onEntitySelectChange, updatePosInfo, savePosition, deletePosition } from './tabs/positions.js';
 import { openHoldingsModal, wireHoldingsEvents, confirmCloseHoldings } from './tabs/holdings.js';
@@ -780,7 +780,6 @@ function wireEvents() {
   }
 
   // Synthèse — évolution groupée
-  document.getElementById('synthese-history-group').addEventListener('change', renderSyntheseHistory);
 
   // Flux buttons
   ['flux-filter-owner','flux-filter-type','flux-filter-category','flux-filter-year'].forEach(id => {

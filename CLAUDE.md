@@ -170,7 +170,7 @@
 - Frontend modulaire : `static/modules/` (un module par onglet dans `tabs/`)
 - Ecrans Svelte 5 + TypeScript dans `frontend/` (Credits, Positions, et les
   cartes de la Synthese au fil des lots : chiffres, Repartition, Vos comptes,
-  D'ou vient la hausse, Projection, Impot latent),
+  D'ou vient la hausse, Projection, Impot latent, evolutions, Ce qui a bouge),
   compiles par Vite dans `frontend_dist/` (hors git), servis sous `/dist/`,
   construits dans l'image (etape `node` du Dockerfile) : un changement d'ecran
   Svelte demande un rebuild, comme du Python. Un ecran reprend le balisage et
@@ -178,7 +178,7 @@
   importe les modules existants par leur URL (`/static/modules/api.js`...) ;
   un montant ecrit par `fmt()` ne suit pas seul le mode discretion : la carte
   recoit `masque` et redessine sous `{#key masque}`. Types des modules existants
-  types dans `frontend/src/types-app/`. Avant de remplacer un ecran : texte
+  dans `frontend/src/types-app/`. Avant de remplacer un ecran : texte
   et structure compares a l'ancien, sur une copie de la base, au caractere
   pres.
 - Services metier : `services/` — `prets.py` (echeanciers, IRA, projection),

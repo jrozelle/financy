@@ -9,6 +9,9 @@ import Comptes from './Comptes.svelte';
 import Contribution from './Contribution.svelte';
 import Projection from './Projection.svelte';
 import Fiscalite from './Fiscalite.svelte';
+import HistoriqueNet from './HistoriqueNet.svelte';
+import EvolutionGroupes from './EvolutionGroupes.svelte';
+import Mouvements from './Mouvements.svelte';
 
 type Props = Record<string, any>;
 const montes = new Map<HTMLElement, { props: Props; instance: any }>();
@@ -43,3 +46,6 @@ export const afficherProjection = (hote: HTMLElement, props: Props) => afficher(
 export async function rechargerFiscalite(hote: HTMLElement, masque: boolean, owner: string | null, date: string | null) {
   await afficher(Fiscalite, hote, { hote, masque }).recharger(owner, date);
 }
+export const afficherHistoriqueNet = (hote: HTMLElement, props: Props) => afficher(HistoriqueNet, hote, props);
+export const afficherEvolutionGroupes = (hote: HTMLElement, props: Props) => afficher(EvolutionGroupes, hote, { hote, ...props });
+export const afficherMouvements = (hote: HTMLElement, props: Props) => afficher(Mouvements, hote, props);
