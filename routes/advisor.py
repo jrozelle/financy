@@ -317,7 +317,9 @@ def get_allocation(owner):
         positions = [compute_position(dict(r), entity_map, ref, holdings_map) for r in rows]
         entites = _entites(conn)
 
-    alloc = allocation_financiere(_normalize_profile_dict(profile), positions, matrix, entites=entites)
+    from routes.performance import rendements_par_compte
+    alloc = allocation_financiere(_normalize_profile_dict(profile), positions, matrix, entites=entites,
+                                  rendements=rendements_par_compte(owner))
     return jsonify({'owner': owner, 'snapshot_date': date,
                     'profile': _normalize_profile_dict(profile), **alloc})
 
@@ -445,8 +447,9 @@ def refresh_proposals(owner):
         if not date:
             return jsonify({'error': 'Aucune position trouvee pour ce proprietaire'}), 400
         matrix = load_matrix(conn)
+        from routes.performance import rendements_par_compte
         allocation = allocation_financiere(_normalize_profile_dict(profile), positions, matrix,
-                                   entites=_entites(conn))
+                                           entites=_entites(conn), rendements=rendements_par_compte(owner))
 
         # Le plafond du PEA porte sur les versements : ceux du titulaire,
         # tels que le journal des flux les connait (None s'il n'en a aucun).

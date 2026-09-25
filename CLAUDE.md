@@ -110,10 +110,17 @@
   euros ; jamais un compte courant, ni ce qui est bloque (liquidite « Bloqué »
   ou part mobilisable nulle : PER, contrat nanti), ni la tresorerie d'une
   societe. L'argent tenu au nom d'un titulaire est le sien. La cible est celle
-  du profil, charges mensuelles x nombre de mois ; les propositions la gardent
-  (livrets d'abord, fonds euros ensuite) et le DCA investit ce qui la depasse.
-  Tant qu'elle n'est pas renseignee, la reserve libre du profil (`reserve_eur`,
-  plus saisie) en tient lieu, et le constat le dit.
+  du profil, charges mensuelles x nombre de mois. Ce qui est GARDE, dans cet
+  ordre : livrets reglementes entiers, puis les supports du plus au moins
+  rentable (rendement mesure du compte, `rendements_par_compte`) jusqu'a la
+  cible ; le surplus est pris sur ce qui rapporte le moins. Sans cible, les
+  seuls livrets reglementes. La reserve libre (`reserve_eur`) n'est plus lue.
+- **Conseil : la precaution d'abord.** La part gardee, les comptes courants et
+  la tresorerie de societe sortent du calcul d'arbitrage (decomptes, et
+  raccordes au financier de la synthese) ; la matrice de risque se repartit
+  sur le reste, sans part de liquidites propre. Avec une cible, les
+  supplements de liquidites (LBO, TNS) vont aux obligations : les mois de
+  charges couvrent deja ce risque.
 - **Plafonds de livrets reglementes : livret par livret**, jamais sur la somme
   d'un titulaire (un parent tient les Livret A des enfants a son nom), avec une
   marge pour les interets capitalises.

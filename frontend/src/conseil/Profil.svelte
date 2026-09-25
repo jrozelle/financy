@@ -35,7 +35,6 @@
     const c = nombre(f.charges), m = nombre(f.mois);
     return c && m ? c * m : null;
   });
-  const reserve = $derived(profil?.reserve_eur ?? null);
 
   async function enregistrer(e: SubmitEvent) {
     e.preventDefault();
@@ -106,8 +105,8 @@
         <input type="text" inputmode="numeric" id="adv-mois" placeholder="ex : 6" aria-describedby="adv-precaution-aide" bind:value={f.mois}>
         <p class="form-aide" id="adv-precaution-aide">{#if cible}Cible : <b>{fmt(cible)}</b> sur livrets et fonds euros disponibles.
           Les propositions n'y touchent jamais ; au-delà, l'excédent est à investir.{:else}Charges × mois : la cible de l'épargne
-          de précaution (livrets, fonds euros disponibles), que les propositions n'investissent jamais.{#if reserve}
-          En attendant, la réserve déclarée de {fmt(reserve)} est gardée.{/if}{/if}</p>
+          de précaution (livrets, fonds euros disponibles), que les propositions n'investissent jamais.
+          En attendant, seuls les livrets réglementés sont gardés.{/if}</p>
       </div>
       <div class="form-group" style="align-self:end">
         <label style="display:flex;align-items:center;gap:var(--esp-6);cursor:pointer">

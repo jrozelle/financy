@@ -616,3 +616,31 @@ def get_performance():
         'non_measurable_categories': sorted(NON_MEASURABLE_CATEGORIES),
         'non_measurable_envelopes': sorted(NON_MEASURABLE_ENVELOPES),
     })
+
+
+def rendements_par_compte(owner=None):
+    """Rendement mesure de chaque compte, tel que l'onglet Performance le
+    montre : {(enveloppe, etablissement, titulaire, libelle): taux en
+    fraction}, le TRI annuel ou, a defaut, celui de la periode. Sert au
+    conseil a garder en precaution, a disponibilite egale, ce qui rapporte le
+    plus. Le calcul reste celui de la route : on l'appelle, on ne le recopie
+    pas."""
+    from flask import current_app
+    qs = {'group': 'account', **({'owner': owner} if owner else {})}
+    with current_app.test_request_context('/api/performance', query_string=qs):
+        rep = get_performance.__wrapped__()
+    d = (rep[0] if isinstance(rep, tuple) else rep).get_json() or {}
+    out = {}
+    for g in d.get('groups') or []:
+        taux = g.get('tri') if g.get('tri') is not None else g.get('tri_periode')
+        if taux is None or g.get('status') == 'closed':
+            continue
+        out[(g.get('envelope') or 'Autre', g.get('establishment') or None, g.get('owner') or None,
+             (g.get('account_label') or '').strip() or None)] = taux
+    return out
+
+
+def cle_compte(p):
+    """La cle de compte d'une position, comme `rendements_par_compte`."""
+    return (p.get('envelope') or 'Autre', p.get('establishment') or None, p.get('owner') or None,
+            (p.get('label') or '').strip() or None)

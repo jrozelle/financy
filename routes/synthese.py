@@ -859,7 +859,7 @@ def projection_epargne():
             cash = next((g for g in a['gap'] if g['category'] == 'Cash'), None)
             if not cash:
                 continue
-            garde = max(cash['target_eur'], profil.get('reserve_eur') or a['reglementes_eur'])
+            garde = max(cash['target_eur'], a['reglementes_eur'])
             excedents.append({'owner': profil['owner'], 'source': 'liquidites',
                               'montant': round(max(0.0, cash['actual_eur'] - garde), 2)})
     return jsonify({

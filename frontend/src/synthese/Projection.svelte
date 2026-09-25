@@ -174,7 +174,7 @@
   const signe = (v: number) => `${v >= 0 ? '+' : '−'}${fmt(Math.abs(v))}`;
   const aide = $derived(mesure ? `Épargne nouvelle mesurée : ${fmt(mesure.nouvelle.par_mois)} par mois sur six mois — la hausse `
     + `des liquidités plus ce qui en est parti vers les placements (${(mesure.nouvelle.periodes || []).length} périodes entre arrêtés). `
-    + `Le DCA, lui, investit l'épargne de précaution au-delà de sa cible — charges × mois du profil, à défaut sa réserve — (${fmt(mesure.dca.excedent)}) `
+    + `Le DCA, lui, investit l'épargne de précaution au-delà de sa cible — charges × mois du profil — (${fmt(mesure.dca.excedent)}) `
     + `au rythme de vos versements (${fmt(mesure.dca.mensuel)} par mois) : il ne crée pas de patrimoine, il le fait travailler.` : '');
 </script>
 

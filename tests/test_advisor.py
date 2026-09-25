@@ -181,11 +181,13 @@ class TestAllocation:
         _make_position(client, owner='Personne 1', category='Autre', envelope='Autre', value=20000)
         r = client.get('/api/advisor/profiles/Personne 1/allocation')
         data = r.get_json()
-        assert data['total_eur'] == 100000 and data['financier_eur'] == 100000
+        # Le Livret A est garde en precaution, hors du calcul d'arbitrage,
+        # et le financier de la synthese le compte toujours.
+        assert data['total_eur'] == 50000 and data['financier_eur'] == 100000
+        assert {'category': 'Épargne de précaution', 'montant': 50000} in data['exclus']
         assert {'category': 'Autre', 'montant': 20000} in data['exclus']
         assert 'Actions' in data['target']
-        assert 'Actions' in data['actual']
-        assert data['actual']['Actions'] == 0.5
+        assert data['actual'] == {'Actions': 1.0}
         assert len(data['gap']) > 0
 
 

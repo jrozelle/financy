@@ -117,18 +117,14 @@ class TestRebalanceEngine:
             'target': {}, 'actual': {}, 'total_eur': 100000,
         }
 
-    def test_la_reserve_n_est_pas_proposee(self):
-        """Avec 35 000 € a garder disponibles, seuls 5 000 € sont mobilisables."""
+    def test_la_reserve_libre_n_est_plus_lue(self):
+        """La cible de precaution (charges x mois) a remplace la reserve libre :
+        une valeur restee en base ne garde plus rien."""
         from services.advisor.rebalance import generate_proposals
         props = generate_proposals({'reserve_eur': 35000}, [], self._gap_liquidites())
         bucket = [p for p in props if p['kind'] == 'bucket']
-        assert bucket and bucket[0]['amount'] == pytest.approx(5000)
-        assert 'Réserve déclarée' in bucket[0]['rationale']
-
-    def test_une_reserve_superieure_aux_liquidites_bloque_l_allegement(self):
-        from services.advisor.rebalance import generate_proposals
-        props = generate_proposals({'reserve_eur': 50000}, [], self._gap_liquidites())
-        assert not [p for p in props if p['kind'] == 'bucket']
+        assert bucket and bucket[0]['amount'] == pytest.approx(20000)
+        assert 'Réserve déclarée' not in bucket[0]['rationale']
 
     def test_sans_reserve_la_proposition_le_dit(self):
         from services.advisor.rebalance import generate_proposals
@@ -228,7 +224,9 @@ class TestPerimetreFinancier:
             self._p('Fond Euro', 'Assurance-vie', 10000), self._p('Cash & dépôts', 'Livret A', 10000),
             self._p('Produits Structurés', 'Assurance-vie', 10000), self._p('Crypto', 'Crypto', 10000)])
         classes = {g['category']: g['actual_eur'] for g in a['gap']}
-        assert classes == {'Obligations': 10000, 'Cash': 10000, 'Actions': 20000}
+        # Le Livret A est garde en precaution, hors du calcul, et decompte.
+        assert classes == {'Obligations': 10000, 'Actions': 20000}
+        assert {'category': 'Épargne de précaution', 'montant': 10000} in a['exclus']
 
     def test_le_bloque_compte_mais_ne_bouge_pas(self):
         """Un fonds euros nanti pese dans l'exposition ; seul le libre est propose."""
@@ -250,11 +248,14 @@ class TestPerimetreFinancier:
         positions = [self._p('Cash & dépôts', 'Livret A', 22950), self._p('Cash & dépôts', 'Livret Bourso+', 50000),
                      self._p('Actions', 'PEA', 10000)]
         a = allocation_financiere(self._profil(), positions)
+        # Le Livret A reste entier en precaution, hors du calcul : seul le
+        # livret bancaire est arbitrable, et la note dit ce qui est garde.
         cash = next(g for g in a['gap'] if g['category'] == 'Cash')
+        assert cash['actual_eur'] == 50000
+        assert {'category': 'Épargne de précaution', 'montant': 22950} in a['exclus']
         bucket = [p for p in generate_proposals(self._profil(), positions, a) if p['kind'] == 'bucket']
-        total = sum(p['amount'] for p in bucket)
-        assert total == pytest.approx(cash['actual_eur'] - max(cash['target_eur'], 22950))
-        assert 'livrets réglementés' in bucket[0]['rationale']
+        assert bucket and 'Épargne de précaution gardée à part' in bucket[0]['rationale']
+        assert 'Livret A' in bucket[0]['rationale']
 
 
 # ─── Proposals route ─────────────────────────────────────────────────────────

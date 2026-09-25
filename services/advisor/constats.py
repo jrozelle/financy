@@ -332,14 +332,12 @@ def _precaution_constats(conn, ps, titulaires):
             continue
         sur = ', '.join(f"{l['libelle']} {_eur(l['montant'])}" for l in b['lignes'])
         if b['cible'] is None:
-            reserve = profil.get('reserve_eur')
             out.append({
                 'niveau': 'info', 'onglet': 'conseil',
                 'titre': f"{qui} : épargne de précaution de {_eur(b['montant'])}, sans cible",
                 'detail': (f"Livrets et fonds euros disponibles : {sur}. Renseignez vos charges mensuelles et "
-                           "le nombre de mois à couvrir dans le profil pour en fixer la cible"
-                           + (f" ; d'ici là, les propositions gardent la réserve déclarée de {_eur(reserve)}." if reserve
-                              else " ; d'ici là, les propositions gardent les livrets réglementés.")),
+                           "le nombre de mois à couvrir dans le profil pour en fixer la cible ; d'ici là, "
+                           "les propositions gardent les livrets réglementés."),
                 'montant': round(b['montant'], 2),
             })
             continue

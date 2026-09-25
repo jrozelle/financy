@@ -8,6 +8,7 @@ export interface Profil {
 export interface Objectif { id: number; label: string | null; target_amount: number | null; horizon_years: number | null; priority: number }
 export interface Ecart { category: string; target_pct: number; actual_pct: number; delta_pct: number; delta_eur: number; bloque_eur?: number }
 export interface Allocation { adjustments?: string[]; gap: Ecart[]; total_eur: number; financier_eur?: number; bloque_eur?: number;
+                              precaution?: { gardees?: { libelle: string; montant: number }[] };
                               exclus?: { category: string; montant: number }[] }
 export interface Proposition { id: number; kind: string; status: string; label: string; rationale: string | null }
 export interface Constat { niveau: string; titre: string; detail: string; onglet?: string | null }

@@ -35,18 +35,26 @@ class TestRegle:
         assert [l['montant'] for l in b['lignes']] == [10000, 5000]
 
 
-class TestGardeDesPropositions:
-    def test_la_cible_se_garde_livrets_puis_fonds_euros(self):
-        from services.advisor.rebalance import _gardes_precaution, _bucket_proposals
-        alloc = {'precaution': {'cible': 30000}, 'precaution_par_classe': {'Cash': 20000, 'Obligations': 40000}}
-        g = _gardes_precaution(alloc)
-        assert g['par_classe'] == {'Cash': 20000, 'Obligations': 10000}
-        assert _gardes_precaution({'precaution': {'cible': None}}) is None
-        # Cash surpondere de 25 000 sur 25 000 : seuls 5 000 sortent, la garde reste.
-        gap = [{'category': 'Cash', 'delta_eur': -25000, 'actual_eur': 25000, 'target_eur': 0, 'libre_eur': 25000},
-               {'category': 'Actions', 'delta_eur': 25000, 'actual_eur': 0, 'target_eur': 25000, 'libre_eur': 0}]
-        props = _bucket_proposals(gap, total_eur=25000, precaution=g)
-        assert sum(p['amount'] for p in props if p.get('kind') == 'bucket') == 5000
+class TestCeQuiEstGarde:
+    def test_reglementes_entiers_puis_le_plus_rentable(self):
+        """Livret A entier ; puis, jusqu'a la cible, le support qui rapporte le
+        plus ; le surplus est pris sur celui qui rapporte le moins."""
+        from services.precaution import repartition
+        from routes.performance import cle_compte
+        la = ligne('Cash & dépôts', 'Livret A', 20000, owner='A')
+        bourso = ligne('Cash & dépôts', 'Livret Bourso+', 60000, owner='A')
+        fe = ligne('Fond Euro', 'Assurance-vie', 50000, liquidity='J8–J30', owner='A')
+        rendements = {cle_compte(bourso): 0.015, cle_compte(fe): 0.025}
+        r = repartition([la, bourso, fe], {'charges_mensuelles': 4000, 'mois_precaution': 18}, rendements=rendements)
+        assert r['garde'] == 72000
+        assert [(p['envelope'], k) for p, k in r['gardees']] == [('Livret A', 20000), ('Assurance-vie', 50000),
+                                                               ('Livret Bourso+', 2000)]
+        assert [(p['envelope'], k) for p, k in r['surplus']] == [('Livret Bourso+', 58000)]
+        # Les livrets reglementes restent entiers, meme au-dela de la cible.
+        r = repartition([la, bourso], {'charges_mensuelles': 1000, 'mois_precaution': 6})
+        assert r['garde'] == 20000 and [k for _, k in r['gardees']] == [20000]
+        # Sans cible, les seuls livrets reglementes sont gardes.
+        assert repartition([la, bourso], {'reserve_eur': 50000})['garde'] == 20000
 
 
 class TestProfilEtConseil:
@@ -64,16 +72,22 @@ class TestProfilEtConseil:
 
     def test_dca_et_constat(self, client):
         self._profil(client, charges_mensuelles=2000, mois_precaution=6)
-        _make_position(client, owner='Personne 1', category='Cash & dépôts', envelope='Livret A', value=20000)
+        _make_position(client, owner='Personne 1', category='Cash & dépôts', envelope='Livret A', value=5000)
+        _make_position(client, owner='Personne 1', category='Cash & dépôts', envelope='Livret Bourso+', value=20000)
         _make_position(client, owner='Personne 1', category='Cash & dépôts', envelope='Compte courant', value=5000)
         _make_position(client, owner='Personne 1', category='Actions', envelope='PEA', value=10000)
         dca = client.get('/api/projection/epargne').get_json()['dca']
-        assert dca['par_titulaire'] == [{'owner': 'Personne 1', 'source': 'precaution', 'montant': 8000}]
-        a = client.get('/api/advisor/profiles/Personne 1/allocation').get_json()['precaution']
-        assert (a['montant'], a['cible'], a['ecart']) == (20000, 12000, 8000)
+        assert dca['par_titulaire'] == [{'owner': 'Personne 1', 'source': 'precaution', 'montant': 13000}]
+        a = client.get('/api/advisor/profiles/Personne 1/allocation').get_json()
+        assert (a['precaution']['montant'], a['precaution']['cible'], a['precaution']['ecart']) == (25000, 12000, 13000)
+        # Garde hors du calcul : 12 000 ; comptes courants a part ; arbitrable :
+        # le surplus du livret bancaire et le PEA.
+        exclus = {e['category']: e['montant'] for e in a['exclus']}
+        assert exclus['Épargne de précaution'] == 12000 and exclus['Comptes courants'] == 5000
+        assert a['total_eur'] == 23000 and a['financier_eur'] == 40000
         cs = client.get('/api/advisor/constats?owner=Personne 1&date=2024-06-01').get_json()['constats']
         c = next(c for c in cs if "d'épargne de précaution au-delà" in c['titre'])
-        assert c['niveau'] == 'action' and c['montant'] == 8000
+        assert c['niveau'] == 'action' and c['montant'] == 13000
 
 
 def test_synthese_famille_dont_un_titulaire_sans_cible(client):
@@ -81,7 +95,7 @@ def test_synthese_famille_dont_un_titulaire_sans_cible(client):
     une cible ; les autres sont nommes."""
     client.put('/api/advisor/profiles/Personne 1', headers=CSRF_HEADERS,
                json={'horizon_years': 10, 'risk_tolerance': 3, 'charges_mensuelles': 1000, 'mois_precaution': 3})
-    _make_position(client, owner='Personne 1', category='Cash & dépôts', envelope='Livret A', value=5000)
+    _make_position(client, owner='Personne 1', category='Cash & dépôts', envelope='Livret Bourso+', value=5000)
     _make_position(client, owner='Personne 2', category='Fond Euro', envelope='Assurance-vie', value=7000)
     pr = client.get('/api/synthese?date=2024-06-01').get_json()['precaution']
     assert pr['par_titulaire']['Personne 1'] == {'montant': 5000, 'cible': 3000, 'ecart': 2000,
@@ -89,3 +103,17 @@ def test_synthese_famille_dont_un_titulaire_sans_cible(client):
     f = pr['famille']
     assert (f['montant'], f['montant_avec_cible'], f['cible'], f['ecart']) == (12000, 5000, 3000, 2000)
     assert f['titulaires_sans_cible'] == ['Personne 2']
+
+
+def test_supplements_de_liquidites_aux_obligations_avec_une_cible():
+    """TNS et LBO ajoutent des liquidites a la matrice ; avec une cible de
+    precaution, ils iraient en double : ils vont aux obligations."""
+    from services.advisor.allocation import allocation_financiere
+    base = {'horizon_years': 15, 'risk_tolerance': 4, 'employment_type': 'TNS', 'has_lbo': True}
+    pos = [ligne('Actions', 'PEA', 50000, owner='A')]
+    sans = allocation_financiere(base, pos)['target']
+    avec = allocation_financiere({**base, 'charges_mensuelles': 4000, 'mois_precaution': 18}, pos)
+    assert sans['Cash'] > 0 and avec['target'].get('Cash', 0) == 0
+    assert avec['target']['Obligations'] > sans['Obligations']
+    assert avec['target']['Actions'] == sans['Actions']
+    assert any('vont aux obligations' in a for a in avec['adjustments'])

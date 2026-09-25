@@ -243,16 +243,44 @@ def _libelle(p):
     return ' '.join(x for x in (tete, p.get('envelope'), p.get('establishment')) if x)
 
 
-def allocation_financiere(profile: dict, positions: List[dict], matrix=None, entites=()) -> dict:
-    """Cible, reel et ecarts par classe, sur le patrimoine financier.
+def allocation_financiere(profile: dict, positions: List[dict], matrix=None, entites=(), rendements=None) -> dict:
+    """Cible, reel et ecarts par classe, sur le patrimoine financier ARBITRABLE.
+
+    La precaution passe d'abord : la part gardee (services/precaution.py —
+    livrets reglementes entiers, puis les supports les plus rentables jusqu'a
+    la cible) sort du calcul, comme les comptes courants (l'argent qui tourne)
+    et la tresorerie des societes. La matrice de risque se repartit sur ce qui
+    reste, sans part de liquidites propre : les liquidites sont la precaution.
+    Seuls les supplements de liquidites (LBO, TNS) restent a la cible.
 
     Chaque classe distingue ce qui peut bouger (`libre_eur`) de ce qui compte
     dans l'exposition sans pouvoir bouger (`bloque_eur` : contrat nanti, PER,
-    produit structure). Les categories hors perimetre ne disparaissent pas :
-    elles sont decomptees dans `exclus`.
+    produit structure). Rien ne disparait : tout ce qui est ecarte est
+    decompte dans `exclus`.
     """
     target, adjustments = target_allocation(profile, matrix)
+    # La part de liquidites de la matrice est la precaution, gardee a part :
+    # ne restent que les supplements des ajustements (LBO, TNS).
+    base_cash = (matrix or DEFAULT_ALLOCATION_MATRIX).get(_horizon_bucket(profile.get('horizon_years')), {}) \
+        .get(_clamp_risk(profile.get('risk_tolerance')), DEFAULT_ALLOCATION_MATRIX['3-8'][3]).get('Cash', 0)
+    target = dict(target)
+    target['Cash'] = max(0.0, target.get('Cash', 0) - base_cash)
+    # Avec une cible de precaution, les supplements de liquidites (LBO, TNS)
+    # feraient double emploi : les mois de charges choisis couvrent deja ce
+    # risque. Ils vont aux obligations — la prudence voulue reste, en moins
+    # d'actions, sans gonfler les liquidites.
+    if target['Cash'] > 0 and _precaution.cible(profile) is not None:
+        supplement = target['Cash']
+        target['Obligations'] = target.get('Obligations', 0) + supplement
+        target['Cash'] = 0.0
+        adjustments = adjustments + [
+            f'Cible de précaution renseignée ({profile.get("mois_precaution")} mois de charges) : les '
+            f'{supplement * 100:.0f} points de liquidités de ces ajustements vont aux obligations, la réserve '
+            'étant déjà gardée à part.']
     cible = _normalize({k: v for k, v in target.items() if k != 'Immobilier'})
+
+    rep = _precaution.repartition(positions, profile, entites, rendements)
+    gardee = {id(p): k for p, k in rep['gardees']}
 
     classes: Dict[str, dict] = {}
     exclus: Dict[str, float] = {}
@@ -270,25 +298,33 @@ def allocation_financiere(profile: dict, positions: List[dict], matrix=None, ent
         if {p.get('label'), p.get('entity')} & set(entites):
             exclus['Trésorerie de société'] = exclus.get('Trésorerie de société', 0) + net
             continue
+        if cat == 'Cash & dépôts' and (p.get('envelope') or '') == _precaution.COMPTE_COURANT:
+            exclus['Comptes courants'] = exclus.get('Comptes courants', 0) + net
+            continue
+        if p.get('envelope') in LIVRETS_REGLEMENTES:
+            reglementes += net
+        k = gardee.get(id(p), 0.0)
+        if k:
+            exclus['Épargne de précaution'] = exclus.get('Épargne de précaution', 0) + k
+            net -= k
+            if net <= 0.005:
+                continue
         c = classes.setdefault(CLASSE_DE.get(cat, 'Autres'),
-                               {'actual_eur': 0.0, 'libre_eur': 0.0, 'bloque_eur': 0.0, 'precaution_eur': 0.0,
+                               {'actual_eur': 0.0, 'libre_eur': 0.0, 'bloque_eur': 0.0,
                                 'lignes_libres': [], 'lignes_bloquees': []})
-        if _precaution.est_precaution(p, entites):
-            c['precaution_eur'] += net
-        libre = 0.0 if p.get('liquidity') == 'Bloqué' else min(net, p.get('mobilizable_value') or 0)
+        mobilisable = (p.get('mobilizable_value') or 0) - k
+        libre = 0.0 if p.get('liquidity') == 'Bloqué' else max(0.0, min(net, mobilisable))
         c['actual_eur'] += net
         c['libre_eur'] += libre
         if libre <= 0:
             c['bloque_eur'] += net
-        ligne = {'libelle': _libelle(p), 'montant': round(net, 2)}
+        ligne = {'libelle': _libelle(p) + (' (au-delà de la précaution)' if k else ''), 'montant': round(net, 2)}
         (c['lignes_libres'] if libre > 0 else c['lignes_bloquees']).append(ligne)
-        if p.get('envelope') in LIVRETS_REGLEMENTES:
-            reglementes += net
 
     total = sum(c['actual_eur'] for c in classes.values())
     # Le financier de la synthese, pour que l'ecran raccorde les deux montants :
-    # la seule difference est la tresorerie des societes.
-    financier = total + exclus.get('Trésorerie de société', 0)
+    # l'arbitrable plus ce qui en est ecarte sans quitter le financier.
+    financier = total + sum(exclus.get(k, 0) for k in ('Trésorerie de société', 'Comptes courants', 'Épargne de précaution'))
     gap = []
     for cle in sorted(set(cible) | set(classes)):
         c = classes.get(cle, {'actual_eur': 0.0, 'libre_eur': 0.0, 'bloque_eur': 0.0,
@@ -319,7 +355,6 @@ def allocation_financiere(profile: dict, positions: List[dict], matrix=None, ent
         'reglementes_eur': round(reglementes, 2),
         # Epargne de precaution : montant, cible du profil, ecart ; et sa part
         # dans chaque classe, pour que les propositions la gardent.
-        'precaution': _precaution.bilan(positions, profile, entites),
-        'precaution_par_classe': {k: round(c['precaution_eur'], 2) for k, c in classes.items() if c['precaution_eur']},
+        'precaution': _precaution.bilan(positions, profile, entites, rendements),
         'adjustments': adjustments,
     }

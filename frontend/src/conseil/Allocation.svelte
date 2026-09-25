@@ -120,10 +120,15 @@
     </div>
     <!-- Ce qui est hors du calcul ne disparait pas : il est decompte ici. -->
     <!-- Le montant se raccorde a celui de la synthese : meme patrimoine
-         financier (services/categories.py), moins la tresorerie des societes. -->
-    <p class="advisor-perimetre" id="advisor-perimetre">{#key masque}{#if avecProfil && donnees && avecEcarts}{@const treso = (donnees.exclus || []).find(e => e.category === 'Trésorerie de société')?.montant || 0}{@const exclus = (donnees.exclus || []).filter(e => e.category !== 'Trésorerie de société').map(e => `${e.category} ${fmt(e.montant)}`).join(', ')}Calcul sur le patrimoine financier arbitrable : {fmt(donnees.total_eur)}{donnees.bloque_eur
-      ? `, dont ${fmt(donnees.bloque_eur)} bloqués (contrat nanti, PER, produit structuré) : ils comptent dans l'exposition, mais les propositions n'y touchent pas` : ''}.{treso && donnees.financier_eur
-      ? ` C'est le patrimoine financier de la synthèse (${fmt(donnees.financier_eur)}), moins ${fmt(treso)} de trésorerie de société.` : ''}{exclus
-      ? ` Hors du patrimoine financier, donc du calcul : ${exclus}.` : ''}{/if}{/key}</p>
+         financier (services/categories.py), moins ce que le calcul ecarte sans
+         que cela quitte le financier — la precaution gardee, les comptes
+         courants, la tresorerie des societes. -->
+    <p class="advisor-perimetre" id="advisor-perimetre">{#key masque}{#if avecProfil && donnees && avecEcarts}{@const ex = Object.fromEntries((donnees.exclus || []).map(e => [e.category, e.montant]))}{@const FIN = ['Épargne de précaution', 'Comptes courants', 'Trésorerie de société']}{@const retraits = [
+        ex['Épargne de précaution'] ? `${fmt(ex['Épargne de précaution'])} d'épargne de précaution gardée${donnees.precaution?.gardees?.length ? ` (${donnees.precaution.gardees.map(g => `${g.libelle} ${fmt(g.montant)}`).join(', ')})` : ''}` : '',
+        ex['Comptes courants'] ? `${fmt(ex['Comptes courants'])} de comptes courants` : '',
+        ex['Trésorerie de société'] ? `${fmt(ex['Trésorerie de société'])} de trésorerie de société` : ''].filter(Boolean)}{@const hors = (donnees.exclus || []).filter(e => !FIN.includes(e.category)).map(e => `${e.category} ${fmt(e.montant)}`).join(', ')}Calcul sur le patrimoine financier arbitrable : {fmt(donnees.total_eur)}{donnees.bloque_eur
+      ? `, dont ${fmt(donnees.bloque_eur)} bloqués (contrat nanti, PER, produit structuré) : ils comptent dans l'exposition, mais les propositions n'y touchent pas` : ''}.{retraits.length && donnees.financier_eur
+      ? ` C'est le patrimoine financier de la synthèse (${fmt(donnees.financier_eur)}), moins ${retraits.join(', ')}.` : ''}{hors
+      ? ` Hors du patrimoine financier, donc du calcul : ${hors}.` : ''}{/if}{/key}</p>
   </div>
 </div>
