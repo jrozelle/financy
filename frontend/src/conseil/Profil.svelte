@@ -6,7 +6,7 @@
    * Porte de static/modules/tabs/advisor.js (_fillProfileForm, saveProfile).
    */
   import { api } from '/static/modules/api.js';
-  import { parseLocaleNumber } from '/static/modules/utils.js';
+  import { fmt, parseLocaleNumber } from '/static/modules/utils.js';
   import { toast } from '/static/modules/dialogs.js';
   import type { Profil } from './types';
 
@@ -15,12 +15,13 @@
   } = $props();
 
   // Les champs repartent du profil charge a chaque changement de titulaire.
-  let f = $state({ horizon: '', risque: '3', statut: '', retraite: '', enfants: '0', reserve: '', residence: false, lbo: false, notes: '' });
+  let f = $state({ horizon: '', risque: '3', statut: '', retraite: '', enfants: '0', charges: '', mois: '', residence: false, lbo: false, notes: '' });
   $effect.pre(() => {
     void proprietaire;
     const p = profil || ({} as Partial<Profil>);
     f = { horizon: String(p.horizon_years ?? ''), risque: String(p.risk_tolerance ?? 3), statut: p.employment_type ?? '',
-          retraite: String(p.pension_age ?? ''), enfants: String(p.children_count ?? 0), reserve: String(p.reserve_eur ?? ''),
+          retraite: String(p.pension_age ?? ''), enfants: String(p.children_count ?? 0),
+          charges: String(p.charges_mensuelles ?? ''), mois: String(p.mois_precaution ?? ''),
           residence: !!p.main_residence_owned, lbo: !!p.has_lbo, notes: p.notes ?? '' };
   });
   const nombre = (v: string) => {
@@ -29,12 +30,20 @@
     return isNaN(n) ? null : n;
   };
 
+  // La cible de l'epargne de precaution, calculee a la saisie.
+  const cible = $derived.by(() => {
+    const c = nombre(f.charges), m = nombre(f.mois);
+    return c && m ? c * m : null;
+  });
+  const reserve = $derived(profil?.reserve_eur ?? null);
+
   async function enregistrer(e: SubmitEvent) {
     e.preventDefault();
     if (!proprietaire) return;
     const payload = {
       horizon_years: nombre(f.horizon), risk_tolerance: nombre(f.risque), employment_type: f.statut || null,
-      pension_age: nombre(f.retraite), children_count: nombre(f.enfants), reserve_eur: nombre(f.reserve),
+      pension_age: nombre(f.retraite), children_count: nombre(f.enfants),
+      charges_mensuelles: nombre(f.charges), mois_precaution: nombre(f.mois),
       main_residence_owned: f.residence, has_lbo: f.lbo, notes: f.notes.trim(),
     };
     try {
@@ -89,10 +98,16 @@
         <input type="text" inputmode="numeric" id="adv-children" min="0" max="20" step="1" bind:value={f.enfants}>
       </div>
       <div class="form-group">
-        <label for="adv-reserve">Réserve à garder disponible</label>
-        <input type="text" inputmode="decimal" id="adv-reserve" placeholder="ex : 30 000" aria-describedby="adv-reserve-aide" bind:value={f.reserve}>
-        <p class="form-aide" id="adv-reserve-aide">Précaution, apport, nantissement d'un crédit :
-          les propositions n'investissent jamais ce montant.</p>
+        <label for="adv-charges">Charges mensuelles</label>
+        <input type="text" inputmode="decimal" id="adv-charges" placeholder="ex : 2 500" aria-describedby="adv-precaution-aide" bind:value={f.charges}>
+      </div>
+      <div class="form-group">
+        <label for="adv-mois">Mois d'épargne de précaution</label>
+        <input type="text" inputmode="numeric" id="adv-mois" placeholder="ex : 6" aria-describedby="adv-precaution-aide" bind:value={f.mois}>
+        <p class="form-aide" id="adv-precaution-aide">{#if cible}Cible : <b>{fmt(cible)}</b> sur livrets et fonds euros disponibles.
+          Les propositions n'y touchent jamais ; au-delà, l'excédent est à investir.{:else}Charges × mois : la cible de l'épargne
+          de précaution (livrets, fonds euros disponibles), que les propositions n'investissent jamais.{#if reserve}
+          En attendant, la réserve déclarée de {fmt(reserve)} est gardée.{/if}{/if}</p>
       </div>
       <div class="form-group" style="align-self:end">
         <label style="display:flex;align-items:center;gap:var(--esp-6);cursor:pointer">

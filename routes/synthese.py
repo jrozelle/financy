@@ -1,5 +1,6 @@
 import json
 import re
+import sqlite3
 from flask import Blueprint, jsonify, request
 from datetime import datetime
 from models import (get_db, compute_position, get_entity_map, get_holdings_map,
@@ -227,6 +228,7 @@ def get_synthese():
         note_row = conn2.execute('SELECT notes FROM snapshot_notes WHERE date=?', (date,)).fetchone()
         if note_row:
             snapshot_note = note_row['notes']
+        precaution = _precaution_synthese(conn2, positions, owners)
 
     return jsonify({
         'date':                    date,
@@ -240,6 +242,7 @@ def get_synthese():
         'variation':               variation,
         'yoy_variation':           yoy_variation,
         'snapshot_note':           snapshot_note,
+        'precaution':              precaution,
     })
 
 
@@ -796,6 +799,31 @@ def enregistrer_contrats():
     with get_db() as conn:
         enregistrer(conn, lignes)
     return jsonify({'ok': True, 'n': len(lignes)})
+
+
+def _precaution_synthese(conn, positions, owners):
+    """Epargne de precaution par titulaire et pour la famille : montant, cible
+    du profil, ecart (services/precaution.py). La cible de la famille est la
+    somme des cibles renseignees ; son ecart ne porte que sur les titulaires
+    qui en ont une, pour ne pas comparer l'epargne de tous a la cible de
+    certains."""
+    from services import precaution as pr
+    entites = {r['name'] for r in conn.execute('SELECT name FROM entities')}
+    try:
+        profils = {r['owner']: r for r in lignes_en_euros('owner_profiles', conn.execute('SELECT * FROM owner_profiles'))}
+    except sqlite3.OperationalError:
+        profils = {}
+    par = {}
+    for o in owners:
+        b = pr.bilan([p for p in positions if p['owner'] == o], profils.get(o), entites)
+        par[o] = {k: b[k] for k in ('montant', 'cible', 'ecart', 'charges_mensuelles', 'mois')}
+    avec = [v for v in par.values() if v['cible'] is not None]
+    famille = {'montant': round(sum(v['montant'] for v in par.values()), 2),
+               'cible': round(sum(v['cible'] for v in avec), 2) if avec else None,
+               'ecart': round(sum(v['ecart'] for v in avec), 2) if avec else None,
+               'montant_avec_cible': round(sum(v['montant'] for v in avec), 2) if avec else None,
+               'titulaires_sans_cible': [o for o, v in par.items() if v['cible'] is None and v['montant']]}
+    return {'par_titulaire': par, 'famille': famille}
 
 
 @synthese_bp.route('/api/projection/epargne')

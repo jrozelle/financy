@@ -18,6 +18,14 @@
 
   let { synthese, owner, masque = false }: { synthese: Synthese | null; owner: string | null; masque?: boolean } = $props();
 
+  // Dans la poche financiere, la part d'epargne de precaution (livrets et
+  // fonds euros disponibles, services/precaution.py) : le total ne change pas.
+  interface Precaution { montant: number }
+  const precaution = $derived.by(() => {
+    const pr = synthese?.precaution as { famille?: Precaution; par_titulaire?: Record<string, Precaution> } | undefined;
+    return (owner && owner !== 'Famille' ? pr?.par_titulaire?.[owner] : pr?.famille)?.montant || 0;
+  });
+
   const ANGLES = [
     { cle: 'macro', libelle: 'Poche', source: 'totals_by_macro' },
     { cle: 'category', libelle: 'Catégorie', source: 'totals_by_category' },
@@ -100,6 +108,9 @@
           <tr>
             <td>
               <span class="rep-n"><i class="dot" style:background={couleur(i)}></i>{l.nom}</span>
+              {#if angle === 'macro' && l.nom === 'Patrimoine financier' && precaution >= 1}
+                <span class="rep-sous">dont épargne de précaution {fmt(precaution)} · le reste, {fmt(l.net - precaution)} : comptes courants et placements</span>
+              {/if}
               <span class="rep-bar">
                 <span class="fill" style:width="{pct(l.net, brut).toFixed(2)}%" style:background={couleur(i)}></span>
                 {#if l.debt}<span class="fill lev" style:width="{pct(l.debt, brut).toFixed(2)}%" style:background={couleur(i)}></span>{/if}

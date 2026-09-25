@@ -2,6 +2,7 @@
 export interface Profil {
   horizon_years: number | null; risk_tolerance: number | null; employment_type: string | null; pension_age: number | null;
   children_count: number | null; reserve_eur: number | null; main_residence_owned: boolean | number; has_lbo: boolean | number;
+  charges_mensuelles?: number | null; mois_precaution?: number | null;
   notes: string | null;
 }
 export interface Objectif { id: number; label: string | null; target_amount: number | null; horizon_years: number | null; priority: number }

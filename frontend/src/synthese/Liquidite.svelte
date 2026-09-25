@@ -12,8 +12,10 @@
   import { natureDe } from '/static/modules/categories.js';
 
   interface Pos { category: string; envelope: string | null; net_attributed?: number; mobilizable_value?: number }
-  let { parLiquidite = {}, positions = [], masque = false }: {
-    parLiquidite?: Record<string, number>; positions?: Pos[]; masque?: boolean;
+  interface Precaution { montant: number; cible: number | null; ecart: number | null; charges_mensuelles?: number | null;
+                         mois?: number | null; montant_avec_cible?: number | null; titulaires_sans_cible?: string[] }
+  let { parLiquidite = {}, positions = [], precaution = null, masque = false }: {
+    parLiquidite?: Record<string, number>; positions?: Pos[]; precaution?: Precaution | null; masque?: boolean;
   } = $props();
 
   const calcul = $derived.by(() => {
@@ -57,6 +59,20 @@
       </div>
     {/if}
   </div>
+  <!-- Epargne de precaution face a sa cible (charges x mois du profil) :
+       au-dela, de quoi investir ; en deca, ce qui manque. -->
+  {#if precaution && precaution.montant >= 1}
+    {@const p = precaution}
+    <!-- En famille, une cible manque parfois a un titulaire : l'ecart ne porte
+         que sur l'epargne de ceux qui en ont une, et la phrase le dit. -->
+    {@const partiel = !!p.titulaires_sans_cible?.length && p.cible != null}
+    <p class="dispo-precaution">Épargne de précaution : <b>{fmt(p.montant)}</b>{#if p.cible == null}{' '}— la cible se fixe
+      dans le profil de l'onglet Conseil : charges mensuelles et nombre de mois.{:else}{#if partiel}, dont {fmt(p.montant_avec_cible || 0)}
+      face à une cible de {fmt(p.cible)}{:else}{' '}pour une cible de {fmt(p.cible)}{p.mois && p.charges_mensuelles
+      ? ` (${p.mois} mois de ${fmt(p.charges_mensuelles)} de charges)` : ''}{/if}{#if p.ecart != null && Math.abs(p.ecart) >= 1}{' '}—
+      {#if p.ecart > 0}<b class="pos">{fmt(p.ecart)} au-delà, à investir</b>{:else}<b class="neg">{fmt(-p.ecart)} sous la cible</b>{/if}{/if}{#if partiel}{' '};
+      sans cible pour {p.titulaires_sans_cible?.join(', ')}{/if}.{/if}</p>
+  {/if}
   {#if calcul.mobilisable || calcul.bloque}
     <p class="dispo-note">Délais cumulés : chaque ligne inclut la précédente.
       « Bloqué » : le patrimoine financier qui ne se mobilise pas — épargne retraite, contrat nanti,

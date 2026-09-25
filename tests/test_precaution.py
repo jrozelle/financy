@@ -74,3 +74,18 @@ class TestProfilEtConseil:
         cs = client.get('/api/advisor/constats?owner=Personne 1&date=2024-06-01').get_json()['constats']
         c = next(c for c in cs if "d'épargne de précaution au-delà" in c['titre'])
         assert c['niveau'] == 'action' and c['montant'] == 8000
+
+
+def test_synthese_famille_dont_un_titulaire_sans_cible(client):
+    """L'ecart de la famille ne porte que sur l'epargne des titulaires qui ont
+    une cible ; les autres sont nommes."""
+    client.put('/api/advisor/profiles/Personne 1', headers=CSRF_HEADERS,
+               json={'horizon_years': 10, 'risk_tolerance': 3, 'charges_mensuelles': 1000, 'mois_precaution': 3})
+    _make_position(client, owner='Personne 1', category='Cash & dépôts', envelope='Livret A', value=5000)
+    _make_position(client, owner='Personne 2', category='Fond Euro', envelope='Assurance-vie', value=7000)
+    pr = client.get('/api/synthese?date=2024-06-01').get_json()['precaution']
+    assert pr['par_titulaire']['Personne 1'] == {'montant': 5000, 'cible': 3000, 'ecart': 2000,
+                                                 'charges_mensuelles': 1000, 'mois': 3}
+    f = pr['famille']
+    assert (f['montant'], f['montant_avec_cible'], f['cible'], f['ecart']) == (12000, 5000, 3000, 2000)
+    assert f['titulaires_sans_cible'] == ['Personne 2']
