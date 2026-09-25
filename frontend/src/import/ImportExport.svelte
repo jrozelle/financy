@@ -129,7 +129,7 @@
 
   <div class="card">
     <h2>Importer depuis Excel</h2>
-    <p class="text-muted" style="margin-bottom:1rem">
+    <p class="text-muted" style="margin-bottom:var(--esp-16)">
       Importez les onglets <strong>Positions</strong> et <strong>Flux</strong>
       depuis votre fichier <code>.xlsx</code>.<br>
       Les données existantes ne sont pas effacées.
@@ -138,14 +138,14 @@
       <label for="import-file">Fichier .xlsx</label>
       <input type="file" id="import-file" accept=".xlsx" bind:this={fichierXlsx}>
     </div>
-    <button class="btn btn-primary" id="btn-import" style="margin-top:.75rem" disabled={enCours.xlsx}
+    <button class="btn btn-primary" id="btn-import" style="margin-top:var(--esp-12)" disabled={enCours.xlsx}
             onclick={importerXlsx}>{enCours.xlsx ? 'Import en cours…' : 'Importer'}</button>
-    <div id="import-result" style="margin-top:1rem">{#if xlsx}<div class="alert alert-{xlsx.ok ? 'success' : 'error'}">{xlsx.texte}</div>{/if}</div>
+    <div id="import-result" style="margin-top:var(--esp-16)">{#if xlsx}<div class="alert alert-{xlsx.ok ? 'success' : 'error'}">{xlsx.texte}</div>{/if}</div>
   </div>
 
   <div class="card">
     <h2>Importer depuis JSON</h2>
-    <p class="text-muted" style="margin-bottom:1rem">
+    <p class="text-muted" style="margin-bottom:var(--esp-16)">
       Restaure un export JSON. Ce qui existe déjà est gardé tel quel, jamais doublé ni écrasé ;
       une copie de la base est faite avant.
     </p>
@@ -153,14 +153,14 @@
       <label for="import-json-file">Fichier .json</label>
       <input type="file" id="import-json-file" accept=".json" bind:this={fichierJson}>
     </div>
-    <button class="btn btn-primary" id="btn-import-json" style="margin-top:.75rem" disabled={enCours.json}
+    <button class="btn btn-primary" id="btn-import-json" style="margin-top:var(--esp-12)" disabled={enCours.json}
             onclick={importerJson}>{enCours.json ? 'Import en cours…' : 'Importer JSON'}</button>
-    <div id="import-json-result" style="margin-top:1rem">{#if json}<div class="alert alert-{json.ok ? 'success' : 'error'}">{json.texte}</div>{/if}</div>
+    <div id="import-json-result" style="margin-top:var(--esp-16)">{#if json}<div class="alert alert-{json.ok ? 'success' : 'error'}">{json.texte}</div>{/if}</div>
   </div>
 
   <div class="card">
     <h2>Exporter en JSON</h2>
-    <p class="text-muted" style="margin-bottom:1rem">
+    <p class="text-muted" style="margin-bottom:var(--esp-16)">
       Toutes vos données — positions et lignes de titres, flux, opérations, entités, cours,
       profils, référentiel — en un fichier. La clé API n'y figure pas.
     </p>
@@ -169,12 +169,12 @@
 
   <div class="card" id="demo-card" style:display={demo && !demo.available ? 'none' : null}>
     <h2>Mode démo</h2>
-    <p class="text-muted" style="margin-bottom:1rem">
+    <p class="text-muted" style="margin-bottom:var(--esp-16)">
       Bascule vers une base de données fictive pour explorer l'application sans risque.<br>
       Vos vraies données ne sont pas affectées.
     </p>
     <!-- Le libelle dit ce que la case active ; l'etat se lit a cote. -->
-    <label class="toggle-label" style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+    <label class="toggle-label" style="display:flex;align-items:center;gap:var(--esp-8);cursor:pointer">
       <input type="checkbox" id="demo-toggle" aria-describedby="demo-status" checked={coche} onchange={basculer}>
       Utiliser la base de démonstration
     </label>
@@ -183,27 +183,27 @@
 
   <div class="card">
     <h2>Sauvegarder la base</h2>
-    <p class="text-muted" style="margin-bottom:1rem">
+    <p class="text-muted" style="margin-bottom:var(--esp-16)">
       Crée une copie horodatée de la base de données dans le dossier <code>backups/</code>.
     </p>
     <button class="btn btn-secondary" id="btn-backup" onclick={sauvegarder}>Créer un backup</button>
-    <div id="backup-result" style="margin-top:.75rem">{#if copie}<div class="alert alert-{copie.ok ? 'success' : 'error'}">{copie.texte}</div>{/if}</div>
+    <div id="backup-result" style="margin-top:var(--esp-12)">{#if copie}<div class="alert alert-{copie.ok ? 'success' : 'error'}">{copie.texte}</div>{/if}</div>
   </div>
 
   <div class="card" style="border: 1px solid #fca5a5">
     <h2 style="color:var(--danger)">Zone dangereuse</h2>
-    <p class="text-muted" style="margin-bottom:1rem">
+    <p class="text-muted" style="margin-bottom:var(--esp-16)">
       Supprime toutes les positions, flux et entités.<br>
       <strong>Irréversible</strong> — fais un export JSON avant.
     </p>
     <button class="btn" style="background:var(--danger);color:var(--on-accent);border-color:var(--danger)" id="btn-reset" onclick={vider}>Vider la base</button>
-    <div id="reset-result" style="margin-top:.75rem">
+    <div id="reset-result" style="margin-top:var(--esp-12)">
       {#if reset}
         {@const lignes = Object.entries(reset.deleted || {}).filter(([, n]) => n > 0)}
         <div class="alert alert-success">
           Base vidée — <strong>{(reset.total || 0).toLocaleString('fr-FR')}</strong> ligne(s) supprimée(s).
           {#if reset.backup?.filename}<br>Backup automatique : <strong>{reset.backup.filename}</strong> ({reset.backup.size_kb} Ko).{/if}
-          {#if lignes.length}<ul style="margin:.4rem 0 0 1.1rem;font-size:var(--fs-sm)">{#each lignes as [t, n] (t)}<li>{n.toLocaleString('fr-FR')} {LIBELLES[t] || t}</li>{/each}</ul>{/if}
+          {#if lignes.length}<ul style="margin:var(--esp-6) 0 0 var(--esp-16);font-size:var(--fs-sm)">{#each lignes as [t, n] (t)}<li>{n.toLocaleString('fr-FR')} {LIBELLES[t] || t}</li>{/each}</ul>{/if}
         </div>
       {/if}
     </div>

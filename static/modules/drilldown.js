@@ -221,7 +221,7 @@ export async function drilldownHistory({ subtitle, title, filters }) {
     montantPanneau('', 0);
     _hist = null;
     document.getElementById('dd-body').innerHTML =
-      '<p style="color:var(--text-muted);padding:.75rem">Aucune donnée historique.</p>';
+      '<p style="color:var(--text-muted);padding:var(--esp-12)">Aucune donnée historique.</p>';
     _ouvrirPanneau();
     return;
   }
@@ -236,7 +236,7 @@ export async function drilldownHistory({ subtitle, title, filters }) {
   }));
 
   document.getElementById('dd-body').innerHTML = `
-    ${history.length >= 2 ? '<div style="position:relative;height:200px;margin-bottom:1rem"><canvas id="dd-history-chart"></canvas></div>' : ''}
+    ${history.length >= 2 ? '<div style="position:relative;height:200px;margin-bottom:var(--esp-16)"><canvas id="dd-history-chart"></canvas></div>' : ''}
     <div class="table-scroll" tabindex="0" role="region" aria-label="Historique">
       <table class="data-table">
         <thead id="dd-history-thead"><tr><th data-sort="date">Date</th><th class="num" data-sort="gross">Brut</th>

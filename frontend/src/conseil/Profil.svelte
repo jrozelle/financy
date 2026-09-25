@@ -47,9 +47,9 @@
 
 <div class="card" id="adv-profile">
   <h2>Profil du titulaire</h2>
-  <div style="margin-bottom:.75rem">
+  <div style="margin-bottom:var(--esp-12)">
     <label for="advisor-owner-select" style="font-size:var(--fs-xs);color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Titulaire</label>
-    <select id="advisor-owner-select" class="filter-select" style="margin-left:.5rem" aria-label="Titulaire du profil" bind:value={proprietaire}>
+    <select id="advisor-owner-select" class="filter-select" style="margin-left:var(--esp-8)" aria-label="Titulaire du profil" bind:value={proprietaire}>
       {#each titulaires as o (o)}<option value={o}>{o}</option>{/each}
     </select>
   </div>
@@ -95,10 +95,10 @@
           les propositions n'investissent jamais ce montant.</p>
       </div>
       <div class="form-group" style="align-self:end">
-        <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer">
+        <label style="display:flex;align-items:center;gap:var(--esp-6);cursor:pointer">
           <input type="checkbox" id="adv-main-residence" bind:checked={f.residence}> Résidence principale détenue
         </label>
-        <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer">
+        <label style="display:flex;align-items:center;gap:var(--esp-6);cursor:pointer">
           <input type="checkbox" id="adv-lbo" bind:checked={f.lbo}> Patrimoine pro (LBO, actions de société)
         </label>
       </div>

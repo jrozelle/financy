@@ -134,21 +134,21 @@
           Ce mois : <strong>{depense.toFixed(4)} $</strong>{#if usage.mock_mode}{' '}<span class="h-badge h-badge-muted">mock</span>{/if}
           · Aujourd'hui : {usage.days.length ? usage.days[usage.days.length - 1].calls : 0} appel(s)
           {#if budget != null && budget > 0 && part != null}
-            <div style="margin-top:.5rem">
+            <div style="margin-top:var(--esp-8)">
               <div style="height:6px;background:var(--bg);border-radius:3px;overflow:hidden;border:1px solid var(--border)">
                 <div style="height:100%;width:{part}%;background:{part >= 100 ? 'var(--danger)' : part >= 80 ? 'var(--warning)' : 'var(--primary)'};transition:width .25s"></div>
               </div>
-              <div style="font-size:var(--fs-2xs);color:var(--text-muted);margin-top:.25rem">
+              <div style="font-size:var(--fs-2xs);color:var(--text-muted);margin-top:var(--esp-4)">
                 {depense.toFixed(4)} $ / {budget.toFixed(2)} $ ({fmtPct(part, 0)})
               </div>
             </div>
             {#if part >= 80 && part < 100}
-              <div class="advisor-budget-warning" style="margin-top:.5rem;padding:.4rem .6rem;border-left:3px solid var(--warning);background:rgba(234,179,8,.1);font-size:var(--fs-xs);border-radius:4px">
+              <div class="advisor-budget-warning" style="margin-top:var(--esp-8);padding:var(--esp-6) var(--esp-10);border-left:3px solid var(--warning);background:rgba(234,179,8,.1);font-size:var(--fs-xs);border-radius:4px">
                 Budget mensuel consommé à {fmtPct(part, 0)}. Les prochains appels Claude
                 passeront toujours, mais envisagez d'augmenter <code>ADVISOR_BUDGET_USD</code>.
               </div>
             {:else if part >= 100}
-              <div class="advisor-budget-warning" style="margin-top:.5rem;padding:.4rem .6rem;border-left:3px solid var(--danger);background:rgba(239,68,68,.1);font-size:var(--fs-xs);border-radius:4px">
+              <div class="advisor-budget-warning" style="margin-top:var(--esp-8);padding:var(--esp-6) var(--esp-10);border-left:3px solid var(--danger);background:rgba(239,68,68,.1);font-size:var(--fs-xs);border-radius:4px">
                 <strong>Budget mensuel dépassé.</strong> Les prochains appels Claude seront bloqués
                 jusqu'à augmentation de <code>ADVISOR_BUDGET_USD</code> ou mois suivant.
               </div>

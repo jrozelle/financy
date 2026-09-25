@@ -50,11 +50,11 @@
 
 <div class="card" id="adv-proposals">
   <h2>Propositions d'arbitrage</h2>
-  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem">
+  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:var(--esp-14)">
     Ce qui rapprocherait le patrimoine financier de la cible du profil, en ne puisant
     que dans l'argent libre, et les leviers fiscaux chiffrés.
   </p>
-  <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.875rem;flex-wrap:wrap">
+  <div style="display:flex;gap:var(--esp-8);align-items:center;margin-bottom:var(--esp-14);flex-wrap:wrap">
     <button type="button" class="btn btn-primary" id="btn-proposals-refresh" class:is-loading={enCours} disabled={enCours}
             onclick={generer}>{enCours ? 'Calcul…' : 'Générer les propositions'}</button>
     <select id="proposals-filter" class="filter-select" style="margin-left:auto" aria-label="Afficher les propositions" bind:value={statut}>
@@ -74,7 +74,7 @@
         <div class="proposal-head">
           <div>
             <span class="proposal-kind">{GENRES[p.kind] || p.kind}</span>
-            <strong style="margin-left:.4rem">{@html montants(p.label)}</strong>
+            <strong style="margin-left:var(--esp-6)">{@html montants(p.label)}</strong>
           </div>
           <div class="proposal-actions">
             {#if p.status === 'pending'}

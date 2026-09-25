@@ -148,6 +148,9 @@
   une valeur brute — y compris dans un `style=` en ligne ou un ecran Svelte. Une
   taille manquante prend le palier le plus proche. Seule exception : les 16 px
   `!important` des champs sur telephone, qui empechent le zoom d'iOS.
+- Espacements (padding, margin, gap) : les paliers `--esp-*` (4 a 64 px), de
+  meme ; restent en valeur brute les ajustements fins sous 3 px, les marges
+  negatives et ce qui n'est pas un espacement (`scroll-padding`, positions).
 - Toutes les migrations DB sont idempotentes (`CREATE IF NOT EXISTS`, `ALTER` dans try/except)
 - Jamais de `DROP` ou `ALTER` destructif. Seule exception, levee par
   l'utilisateur pour le passage aux centimes : `_reconstruire_en_centimes`

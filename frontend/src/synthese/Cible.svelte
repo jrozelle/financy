@@ -54,14 +54,14 @@
   };
 </script>
 
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.875rem;gap:.5rem">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--esp-14);gap:var(--esp-8)">
   <h2 style="margin:0">Écart à la cible</h2>
 <p class="card-sub">Le trait marque l’allocation visée</p>
-  <div style="display:flex;align-items:center;gap:.5rem">
+  <div style="display:flex;align-items:center;gap:var(--esp-8)">
     <span id="alloc-mode-switch"><span style="display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;font-size:var(--fs-xs);vertical-align:middle">
       {#each ['net', 'brut'] as m (m)}
         <button type="button" data-alloc-mode={m} onclick={() => mode = m as 'net' | 'brut'}
-                style="padding:.2rem .6rem;border:none;cursor:pointer;background:{m === mode ? 'var(--primary)' : 'transparent'};color:{m === mode ? 'var(--on-accent)' : 'var(--text)'}">{m === 'net' ? 'Net' : 'Brut'}</button>
+                style="padding:var(--esp-4) var(--esp-10);border:none;cursor:pointer;background:{m === mode ? 'var(--primary)' : 'transparent'};color:{m === mode ? 'var(--on-accent)' : 'var(--text)'}">{m === 'net' ? 'Net' : 'Brut'}</button>
       {/each}
     </span></span>
     <button class="btn btn-secondary btn-sm" id="btn-edit-targets" onclick={() => openTargetsModal()}>Modifier cibles</button>

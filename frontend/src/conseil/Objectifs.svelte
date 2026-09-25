@@ -53,7 +53,7 @@
 
 <div class="card" id="adv-objectives">
   <h2>Objectifs</h2>
-  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem">
+  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:var(--esp-14)">
     Projets patrimoniaux multi-horizons. Pris en compte pour affiner l'allocation cible en phase ultérieure.
   </p>
   <!-- svelte-ignore a11y_no_noninteractive_tabindex : zone defilante, atteignable au clavier -->
@@ -85,10 +85,10 @@
             </td>
           </tr>
         {:else}
-          <tr><td colspan="5" style="text-align:center;padding:1rem;color:var(--text-muted);font-style:italic">Aucun objectif. Ajoutez une ligne pour documenter vos projets patrimoniaux.</td></tr>
+          <tr><td colspan="5" style="text-align:center;padding:var(--esp-16);color:var(--text-muted);font-style:italic">Aucun objectif. Ajoutez une ligne pour documenter vos projets patrimoniaux.</td></tr>
         {/each}
       </tbody>
     </table>
   </div>
-  <button type="button" class="btn btn-secondary btn-sm" id="btn-add-objective" style="margin-top:.75rem" onclick={ajouter}>+ Ajouter un objectif</button>
+  <button type="button" class="btn btn-secondary btn-sm" id="btn-add-objective" style="margin-top:var(--esp-12)" onclick={ajouter}>+ Ajouter un objectif</button>
 </div>

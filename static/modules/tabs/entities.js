@@ -55,15 +55,15 @@ function showEntitySnapshots(entityName) {
           aria-label="Supprimer la valeur du ${fmtDate(s.date)}">×</button>
       </td>
     </tr>`;
-  }).join('') || '<tr><td colspan="5" style="color:var(--text-muted);padding:.75rem">Aucune valorisation enregistrée.</td></tr>';
+  }).join('') || '<tr><td colspan="5" style="color:var(--text-muted);padding:var(--esp-12)">Aucune valorisation enregistrée.</td></tr>';
 
   document.getElementById('dd-subtitle').textContent = 'Entité';
   document.getElementById('dd-title').textContent = entityName;
   montantPanneau(entity ? fmt(entity.net_assets) + ' (actuel)' : '', entity?.net_assets || 0);
   const showChart = snaps.length >= 2;
   document.getElementById('dd-body').innerHTML = `
-    ${showChart ? '<div style="position:relative;height:200px;margin-bottom:1rem"><canvas id="entity-timeline-canvas"></canvas></div>' : ''}
-    <p style="font-size:var(--fs-sm);color:var(--text-muted);margin-bottom:.75rem">
+    ${showChart ? '<div style="position:relative;height:200px;margin-bottom:var(--esp-16)"><canvas id="entity-timeline-canvas"></canvas></div>' : ''}
+    <p style="font-size:var(--fs-sm);color:var(--text-muted);margin-bottom:var(--esp-12)">
       Chaque modification de valeur crée une entrée datée. L'historique est utilisé pour reconstituer la valorisation aux dates passées.
     </p>
     <div class="table-scroll" tabindex="0" role="region" aria-label="Valeurs enregistrées">

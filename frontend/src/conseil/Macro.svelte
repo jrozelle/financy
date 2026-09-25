@@ -60,14 +60,14 @@
 
 <div class="card" id="adv-macro">
   <h2>Vue macroéconomique</h2>
-  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem">
+  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:var(--esp-14)">
     Synthèse générée par Claude (sans web search) ou éditée à la main.
     Utilisée comme contexte pour les propositions d'arbitrage.
   </p>
-  <div id="macro-empty" class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem" style:display={charge && !snap ? null : 'none'}>
+  <div id="macro-empty" class="text-muted" style="font-size:var(--fs-sm);margin-bottom:var(--esp-14)" style:display={charge && !snap ? null : 'none'}>
     Aucun arrêté pour le moment.
   </div>
-  <div id="macro-content" class="form-grid" style="margin-bottom:.875rem" style:display={snap ? null : 'none'}>
+  <div id="macro-content" class="form-grid" style="margin-bottom:var(--esp-14)" style:display={snap ? null : 'none'}>
     <div class="form-group">
       <label for="macro-rates">Régime de taux</label>
       <select id="macro-rates" bind:value={f.taux}><option value="bas">Bas</option><option value="neutre">Neutre</option><option value="haut">Haut</option></select>
@@ -83,11 +83,11 @@
     <div class="form-group full-span" style="grid-column:1 / -1">
       <label for="macro-summary">Synthèse</label>
       <textarea id="macro-summary" rows="4" maxlength="4000" bind:value={f.synthese}
-        style="border:1px solid var(--border);border-radius:6px;padding:.5rem .75rem;font-size:var(--fs-sm);background:var(--card);color:var(--text);font-family:inherit;resize:vertical"></textarea>
+        style="border:1px solid var(--border);border-radius:6px;padding:var(--esp-8) var(--esp-12);font-size:var(--fs-sm);background:var(--card);color:var(--text);font-family:inherit;resize:vertical"></textarea>
     </div>
   </div>
-  <div id="macro-meta" class="text-muted" style="font-size:var(--fs-xs);margin-bottom:.5rem">{snap ? `Source : ${snap.source === 'manual' ? 'manuelle' : 'LLM'} · ${snap.date || ''}` : ''}</div>
-  <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+  <div id="macro-meta" class="text-muted" style="font-size:var(--fs-xs);margin-bottom:var(--esp-8)">{snap ? `Source : ${snap.source === 'manual' ? 'manuelle' : 'LLM'} · ${snap.date || ''}` : ''}</div>
+  <div style="display:flex;gap:var(--esp-8);flex-wrap:wrap">
     <button type="button" class="btn btn-primary" id="btn-macro-refresh" class:is-loading={enCours} disabled={enCours || (charge && !llm.dispo)}
       title={charge ? (llm.dispo ? (llm.mock ? 'Mode mock : reponse fictive' : 'Appel Claude API') : 'ANTHROPIC_API_KEY absente') : undefined}
       onclick={actualiser}>{enCours ? 'Appel Claude…' : 'Actualiser via Claude'}</button>

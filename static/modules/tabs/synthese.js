@@ -52,13 +52,13 @@ function _renderSyntheseEmpty() {
   const card = document.createElement('div');
   card.className = 'card empty-state empty-state-synthese';
   card.innerHTML = `
-    <div style="text-align:center;padding:1.5rem .5rem">
-      <h2 style="margin-bottom:.5rem">Aucun arrêté pour le moment</h2>
-      <p class="text-muted" style="font-size:var(--fs-base);margin-bottom:1.25rem;line-height:1.6">
+    <div style="text-align:center;padding:var(--esp-24) var(--esp-8)">
+      <h2 style="margin-bottom:var(--esp-8)">Aucun arrêté pour le moment</h2>
+      <p class="text-muted" style="font-size:var(--fs-base);margin-bottom:var(--esp-20);line-height:1.6">
         Commencez par ajouter une position ou importer un fichier existant
         pour que votre patrimoine s'affiche ici.
       </p>
-      <div style="display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap">
+      <div style="display:flex;gap:var(--esp-8);justify-content:center;flex-wrap:wrap">
         <button class="btn btn-primary" data-tab-switch="positions">+ Ajouter une position</button>
         <button class="btn btn-secondary" data-tab-switch="import">&#8645; Importer des données</button>
       </div>

@@ -152,8 +152,8 @@ function _holdingHtml(h) {
       </tr>`;
     }).join('');
     posHtml = `
-      <div style="margin-top:.75rem">
-        <div style="font-size:var(--fs-xs);font-weight:600;margin-bottom:.25rem">Detention par enveloppe</div>
+      <div style="margin-top:var(--esp-12)">
+        <div style="font-size:var(--fs-xs);font-weight:600;margin-bottom:var(--esp-4)">Detention par enveloppe</div>
         <table style="width:100%;font-size:var(--fs-xs)">
           <thead><tr>
             <th style="text-align:left;font-weight:600">Enveloppe</th>

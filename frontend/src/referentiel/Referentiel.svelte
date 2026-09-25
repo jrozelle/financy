@@ -194,7 +194,7 @@
 
 <div class="page-header">
   <h1>Référentiel</h1>
-  <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap">
+  <div style="display:flex;gap:var(--esp-12);align-items:center;flex-wrap:wrap">
     <div id="ref-save-status" style="font-size:var(--fs-sm)" class={statut.classe || undefined}>{statut.texte}</div>
     <select id="ref-template-select" class="filter-select" style="width:auto" bind:value={modele} onchange={choisirModele}>
       {#if modeles}
@@ -208,10 +208,10 @@
     <button class="btn btn-primary" id="btn-save-referential" disabled={enCours} onclick={enregistrer}>{enCours ? 'Enregistrement…' : 'Enregistrer le référentiel'}</button>
   </div>
 </div>
-<p class="text-muted" style="margin-bottom:1.25rem;font-size:var(--fs-sm)">
+<p class="text-muted" style="margin-bottom:var(--esp-20);font-size:var(--fs-sm)">
   Modifiez les listes et valeurs utilisées dans toute l'application. Les changements prennent effet après enregistrement.
 </p>
-<div id="ref-template-preview" class="card" style="margin-bottom:1.25rem;border:2px solid var(--primary);background:var(--primary-light)"
+<div id="ref-template-preview" class="card" style="margin-bottom:var(--esp-20);border:2px solid var(--primary);background:var(--primary-light)"
      style:display={apercu ? null : 'none'}>
   {#if apercu && modeles}
     {@const t = modeles[apercu]}
@@ -219,7 +219,7 @@
       <div><strong>Titulaires :</strong> {(t.owners || []).join(', ')}</div>
       <div><strong>Catégories :</strong> {(t.categories || []).join(', ')}</div>
       <div><strong>Enveloppes :</strong> {Object.keys(t.envelope_meta || {}).join(', ')}</div>
-      <div style="margin-top:.5rem;display:flex;gap:.5rem">
+      <div style="margin-top:var(--esp-8);display:flex;gap:var(--esp-8)">
         <button class="btn btn-primary btn-sm" id="btn-apply-template" onclick={appliquerModele}>Appliquer ce modèle</button>
         <button class="btn btn-secondary btn-sm" id="btn-cancel-template" onclick={() => { apercu = null; modele = ''; }}>Annuler</button>
       </div>
@@ -230,7 +230,7 @@
 <div class="two-col">
   <div class="card">
     <h2>Titulaires</h2>
-    <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem">
+    <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:var(--esp-14)">
       Personnes dont les patrimoines sont suivis. Une suppression n'efface pas les positions existantes.
     </p>
     <div id="ref-owners-chips">
@@ -243,7 +243,7 @@
                     onclick={() => supprimerTitulaire(i)}><span aria-hidden="true">×</span></button>
           </span>
         {/each}
-        <div style="display:flex;gap:.5rem;align-items:center;margin-top:.25rem">
+        <div style="display:flex;gap:var(--esp-8);align-items:center;margin-top:var(--esp-4)">
           <input type="text" id="new-owner-input" class="ref-input" placeholder="Prénom / entité" bind:value={nouveaux.owners}
                  onkeydown={e => { if (e.key === 'Enter') { e.preventDefault(); ajouter('owners'); } }}>
           <button class="btn btn-secondary btn-sm" id="btn-add-owner" onclick={() => ajouter('owners')}>+ Ajouter</button>
@@ -253,9 +253,9 @@
   </div>
   <div class="card">
     <h2>Types d'entités</h2>
-    <div id="ref-entity-types" style="margin-bottom:1.25rem">{@render liste('ref-entity-types', 'entity_types', 'Type d\'entité')}</div>
+    <div id="ref-entity-types" style="margin-bottom:var(--esp-20)">{@render liste('ref-entity-types', 'entity_types', 'Type d\'entité')}</div>
     <h2>Modes de valorisation <span class="text-muted" style="font-size:var(--fs-2xs);font-weight:400">(label documentaire)</span></h2>
-    <div id="ref-valuation-modes" style="margin-bottom:1.25rem">{@render liste('ref-valuation-modes', 'valuation_modes', 'Mode de valorisation')}</div>
+    <div id="ref-valuation-modes" style="margin-bottom:var(--esp-20)">{@render liste('ref-valuation-modes', 'valuation_modes', 'Mode de valorisation')}</div>
     <h2>Types de flux</h2>
     <div id="ref-flux-types">{@render liste('ref-flux-types', 'flux_types', 'Type de flux')}</div>
   </div>
@@ -263,7 +263,7 @@
 
 <div class="card">
   <h2>Catégories d'actifs &amp; mobilisabilité</h2>
-  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem">
+  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:var(--esp-14)">
     Le % mobilisable est appliqué au net attribué positif pour estimer la liquidité disponible par catégorie.
   </p>
   <!-- svelte-ignore a11y_no_noninteractive_tabindex : zone defilante, atteignable au clavier -->
@@ -306,10 +306,10 @@
 
 <div class="card">
   <h2>Alertes</h2>
-  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem">
+  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:var(--esp-14)">
     Affichées dans Synthèse quand le seuil est franchi. Stockées localement dans votre navigateur.
   </p>
-  <div id="ref-alerts-list" style="margin-bottom:.75rem">
+  <div id="ref-alerts-list" style="margin-bottom:var(--esp-12)">
     {#if !alertes.length}
       <p class="text-muted" style="font-size:var(--fs-sm)">Aucune alerte configurée.</p>
     {:else}
@@ -352,7 +352,7 @@
 
 <div class="card">
   <h2>Enveloppes &amp; liquidité</h2>
-  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem">
+  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:var(--esp-14)">
     La liquidité détermine la classe d'horizon de disponibilité. La friction indique les contraintes de sortie (fiscale, frais, décote probable…).
   </p>
   <!-- svelte-ignore a11y_no_noninteractive_tabindex : zone defilante, atteignable au clavier -->
@@ -405,7 +405,7 @@
                 onclick={() => ref![cle].splice(i, 1)}><span aria-hidden="true">×</span></button>
       </span>
     {/each}
-    <div style="display:flex;gap:.5rem;align-items:center;margin-top:.25rem">
+    <div style="display:flex;gap:var(--esp-8);align-items:center;margin-top:var(--esp-4)">
       <input type="text" id="new-{conteneur}" class="ref-input" placeholder={indication} bind:value={nouveaux[cle]}>
       <button class="btn btn-secondary btn-sm" id="btn-add-{conteneur}" onclick={() => ajouter(cle)}>+ Ajouter</button>
     </div>

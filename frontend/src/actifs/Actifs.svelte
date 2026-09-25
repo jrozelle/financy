@@ -139,7 +139,7 @@
 </div>
 
 {#key masque}
-<div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:1rem">
+<div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:var(--esp-16)">
   <div class="kpi-card"><div class="kpi-label">Valeur des lignes de titres</div><div class="kpi-value" id="actifs-kpi-value">{t ? fmt(t.market_value || 0) : '—'}</div></div>
   <div class="kpi-card"><div class="kpi-label">Prix de revient</div><div class="kpi-value" id="actifs-kpi-cost">{t?.cost_basis ? fmt(t.cost_basis) : '—'}</div></div>
   <div class="kpi-card"><div class="kpi-label">+/- latent</div><div class="kpi-value" id="actifs-kpi-pnl"
@@ -153,7 +153,7 @@
      que le controle n'a rien a dire ; rempli par reconcile.js. -->
 <div id="reconcile-panel"></div>
 
-<div class="charts-row" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+<div class="charts-row" style="display:grid;grid-template-columns:1fr 1fr;gap:var(--esp-16);margin-bottom:var(--esp-16)">
   <div class="card">
     <h2>Par classe d'actif</h2>
     <div style="position:relative;height:240px"><canvas id="actifs-chart-class" bind:this={toileClasse}></canvas></div>
@@ -217,15 +217,15 @@
     {/each}
     {/key}
   </div>
-  <div id="actifs-empty" class="empty-state" style="padding:2rem 1rem;text-align:center" style:display={donnees && !donnees.lines?.length ? null : 'none'}>
-    <div style="margin-bottom:.4rem;opacity:.5" aria-hidden="true">
+  <div id="actifs-empty" class="empty-state" style="padding:var(--esp-32) var(--esp-16);text-align:center" style:display={donnees && !donnees.lines?.length ? null : 'none'}>
+    <div style="margin-bottom:var(--esp-6);opacity:.5" aria-hidden="true">
       <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8"
            stroke-linecap="round" stroke-linejoin="round" focusable="false">
         <path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-6"/>
       </svg>
     </div>
-    <h3 style="font-size:var(--fs-base);margin-bottom:.4rem">Aucune ligne d'actif</h3>
-    <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:1rem">
+    <h3 style="font-size:var(--fs-base);margin-bottom:var(--esp-6)">Aucune ligne d'actif</h3>
+    <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:var(--esp-16)">
       Pour voir vos ETF, actions et fonds euros ici, ajoutez des lignes
       dans une position depuis l'onglet Positions.
     </p>

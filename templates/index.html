@@ -147,7 +147,7 @@
       <div id="todo-zone" class="hidden"></div>
       <div id="entity-warnings-bar"></div>
 
-      <div id="snapshot-note-bar" style="display:none;margin-bottom:1rem"></div>
+      <div id="snapshot-note-bar" style="display:none;margin-bottom:var(--esp-16)"></div>
       <!-- La grille et ses douze cartes : ecran Svelte (frontend/src/synthese/),
            monte ici au premier rendu. -->
     </div>
@@ -240,13 +240,13 @@
         <h2 id="settings-modal-heading">Paramètres</h2>
         <button class="modal-close" data-close="settings-modal" aria-label="Fermer">&#10005;</button>
       </div>
-      <div style="margin-bottom:1.25rem">
-        <label for="settings-api-key" style="display:block;font-size:var(--fs-sm);font-weight:600;margin-bottom:.375rem">Clé API Anthropic</label>
-        <p class="text-muted" style="font-size:var(--fs-xs);margin-bottom:.5rem">
+      <div style="margin-bottom:var(--esp-20)">
+        <label for="settings-api-key" style="display:block;font-size:var(--fs-sm);font-weight:600;margin-bottom:var(--esp-6)">Clé API Anthropic</label>
+        <p class="text-muted" style="font-size:var(--fs-xs);margin-bottom:var(--esp-8)">
           Nécessaire pour l'analyse de l'onglet Conseil. La clé est stockée dans la base, sur ce serveur.
           Laisser le champ vide garde la clé actuelle.
         </p>
-        <div style="display:flex;gap:.5rem;align-items:center">
+        <div style="display:flex;gap:var(--esp-8);align-items:center">
           <input type="password" id="settings-api-key" class="form-control"
                  placeholder="sk-ant-api03-..." autocomplete="off"
                  style="flex:1;font-family:monospace;font-size:var(--fs-sm)">
@@ -257,7 +257,7 @@
             </svg>
           </button>
         </div>
-        <div id="settings-api-status" class="text-muted" style="font-size:var(--fs-xs);margin-top:.375rem"></div>
+        <div id="settings-api-status" class="text-muted" style="font-size:var(--fs-xs);margin-top:var(--esp-6)"></div>
       </div>
       <div class="modal-actions">
         <button type="button" class="btn btn-danger-quiet hidden" id="btn-delete-api-key" style="margin-right:auto">Supprimer la clé</button>
@@ -274,7 +274,7 @@
         <h2 id="targets-modal-heading">Allocation cible par catégorie</h2>
         <button class="modal-close" data-close="targets-modal" aria-label="Fermer">&#10005;</button>
       </div>
-      <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:1rem">
+      <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:var(--esp-16)">
         Renseigne un % cible pour chaque catégorie (le total n'a pas besoin de faire 100 %).
       </p>
       <div id="targets-form-grid" class="targets-grid"></div>
@@ -310,7 +310,7 @@
         <h2 id="keyboard-help-title">Raccourcis clavier</h2>
         <button class="modal-close" data-close="keyboard-help-modal" aria-label="Fermer">&#10005;</button>
       </div>
-      <div class="modal-body" style="padding:0 1.25rem 1.25rem">
+      <div class="modal-body" style="padding:0 var(--esp-20) var(--esp-20)">
         <table class="kbd-help-table" style="width:100%;font-size:var(--fs-base)">
           <tbody>
             <tr><td><kbd>Ctrl</kbd>+<kbd>N</kbd> <span class="text-muted">/</span> <kbd>&#8984;</kbd>+<kbd>N</kbd></td><td>Nouvelle position</td></tr>
@@ -323,7 +323,7 @@
             <tr><td><kbd>Tab</kbd></td><td>Navigation clavier (outline bleu visible)</td></tr>
           </tbody>
         </table>
-        <p class="text-muted" style="font-size:var(--fs-xs);margin-top:1rem">
+        <p class="text-muted" style="font-size:var(--fs-xs);margin-top:var(--esp-16)">
           Les raccourcis ne s'activent pas quand vous tapez dans un champ (sauf <kbd>Esc</kbd>).
         </p>
       </div>
@@ -392,14 +392,14 @@
             <input type="text" id="pos-notes">
           </div>
           <div class="form-group full-span" id="pos-mob-override-row">
-            <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+            <label style="display:flex;align-items:center;gap:var(--esp-8);cursor:pointer">
               <input type="checkbox" id="pos-mob-override-check">
               Surcharger la mobilisabilité pour cette ligne
             </label>
-            <div id="pos-mob-override-field" style="display:none;margin-top:.4rem;gap:1rem;align-items:center;flex-wrap:wrap">
+            <div id="pos-mob-override-field" style="display:none;margin-top:var(--esp-6);gap:var(--esp-16);align-items:center;flex-wrap:wrap">
               <div>
                 <input type="text" inputmode="decimal" id="pos-mob-override-pct" step="1" min="0" max="100" value="100" style="width:90px" aria-label="Part mobilisable (%)">
-                <span style="font-size:var(--fs-sm);color:var(--text-muted);margin-left:.25rem">% mobilisable</span>
+                <span style="font-size:var(--fs-sm);color:var(--text-muted);margin-left:var(--esp-4)">% mobilisable</span>
               </div>
               <div>
                 <select id="pos-liquidity-override" style="font-size:var(--fs-sm)" aria-label="Liquidité de la ligne">
@@ -460,8 +460,8 @@
           <div id="isin-chart-empty" class="isin-chart-empty hidden">Pas de données de cours.</div>
         </div>
         <div id="isin-popover-holding"></div>
-        <div class="isin-popover-actions" style="display:flex;flex-direction:column;gap:.5rem">
-          <div style="display:flex;gap:.4rem;align-items:center">
+        <div class="isin-popover-actions" style="display:flex;flex-direction:column;gap:var(--esp-8)">
+          <div style="display:flex;gap:var(--esp-6);align-items:center">
             <button type="button" class="btn btn-secondary btn-sm" id="isin-refresh-btn">Actualiser</button>
             <button type="button" class="btn btn-secondary btn-sm" id="isin-reset-btn" title="Effacer ticker + cours (force re-resolution)">Reset</button>
           </div>
@@ -507,7 +507,7 @@
           Saisissez les lignes détenues dans cette enveloppe. ISIN standard (12 caractères)
           ou pseudo-ISIN commençant par <code>FONDS_EUROS_</code> / <code>CUSTOM_</code>
           pour un actif non coté.
-          <div style="margin-top:.4rem;font-size:var(--fs-xs)">
+          <div style="margin-top:var(--esp-6);font-size:var(--fs-xs)">
             Import CSV : <a href="/api/import/csv-template" download style="color:var(--primary);text-decoration:underline">télécharger le template</a>
             (colonnes : ISIN, Libellé, Quantité, PRU, Cours, Valorisation — séparateur <code>;</code>).
           </div>
@@ -530,19 +530,19 @@
           </table>
         </div>
         <datalist id="holdings-isin-list"></datalist>
-        <div class="modal-actions" style="justify-content:space-between;gap:.5rem;flex-wrap:wrap">
-          <div style="display:flex;gap:.4rem">
+        <div class="modal-actions" style="justify-content:space-between;gap:var(--esp-8);flex-wrap:wrap">
+          <div style="display:flex;gap:var(--esp-6)">
             <button type="button" class="btn btn-secondary" id="holdings-add-line">+ Ligne</button>
             <button type="button" class="btn btn-secondary" id="holdings-import-pdf">Importer fichier…</button>
             <button type="button" class="btn btn-secondary" id="holdings-paste-btn">Coller</button>
             <input type="file" id="holdings-pdf-input" accept="application/pdf,.pdf,.csv,text/csv" style="display:none">
           </div>
-          <div style="display:flex;gap:.4rem">
+          <div style="display:flex;gap:var(--esp-6)">
             <button type="button" class="btn btn-secondary" data-close="holdings-modal">Annuler</button>
             <button type="button" class="btn btn-primary" id="holdings-save">Enregistrer</button>
           </div>
         </div>
-        <div id="holdings-import-status" style="margin-top:.5rem;font-size:var(--fs-sm)"></div>
+        <div id="holdings-import-status" style="margin-top:var(--esp-8);font-size:var(--fs-sm)"></div>
       </div>
     </div>
   </div>
@@ -645,7 +645,7 @@
           </div>
         </div>
         <div class="computed-info" id="ent-computed-info"></div>
-        <div id="ent-retro-warning" class="ent-retro-warning" style="display:none;margin-top:.75rem;padding:.625rem 1rem;border-radius:6px;font-size:var(--fs-sm)">
+        <div id="ent-retro-warning" class="ent-retro-warning" style="display:none;margin-top:var(--esp-12);padding:var(--esp-10) var(--esp-16);border-radius:6px;font-size:var(--fs-sm)">
           La nouvelle valorisation sera enregistrée à la date d'aujourd'hui. Les arrêtés passés conservent leurs valeurs d'origine — l'historique reste intact.
         </div>
         <div class="modal-actions">

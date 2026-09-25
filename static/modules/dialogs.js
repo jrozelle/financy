@@ -120,10 +120,10 @@ export function promptDialog(title, { defaultValue = '', placeholder = '', input
     const isTextarea = inputType === 'textarea';
     const inputHtml = isTextarea
       ? `<textarea class="prompt-input" placeholder="${esc(placeholder)}" aria-label="${esc(title)}"
-                   style="width:100%;min-height:180px;padding:.5rem .75rem;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm);margin-top:.5rem;resize:vertical;font-family:monospace">${esc(defaultValue)}</textarea>`
+                   style="width:100%;min-height:180px;padding:var(--esp-8) var(--esp-12);border:1px solid var(--border);border-radius:6px;font-size:var(--fs-sm);margin-top:var(--esp-8);resize:vertical;font-family:monospace">${esc(defaultValue)}</textarea>`
       : `<input type="${esc(inputType)}" class="prompt-input" value="${esc(defaultValue)}"
                placeholder="${esc(placeholder)}" aria-label="${esc(title)}"
-               style="width:100%;padding:.5rem .75rem;border:1px solid var(--border);border-radius:6px;font-size:var(--fs-base);margin-top:.5rem">`;
+               style="width:100%;padding:var(--esp-8) var(--esp-12);border:1px solid var(--border);border-radius:6px;font-size:var(--fs-base);margin-top:var(--esp-8)">`;
     overlay.innerHTML = `
       <div class="confirm-dialog" ${isTextarea ? 'style="max-width:600px"' : ''}>
         <div class="confirm-title">${esc(title)}</div>

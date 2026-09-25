@@ -219,7 +219,7 @@ function renderResults(query, panel, switchTabFn) {
       <div ${opt('positions', p.id)}>
         <div class="search-item-label">
           ${highlight(p.establishment || p.envelope || p.category, q)}
-          <span style="color:var(--text-muted);font-size:var(--fs-2xs);margin-left:.25rem">${esc(p.owner)} · ${esc(p.envelope)}</span>
+          <span style="color:var(--text-muted);font-size:var(--fs-2xs);margin-left:var(--esp-4)">${esc(p.owner)} · ${esc(p.envelope)}</span>
         </div>
         <div class="search-item-amount">${fmt(p.net_attributed || p.value)}</div>
       </div>
@@ -231,7 +231,7 @@ function renderResults(query, panel, switchTabFn) {
       <div ${opt('flux', f.id)}>
         <div class="search-item-label">
           ${highlight(f.notes || f.envelope || f.type, q)}
-          <span style="color:var(--text-muted);font-size:var(--fs-2xs);margin-left:.25rem">${esc(f.owner)} · ${fmtDate(f.date)}</span>
+          <span style="color:var(--text-muted);font-size:var(--fs-2xs);margin-left:var(--esp-4)">${esc(f.owner)} · ${fmtDate(f.date)}</span>
         </div>
         <div class="search-item-amount">${fmtSigned(fluxSigned(f))}</div>
       </div>
@@ -243,7 +243,7 @@ function renderResults(query, panel, switchTabFn) {
       <div ${opt('entites', e.id)}>
         <div class="search-item-label">
           ${highlight(e.name, q)}
-          <span style="color:var(--text-muted);font-size:var(--fs-2xs);margin-left:.25rem">${esc(e.type || '')}</span>
+          <span style="color:var(--text-muted);font-size:var(--fs-2xs);margin-left:var(--esp-4)">${esc(e.type || '')}</span>
         </div>
         <div class="search-item-amount">${fmt(e.gross_assets - (e.debt || 0))}</div>
       </div>

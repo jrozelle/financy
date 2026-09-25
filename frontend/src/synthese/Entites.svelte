@@ -63,12 +63,12 @@
             <td style="text-align:right;font-weight:600" class={l.e.net_assets >= 0 ? 'pos' : 'neg'}>{fmt(l.e.net_assets)}</td>
             <td style="text-align:right">
               {fmt(l.netFamille)}
-              <span style="font-size:var(--fs-2xs);color:var(--text-muted);margin-left:4px">{l.pctFamille}</span>
+              <span style="font-size:var(--fs-2xs);color:var(--text-muted);margin-left:var(--esp-4)">{l.pctFamille}</span>
             </td>
             {#if !famille}
               <td style="text-align:right;font-weight:700;color:var(--primary)">
                 {fmt(l.netTitulaire)}
-                {#if l.pctTitulaire !== null}<span style="font-size:var(--fs-2xs);color:var(--text-muted);margin-left:4px">{fmtPct(l.pctTitulaire * 100, 0)}{
+                {#if l.pctTitulaire !== null}<span style="font-size:var(--fs-2xs);color:var(--text-muted);margin-left:var(--esp-4)">{fmtPct(l.pctTitulaire * 100, 0)}{
                   l.pctDette !== null && Math.abs(l.pctDette - l.pctTitulaire) > 0.005 ? ` du bien, ${fmtPct(l.pctDette * 100, 0)} de la dette` : ''}</span>{/if}
               </td>
             {/if}

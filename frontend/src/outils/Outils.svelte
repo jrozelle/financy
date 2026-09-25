@@ -133,14 +133,14 @@
 
 <div class="card">
   <h2>Timeline patrimoniale</h2>
-  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem">
+  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:var(--esp-14)">
     Frise chronologique des arrêtés, flux et événements.
   </p>
   <div id="timeline-body">
     {#if evenements && !evenements.length}
-      <p class="text-muted" style="padding:1rem">Aucun événement.</p>
+      <p class="text-muted" style="padding:var(--esp-16)">Aucun événement.</p>
     {:else if evenements}
-      {#if arretes.length >= 2}<div style="position:relative;height:220px;margin-bottom:1.25rem"><canvas id="timeline-chart" bind:this={toileFrise}></canvas></div>{/if}
+      {#if arretes.length >= 2}<div style="position:relative;height:220px;margin-bottom:var(--esp-20)"><canvas id="timeline-chart" bind:this={toileFrise}></canvas></div>{/if}
       <div class="timeline-wrapper"><div class="timeline">
         {#key masque}
         {#each evenements as ev, i (i)}
@@ -160,11 +160,11 @@
 
 <div class="card">
   <h2>Projection / Simulation</h2>
-  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem">
+  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:var(--esp-14)">
     Simulez l'évolution d'un capital avec un versement mensuel régulier.
   </p>
   <form id="simulation-form" onsubmit={simuler}>
-    <div class="form-grid" style="margin-bottom:1rem">
+    <div class="form-grid" style="margin-bottom:var(--esp-16)">
       <div class="form-group">
         <label for="sim-initial">Capital initial (€)</label>
         <input type="text" inputmode="decimal" id="sim-initial" min="0" step="100" bind:value={f.initial}>
@@ -184,10 +184,10 @@
     </div>
     <button type="submit" class="btn btn-primary">Simuler</button>
   </form>
-  <div id="simulation-result" style="margin-top:1.25rem">
+  <div id="simulation-result" style="margin-top:var(--esp-20)">
     {#if resultat}
       {#key masque}
-      <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:1rem">
+      <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:var(--esp-16)">
         <div class="kpi-card"><div class="kpi-label">Capital final</div><div class="kpi-value">{fmt(resultat.final_balance)}</div></div>
         <div class="kpi-card"><div class="kpi-label">Total investi</div><div class="kpi-value">{fmt(resultat.total_invested)}</div></div>
         <div class="kpi-card"><div class="kpi-label">Plus-values</div><div class="kpi-value" style="color:{resultat.gains >= 0 ? 'var(--success)' : 'var(--danger)'}">{fmt(resultat.gains)}</div></div>
@@ -200,7 +200,7 @@
 
 <div class="card">
   <h2>Arrêté automatique</h2>
-  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem">
+  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:var(--esp-14)">
     Duplique le dernier arrêté à la date du jour. Utile pour garder un historique régulier sans modifier manuellement les positions.
   </p>
   <button class="btn btn-secondary" id="btn-auto-snapshot" onclick={() => triggerAutoSnapshot()}>Créer un arrêté aujourd'hui</button>
@@ -208,14 +208,14 @@
 
 <div class="card">
   <h2>Cours de marché</h2>
-  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.875rem">
+  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:var(--esp-14)">
     Rafraîchit automatiquement les derniers cours des ISIN cotés (actions, ETF, OPCVM). Les fonds euros et actifs non cotés sont ignorés.
   </p>
-  <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+  <div style="display:flex;gap:var(--esp-8);align-items:center;flex-wrap:wrap">
     <button class="btn btn-primary" id="btn-refresh-prices" onclick={() => triggerPricesRefresh(false)}>Rafraîchir les cours</button>
     <button class="btn btn-secondary" id="btn-refresh-prices-stale" onclick={() => triggerPricesRefresh(true)}>Rafraîchir uniquement les périmés (&gt;20h)</button>
   </div>
   <!-- Remplis par tools.js (triggerPricesRefresh, loadSchedulerStatus) : Svelte n'y touche pas. -->
-  <div id="prices-refresh-result" style="margin-top:1rem;font-size:var(--fs-sm)"></div>
-  <div id="scheduler-status" style="margin-top:.75rem;font-size:var(--fs-xs);color:var(--text-muted)"></div>
+  <div id="prices-refresh-result" style="margin-top:var(--esp-16);font-size:var(--fs-sm)"></div>
+  <div id="scheduler-status" style="margin-top:var(--esp-12);font-size:var(--fs-xs);color:var(--text-muted)"></div>
 </div>

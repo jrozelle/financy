@@ -5,7 +5,6 @@ l'historique git (`git log`), un commit par phase.
 
 ## Ouvert
 
-- [ ] CSS : échelle d'espacements (les tailles de texte sont faites : paliers `--fs-*`)
 - [ ] Téléphone : synthèse longue (onze écrans) — cartes secondaires repliées
       par défaut ? La personnalisation est désormais dans le menu « ··· »
 
@@ -35,6 +34,8 @@ l'historique git (`git log`), un commit par phase.
   copie de la base, au bureau et sur téléphone, puis déployé ; restent en
   JavaScript les Préférences, les fenêtres (fiche d'une position, d'un flux,
   d'un titre) et les modules partagés.
+- **CSS** (septembre 2026) : échelles de tailles de texte (`--fs-*`, onze
+  paliers au lieu de 47 valeurs) et d'espacements (`--esp-*`, treize paliers).
 - **Hygiène** (septembre 2026) : revue complète (calculs, cohérence, interface,
   CSS), dépôt public purgé des données réelles, clé d'API hors de la base,
   rotation des sauvegardes.

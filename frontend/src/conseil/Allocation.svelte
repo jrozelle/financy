@@ -62,8 +62,8 @@
   <h2>Allocation cible vs actuelle</h2>
   <div id="advisor-adjustments" class="advisor-adjustments">
     {#if !avecProfil}
-      <div class="empty-state" style="padding:1rem 0">
-        <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:.75rem">
+      <div class="empty-state" style="padding:var(--esp-16) 0">
+        <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:var(--esp-12)">
           Enregistrez un profil (horizon + tolérance au risque) pour calculer
           l'allocation cible et générer des propositions d'arbitrage.
         </p>
@@ -81,7 +81,7 @@
   </div>
   <div id="advisor-allocation-wrap">
     <!-- Sans donnees, pas de cadre de graphe vide de 280 px. -->
-    <div id="advisor-allocation-graphe" style="position:relative;height:280px;margin-bottom:1rem" style:display={avecProfil ? null : 'none'}>
+    <div id="advisor-allocation-graphe" style="position:relative;height:280px;margin-bottom:var(--esp-16)" style:display={avecProfil ? null : 'none'}>
       <canvas id="advisor-allocation-chart" bind:this={toile}></canvas>
     </div>
     <!-- svelte-ignore a11y_no_noninteractive_tabindex : zone defilante, atteignable au clavier -->
@@ -100,7 +100,7 @@
         <tbody id="advisor-gap-tbody">
           {#key masque}
           {#if avecProfil && donnees && !avecEcarts}
-            <tr><td colspan="6" style="text-align:center;padding:1rem;color:var(--text-muted);font-style:italic">Pas de positions sur ce propriétaire. Saisissez des positions pour comparer.</td></tr>
+            <tr><td colspan="6" style="text-align:center;padding:var(--esp-16);color:var(--text-muted);font-style:italic">Pas de positions sur ce propriétaire. Saisissez des positions pour comparer.</td></tr>
           {:else if avecProfil && donnees}
             {#each donnees.gap as g (g.category)}
               {@const cls = g.delta_eur > 0 ? 'pos' : g.delta_eur < 0 ? 'neg' : ''}

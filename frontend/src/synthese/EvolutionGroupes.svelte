@@ -58,7 +58,7 @@
   }
 </script>
 
-<div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:.875rem">
+<div style="display:flex;align-items:center;gap:var(--esp-16);flex-wrap:wrap;margin-bottom:var(--esp-14)">
   <h2 style="margin:0">Évolution par</h2>
   <select id="synthese-history-group" class="filter-select" style="width:auto" aria-label="Regrouper l'évolution par"
           bind:value={groupe}>
