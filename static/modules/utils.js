@@ -89,10 +89,13 @@ export function sparkline(valeurs, { couleur = 'var(--primary)', hauteur = 26, d
   </svg>`;
 }
 
+// Une date AAAA-MM-JJ devient JJ/MM/AAAA ; toute autre valeur ressort
+// echappee : fmtDate s'insere souvent tel quel dans du HTML, et une date peut
+// venir d'un fichier importe.
 export const fmtDate = d => {
   if (!d) return '—';
-  const [y, m, day] = d.split('-');
-  return `${day}/${m}/${y}`;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d));
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : esc(String(d));
 };
 
 export const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');

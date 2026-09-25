@@ -10,3 +10,12 @@ docker-compose.yml
 node_modules
 frontend/node_modules
 frontend_dist
+# Donnees et secrets locaux : jamais dans une image. La base de demonstration,
+# versionnee, y reste.
+*.db
+!demo.db
+*.db.bak-*
+*.db-journal
+secrets.json
+data/
+backups/

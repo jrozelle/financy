@@ -192,6 +192,11 @@
   600), via `services/settings.py`
 - Mode démo (`is_demo_mode()`) : aucun appel réseau (providers et LLM mockés)
 - Uploads : limite de taille, vérif MIME, stockage temporaire purgé
+- Un fichier importe vient peut-etre d'ailleurs : l'import JSON n'accepte une
+  date qu'en AAAA-MM-JJ, une devise qu'en trois lettres, et une valeur de
+  configuration que si elle passe les controles de sa route (`_sain`,
+  `_config_valide`). Cote client, toute donnee entre dans le HTML par `esc()`
+  ou par une fonction qui echappe (`fmtDate` echappe ce qui n'est pas une date).
 - Adresse du client : `adresse_client()` (`auth.py`), jamais `request.remote_addr`
   directement — derrière un proxy, c'est celle du proxy. `X-Forwarded-For` ne
   se lit que depuis les proxies de `FINANCY_PROXIES_DE_CONFIANCE`, de droite à

@@ -115,11 +115,14 @@ def login_page():
                                    csrf_token=session.get('csrf_token', '')), 429
         _record_attempt(ip)
         form_token = request.form.get('csrf_token', '')
-        if not form_token or form_token != session.get('csrf_token'):
+        attendu = session.get('csrf_token')
+        if not form_token or not isinstance(attendu, str) or not hmac.compare_digest(form_token.encode(), attendu.encode()):
             logger.warning('Login failed — CSRF token mismatch')
             return render_template('login.html', error='Session expirée, réessayez.',
                                    csrf_token=session.get('csrf_token', ''))
-        if hmac.compare_digest(request.form.get('password', ''), AUTH_PASSWORD):
+        # En octets : sur des chaines, compare_digest refuse tout caractere non
+        # ASCII — un « é » saisi provoquait une erreur 500 au lieu d'un refus.
+        if hmac.compare_digest(request.form.get('password', '').encode(), AUTH_PASSWORD.encode()):
             # Regenerate session to prevent session fixation
             session.clear()
             session['authenticated'] = True

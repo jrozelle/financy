@@ -1,4 +1,6 @@
+import json
 import logging
+import re
 from flask import Blueprint, jsonify, request
 from datetime import datetime
 from io import BytesIO
@@ -365,6 +367,22 @@ _TECHNIQUES = {'id', 'created_at', 'updated_at'}
 # Cle d'identite d'une position : l'etablissement en fait partie — deux
 # assurances-vie d'un meme titulaire chez deux assureurs ne sont pas une.
 _CLE_POSITION = ('date', 'owner', 'category', 'envelope', 'establishment', 'entity', 'label')
+def _config_valide(cle, valeur):
+    """Une valeur de configuration importee passe les controles de sa route
+    d'enregistrement : cibles et alertes comme a leur PUT. Toutes doivent au
+    moins etre du JSON."""
+    from routes.referential import _erreur_cibles, _erreur_alertes
+    try:
+        d = json.loads(valeur)
+    except (ValueError, TypeError):
+        return False
+    if cle == 'allocation_targets':
+        return isinstance(d, dict) and _erreur_cibles(d) is None
+    if cle == 'user_alerts':
+        return isinstance(d, list) and _erreur_alertes(d) is None
+    return True
+
+
 # Configuration exportable ; les reglages (cle API) n'en sont pas.
 _CONFIG_EXPORTEE = ('referential', 'allocation_targets', 'user_alerts', 'wealth_target',
                     'benchmark_isin', 'synthese_disposition', 'barre_mobile', 'preferences')
@@ -404,10 +422,31 @@ def _propre(v):
     return str(v)[:MAX_NOTE_LENGTH]
 
 
+def _est_date(colonne):
+    return colonne in ('date', 'debut', 'fin') or colonne.endswith('_date') or colonne.startswith('date_')
+
+
+def _sain(ligne):
+    """Un fichier importe peut venir d'ailleurs : ses dates et ses devises,
+    affichees telles quelles par l'interface, doivent avoir leur forme. Une
+    date hors AAAA-MM-JJ devient vide ; une devise hors trois lettres est
+    retiree (la base garde sa valeur par defaut)."""
+    out = {}
+    for c, v in ligne.items():
+        if _est_date(c) and v is not None and not validate_date(str(v)):
+            v = None
+        if c == 'currency':
+            if v is None or not re.fullmatch(r'[A-Z]{3}', str(v).strip().upper()):
+                continue
+            v = str(v).strip().upper()
+        out[c] = v
+    return out
+
+
 def _inserer(conn, table, ligne, cols, ignorer=False):
     # L'import parle en euros, comme l'export ; la base, en centimes pour les
     # tables de montants.COLONNES. Ici seulement, et dans _existe.
-    ligne = ligne_en_centimes(table, ligne)
+    ligne = ligne_en_centimes(table, _sain(ligne))
     champs = [c for c in cols if c not in _TECHNIQUES and c in ligne]
     if not champs:
         return None
@@ -625,8 +664,10 @@ def import_json():
         config = data.get('config') or {}
         if isinstance(config, dict):
             for cle, valeur in config.items():
-                if cle in _CONFIG_EXPORTEE and isinstance(valeur, str):
+                if cle in _CONFIG_EXPORTEE and isinstance(valeur, str) and _config_valide(cle, valeur):
                     conn.execute('INSERT OR IGNORE INTO config (key, value) VALUES (?, ?)', (cle, valeur))
+                elif cle in _CONFIG_EXPORTEE:
+                    rapport['skipped'] += 1
 
     logger.info('Import JSON : %s', rapport)
     return jsonify(rapport)

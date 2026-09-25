@@ -94,7 +94,7 @@ function _summaryHtml(data) {
 
   // Deux decimales dans la devise du titre : `fmt` arrondit a l'euro et
   // suffixe « € » — 0,85 USD s'affichait « 1 € USD ».
-  const last = data.last_price != null ? `${fmtQty(data.last_price, 2)} ${data.currency || 'EUR'}` : '—';
+  const last = data.last_price != null ? `${fmtQty(data.last_price, 2)} ${esc(data.currency || 'EUR')}` : '—';
   const varPct = data.variation_pct;
   const varDisplay = varPct != null
     ? `<span class="${varPct >= 0 ? 'pos' : 'neg'}">${fmtPct(varPct, 2, true)}</span>`

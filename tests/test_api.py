@@ -108,6 +108,16 @@ class TestAuth:
         assert resp.status_code == 200
         assert 'incorrect' in resp.data.decode().lower() or 'Mot de passe' in resp.data.decode()
 
+    def test_login_mot_de_passe_accentue(self, anon_client):
+        """Un caractere non ASCII est refuse comme un mauvais mot de passe :
+        compare_digest sur des chaines levait une erreur 500."""
+        anon_client.get('/login')
+        with anon_client.session_transaction() as s:
+            token = s.get('csrf_token', '')
+        resp = anon_client.post('/login', data={'password': 'été', 'csrf_token': token})
+        assert resp.status_code == 200
+        assert 'incorrect' in resp.data.decode().lower()
+
     def test_login_post_no_csrf(self, anon_client):
         anon_client.get('/login')
         resp = anon_client.post('/login', data={'password': 'testpass', 'csrf_token': ''})

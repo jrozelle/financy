@@ -109,3 +109,39 @@ def test_un_export_au_format_1_reste_lisible(client):
               'flux': []}
     r = client.post('/api/import-json', json=ancien, headers=H).get_json()
     assert r['positions'] == 1 and r['holdings'] == 1
+
+
+class TestImportPiege:
+    """Un fichier JSON recu d'ailleurs ne doit rien faire entrer que
+    l'interface afficherait tel quel dans du HTML (audit du 25/09/2026)."""
+
+    def test_devise_et_dates_assainies(self, client):
+        piege = '<img src=x onerror=alert(1)>'
+        r = client.post('/api/import-json', headers=H, json={
+            'format': 2,
+            'securities': [{'isin': 'FR0000120271', 'name': 'T', 'currency': piege,
+                            'last_price_date': piege, 'last_price': 10, 'is_priceable': 1},
+                           {'isin': 'US0378331005', 'name': 'U', 'currency': 'usd', 'last_price_date': '2026-09-02'}],
+        })
+        assert r.status_code == 200
+        with get_db() as c:
+            lignes = {x['isin']: dict(x) for x in c.execute('SELECT isin, currency, last_price_date FROM securities')}
+        assert lignes['FR0000120271']['currency'] in (None, 'EUR')          # valeur par defaut, pas le piege
+        assert lignes['FR0000120271']['last_price_date'] is None
+        assert lignes['US0378331005'] == {'isin': 'US0378331005', 'currency': 'USD', 'last_price_date': '2026-09-02'}
+
+    def test_config_controlee_comme_a_son_enregistrement(self, client):
+        import json
+        r = client.post('/api/import-json', headers=H, json={'format': 2, 'config': {
+            'allocation_targets': json.dumps({'Actions': '"><img src=x onerror=alert(1)>'}),
+            'user_alerts': 'pas du json',
+            'wealth_target': json.dumps(600000),
+        }})
+        assert r.status_code == 200
+        with get_db() as c:
+            cles = {x['key'] for x in c.execute('SELECT key FROM config')}
+        assert 'allocation_targets' not in cles and 'user_alerts' not in cles
+        assert 'wealth_target' in cles
+        r = client.post('/api/import-json', headers=H, json={'format': 2, 'config': {
+            'allocation_targets': json.dumps({'Actions': 60})}})
+        assert client.get('/api/targets').get_json() == {'Actions': 60}
