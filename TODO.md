@@ -5,6 +5,7 @@ l'historique git (`git log`), un commit par phase.
 
 ## Ouvert
 
+Rien en cours.
 
 ## Fait, en bref
 
