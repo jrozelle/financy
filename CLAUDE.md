@@ -105,6 +105,15 @@
   date du premier arrete. Assurance-vie de moins de 8 ans ou PEA de moins de 5 :
   prelevement forfaitaire. Sans date, l'hypothese favorable reste, mais
   l'enveloppe dit combien de contrats la portent.
+- **Epargne de precaution** (`services/precaution.py`, seule regle) : livrets et
+  comptes d'epargne hors enveloppe de placement (PEL/CEL compris), et fonds
+  euros ; jamais un compte courant, ni ce qui est bloque (liquidite « Bloqué »
+  ou part mobilisable nulle : PER, contrat nanti), ni la tresorerie d'une
+  societe. L'argent tenu au nom d'un titulaire est le sien. La cible est celle
+  du profil, charges mensuelles x nombre de mois ; les propositions la gardent
+  (livrets d'abord, fonds euros ensuite) et le DCA investit ce qui la depasse.
+  Tant qu'elle n'est pas renseignee, la reserve libre du profil (`reserve_eur`,
+  plus saisie) en tient lieu, et le constat le dit.
 - **Plafonds de livrets reglementes : livret par livret**, jamais sur la somme
   d'un titulaire (un parent tient les Livret A des enfants a son nom), avec une
   marge pour les interets capitalises.

@@ -213,6 +213,8 @@ def constats(conn, date, owner=None):
     ordre = {'alerte': 0, 'action': 1, 'info': 2}
     # « Garder le credit » n'appelle aucun geste : en dernier, quel que soit
     # son montant, que le restant du placerait sinon en tete.
+    out.extend(_precaution_constats(conn, ps, titulaires))
+
     out.sort(key=lambda c: (ordre[c['niveau']], c['onglet'] == 'credits', -abs(c.get('montant') or 0)))
     return {'date': date, 'owner': owner, 'constats': out}
 
@@ -311,3 +313,53 @@ def _champs_societe(p):
 def _livret_fiscalise(p):
     env = (p.get('envelope') or '')
     return env.lower().startswith('livret') and env not in PLAFONDS
+
+
+def _precaution_constats(conn, ps, titulaires):
+    """9. Epargne de precaution face a sa cible (charges x mois du profil) :
+    au-dela, de quoi investir ; en deca, une reserve a reconstituer. Sans
+    cible, le dire : les propositions gardent alors la reserve libre."""
+    from services import precaution
+    entites = {r['name'] for r in conn.execute('SELECT name FROM entities')}
+    profils = {r['owner']: r for r in lignes_en_euros('owner_profiles', conn.execute('SELECT * FROM owner_profiles'))}
+    out = []
+    for qui in titulaires:
+        profil = profils.get(qui)
+        if not profil:
+            continue
+        b = precaution.bilan([p for p in ps if p['owner'] == qui], profil, entites)
+        if not b['montant'] and b['cible'] is None:
+            continue
+        sur = ', '.join(f"{l['libelle']} {_eur(l['montant'])}" for l in b['lignes'])
+        if b['cible'] is None:
+            reserve = profil.get('reserve_eur')
+            out.append({
+                'niveau': 'info', 'onglet': 'conseil',
+                'titre': f"{qui} : épargne de précaution de {_eur(b['montant'])}, sans cible",
+                'detail': (f"Livrets et fonds euros disponibles : {sur}. Renseignez vos charges mensuelles et "
+                           "le nombre de mois à couvrir dans le profil pour en fixer la cible"
+                           + (f" ; d'ici là, les propositions gardent la réserve déclarée de {_eur(reserve)}." if reserve
+                              else " ; d'ici là, les propositions gardent les livrets réglementés.")),
+                'montant': round(b['montant'], 2),
+            })
+            continue
+        seuil = max(1000.0, b['charges_mensuelles'] or 0)
+        couverts = b['montant'] / b['charges_mensuelles'] if b['charges_mensuelles'] else 0
+        base = (f"{_eur(b['montant'])} de livrets et fonds euros disponibles ({sur}), pour une cible de "
+                f"{_eur(b['cible'])} : {b['mois']} mois de {_eur(b['charges_mensuelles'])} de charges")
+        if b['ecart'] >= seuil:
+            out.append({
+                'niveau': 'action', 'onglet': 'synthese',
+                'titre': f"{qui} : {_eur(b['ecart'])} d'épargne de précaution au-delà de la cible",
+                'detail': base + ". L'excédent peut être investi : c'est le montant que la projection propose en DCA.",
+                'montant': round(b['ecart'], 2),
+            })
+        elif b['ecart'] <= -seuil:
+            out.append({
+                'niveau': 'alerte', 'onglet': 'synthese',
+                'titre': f"{qui} : épargne de précaution inférieure de {_eur(-b['ecart'])} à sa cible",
+                'detail': base + f". Elle couvre {f'{couverts:.1f}'.replace('.', ',')} mois de charges sur {b['mois']} voulus.",
+                'montant': round(-b['ecart'], 2),
+            })
+    return out
+

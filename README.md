@@ -19,7 +19,7 @@ Les données restent chez vous, dans un fichier SQLite.
 | **Crédits** | Tableaux d'amortissement importés ou saisis, différé total ou partiel, prêts in fine, indemnités de remboursement anticipé, échéances à venir |
 | **Performance** | Rendement de votre argent (TRI) et rendement comparable à un indice (TWR), par compte ou par enveloppe, face à un indice de référence |
 | **Flux** | Versements, retraits, dividendes et frais ; flux provisoires rapprochés du document qui les atteste |
-| **Conseil** | Constats tirés des chiffres (plafonds, espèces qui dorment, ancienneté des contrats, garder ou rembourser un crédit) et propositions d'arbitrage sur la part libre du patrimoine financier |
+| **Conseil** | Constats tirés des chiffres (plafonds, espèces qui dorment, ancienneté des contrats, garder ou rembourser un crédit, épargne de précaution face à sa cible — charges mensuelles × nombre de mois) et propositions d'arbitrage sur la part libre du patrimoine financier, qui gardent cette épargne de précaution |
 
 Et aussi : un mode discrétion qui ne laisse lisibles que les trois derniers
 chiffres de chaque montant (pour montrer l'écran sans montrer le patrimoine),

@@ -26,6 +26,7 @@ import logging
 from typing import Dict, List, Tuple, Optional
 
 from services.categories import est_financier
+from services import precaution as _precaution
 
 logger = logging.getLogger('financy.advisor')
 
@@ -270,8 +271,10 @@ def allocation_financiere(profile: dict, positions: List[dict], matrix=None, ent
             exclus['Trésorerie de société'] = exclus.get('Trésorerie de société', 0) + net
             continue
         c = classes.setdefault(CLASSE_DE.get(cat, 'Autres'),
-                               {'actual_eur': 0.0, 'libre_eur': 0.0, 'bloque_eur': 0.0,
+                               {'actual_eur': 0.0, 'libre_eur': 0.0, 'bloque_eur': 0.0, 'precaution_eur': 0.0,
                                 'lignes_libres': [], 'lignes_bloquees': []})
+        if _precaution.est_precaution(p, entites):
+            c['precaution_eur'] += net
         libre = 0.0 if p.get('liquidity') == 'Bloqué' else min(net, p.get('mobilizable_value') or 0)
         c['actual_eur'] += net
         c['libre_eur'] += libre
@@ -314,5 +317,9 @@ def allocation_financiere(profile: dict, positions: List[dict], matrix=None, ent
         'bloque_eur': round(sum(g['bloque_eur'] for g in gap), 2),
         'exclus': [{'category': k, 'montant': round(v, 2)} for k, v in sorted(exclus.items(), key=lambda kv: -kv[1])],
         'reglementes_eur': round(reglementes, 2),
+        # Epargne de precaution : montant, cible du profil, ecart ; et sa part
+        # dans chaque classe, pour que les propositions la gardent.
+        'precaution': _precaution.bilan(positions, profile, entites),
+        'precaution_par_classe': {k: round(c['precaution_eur'], 2) for k, c in classes.items() if c['precaution_eur']},
         'adjustments': adjustments,
     }

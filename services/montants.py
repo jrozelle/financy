@@ -29,7 +29,7 @@ COLONNES = {
     'holdings':               ('cost_basis', 'market_value'),
     'holdings_snapshots':     ('cost_basis', 'market_value'),
     'owner_objectives':       ('target_amount',),
-    'owner_profiles':         ('reserve_eur',),
+    'owner_profiles':         ('reserve_eur', 'charges_mensuelles'),
     'rebalance_proposals':    ('amount',),
 }
 

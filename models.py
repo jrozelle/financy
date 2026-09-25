@@ -1143,6 +1143,18 @@ def _migration_026(conn):
         ) STRICT""", ('amount',))
 
 
+def _migration_027(conn):
+    """Epargne de precaution : ses deux reglages dans le profil, les charges
+    mensuelles (centimes) et le nombre de mois a couvrir. Leur produit est la
+    cible ; elle remplace la reserve libre, qui ne sert plus que tant que la
+    cible n'est pas renseignee (reserve_eur reste, rien n'est efface)."""
+    for colonne in ('charges_mensuelles INTEGER', 'mois_precaution INTEGER'):
+        try:
+            conn.execute(f'ALTER TABLE owner_profiles ADD COLUMN {colonne}')
+        except sqlite3.OperationalError:
+            pass                  # deja ajoutee
+
+
 MIGRATIONS = [
     (1, _migration_001),
     (2, _migration_002),
@@ -1170,6 +1182,7 @@ MIGRATIONS = [
     (24, _migration_024),
     (25, _migration_025),
     (26, _migration_026),
+    (27, _migration_027),
 ]
 
 

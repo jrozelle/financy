@@ -105,20 +105,42 @@ def upsert_profile(owner):
     if not validate_string(notes, 2000):
         return jsonify({'error': 'Notes trop longues'}), 400
     reserve = d.get('reserve_eur')
+    garder_reserve = 'reserve_eur' not in d
     if reserve in ('', None):
         reserve = None
     elif not validate_number(reserve) or parse_number(reserve) < 0:
         return jsonify({'error': 'Réserve invalide (montant positif en euros)'}), 400
     else:
         reserve = centimes(parse_number(reserve))
+    # Epargne de precaution : charges mensuelles et nombre de mois a couvrir.
+    charges = d.get('charges_mensuelles')
+    if charges in ('', None):
+        charges = None
+    elif not validate_number(charges) or parse_number(charges) < 0:
+        return jsonify({'error': 'Charges mensuelles invalides (montant positif en euros)'}), 400
+    else:
+        charges = centimes(parse_number(charges))
+    mois = d.get('mois_precaution')
+    if mois in ('', None):
+        mois = None
+    elif not validate_number(mois) or not (0 <= parse_number(mois) <= 60):
+        return jsonify({'error': 'Nombre de mois invalide (0 à 60)'}), 400
+    else:
+        mois = int(round(parse_number(mois)))
 
     with get_db() as conn:
+        # La reserve libre n'est plus saisie (la cible de precaution la
+        # remplace) : absente de la requete, elle garde sa valeur, qui sert
+        # tant que la cible n'est pas renseignee.
+        if garder_reserve:
+            ancien = _get_profile_row(conn, owner)
+            reserve = centimes(ancien['reserve_eur']) if ancien and ancien.get('reserve_eur') is not None else None
         conn.execute(
             '''INSERT INTO owner_profiles (
                  owner, horizon_years, risk_tolerance, employment_type,
                  has_lbo, children_count, main_residence_owned,
-                 pension_age, notes, reserve_eur, updated_at
-               ) VALUES (?,?,?,?,?,?,?,?,?,?, CURRENT_TIMESTAMP)
+                 pension_age, notes, reserve_eur, charges_mensuelles, mois_precaution, updated_at
+               ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?, CURRENT_TIMESTAMP)
                ON CONFLICT(owner) DO UPDATE SET
                  horizon_years=excluded.horizon_years,
                  risk_tolerance=excluded.risk_tolerance,
@@ -129,6 +151,8 @@ def upsert_profile(owner):
                  pension_age=excluded.pension_age,
                  notes=excluded.notes,
                  reserve_eur=excluded.reserve_eur,
+                 charges_mensuelles=excluded.charges_mensuelles,
+                 mois_precaution=excluded.mois_precaution,
                  updated_at=CURRENT_TIMESTAMP''',
             (owner,
              int(parse_number(horizon)) if horizon is not None else None,
@@ -137,7 +161,7 @@ def upsert_profile(owner):
              children if children is not None else 0,
              1 if d.get('main_residence_owned') else 0,
              int(parse_number(pension_age)) if pension_age is not None else None,
-             notes, reserve)
+             notes, reserve, charges, mois)
         )
         row = _get_profile_row(conn, owner)
     return jsonify(_normalize_profile_dict(row))

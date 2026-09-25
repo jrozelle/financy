@@ -74,15 +74,33 @@ def _lignes(lignes, n=3):
     return txt + (f' et {len(lignes) - n} autre(s)' if len(lignes) > n else '')
 
 
-def _bucket_proposals(gap, threshold_eur=2000, total_eur=0.0, reserve=None, reglementes=0.0):
+def _gardes_precaution(allocation):
+    """Ce que chaque classe garde pour la cible de precaution : les
+    liquidites d'abord, puis les fonds euros. None sans cible au profil."""
+    c = (allocation.get('precaution') or {}).get('cible')
+    if c is None:
+        return None
+    par_classe = allocation.get('precaution_par_classe') or {}
+    gardes, reste = {}, c
+    for cle in (LIQUIDITES, 'Obligations'):
+        g = min(par_classe.get(cle, 0.0), reste)
+        if g > 0:
+            gardes[cle] = g
+            reste -= g
+    return {'cible': c, 'par_classe': gardes}
+
+
+def _bucket_proposals(gap, threshold_eur=2000, total_eur=0.0, reserve=None, reglementes=0.0, precaution=None):
     """A partir du gap par classe (allocation.allocation_financiere), genere
     des allegements (classe surponderee -> classe sous-ponderee).
 
     Une classe ne cede que sa part LIBRE : un contrat nanti, un PER ou un
     produit structure comptent dans l'exposition mais ne bougent pas.
-    Les liquidites gardent en outre la reserve : celle du profil, a defaut les
-    livrets reglementes, l'epargne de precaution par excellence. Sans elle, le
-    conseiller proposait d'investir l'argent destine a nantir un credit.
+    L'epargne de precaution garde sa cible (charges x mois du profil) :
+    livrets d'abord, fonds euros ensuite (`precaution`, de _gardes_precaution).
+    Sans cible renseignee, les liquidites gardent la reserve libre du profil,
+    a defaut les livrets reglementes. Sans garde, le conseiller proposait
+    d'investir l'argent destine a nantir un credit.
     """
     merged = {}
     for g in gap:
@@ -107,7 +125,14 @@ def _bucket_proposals(gap, threshold_eur=2000, total_eur=0.0, reserve=None, regl
         excedent = -m['delta_eur']
         libre = m['libre_eur']
         note = ''
-        if key == LIQUIDITES:
+        if precaution is not None:
+            garde = precaution['par_classe'].get(key, 0.0)
+            if garde:
+                libre = max(0.0, libre - garde)
+                excedent = min(excedent, max(0.0, m['actual_eur'] - max(m['target_eur'], garde)))
+                note = (f' Épargne de précaution gardée : {_eur(garde)}'
+                        f'{"" if garde >= precaution["cible"] else " (sur une cible de " + _eur(precaution["cible"]) + ")"}.')
+        elif key == LIQUIDITES:
             garde = reserve if reserve else reglementes
             libre = max(0.0, libre - garde)
             excedent = min(excedent, max(0.0, m['actual_eur'] - max(m['target_eur'], garde)))
@@ -120,7 +145,7 @@ def _bucket_proposals(gap, threshold_eur=2000, total_eur=0.0, reserve=None, regl
                 note = ' Aucune réserve déclarée dans le profil : tout l’excédent sur la cible est proposé.'
         # Les lignes d'ou vient l'argent ; en liquidites, hors livrets gardes.
         sources = [l for l in m['lignes_libres']
-                   if not (key == LIQUIDITES and not reserve and _reglemente(l))]
+                   if not (precaution is None and key == LIQUIDITES and not reserve and _reglemente(l))]
         if sources:
             note = f' Mobilisable : {_lignes(sources)}.' + note
         if m['lignes_bloquees'] and libre < excedent:
@@ -234,7 +259,8 @@ def generate_proposals(profile, positions, allocation, versements_pea=None):
     return [
         *_bucket_proposals(gap, total_eur=allocation.get('total_eur') or 0,
                            reserve=(profile or {}).get('reserve_eur'),
-                           reglementes=allocation.get('reglementes_eur') or 0),
+                           reglementes=allocation.get('reglementes_eur') or 0,
+                           precaution=_gardes_precaution(allocation)),
         *_fiscal_proposals(profile, positions, versements_pea),
     ]
 

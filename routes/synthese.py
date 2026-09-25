@@ -823,11 +823,16 @@ def projection_epargne():
             if not date:
                 continue
             a = allocation_financiere(profil, positions, matrix, entites=entites)
+            # Avec une cible de precaution, l'excedent est ce qui la depasse.
+            if a['precaution']['cible'] is not None:
+                excedents.append({'owner': profil['owner'], 'source': 'precaution',
+                                  'montant': round(max(0.0, a['precaution']['ecart']), 2)})
+                continue
             cash = next((g for g in a['gap'] if g['category'] == 'Cash'), None)
             if not cash:
                 continue
             garde = max(cash['target_eur'], profil.get('reserve_eur') or a['reglementes_eur'])
-            excedents.append({'owner': profil['owner'],
+            excedents.append({'owner': profil['owner'], 'source': 'liquidites',
                               'montant': round(max(0.0, cash['actual_eur'] - garde), 2)})
     return jsonify({
         'nouvelle': nouvelle,
