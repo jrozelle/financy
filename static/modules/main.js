@@ -53,6 +53,10 @@ async function init() {
   wireReglages(chargerEcranReglage);
   initBarreMobile();
   S.config = await api('GET', '/api/config');
+  // La personne connectee (Authelia) et son titulaire : l'application s'ouvre
+  // sur son nom. Sans identite (mot de passe partage), sur la famille.
+  try { S.moi = await api('GET', '/api/moi', null, { silent: true }); } catch { S.moi = {}; }
+  _afficherCompte();
   buildSelects();
   _lireContexte({ avecArrete: false });
   _buildGlobalOwnerFilter();
@@ -171,9 +175,24 @@ function hideLoading(tabId) {
 // Precedent / Suivant restent coherents. Une valeur par defaut n'est pas
 // ecrite — /synthese seul montre la famille au DERNIER arrete, y compris
 // quand un nouvel arrete a ete cree depuis.
+/** Le titulaire par defaut : celui de la personne connectee, sinon la famille. */
+const _titulaireParDefaut = () => S.moi?.titulaire || 'Famille';
+
+/** « Connecté : … » et la deconnexion, dans les Preferences. */
+function _afficherCompte() {
+  const el = document.getElementById('pref-compte');
+  if (!el) return;
+  const u = S.moi?.utilisateur;
+  el.hidden = !u;
+  if (!u) return;
+  el.querySelector('[data-compte-nom]').textContent = S.moi.titulaire ? `${u} · ${S.moi.titulaire}` : u;
+}
+
 function _contexteQuery() {
   const q = new URLSearchParams();
-  if (S.syntheseOwner && S.syntheseOwner !== 'Famille') q.set('titulaire', S.syntheseOwner);
+  // Le titulaire ne s'ecrit que s'il differe du defaut : « Famille » choisie
+  // par une personne connectee s'ecrit donc, pour survivre au rechargement.
+  if (S.syntheseOwner && S.syntheseOwner !== _titulaireParDefaut()) q.set('titulaire', S.syntheseOwner);
   if (S.syntheseDate && S.dates?.length && S.syntheseDate !== S.dates[0]) q.set('arrete', S.syntheseDate);
   if (S.periodeComparaison && S.periodeComparaison !== 'periode') q.set('periode', S.periodeComparaison);
   const t = q.toString();
@@ -191,7 +210,7 @@ function _lireContexte({ avecArrete = true } = {}) {
   const q = new URLSearchParams(location.search);
   const t = q.get('titulaire');
   if (t && ['Famille', ...(S.config?.owners || [])].includes(t)) S.syntheseOwner = t;
-  else if (!t) S.syntheseOwner = 'Famille';
+  else if (!t) S.syntheseOwner = _titulaireParDefaut();
   const p = q.get('periode');
   S.periodeComparaison = p === 'an' ? 'an' : 'periode';
   if (!avecArrete) return;

@@ -1155,6 +1155,21 @@ def _migration_027(conn):
             pass                  # deja ajoutee
 
 
+def _migration_028(conn):
+    """Journal des modifications : qui a ecrit quoi, maintenant que chacun se
+    connecte sous son nom (Authelia)."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS journal (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            quand       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            utilisateur TEXT,
+            methode     TEXT NOT NULL,
+            chemin      TEXT NOT NULL,
+            statut      INTEGER NOT NULL
+        ) STRICT""")
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_journal_quand ON journal(quand)')
+
+
 MIGRATIONS = [
     (1, _migration_001),
     (2, _migration_002),
@@ -1183,6 +1198,7 @@ MIGRATIONS = [
     (25, _migration_025),
     (26, _migration_026),
     (27, _migration_027),
+    (28, _migration_028),
 ]
 
 

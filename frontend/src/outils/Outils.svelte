@@ -127,6 +127,27 @@
     });
   });
   onDestroy(() => { grapheFrise?.destroy(); grapheSimul?.destroy(); });
+
+  // ── Journal des modifications : qui a ecrit quoi ─────────────────────────
+  interface Ecriture { quand: string; utilisateur: string | null; methode: string; chemin: string }
+  let journal = $state<Ecriture[] | null>(null);
+  $effect(() => {
+    void visite;
+    api<Ecriture[]>('GET', '/api/journal?limit=100', null, { silent: true }).then(j => { journal = j; }).catch(() => {});
+  });
+  const SECTIONS: [string, string][] = [
+    ['/api/positions', 'Positions'], ['/api/snapshots', 'Arrêtés'], ['/api/holdings', 'Lignes de titres'],
+    ['/api/securities', 'Titres'], ['/api/transactions', 'Opérations'], ['/api/flux', 'Flux'],
+    ['/api/import', 'Import'], ['/api/entities', 'Entités'], ['/api/entity-snapshots', 'Entités'],
+    ['/api/entites', 'Trésorerie des entités'], ['/api/prets', 'Crédits'], ['/api/advisor', 'Conseil'],
+    ['/api/referential', 'Référentiel'], ['/api/targets', 'Cibles'], ['/api/alerts', 'Alertes'],
+    ['/api/wealth-target', 'Objectif'], ['/api/prices', 'Cours'], ['/api/settings', 'Réglages'],
+    ['/api/backup', 'Sauvegarde'], ['/api/reset', 'Remise à zéro'], ['/api/demo-mode', 'Mode démo'],
+    ['/api/contrats', 'Contrats'], ['/api/auto-snapshot', 'Arrêtés'],
+  ];
+  const section = (chemin: string) => SECTIONS.find(([p]) => chemin.startsWith(p))?.[1] || chemin.replace('/api/', '');
+  const ACTIONS: Record<string, string> = { POST: 'Ajout', PUT: 'Modification', PATCH: 'Modification', DELETE: 'Suppression' };
+  const quand = (q: string) => new Date(q.replace(' ', 'T') + 'Z').toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
 </script>
 
 <div class="page-header"><h1>Outils</h1></div>
@@ -196,6 +217,29 @@
       <div style="position:relative;height:250px"><canvas id="simulation-chart" bind:this={toileSimul}></canvas></div>
     {/if}
   </div>
+</div>
+
+<div class="card">
+  <h2>Journal des modifications</h2>
+  <p class="text-muted" style="font-size:var(--fs-sm);margin-bottom:var(--esp-14)">
+    Les cent dernières écritures, avec la personne qui les a faites. Les réglages d'affichage n'y figurent pas.
+  </p>
+  {#if journal && !journal.length}
+    <p class="text-muted" style="font-size:var(--fs-sm)">Aucune modification enregistrée.</p>
+  {:else if journal}
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex : zone defilante, atteignable au clavier -->
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Journal des modifications" style="max-height:360px;overflow:auto">
+      <table class="data-table" id="journal-table">
+        <thead><tr><th>Quand</th><th>Qui</th><th>Action</th><th>Sur</th></tr></thead>
+        <tbody>
+          {#each journal as e, i (i)}
+            <tr><td>{quand(e.quand)}</td><td>{e.utilisateur || 'mot de passe'}</td>
+              <td>{ACTIONS[e.methode] || e.methode}</td><td>{section(e.chemin)}</td></tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+  {/if}
 </div>
 
 <div class="card">

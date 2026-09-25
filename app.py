@@ -13,7 +13,7 @@ except ImportError:
     pass  # python-dotenv optionnel — variables d'env directes
 
 from flask import Flask, render_template, session, request, redirect, url_for, jsonify
-from auth import AUTH_PASSWORD, login_required, csrf_protect, adresse_client
+from auth import AUTH_PASSWORD, login_required, csrf_protect, adresse_client, utilisateur, titulaire_de, auth_active
 from models import init_db, set_demo_mode, get_db_path, DEMO_DB_PATH
 from routes import all_blueprints
 from services.backups import create_db_backup
@@ -125,6 +125,7 @@ def login_page():
         if hmac.compare_digest(request.form.get('password', '').encode(), AUTH_PASSWORD.encode()):
             # Regenerate session to prevent session fixation
             session.clear()
+            session['utilisateur'] = None
             session['authenticated'] = True
             session['csrf_token'] = secrets.token_hex(32)
             session.permanent = True
@@ -137,8 +138,27 @@ def login_page():
 
 @auth_bp.route('/logout')
 def logout():
+    # Reconnu par le proxy, on se deconnecte chez lui : sinon la requete
+    # suivante rouvrirait la session.
+    par_proxy = bool(session.get('utilisateur'))
     session.pop('authenticated', None)
+    session.pop('utilisateur', None)
+    sortie = os.environ.get('FINANCY_URL_DECONNEXION')
+    if par_proxy and sortie:
+        return redirect(sortie)
     return redirect(url_for('auth.login_page'))
+
+
+@app.route('/api/moi')
+@login_required
+def moi():
+    """La personne connectee et son titulaire, pour ouvrir l'application sur
+    son nom. Sans identite (mot de passe partage), tout est None."""
+    login = utilisateur()
+    from models import get_db, load_referential
+    with get_db() as conn:
+        titulaires = load_referential(conn).get('owners') or []
+    return jsonify({'utilisateur': login, 'titulaire': titulaire_de(login, titulaires)})
 
 app.register_blueprint(auth_bp)
 
@@ -219,6 +239,44 @@ for bp in all_blueprints:
 
 
 # ─── Request logging ─────────────────────────────────────────────────────────
+
+# ─── Journal des modifications ────────────────────────────────────────────────
+# Chaque ecriture reussie sur l'API, avec la personne qui l'a faite. Les
+# reglages d'affichage (preferences, disposition, barre) en sont exclus : ils
+# changent a chaque clic et noieraient le reste. Les 5 000 dernieres seulement.
+_JOURNAL_EXCLUS = ('/api/preferences', '/api/synthese/disposition', '/api/csrf-token')
+_JOURNAL_MAX = 5000
+
+
+@app.after_request
+def journaliser(response):
+    if (request.method in ('POST', 'PUT', 'PATCH', 'DELETE') and request.path.startswith('/api/')
+            and response.status_code < 400 and not request.path.startswith(_JOURNAL_EXCLUS)
+            and session.get('authenticated')):
+        try:
+            from models import get_db
+            with get_db() as conn:
+                conn.execute('INSERT INTO journal (utilisateur, methode, chemin, statut) VALUES (?, ?, ?, ?)',
+                             (utilisateur(), request.method, request.path[:300], response.status_code))
+                conn.execute('DELETE FROM journal WHERE id <= (SELECT MAX(id) FROM journal) - ?', (_JOURNAL_MAX,))
+        except Exception:
+            logger.exception('Journal des modifications')     # ne bloque jamais la reponse
+    return response
+
+
+@app.route('/api/journal')
+@login_required
+def lire_journal():
+    from models import get_db
+    try:
+        limite = max(1, min(500, int(request.args.get('limit', 200))))
+    except ValueError:
+        limite = 200
+    with get_db() as conn:
+        lignes = [dict(r) for r in conn.execute(
+            'SELECT quand, utilisateur, methode, chemin, statut FROM journal ORDER BY id DESC LIMIT ?', (limite,))]
+    return jsonify(lignes)
+
 
 @app.after_request
 def security_headers(response):

@@ -1,5 +1,6 @@
 export const S = {
   config:        null,
+  moi:           null,   // personne connectee (Authelia) et son titulaire
   dates:         [],
   syntheseDate:  null,
   positionsDate: null,

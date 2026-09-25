@@ -197,6 +197,13 @@
   configuration que si elle passe les controles de sa route (`_sain`,
   `_config_valide`). Cote client, toute donnee entre dans le HTML par `esc()`
   ou par une fonction qui echappe (`fmtDate` echappe ce qui n'est pas une date).
+- Identite : `utilisateur_proxy()` (`auth.py`) lit `Remote-User` seulement si
+  `FINANCY_AUTH_PAR_PROXY` est active ET que la requete vient d'un proxy de
+  `FINANCY_PROXIES_DE_CONFIANCE` (Traefik remplace l'en-tete du client). La
+  personne connectee (`utilisateur()`) a ses reglages de lecture sous
+  « <cle>:<identifiant> » (`_lire_config`/`_ecrire_config`, routes/synthese.py),
+  s'ouvre sur son titulaire (`titulaire_de`, meme prenom) et signe le journal
+  (table `journal`, toute ecriture reussie de l'API hors reglages d'affichage).
 - Adresse du client : `adresse_client()` (`auth.py`), jamais `request.remote_addr`
   directement — derrière un proxy, c'est celle du proxy. `X-Forwarded-For` ne
   se lit que depuis les proxies de `FINANCY_PROXIES_DE_CONFIANCE`, de droite à

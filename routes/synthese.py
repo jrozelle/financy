@@ -552,6 +552,36 @@ def get_wealth_target():
 
 CARTES_SYNTHESE = ('chiffres', 'contribution', 'historique', 'evolution', 'projection', 'repartition',
                    'cible', 'mouvements', 'liquidite', 'comptes', 'entites', 'fiscalite')
+# ─── Reglages de lecture propres a chacun ────────────────────────────────────
+# Reconnue par le proxy (Authelia), chaque personne a sa copie de ses reglages
+# de lecture (disposition, barre du telephone, preferences) sous la cle
+# « <cle>:<identifiant> ». Tant qu'elle n'a rien change, elle lit les reglages
+# communs ; au premier changement, elle en recoit sa copie — effacer ou revenir
+# au defaut ne fait donc jamais reapparaitre le reglage commun.
+
+def _cle_perso(base):
+    from auth import utilisateur
+    u = utilisateur()
+    return f'{base}:{u}' if u else base
+
+
+def _lire_config(conn, base):
+    """La valeur propre a la personne connectee si elle en a une, sinon la
+    commune ; None si aucune."""
+    for cle in dict.fromkeys((_cle_perso(base), base)):
+        r = conn.execute('SELECT value FROM config WHERE key=?', (cle,)).fetchone()
+        if r:
+            try:
+                return json.loads(r['value'])
+            except ValueError:
+                return None
+    return None
+
+
+def _ecrire_config(conn, base, valeur):
+    conn.execute('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)', (_cle_perso(base), json.dumps(valeur)))
+
+
 CLE_DISPOSITION = 'synthese_disposition'
 
 
@@ -559,11 +589,8 @@ CLE_DISPOSITION = 'synthese_disposition'
 @login_required
 def lire_disposition():
     with get_db() as conn:
-        r = conn.execute('SELECT value FROM config WHERE key=?', (CLE_DISPOSITION,)).fetchone()
-    try:
-        return jsonify(json.loads(r['value']) if r else {})
-    except ValueError:
-        return jsonify({})
+        d = _lire_config(conn, CLE_DISPOSITION)
+    return jsonify(d if isinstance(d, dict) else {})
 
 
 @synthese_bp.route('/api/synthese/disposition', methods=['PUT'])
@@ -572,9 +599,13 @@ def lire_disposition():
 def ecrire_disposition():
     d = request.get_json(silent=True)
     if d == {} or d is None:
-        # Disposition par defaut : on efface la personnalisation.
+        # Disposition par defaut : on efface la personnalisation (la sienne,
+        # sous forme d'une disposition vide, pour ne pas retomber sur la commune).
         with get_db() as conn:
-            conn.execute('DELETE FROM config WHERE key=?', (CLE_DISPOSITION,))
+            if _cle_perso(CLE_DISPOSITION) == CLE_DISPOSITION:
+                conn.execute('DELETE FROM config WHERE key=?', (CLE_DISPOSITION,))
+            else:
+                _ecrire_config(conn, CLE_DISPOSITION, {})
         return jsonify({})
     if not isinstance(d, dict):
         return jsonify({'error': 'Disposition attendue'}), 400
@@ -589,7 +620,7 @@ def ecrire_disposition():
         return jsonify({'error': 'Largeur entre 3 et 12 colonnes'}), 400
     propre = {'ordre': ordre, 'largeurs': largeurs, 'masquees': sorted(set(masquees))}
     with get_db() as conn:
-        conn.execute('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)', (CLE_DISPOSITION, json.dumps(propre)))
+        _ecrire_config(conn, CLE_DISPOSITION, propre)
     return jsonify(propre)
 
 
@@ -606,11 +637,8 @@ MAX_BARRE = 4
 @login_required
 def lire_barre_mobile():
     with get_db() as conn:
-        r = conn.execute('SELECT value FROM config WHERE key=?', (CLE_BARRE,)).fetchone()
-    try:
-        return jsonify(json.loads(r['value']) if r else {})
-    except ValueError:
-        return jsonify({})
+        d = _lire_config(conn, CLE_BARRE)
+    return jsonify(d if isinstance(d, dict) else {})
 
 
 @synthese_bp.route('/api/preferences/barre-mobile', methods=['PUT'])
@@ -620,7 +648,10 @@ def ecrire_barre_mobile():
     d = request.get_json(silent=True)
     if d == {} or d is None:
         with get_db() as conn:
-            conn.execute('DELETE FROM config WHERE key=?', (CLE_BARRE,))
+            if _cle_perso(CLE_BARRE) == CLE_BARRE:
+                conn.execute('DELETE FROM config WHERE key=?', (CLE_BARRE,))
+            else:
+                _ecrire_config(conn, CLE_BARRE, {})
         return jsonify({})
     ordre, visibles = (d or {}).get('ordre') or [], (d or {}).get('visibles') or []
     if (not isinstance(ordre, list) or not isinstance(visibles, list)
@@ -630,7 +661,7 @@ def ecrire_barre_mobile():
         return jsonify({'error': f'Entre 1 et {MAX_BARRE} onglets dans la barre'}), 400
     propre = {'ordre': ordre, 'visibles': [o for o in ordre if o in visibles] + [o for o in visibles if o not in ordre]}
     with get_db() as conn:
-        conn.execute('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)', (CLE_BARRE, json.dumps(propre)))
+        _ecrire_config(conn, CLE_BARRE, propre)
     return jsonify(propre)
 
 
@@ -648,11 +679,7 @@ MAX_PREF_CLES = 100
 
 
 def _lire_preferences(conn):
-    r = conn.execute('SELECT value FROM config WHERE key=?', (CLE_PREFERENCES,)).fetchone()
-    try:
-        d = json.loads(r['value']) if r else {}
-    except ValueError:
-        return {}
+    d = _lire_config(conn, CLE_PREFERENCES)
     return d if isinstance(d, dict) else {}
 
 
@@ -685,8 +712,7 @@ def modifier_preferences():
                 prefs[cle] = valeur
         if len(prefs) > MAX_PREF_CLES:
             return jsonify({'error': f'{MAX_PREF_CLES} préférences au plus'}), 400
-        conn.execute('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)',
-                     (CLE_PREFERENCES, json.dumps(prefs)))
+        _ecrire_config(conn, CLE_PREFERENCES, prefs)
     return jsonify(prefs)
 
 

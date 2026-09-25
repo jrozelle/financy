@@ -706,6 +706,14 @@
       <div class="reglages-corps">
         <button class="modal-close" data-fermer-reglages aria-label="Fermer">&#10005;</button>
         <div id="reglages-preferences" class="reglages-panneau">
+          <!-- Rempli par main.js quand la personne est reconnue par le proxy. -->
+          <div id="pref-compte" hidden>
+            <h3>Compte</h3>
+            <div class="pref-ligne">
+              <div><b>Connecté</b><p data-compte-nom></p></div>
+              <div><a class="settings-item" href="/logout">Se déconnecter</a></div>
+            </div>
+          </div>
           <h3>Affichage</h3>
           <div class="pref-ligne">
             <div><b>Thème</b><p>Clair, sombre, ou celui du système</p></div>

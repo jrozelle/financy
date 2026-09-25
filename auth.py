@@ -2,17 +2,83 @@ import hmac
 import ipaddress
 import logging
 import os
+import re
+import unicodedata
 from functools import wraps
 from flask import session, request, jsonify, redirect, url_for
 
 AUTH_PASSWORD = os.environ.get('FINANCY_PASSWORD')  # None = pas d'auth
 CSRF_PROTECTED_METHODS = {'POST', 'PUT', 'PATCH', 'DELETE'}
+# Identite transmise par le reverse proxy (Authelia via Traefik) : l'en-tete
+# Remote-User n'est lu que si FINANCY_AUTH_PAR_PROXY est active ET que la
+# requete vient d'un proxy de confiance (FINANCY_PROXIES_DE_CONFIANCE), qui
+# remplace l'en-tete envoye par le client. Sans l'un ou l'autre, il est ignore.
+AUTH_PAR_PROXY = os.environ.get('FINANCY_AUTH_PAR_PROXY', '').lower() in ('1', 'true', 'oui')
+ENTETE_UTILISATEUR = 'Remote-User'
+_LOGIN_VALIDE = re.compile(r'[A-Za-z0-9._@-]{1,64}')
+
+
+def auth_active():
+    return bool(AUTH_PASSWORD or AUTH_PAR_PROXY)
+
+
+def utilisateur_proxy(req=None):
+    """L'identifiant de la personne connectee, tel que le proxy le transmet,
+    ou None."""
+    req = req or request
+    if not AUTH_PAR_PROXY or not PROXIES_DE_CONFIANCE:
+        return None
+    if not _de_confiance(req.remote_addr or '', PROXIES_DE_CONFIANCE):
+        return None
+    login = (req.headers.get(ENTETE_UTILISATEUR) or '').strip()
+    return login if _LOGIN_VALIDE.fullmatch(login) else None
+
+
+def _ouvrir_session(login):
+    """Session d'une personne reconnue par le proxy : regeneree, comme a une
+    connexion par mot de passe."""
+    import secrets
+    demo = session.get('demo_mode')
+    session.clear()
+    session['authenticated'] = True
+    session['utilisateur'] = login
+    session['csrf_token'] = secrets.token_hex(32)
+    if demo is not None:
+        session['demo_mode'] = demo
+    session.permanent = True
+
+
+def _plat(t):
+    t = unicodedata.normalize('NFD', t or '')
+    return ''.join(c for c in t if unicodedata.category(c) != 'Mn').lower().strip()
+
+
+def titulaire_de(login, titulaires):
+    """Le titulaire d'un identifiant : meme nom, ou meme prenom (« claire »,
+    « claire.x@... » -> Claire), accents et casse ignores. None sinon."""
+    if not login:
+        return None
+    candidats = {_plat(login), _plat(re.split(r'[@._-]', login)[0])}
+    for t in titulaires:
+        if _plat(t) in candidats or _plat(t.split()[0] if t.split() else t) in candidats:
+            return t
+    return None
+
+
+def utilisateur():
+    """L'identifiant de la session en cours, ou None (mot de passe partage)."""
+    return session.get('utilisateur')
 
 
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        if AUTH_PASSWORD and not session.get('authenticated'):
+        login = utilisateur_proxy()
+        # Une autre personne reconnue par le proxy dans le meme navigateur : sa
+        # session remplace la precedente.
+        if login and (not session.get('authenticated') or session.get('utilisateur') != login):
+            _ouvrir_session(login)
+        if auth_active() and not session.get('authenticated'):
             if request.is_json or request.path.startswith('/api/'):
                 return jsonify({'error': 'Non authentifié'}), 401
             return redirect(url_for('auth.login_page'))
