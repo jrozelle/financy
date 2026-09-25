@@ -12,6 +12,7 @@
   import { fmt, fmtPct, fmtDate, sortArr } from '/static/modules/utils.js';
   import { estFinancier } from '/static/modules/categories.js';
   import EnTeteTri from '../commun/EnTeteTri.svelte';
+  import { ecran } from '../commun/ecran.svelte';
 
   interface Groupe {
     label?: string; value: number; flux_net?: number; fees?: number; status?: string; reason?: string;
@@ -64,6 +65,12 @@
   const pied = $derived(rendement(donnees?.global));
   const basculer = (cle: string) => { tri = tri.cle === cle ? { cle, sens: -tri.sens } : { cle, sens: 1 }; };
   const pluriel = (n: number, mot: string) => `${n} ${mot}${n > 1 ? 's' : ''}`;
+  // Au telephone, la carte faisait deux ecrans : les cinq premiers comptes,
+  // le reste sur demande. Le pied, lui, totalise toujours tous les comptes.
+  const VISIBLES = 5;
+  let tout = $state(false);
+  const coupe = $derived(ecran.telephone && !tout && lignes.length > VISIBLES + 1);
+  const affiches = $derived(coupe ? lignes.slice(0, VISIBLES) : lignes);
 </script>
 
 {#if groupes.length}
@@ -90,7 +97,7 @@
         </tr>
       </thead>
       <tbody id="comptes-tbody">
-        {#each lignes as g, i (`${g.label}-${i}`)}
+        {#each affiches as g, i (`${g.label}-${i}`)}
           {@const classe = g._taux == null ? 'neutre' : g._taux >= 0 ? 'hausse' : 'baisse'}
           <tr>
             <td><span class="compte-n">{g.label || ''}</span></td>
@@ -118,4 +125,8 @@
       </tfoot>
     </table>
   </div>
+  {#if ecran.telephone && lignes.length > VISIBLES + 1}
+    <button type="button" class="btn-link mv-plus" aria-expanded={tout} aria-controls="comptes-tbody"
+            onclick={() => tout = !tout}>{tout ? 'Réduire' : `Voir les ${lignes.length - VISIBLES} autres comptes`}</button>
+  {/if}
 {/if}

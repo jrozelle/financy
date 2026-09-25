@@ -10,6 +10,7 @@
   import { api } from '/static/modules/api.js';
   import { fmt, fmtDate, fmtPct, sparkline } from '/static/modules/utils.js';
   import { drilldownPositions } from '/static/modules/drilldown.js';
+  import { ecran } from '../commun/ecran.svelte';
 
   interface Point { date: string; by_group?: Record<string, number> }
   interface Pos { owner: string; category: string; envelope: string | null }
@@ -48,6 +49,11 @@
   const dates = $derived(historique.map(h => h.date));
   const d0 = $derived(historique[0]?.date), d1 = $derived(historique[historique.length - 1]?.date);
 
+  // Au telephone, les trois premiers groupes ; le reste sur demande.
+  const VISIBLES = 3;
+  let tout = $state(false);
+  const affichees = $derived(ecran.telephone && !tout && lignes.length > VISIBLES + 1 ? lignes.slice(0, VISIBLES) : lignes);
+
   function ouvrir(g: string) {
     const o = owner, par = groupe, date = d1;
     api<Pos[]>('GET', `/api/positions?date=${date}`).then(positions => {
@@ -69,7 +75,7 @@
 <p class="card-sub" id="evolution-groupes-sous">{visible ? `Du ${fmtDate(d0)} au ${fmtDate(d1)} · une ligne ouvre sa composition` : ''}</p>
 <div id="evolution-groupes" class="evg-liste">
   {#key masque}
-  {#each lignes as l (l.g)}
+  {#each affichees as l (l.g)}
     {@const pct = l.debut ? (l.delta / Math.abs(l.debut)) * 100 : null}
     {@const part = totalFin > 0 && l.fin > 0 ? fmtPct(l.fin / totalFin * 100, 0) : ''}
     <button type="button" class="evg-ligne" data-groupe={l.g} onclick={() => ouvrir(l.g)}>
@@ -81,3 +87,7 @@
   {/each}
   {/key}
 </div>
+{#if ecran.telephone && lignes.length > VISIBLES + 1}
+  <button type="button" class="btn-link mv-plus" aria-expanded={tout} aria-controls="evolution-groupes"
+          onclick={() => tout = !tout}>{tout ? 'Réduire' : `Voir les ${lignes.length - VISIBLES} autres`}</button>
+{/if}

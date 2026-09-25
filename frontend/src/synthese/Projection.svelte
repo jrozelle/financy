@@ -16,6 +16,7 @@
   import { dessinerCourbe } from '/static/modules/courbe.js';
   import { fmt, fmtPct, parseLocaleNumber } from '/static/modules/utils.js';
   import { lirePref, ecrirePref } from '/static/modules/preferences.js';
+  import { ecran } from '../commun/ecran.svelte';
 
   interface Position { category: string; envelope: string | null; net_attributed?: number }
   interface Mesure { nouvelle: { par_mois: number; periodes?: unknown[] }; dca: { mensuel: number; excedent: number } }
@@ -164,6 +165,11 @@
     });
   });
 
+  // Au telephone, la carte faisait pres de deux ecrans : repliee sur la
+  // phrase qui resume la projection, reglages et courbe a la demande.
+  let ouverte = $state(false);
+  const repliee = $derived(ecran.telephone && !ouverte);
+
   const mois = (d: Date | string) => new Date(d).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   const signe = (v: number) => `${v >= 0 ? '+' : '−'}${fmt(Math.abs(v))}`;
   const aide = $derived(mesure ? `Épargne nouvelle mesurée : ${fmt(mesure.nouvelle.par_mois)} par mois sur six mois — la hausse `
@@ -177,8 +183,16 @@
     <h2>Projection</h2>
     <p class="card-sub">Trois moteurs : le remboursement des crédits, l'épargne nouvelle, le rendement. Seul le premier est certain.</p>
   </div>
-  <button type="button" class="btn btn-secondary btn-sm" id="proj-reinit" onclick={reinitialiser}>Valeurs mesurées</button>
+  <!-- Remet les hypotheses aux valeurs mesurees : sans objet tant qu'elles sont repliees. -->
+  {#if !repliee}<button type="button" class="btn btn-secondary btn-sm" id="proj-reinit" onclick={reinitialiser}>Valeurs mesurées</button>{/if}
 </div>
+{#if repliee}
+  {#key masque}
+  {#if calcul}<p class="proj-total">En {calcul.fin.date.slice(0, 4)} : <b>{fmt(calcul.fin.v)}</b>{objectif ? (calcul.atteint
+    ? ` — objectif de ${fmt(objectif)} atteint en ${mois(calcul.atteint)}`
+    : net >= objectif ? '' : ` — objectif de ${fmt(objectif)} non atteint à cet horizon`) : ''}</p>{/if}
+  {/key}
+{:else}
 <div class="proj-reglages">
   <label for="proj-epargne">Épargne nouvelle par mois
     <input type="text" inputmode="decimal" id="proj-epargne" class="ref-input" aria-describedby="proj-epargne-aide"
@@ -219,3 +233,8 @@
   {/if}
   {/key}
 </div>
+{/if}
+{#if ecran.telephone}
+  <button type="button" class="btn-link mv-plus" aria-expanded={ouverte} onclick={() => ouverte = !ouverte}>{ouverte
+    ? 'Réduire' : 'Afficher les hypothèses et la courbe'}</button>
+{/if}

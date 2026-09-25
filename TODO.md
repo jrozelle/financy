@@ -5,8 +5,6 @@ l'historique git (`git log`), un commit par phase.
 
 ## Ouvert
 
-- [ ] Téléphone : synthèse longue (onze écrans) — cartes secondaires repliées
-      par défaut ? La personnalisation est désormais dans le menu « ··· »
 
 ## Fait, en bref
 
@@ -26,7 +24,8 @@ l'historique git (`git log`), un commit par phase.
 - **Conseil** : constats vérifiables (plafonds, espèces dormantes, ancienneté
   des contrats, garder ou rembourser), propositions sur la part libre du
   financier, vue macro facultative.
-- **Interface** : synthèse personnalisable (widgets), barre du bas du téléphone
+- **Interface** : synthèse personnalisable (widgets), raccourcie au téléphone
+  (sept écrans au lieu de onze : comptes, évolution et projection se déplient), barre du bas du téléphone
   au choix, mode discrétion, thème sombre, application installable, tris et
   accessibilité clavier.
 - **Svelte** (septembre 2026) : tous les onglets et trois écrans des Réglages
