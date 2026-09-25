@@ -118,9 +118,11 @@
 - **Conseil : la precaution d'abord.** La part gardee, les comptes courants et
   la tresorerie de societe sortent du calcul d'arbitrage (decomptes, et
   raccordes au financier de la synthese) ; la matrice de risque se repartit
-  sur le reste, sans part de liquidites propre. Avec une cible, les
-  supplements de liquidites (LBO, TNS) vont aux obligations : les mois de
-  charges couvrent deja ce risque.
+  sur le reste, sans part de liquidites propre. Avec une cible, pas
+  d'ajustement LBO ni TNS : les mois de charges couvrent deja ce risque.
+  Fonds euros (capital garanti) et obligations forment une seule classe cible,
+  « Fonds euros et obligations », mais ne se confondent pas : la composition
+  les distingue et une proposition vers elle nomme le fonds euros deja detenu.
 - **Plafonds de livrets reglementes : livret par livret**, jamais sur la somme
   d'un titulaire (un parent tient les Livret A des enfants a son nom), avec une
   marge pour les interets capitalises.

@@ -1631,6 +1631,7 @@ input[type="file"] {
   padding: var(--esp-8) var(--esp-12);
 }
 
+.advisor-composition { display: block; font-size: var(--fs-2xs); color: var(--text-muted); font-weight: 400; }
 .advisor-perimetre {
   margin: var(--esp-12) 0 0;
   font-size: var(--fs-sm);

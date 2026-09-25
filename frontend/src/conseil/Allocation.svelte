@@ -105,7 +105,8 @@
             {#each donnees.gap as g (g.category)}
               {@const cls = g.delta_eur > 0 ? 'pos' : g.delta_eur < 0 ? 'neg' : ''}
               <tr>
-                <td><strong>{g.category}</strong></td>
+                <td><strong>{g.category}</strong>{#if g.composition && Object.keys(g.composition).length > 1}<span
+                  class="advisor-composition">dont {Object.entries(g.composition).map(([k, v]) => `${k.toLowerCase()} ${fmt(v)}`).join(' · ')}</span>{/if}</td>
                 <td class="num">{fmtPct(g.target_pct * 100)}</td>
                 <td class="num">{fmtPct(g.actual_pct * 100)}</td>
                 <td class="num {cls}">{fmtPct(g.delta_pct * 100, 1, true)}</td>

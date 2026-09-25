@@ -19,7 +19,7 @@ from datetime import datetime
 from typing import List, Dict, Optional
 
 from models import _holding_value_or_none
-from services.advisor.allocation import CLASSE_DE
+from services.advisor.allocation import CLASSE_DE, SECURISE
 from services.montants import centimes, lignes_en_euros
 
 logger = logging.getLogger('financy.advisor.rebalance')
@@ -94,7 +94,8 @@ def _bucket_proposals(gap, threshold_eur=2000, total_eur=0.0, reserve=None, regl
         key = CLASSE_DE.get(g['category'], g['category'])
         m = merged.setdefault(key, {'category': key, 'delta_eur': 0.0, 'actual_eur': 0.0,
                                     'target_eur': 0.0, 'libre_eur': 0.0,
-                                    'lignes_libres': [], 'lignes_bloquees': []})
+                                    'lignes_libres': [], 'lignes_bloquees': [], 'destination': None})
+        m['destination'] = m['destination'] or g.get('destination')
         actual = g.get('actual_eur', (g.get('actual_pct') or 0) * total_eur)
         m['delta_eur'] += g['delta_eur']
         m['actual_eur'] += actual
@@ -111,7 +112,7 @@ def _bucket_proposals(gap, threshold_eur=2000, total_eur=0.0, reserve=None, regl
         libre = m['libre_eur']
         note = ''
         if precaution is not None:
-            if key in (LIQUIDITES, 'Obligations') and precaution.get('gardees'):
+            if key in (LIQUIDITES, SECURISE) and precaution.get('gardees'):
                 note = (f" Épargne de précaution gardée à part : {_eur(precaution['garde'])} "
                         f"({_lignes(precaution['gardees'])}).")
         elif key == LIQUIDITES:
@@ -153,7 +154,9 @@ def _bucket_proposals(gap, threshold_eur=2000, total_eur=0.0, reserve=None, regl
             label=f'Alléger {src_cat} de {_eur(amt)} vers {dst_cat}',
             from_ref=src_cat, to_ref=dst_cat, amount=amt,
             rationale=(f'{src_cat} au-dessus de la cible de {_eur(src_amt)} mobilisables, '
-                       f'{dst_cat} en dessous de {_eur(dst_amt)}.' + notes.get(src_cat, '')),
+                       f'{dst_cat} en dessous de {_eur(dst_amt)}.'
+                       + (f" Vers {merged[dst_cat]['destination']}." if merged.get(dst_cat, {}).get('destination') else '')
+                       + notes.get(src_cat, '')),
         ))
         if amt >= src_amt:
             over_left.pop(0)

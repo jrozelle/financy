@@ -105,15 +105,17 @@ def test_synthese_famille_dont_un_titulaire_sans_cible(client):
     assert f['titulaires_sans_cible'] == ['Personne 2']
 
 
-def test_supplements_de_liquidites_aux_obligations_avec_une_cible():
-    """TNS et LBO ajoutent des liquidites a la matrice ; avec une cible de
-    precaution, ils iraient en double : ils vont aux obligations."""
+def test_avec_une_cible_pas_de_supplement_tns_lbo():
+    """TNS et LBO retirent des actions pour des liquidites ; les mois de
+    charges de la cible couvrent deja ce risque : la matrice s'applique
+    comme pour un profil sans eux, et l'ajustement le dit."""
     from services.advisor.allocation import allocation_financiere
-    base = {'horizon_years': 15, 'risk_tolerance': 4, 'employment_type': 'TNS', 'has_lbo': True}
+    base = {'horizon_years': 15, 'risk_tolerance': 4}
     pos = [ligne('Actions', 'PEA', 50000, owner='A')]
-    sans = allocation_financiere(base, pos)['target']
-    avec = allocation_financiere({**base, 'charges_mensuelles': 4000, 'mois_precaution': 18}, pos)
-    assert sans['Cash'] > 0 and avec['target'].get('Cash', 0) == 0
-    assert avec['target']['Obligations'] > sans['Obligations']
-    assert avec['target']['Actions'] == sans['Actions']
-    assert any('vont aux obligations' in a for a in avec['adjustments'])
+    cible = {'charges_mensuelles': 4000, 'mois_precaution': 18}
+    sans_ajustement = allocation_financiere({**base, **cible}, pos)['target']
+    avec = allocation_financiere({**base, **cible, 'employment_type': 'TNS', 'has_lbo': True}, pos)
+    assert avec['target'] == sans_ajustement and avec['target'].get('Cash', 0) == 0
+    assert any('TNS' in a and 'couvre déjà' in a for a in avec['adjustments'])
+    # Sans cible, l'ajustement joue toujours.
+    assert allocation_financiere({**base, 'employment_type': 'TNS'}, pos)['target']['Cash'] > 0

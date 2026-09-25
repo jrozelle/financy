@@ -219,11 +219,16 @@ def compute_gap(target: Dict[str, float], actual: Dict[str, float],
 # Comparer les deux sans table de passage produisait des absurdites : « alleger
 # Cash / Fond Euro vers Cash », un fonds euros vise a 0 % faute de cle.
 
+SECURISE = 'Fonds euros et obligations'
+
 CLASSE_DE = {
     'Cash & dépôts': 'Cash', 'Monétaire': 'Cash',
     # Capital garanti, rendement de portefeuille obligataire : c'est ainsi qu'un
     # conseiller le range.
-    'Fond Euro': 'Obligations', 'Obligations': 'Obligations',
+    # Fonds euros (capital garanti) et obligations (valeur qui suit les taux)
+    # ne sont pas la meme chose ; la matrice n'a qu'une cible pour les deux,
+    # la classe les reunit et le detail les distingue (`composition`).
+    'Fond Euro': 'Fonds euros et obligations', 'Obligations': 'Fonds euros et obligations',
     'Actions': 'Actions', 'Produits Structurés': 'Actions', 'Crypto': 'Actions',
 }
 
@@ -258,25 +263,31 @@ def allocation_financiere(profile: dict, positions: List[dict], matrix=None, ent
     produit structure). Rien ne disparait : tout ce qui est ecarte est
     decompte dans `exclus`.
     """
-    target, adjustments = target_allocation(profile, matrix)
+    # Avec une cible de precaution, les ajustements de liquidites (LBO, TNS)
+    # feraient double emploi : les mois de charges choisis couvrent deja le
+    # risque professionnel. La matrice s'applique alors sans eux.
+    avec_cible = _precaution.cible(profile) is not None
+    profil_matrice = dict(profile or {})
+    ecartes = []
+    if avec_cible:
+        if profil_matrice.get('has_lbo'):
+            profil_matrice['has_lbo'] = False
+            ecartes.append('LBO')
+        if profil_matrice.get('employment_type') == 'TNS':
+            profil_matrice['employment_type'] = None
+            ecartes.append('TNS')
+    target, adjustments = target_allocation(profil_matrice, matrix)
+    if ecartes:
+        adjustments = adjustments + [
+            f"{' et '.join(ecartes)} : pas de supplément de liquidités, la cible de précaution "
+            f"({profile.get('mois_precaution')} mois de charges) couvre déjà ce risque."]
     # La part de liquidites de la matrice est la precaution, gardee a part :
-    # ne restent que les supplements des ajustements (LBO, TNS).
+    # ne restent que les supplements des ajustements (sans cible de precaution).
     base_cash = (matrix or DEFAULT_ALLOCATION_MATRIX).get(_horizon_bucket(profile.get('horizon_years')), {}) \
         .get(_clamp_risk(profile.get('risk_tolerance')), DEFAULT_ALLOCATION_MATRIX['3-8'][3]).get('Cash', 0)
     target = dict(target)
     target['Cash'] = max(0.0, target.get('Cash', 0) - base_cash)
-    # Avec une cible de precaution, les supplements de liquidites (LBO, TNS)
-    # feraient double emploi : les mois de charges choisis couvrent deja ce
-    # risque. Ils vont aux obligations — la prudence voulue reste, en moins
-    # d'actions, sans gonfler les liquidites.
-    if target['Cash'] > 0 and _precaution.cible(profile) is not None:
-        supplement = target['Cash']
-        target['Obligations'] = target.get('Obligations', 0) + supplement
-        target['Cash'] = 0.0
-        adjustments = adjustments + [
-            f'Cible de précaution renseignée ({profile.get("mois_precaution")} mois de charges) : les '
-            f'{supplement * 100:.0f} points de liquidités de ces ajustements vont aux obligations, la réserve '
-            'étant déjà gardée à part.']
+    target[SECURISE] = target.pop('Obligations', 0.0)
     cible = _normalize({k: v for k, v in target.items() if k != 'Immobilier'})
 
     rep = _precaution.repartition(positions, profile, entites, rendements)
@@ -311,24 +322,32 @@ def allocation_financiere(profile: dict, positions: List[dict], matrix=None, ent
                 continue
         c = classes.setdefault(CLASSE_DE.get(cat, 'Autres'),
                                {'actual_eur': 0.0, 'libre_eur': 0.0, 'bloque_eur': 0.0,
-                                'lignes_libres': [], 'lignes_bloquees': []})
+                                'lignes_libres': [], 'lignes_bloquees': [], 'composition': {}})
+        sorte = 'Fonds euros' if cat == 'Fond Euro' else cat
+        c['composition'][sorte] = c['composition'].get(sorte, 0) + net
         mobilisable = (p.get('mobilizable_value') or 0) - k
         libre = 0.0 if p.get('liquidity') == 'Bloqué' else max(0.0, min(net, mobilisable))
         c['actual_eur'] += net
         c['libre_eur'] += libre
         if libre <= 0:
             c['bloque_eur'] += net
-        ligne = {'libelle': _libelle(p) + (' (au-delà de la précaution)' if k else ''), 'montant': round(net, 2)}
+        ligne = {'libelle': _libelle(p) + (', au-delà de la précaution' if k else ''), 'montant': round(net, 2)}
         (c['lignes_libres'] if libre > 0 else c['lignes_bloquees']).append(ligne)
 
     total = sum(c['actual_eur'] for c in classes.values())
     # Le financier de la synthese, pour que l'ecran raccorde les deux montants :
     # l'arbitrable plus ce qui en est ecarte sans quitter le financier.
     financier = total + sum(exclus.get(k, 0) for k in ('Trésorerie de société', 'Comptes courants', 'Épargne de précaution'))
+    # Ou aller, pour une classe a renforcer : les contrats de fonds euros deja
+    # detenus et disponibles, a defaut rien de nomme.
+    fe = sorted({_libelle(p) for p in positions if p.get('category') == 'Fond Euro'
+                 and (p.get('net_attributed') or 0) > 0 and not _precaution.est_bloque(p)})
+    destinations = {SECURISE: (f"le fonds euros déjà détenu ({', '.join(fe)}), capital garanti" if fe
+                               else 'un fonds euros (capital garanti) ou des obligations')}
     gap = []
     for cle in sorted(set(cible) | set(classes)):
         c = classes.get(cle, {'actual_eur': 0.0, 'libre_eur': 0.0, 'bloque_eur': 0.0,
-                              'lignes_libres': [], 'lignes_bloquees': []})
+                              'lignes_libres': [], 'lignes_bloquees': [], 'composition': {}})
         t = cible.get(cle, 0.0)
         a = c['actual_eur'] / total if total else 0.0
         if not t and not c['actual_eur']:
@@ -342,6 +361,8 @@ def allocation_financiere(profile: dict, positions: List[dict], matrix=None, ent
             'bloque_eur': round(c['bloque_eur'], 2),
             'lignes_libres': sorted(c['lignes_libres'], key=lambda l: -l['montant']),
             'lignes_bloquees': sorted(c['lignes_bloquees'], key=lambda l: -l['montant']),
+            'composition': {k: round(v, 2) for k, v in (c.get('composition') or {}).items()},
+            'destination': destinations.get(cle),
         })
     gap.sort(key=lambda r: abs(r['delta_eur']), reverse=True)
     return {

@@ -225,7 +225,7 @@ class TestPerimetreFinancier:
             self._p('Produits Structurés', 'Assurance-vie', 10000), self._p('Crypto', 'Crypto', 10000)])
         classes = {g['category']: g['actual_eur'] for g in a['gap']}
         # Le Livret A est garde en precaution, hors du calcul, et decompte.
-        assert classes == {'Obligations': 10000, 'Actions': 20000}
+        assert classes == {'Fonds euros et obligations': 10000, 'Actions': 20000}
         assert {'category': 'Épargne de précaution', 'montant': 10000} in a['exclus']
 
     def test_le_bloque_compte_mais_ne_bouge_pas(self):
@@ -236,7 +236,8 @@ class TestPerimetreFinancier:
                      self._p('Fond Euro', 'Assurance-vie', 10000, mob=9500, label='AV libre'),
                      self._p('Actions', 'PEA', 10000)]
         a = allocation_financiere(self._profil(), positions)
-        oblig = next(g for g in a['gap'] if g['category'] == 'Obligations')
+        oblig = next(g for g in a['gap'] if g['category'] == 'Fonds euros et obligations')
+        assert oblig['composition'] == {'Fonds euros': 90000}
         assert oblig['bloque_eur'] == pytest.approx(80000) and oblig['libre_eur'] == pytest.approx(9500)
         bucket = [p for p in generate_proposals(self._profil(), positions, a) if p['kind'] == 'bucket']
         assert bucket and bucket[0]['amount'] == pytest.approx(9500)

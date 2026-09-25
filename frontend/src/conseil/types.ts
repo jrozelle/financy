@@ -6,7 +6,7 @@ export interface Profil {
   notes: string | null;
 }
 export interface Objectif { id: number; label: string | null; target_amount: number | null; horizon_years: number | null; priority: number }
-export interface Ecart { category: string; target_pct: number; actual_pct: number; delta_pct: number; delta_eur: number; bloque_eur?: number }
+export interface Ecart { composition?: Record<string, number>; category: string; target_pct: number; actual_pct: number; delta_pct: number; delta_eur: number; bloque_eur?: number }
 export interface Allocation { adjustments?: string[]; gap: Ecart[]; total_eur: number; financier_eur?: number; bloque_eur?: number;
                               precaution?: { gardees?: { libelle: string; montant: number }[] };
                               exclus?: { category: string; montant: number }[] }
