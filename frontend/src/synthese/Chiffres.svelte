@@ -4,7 +4,7 @@
    * dettes, mobilisable). Chacun avec sa variation sur la periode choisie
    * dans l'en-tete, sa tendance, et un sous-titre qui le situe.
    *
-   * Sous le net, l'objectif de patrimoine (famille seulement) : une jauge,
+   * Sous le net, l'objectif de patrimoine de la vue (famille ou titulaire) : une jauge,
    * et quand il tombe au rythme observe sur l'historique.
    */
   import { fmt, fmtDate, fmtPct, kpiDelta, sparkline } from '/static/modules/utils.js';
@@ -59,11 +59,11 @@
                                dates[debut] <= cible ? '1 an' : `depuis le ${fmtDate(dates[debut])}`);
     return out;
   });
-  // L'objectif vise le patrimoine de la famille : sous un titulaire, la jauge
-  // melangerait son net a la progression de la famille.
+  // L'objectif est celui de la vue affichee (famille ou titulaire) : la jauge
+  // compare le net de cette vue a son propre objectif.
   const but = $derived.by(() => {
     const cible = p.objectif, net = p.kpi.net;
-    if (!cible || !p.famille) return null;
+    if (!cible) return null;
     const pct = cible > 0 ? Math.min((net / cible) * 100, 100) : 0;
     let quand: { prefixe: string; date: string } | null = null, atteint = false;
     const v = p.series.net, d = p.dates;
@@ -96,7 +96,7 @@
       <span>Objectif <b>{fmt(but.cible)}</b></span>
       <span>{#if but.atteint}<b>Objectif atteint</b>{:else if but.quand}{but.quand.prefixe} <b>{but.quand.date}</b> au rythme actuel{:else}Reste <b>{fmt(but.reste)}</b>{/if}</span>
     </div>{/if}</div>
-  <div id="kpi-hero-spark">{#if !(p.famille && p.objectif)}{@html spark(p.series.net)}{/if}</div>
+  <div id="kpi-hero-spark">{#if !p.objectif}{@html spark(p.series.net)}{/if}</div>
 </div>
 <div class="kpi-card clickable kpi-gross">
   <div class="kpi-label" id="kpi-gross-label">{libelle('Actifs bruts')}</div>

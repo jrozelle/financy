@@ -12,7 +12,7 @@ Les données restent chez vous, dans un fichier SQLite.
 
 | Page | Ce qu'on y lit |
 |------|----------------|
-| **Synthèse** | Des widgets que l'on déplace, redimensionne ou masque, disposition mémorisée d'un appareil à l'autre : patrimoine net, brut, dettes et mobilisable ; épargne de précaution face à sa cible ; ce qui a bougé depuis l'arrêté précédent ; d'où vient la hausse (épargne nouvelle, capital remboursé, performance des marchés) ; évolution par catégorie ; projection à 5–20 ans ; impôt latent « si vous vendiez tout » |
+| **Synthèse** | Des widgets que l'on déplace, redimensionne ou masque, disposition mémorisée d'un appareil à l'autre : patrimoine net, brut, dettes et mobilisable, face à l'objectif de la vue (la famille ou chaque titulaire) ; épargne de précaution face à sa cible ; ce qui a bougé depuis l'arrêté précédent ; d'où vient la hausse (épargne nouvelle, capital remboursé, performance des marchés) ; évolution par catégorie ; projection à 5–20 ans ; impôt latent « si vous vendiez tout » |
 | **Positions** | Chaque compte dans une arborescence triable : par nature, par titulaire, par établissement ou à plat, avec recherche, filtre par établissement et par enveloppe, part du brut et du net (le levier se lit à la barre), lignes de titres dépliables ; mise à jour d'un arrêté en une passe |
 | **Actifs** | Les titres détenus, leurs cours, leur devise, et tout arbitrage de valorisation signalé |
 | **Entités** | SCI, holdings, indivisions : valeur, dette, parts de chaque titulaire ; trésorerie et levier d'une société lus sur ses relevés bancaires, chaque relevé importé pouvant être retiré ; parts de SCPI au prix de retrait ; impôt sur les sociétés estimé |

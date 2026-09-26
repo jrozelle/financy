@@ -85,3 +85,22 @@ class TestJournal:
         appel(anon_client, 'patch', '/api/preferences', 'claire', headers=h, json={'financy_x': 'y'})
         j = appel(anon_client, 'get', '/api/journal', 'claire').get_json()
         assert [(e['utilisateur'], e['methode'], e['chemin']) for e in j] == [('claire', 'POST', '/api/flux')]
+
+
+class TestObjectifs:
+    """Un objectif par perimetre : la famille et chaque titulaire."""
+
+    def test_par_perimetre_et_reprise_de_l_ancien(self, client):
+        from models import get_db
+        from tests.test_api import CSRF_HEADERS as H
+        with get_db() as c:   # ancienne cle unique : lue comme objectif de la famille
+            c.execute("INSERT INTO config (key, value) VALUES ('wealth_target', '{\"target\": 600000}')")
+        assert client.get('/api/wealth-target').get_json() == {'target': 600000}
+        # Le titulaire du referentiel par defaut.
+        qui = client.get('/api/config').get_json()['owners'][0]
+        assert client.put('/api/wealth-target', headers=H, json={'target': 600000, 'titulaire': qui}).status_code == 200
+        assert client.put('/api/wealth-target', headers=H, json={'target': None, 'titulaire': 'Famille'}).status_code == 200
+        tous = client.get('/api/wealth-target?tous=1').get_json()
+        assert tous == {qui: {'target': 600000}}                      # l'ancienne cle ne revient pas
+        assert client.get(f'/api/wealth-target?titulaire={qui}').get_json() == {'target': 600000}
+        assert client.put('/api/wealth-target', headers=H, json={'target': 1, 'titulaire': 'Inconnu'}).status_code == 400

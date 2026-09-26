@@ -174,7 +174,7 @@ export function renderSynthese({ cache = false } = {}) {
     chiffres: { kpi, owner, famille: isFamily, date: S.syntheseDate, variation: variation || null,
                 variationAn: yoyVariation || null, surAn: S.periodeComparaison === 'an',
                 series: { net: serie('net'), gross: serie('gross'), debt: serie('debt'), mob: serie('mob') },
-                dates, objectif: _wealthTarget, immo, court: liqFiltered['J0–J1'] || 0 },
+                dates, objectif: objectifDe(owner), immo, court: liqFiltered['J0–J1'] || 0 },
     repartition: { synthese: syn, owner },
     historique: { historique: S.historique || [], owner: qui },
     evolution: { owner: qui, arretes: (S.historique || []).length },
@@ -183,7 +183,7 @@ export function renderSynthese({ cache = false } = {}) {
                  precaution: (isFamily ? syn.precaution?.famille : syn.precaution?.par_titulaire?.[owner]) || null },
     entites: { entites: S.entities || [], owner, positions: Object.values(syn._positions_cache || {}).flat() },
     cible: { synthese: syn, owner, categories: S.config?.categories || [] },
-    projection: { positions: posTitulaire, famille: isFamily, net: kpi.net, objectif: _wealthTarget },
+    projection: { positions: posTitulaire, famille: isFamily, net: kpi.net, objectif: objectifDe(owner) },
   }, { cache });
   _noteSvelte(syn);
 }
@@ -308,27 +308,32 @@ async function openSnapshotNoteEditor(date, currentNote) {
 
 // ─── Wealth target gauge ─────────────────────────────────────────────────
 
-let _wealthTarget = null;
+// Objectifs de patrimoine, un par perimetre (la famille et chaque titulaire) :
+// la synthese montre celui de la vue affichee.
+let _objectifs = {};
 let _wealthTargetCharge = false;
+
+const _perimetre = owner => (owner && owner !== 'Famille' ? owner : 'Famille');
+export const objectifDe = owner => _objectifs[_perimetre(owner)]?.target || null;
 
 export async function loadWealthTarget() {
   try {
-    const data = await api('GET', '/api/wealth-target');
-    _wealthTarget = data?.target || null;
+    _objectifs = (await api('GET', '/api/wealth-target?tous=1')) || {};
     _wealthTargetCharge = true;
-  } catch { _wealthTarget = null; }
+  } catch { _objectifs = {}; }
 }
 
 async function openWealthTargetEditor() {
-  const current = _wealthTarget ? String(_wealthTarget) : '';
-  const val = await promptDialog('Objectif patrimoine net (€)', {
-    defaultValue: current, placeholder: 'Laisser vide pour supprimer', confirmText: 'Enregistrer'
+  const qui = _perimetre(S.syntheseOwner);
+  const actuel = objectifDe(qui);
+  const val = await promptDialog(`Objectif de patrimoine net — ${qui}`, {
+    defaultValue: actuel ? String(actuel) : '', placeholder: 'Laisser vide pour supprimer', confirmText: 'Enregistrer'
   });
   if (val === null) return;
   const target = val.trim() ? parseLocaleNumber(val) : null;
   if (val.trim() && (isNaN(target) || target <= 0)) { toast('Montant invalide', 'error'); return; }
-  await api('PUT', '/api/wealth-target', { target });
-  _wealthTarget = target;
+  await api('PUT', '/api/wealth-target', { target, titulaire: qui });
+  if (target) _objectifs[qui] = { target }; else delete _objectifs[qui];
   if (S.synthese) renderSynthese({ cache: true });
-  toast(target ? 'Objectif enregistré' : 'Objectif supprimé');
+  toast(target ? `Objectif de ${qui} enregistré` : `Objectif de ${qui} supprimé`);
 }

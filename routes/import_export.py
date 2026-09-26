@@ -380,11 +380,16 @@ def _config_valide(cle, valeur):
         return isinstance(d, dict) and _erreur_cibles(d) is None
     if cle == 'user_alerts':
         return isinstance(d, list) and _erreur_alertes(d) is None
+    if cle == 'objectifs_patrimoine':
+        return isinstance(d, dict) and all(
+            isinstance(k, str) and len(k) <= 100 and isinstance(v, dict)
+            and isinstance(v.get('target'), (int, float)) and not isinstance(v.get('target'), bool) and v['target'] > 0
+            for k, v in d.items())
     return True
 
 
 # Configuration exportable ; les reglages (cle API) n'en sont pas.
-_CONFIG_EXPORTEE = ('referential', 'allocation_targets', 'user_alerts', 'wealth_target',
+_CONFIG_EXPORTEE = ('referential', 'allocation_targets', 'user_alerts', 'wealth_target', 'objectifs_patrimoine',
                     'benchmark_isin', 'synthese_disposition', 'barre_mobile', 'preferences')
 
 

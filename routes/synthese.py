@@ -532,17 +532,45 @@ def save_snapshot_note():
 
 # ─── Objectif patrimoine ──────────────────────────────────────────────────
 
+# ─── Objectifs de patrimoine, par perimetre ──────────────────────────────────
+# Un objectif pour la famille et un par titulaire : chacun suit le sien, la
+# synthese montre celui de la vue affichee. L'ancienne cle unique
+# (`wealth_target`) reste lue comme objectif de la famille.
+CLE_OBJECTIFS = 'objectifs_patrimoine'
+
+
+def _lire_objectifs(conn):
+    out = {}
+    r = conn.execute("SELECT value FROM config WHERE key='wealth_target'").fetchone()
+    if r:
+        try:
+            ancien = json.loads(r['value'])
+            if isinstance(ancien, dict) and ancien.get('target'):
+                out['Famille'] = ancien
+        except ValueError:
+            pass
+    r = conn.execute('SELECT value FROM config WHERE key=?', (CLE_OBJECTIFS,)).fetchone()
+    if r:
+        try:
+            d = json.loads(r['value'])
+            if isinstance(d, dict):
+                out.update({k: v for k, v in d.items() if isinstance(v, dict)})
+        except ValueError:
+            pass
+    return out
+
+
 @synthese_bp.route('/api/wealth-target', methods=['GET'])
 @login_required
 def get_wealth_target():
+    """Tous les objectifs ({perimetre: {target, deadline}}) avec `tous=1` ;
+    sinon celui d'un perimetre (`titulaire`, la famille par defaut)."""
     with get_db() as conn:
-        row = conn.execute("SELECT value FROM config WHERE key='wealth_target'").fetchone()
-    if row:
-        try:
-            return jsonify(json.loads(row['value']))
-        except Exception:
-            pass
-    return jsonify({'target': None})
+        objectifs = _lire_objectifs(conn)
+    if request.args.get('tous'):
+        return jsonify(objectifs)
+    qui = request.args.get('titulaire') or 'Famille'
+    return jsonify(objectifs.get(qui) or {'target': None})
 
 
 # ─── Disposition de la synthese ──────────────────────────────────────────────
@@ -723,6 +751,7 @@ def save_wealth_target():
     d = request.get_json(silent=True)
     if not isinstance(d, dict):
         return jsonify({'error': 'Objet JSON attendu'}), 400
+    qui = d.get('titulaire') or 'Famille'
     # Seul l'objectif s'enregistre : un montant positif, ou rien pour le retirer.
     target = d.get('target')
     if target is not None:
@@ -735,10 +764,17 @@ def save_wealth_target():
             return jsonify({'error': 'Échéance invalide (format AAAA-MM-JJ attendu)'}), 400
         valeur['deadline'] = d['deadline']
     with get_db() as conn:
-        conn.execute(
-            "INSERT OR REPLACE INTO config (key, value) VALUES ('wealth_target', ?)",
-            (json.dumps(valeur),)
-        )
+        if qui != 'Famille' and qui not in (load_referential(conn).get('owners') or []):
+            return jsonify({'error': 'Titulaire inconnu'}), 400
+        objectifs = _lire_objectifs(conn)
+        if target is None:
+            objectifs.pop(qui, None)
+        else:
+            objectifs[qui] = valeur
+        conn.execute('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)', (CLE_OBJECTIFS, json.dumps(objectifs)))
+        # L'ancienne cle unique est reprise dans la nouvelle : on la retire,
+        # sans quoi un objectif de la famille efface reviendrait par elle.
+        conn.execute("DELETE FROM config WHERE key='wealth_target'")
     return jsonify({'ok': True})
 
 
