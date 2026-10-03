@@ -8,7 +8,7 @@ export interface Part { nom: string; parts: number | null; montant_souscrit: num
                         valeur_retrait?: number | null; date_prix: string | null }
 export interface Exercice { fin?: string; resultat?: number | null; source?: string | null }
 export interface Bloc {
-  entite: string; periode: { debut: string; fin: string; mois: number } | null;
+  entite: string; type?: string | null; periode: { debut: string; fin: string; mois: number } | null;
   indicateurs: { couverture: number | null; effort_mensuel: number; apports: number; capital_par_euro_apporte: number | null;
                  rendement: number | null; cash_flow_net: number | null };
   credit: { capital: number; interets: number; assurance: number; taux: number | null } | null;

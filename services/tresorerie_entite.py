@@ -319,8 +319,10 @@ def bilan(conn, entite, mois=12):
     # tirerait en les revendant. Le capital rembourse doit d'abord les absorber.
     frais_latents = (round(detenues['montant_souscrit'] - detenues['valeur_retrait'], 2)
                      if detenues and detenues['complet'] and detenues['montant_souscrit'] else None)
+    genre = conn.execute('SELECT type FROM entities WHERE name=?', (entite,)).fetchone()
     return {
         'entite': entite,
+        'type': genre['type'] if genre else None,
         'parts': detenues,
         'fiscal': fisc,
         'frais_latents': frais_latents,

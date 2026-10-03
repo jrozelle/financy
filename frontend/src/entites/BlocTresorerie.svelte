@@ -31,6 +31,11 @@
   // la revente. Le capital rembourse doit d'abord les rattraper.
   const annees = $derived(c?.capital ? b.frais_latents / c.capital * (12 / periode.mois) : null);
   const ecart = $derived(c ? c.capital + (i.cash_flow_net || 0) : 0);
+  // Les indicateurs lisent une societe de placement (SCI, SCPI) : loyers,
+  // echeances, effort des associes. Une holding qui facture n'y entre pas —
+  // ses honoraires n'etaient pas des revenus, ses remboursements d'associe
+  // passaient en frais. Elle n'affiche que sa tresorerie et ses operations.
+  const placement = $derived(b.type !== 'Holding');
 
   // ── Douze colonnes : les entrees au-dessus de zero, les sorties en dessous.
   const W = 640, H = 170;
@@ -64,6 +69,7 @@
     <h3>{b.entite}</h3>
     <span class="text-muted">{moisLib(periode.debut)} – {moisLib(periode.fin)}, d'après {nbReleves} relevé{nbReleves > 1 ? 's' : ''}</span>
   </div>
+  {#if placement}
   <!-- Une idee par ligne : en paragraphe, cinq chiffres se lisaient d'un bloc. -->
   <ul class="treso-verdict">
     {#if i.couverture != null}<li>Les loyers paient <b>{pct(i.couverture)}</b> de l'échéance du crédit.</li>{/if}
@@ -85,7 +91,7 @@
   </ul>
   <div class="treso-kpis">
     {@render kpi('Revenus', fmt(t.revenu), t.revenu_exceptionnel ? `+ ${fmt(t.revenu_exceptionnel)} exceptionnels` : 'distributions récurrentes')}
-    {@render kpi('Échéances', fmt(-t.echeance), c ? `dont ${fmt(c.capital)} de capital` : '')}
+    {@render kpi('Échéances', fmt(-t.echeance || 0), c ? `dont ${fmt(c.capital)} de capital` : '')}
     {@render kpi('Apports des associés', fmt(i.apports), i.capital_par_euro_apporte != null
       ? `${virgule(i.capital_par_euro_apporte)} € de capital remboursé par euro` : '')}
     {@render kpi('Rendement distribué', pct(i.rendement), c?.taux ? `crédit à ${virgule(c.taux)} %` : '')}
@@ -132,8 +138,17 @@
     <span><i class="treso-pastille" style="background:var(--danger)"></i>Échéance et frais</span>
     <span><i class="treso-pastille treso-pastille--apport"></i>Apports des associés</span>
   </div>
-  <PartsEntite {b} {idx} {onRecharger} />
-  <FiscalEntite {b} {idx} {onRecharger} />
+  {:else}
+    <p class="text-muted">Holding : la trésorerie et les opérations seules. Loyers, échéances et effort des
+      associés lisent une société de placement ; ici, ils diraient faux.</p>
+    <div class="treso-kpis" style="grid-template-columns:minmax(0, 16rem)">
+      {@render kpi('Trésorerie', fmt(b.tresorerie), 'tous comptes')}
+    </div>
+  {/if}
+  {#if placement}
+    <PartsEntite {b} {idx} {onRecharger} />
+    <FiscalEntite {b} {idx} {onRecharger} />
+  {/if}
   <OperationsEntite {b} {idx} {natures} {onRecharger} />
   <RelevesEntite {b} {onRecharger} />
 </section>
