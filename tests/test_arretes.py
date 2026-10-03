@@ -133,3 +133,14 @@ def test_supprimer_une_entite_garde_la_valeur_des_positions(client):
     avant = (_net(client, '2026-01-01'), _net(client, '2026-06-01'))
     assert client.delete(f'/api/entities/{eid}?force=1', headers=H).status_code == 204
     assert (_net(client, '2026-01-01'), _net(client, '2026-06-01')) == avant == (100000, 120000)
+
+
+def test_auto_snapshot_ne_glisse_pas_un_arrete_avant_un_plus_recent(client):
+    """Un arrete date dans le futur (echeance d'un pret) : enregistrer des
+    lignes aujourd'hui ne doit pas creer une copie perimee entre les deux."""
+    with get_db() as c:
+        _pos_sci(c, '2099-01-05'); c.commit()
+    r = client.post('/api/auto-snapshot', json={'date': '2099-01-03'}, headers=H)
+    assert r.get_json().get('skipped')
+    with get_db() as c:
+        assert not c.execute("SELECT 1 FROM positions WHERE date='2099-01-03'").fetchone()

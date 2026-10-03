@@ -233,6 +233,11 @@ def auto_snapshot():
             return jsonify({'error': 'Aucun snapshot existant'}), 400
 
         last_date = last['date']
+        # Un arrete plus recent existe deja (date a venir, comme un arrete
+        # cale sur une echeance de pret) : en creer un aujourd'hui glisserait
+        # une copie perimee entre les deux.
+        if last_date > target_date:
+            return jsonify({'error': f'Un arrêté plus récent existe déjà ({last_date})', 'skipped': True}), 200
         if last_date == target_date:
             return jsonify({'error': 'Un snapshot existe déjà à cette date', 'skipped': True}), 200
 
