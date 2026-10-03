@@ -5,14 +5,16 @@ l'historique git (`git log`), un commit par phase.
 
 ## Ouvert
 
-Rien en cours.
+- **Bourso Vie, relevé de situation** : non reconnu (ni empreinte, ni ISIN,
+  supports nommés en clair) ; un lecteur par nom de support serait à écrire.
 
 ## Fait, en bref
 
 - **Socle** (avril 2026) : positions datées par arrêté, entités (SCI,
   indivisions) à parts de propriété et de dette distinctes, vue en arbre,
   import / export JSON et XLSX, mode démo, authentification et CSRF.
-- **Actifs** : lignes de titres, import PDF et copier-coller, cours et devises
+- **Actifs** : lignes de titres, import PDF (relevé de titres BoursoBank
+  vérifié contre son total, tout relevé incohérent refusé) et copier-coller, cours et devises
   (conversion par `fx_rates`), rafraîchissement planifié, fiche d'un titre.
 - **Mesure** : TRI et TWR par compte et par enveloppe face à un indice,
   décomposition de la hausse (épargne nouvelle, capital remboursé, comptes

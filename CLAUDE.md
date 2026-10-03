@@ -133,7 +133,12 @@
   retrouves), tableau d'amortissement (restant du precedent − capital = restant
   du, zero a la fin, premiere echeance partant du montant du credit). Une
   colonne debit/credit se lit a la POSITION des mots quand le texte ne la dit
-  pas (Credit Agricole).
+  pas (Credit Agricole). Releve de titres : somme des lignes = « TOTAL DU
+  PORTEFEUILLE » imprime (jamais « TOTAL DE L'ACTIF », especes comprises),
+  sinon `ReleveIncoherentError` et rien n'est importe — y compris par le
+  lecteur generique (`verifier_total`), qui prenait un cours a trois decimales
+  pour des milliers. Un format connu a son lecteur dedie, sans repli sur le
+  generique (`pdf_releve_titres.py` pour BoursoBank).
 - Reimporter un document n'ajoute rien : unicite sur l'operation ou sur
   `(montant, debut, fin)` du pret.
 - Un scan sans texte se lit en image ; un formulaire PDF porte ses valeurs dans

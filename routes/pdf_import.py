@@ -15,7 +15,7 @@ from flask import Blueprint, jsonify, request
 from models import (get_db, validate_isin, validate_number, validate_date,
                     parse_number, sync_position_value)
 from services.parsers import parse_pdf, parse_csv, parse_pasted_text
-from services.parsers.common import PdfEncryptedError, PdfImageScanError
+from services.parsers.common import PdfEncryptedError, PdfImageScanError, ReleveIncoherentError
 from services.securities import upsert_security
 from auth import login_required, csrf_protect
 from services.montants import lignes_en_euros
@@ -175,7 +175,7 @@ def _preview(position_id):
             result = parse_pdf(data)
     except PdfEncryptedError as e:
         return jsonify({'error': str(e)}), 400
-    except PdfImageScanError as e:
+    except (PdfImageScanError, ReleveIncoherentError) as e:
         return jsonify({'error': str(e)}), 422
     except Exception as e:
         logger.warning('parse failed: %s', e, exc_info=True)

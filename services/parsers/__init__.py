@@ -10,11 +10,13 @@ from io import BytesIO
 
 from .common import (
     ParseResult, DetectedLine, PdfEncryptedError, PdfImageScanError,
-    detect_format, format_label, deduplicate,
+    detect_format, format_label, deduplicate, verifier_total,
+    ReleveIncoherentError,  # noqa: F401 — re-export
 )
 from .pdf_generic import parse_tables, parse_text_lines
 from .pdf_attestation import parse_attestation
 from .pdf_predica import parse_predica_detail
+from . import pdf_releve_titres
 from .csv_generic import parse_csv  # noqa: F401 — re-export
 from .text_paste import parse_pasted_text  # noqa: F401 — re-export
 
@@ -65,6 +67,12 @@ def parse_pdf(file_bytes: bytes) -> ParseResult:
                 result.needs_price_lookup = True
                 return result
 
+        if fmt == 'boursobank_releve_titres':
+            # Jamais de repli sur le generique : il lisait ces releves faux.
+            result.lines, result.warnings = pdf_releve_titres.lire(pdf)
+            result.total_market_value = round(sum(l.market_value for l in result.lines), 2)
+            return result
+
         if fmt == 'predica_detail':
             lines = parse_predica_detail(pdf)
             if lines:
@@ -75,12 +83,14 @@ def parse_pdf(file_bytes: bytes) -> ParseResult:
         # ── Parser generique (tableaux + texte) ─────────────────────────
         table_lines = parse_tables(pdf)
         text_lines = parse_text_lines(pdf)
+        texte_complet = '\n'.join((p.extract_text() or '') for p in pdf.pages)
 
     merged = deduplicate(table_lines + text_lines)
     merged.sort(key=lambda l: (-l.confidence, l.isin))
 
     result.lines = merged
     result.total_market_value = sum(l.market_value or 0 for l in merged)
+    verifier_total(merged, texte_complet)
 
     # Heuristique scan image
     if not merged and len(global_text.strip()) < 10:

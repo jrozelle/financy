@@ -87,7 +87,9 @@ Dans `.env` (voir `.env.example`) :
 
 - **Documents** : avis d'opéré, relevés de comptes, tableaux d'amortissement et
   avis de réalisation de prêt (PDF), copier-coller d'un tableau de positions
-  depuis le site de la banque.
+  depuis le site de la banque. Un relevé se vérifie lui-même : si les lignes
+  lues ne redonnent pas le total imprimé, il est refusé avec les deux montants,
+  plutôt qu'importé faux.
 - **Tableur** : le modèle vierge `Patrimoine_Familial_blank.xlsx` (positions,
   flux, entités), à remplir puis importer depuis **Import / Export**.
 - **Sauvegarde** : export et import JSON complets. Chaque import est précédé

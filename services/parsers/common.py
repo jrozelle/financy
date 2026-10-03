@@ -18,6 +18,7 @@ NUMBER_RE = re.compile(
 # Ordre : les entrees les plus specifiques en premier.
 FORMAT_FINGERPRINTS = [
     ('boursobank_attestation', ['ATTESTATION DE DETENTION'], ['BOURSOBANK', 'BOURSORAMA']),
+    ('boursobank_releve_titres', ['RELEVE COMPTE TITRES'],   ['BOURSOBANK', 'BOURSORAMA']),
     ('predica_detail',         ['ANAÉ'],                     ['DÉTAIL', 'DETAIL']),
     ('boursorama_pea',         ['BOURSORAMA'],               ['PEA']),
     ('boursorama_cto',         ['BOURSORAMA'],               ['CTO', 'COMPTE TITRES', 'COMPTE-TITRES']),
@@ -43,6 +44,7 @@ FORMAT_FINGERPRINTS = [
 
 FORMAT_LABELS = {
     'boursobank_attestation': 'BoursoBank — Attestation PEA',
+    'boursobank_releve_titres': 'BoursoBank — Relevé de compte titres',
     'predica_detail':   'Crédit Agricole — Anaé (détail)',
     'boursorama_pea':   'Boursorama — PEA',
     'boursorama_cto':   'Boursorama — CTO',
@@ -72,6 +74,12 @@ class PdfEncryptedError(RuntimeError):
 
 class PdfImageScanError(RuntimeError):
     """PDF qui semble etre un scan image sans couche texte."""
+    pass
+
+
+class ReleveIncoherentError(ValueError):
+    """Document dont les lignes lues ne redonnent pas le total imprime :
+    il est refuse plutot qu'importe faux. Le message dit les deux montants."""
     pass
 
 
@@ -204,3 +212,32 @@ def deduplicate(lines: List[DetectedLine]) -> List[DetectedLine]:
 
 def _looks_like_date_fragment(s: str) -> bool:
     return '/' in s or bool(re.match(r'^(19|20)\d{2}$', s.strip()))
+
+
+# Totaux de portefeuille reconnus sur un releve quelconque. Jamais « TOTAL DE
+# L'ACTIF », qui ajoute les especes aux titres.
+_TOTAL_GENERIQUE = re.compile(
+    r'(?:TOTAL DU PORTEFEUILLE(?: TITRES)?|VALORISATION TOTALE(?: DU PORTEFEUILLE)?)\s*:?\s*'
+    r'(\d{1,3}(?:[ \u00a0\u202f.]\d{3})*,\d{2})\s*(?:EUR|€)', re.I)
+
+
+def verifier_total(lignes: List[DetectedLine], texte: str) -> None:
+    """Refuse un releve dont les lignes lues ne redonnent pas le total imprime.
+
+    Ne s'applique que si le document porte un total reconnu et que des lignes
+    ont ete lues ; sans total, rien a verifier (les avertissements de confiance
+    restent). Tolerance d'un euro : le generique arrondit parfois a la ligne."""
+    m = _TOTAL_GENERIQUE.search(texte or '')
+    if not m or not lignes:
+        return
+    total = float(re.sub(r'[ \u00a0\u202f.]', '', m.group(1)).replace(',', '.'))
+    somme = round(sum(l.market_value or 0 for l in lignes), 2)
+    if abs(total - somme) > 1:
+        raise ReleveIncoherentError(
+            f"Relevé incohérent : les {len(lignes)} lignes lues totalisent {montant_fr(somme)}, "
+            f"le document indique {montant_fr(total)}. Rien n'est importé ; saisissez les "
+            f"lignes à la main ou signalez le format.")
+
+
+def montant_fr(v: float) -> str:
+    return f'{v:,.2f} €'.replace(',', '\u202f').replace('.', ',')
