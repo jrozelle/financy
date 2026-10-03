@@ -3082,6 +3082,8 @@ main > .tab-content > .page-header > h1 { display: none; }
 .pref-ligne b { display: block; font-weight: 500; font-size: var(--fs-base); }
 .pref-ligne p { margin: .1rem 0 0; color: var(--text-muted); font-size: var(--fs-xs); }
 .pref-ligne > div:last-child { flex: none; }
+.pref-seuil { display: flex; align-items: center; gap: var(--esp-6); margin: 0; }
+.pref-seuil input { width: 7rem; text-align: right; font-variant-numeric: tabular-nums; }
 /* Les boutons repris du menu retrouvent une apparence de contrôle. */
 .pref-ligne .settings-item {
   width: auto; border: 1px solid var(--border); border-radius: 8px;

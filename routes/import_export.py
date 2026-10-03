@@ -385,12 +385,15 @@ def _config_valide(cle, valeur):
             isinstance(k, str) and len(k) <= 100 and isinstance(v, dict)
             and isinstance(v.get('target'), (int, float)) and not isinstance(v.get('target'), bool) and v['target'] > 0
             for k, v in d.items())
+    if cle == 'seuil_flux_exceptionnel':
+        return isinstance(d, (int, float)) and not isinstance(d, bool) and d > 0
     return True
 
 
 # Configuration exportable ; les reglages (cle API) n'en sont pas.
 _CONFIG_EXPORTEE = ('referential', 'allocation_targets', 'user_alerts', 'wealth_target', 'objectifs_patrimoine',
-                    'benchmark_isin', 'synthese_disposition', 'barre_mobile', 'preferences')
+                    'benchmark_isin', 'synthese_disposition', 'barre_mobile', 'preferences',
+                    'seuil_flux_exceptionnel')
 
 
 def _vide(v):

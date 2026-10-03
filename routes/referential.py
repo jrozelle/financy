@@ -1,7 +1,7 @@
 import json
 import os
 from flask import Blueprint, jsonify, request
-from models import get_db, load_referential, REFERENTIAL_TEMPLATES, parse_number, get_db_path, validate_string
+from models import get_db, load_referential, REFERENTIAL_TEMPLATES, parse_number, get_db_path, validate_string, validate_number
 from auth import login_required, csrf_protect
 
 referential_bp = Blueprint('referential', __name__)
@@ -50,6 +50,8 @@ def get_config():
         entity_names = [r['name'] for r in
                         conn.execute('SELECT name FROM entities ORDER BY name').fetchall()]
         ref = load_referential(conn)
+        from services.contribution import seuil_exceptionnel
+        seuil = seuil_exceptionnel(conn)
     return jsonify({
         'owners':               ref['owners'],
         'categories':           ref['categories'],
@@ -61,7 +63,23 @@ def get_config():
         'entity_types':         ref['entity_types'],
         'valuation_modes':      ref['valuation_modes'],
         'entity_names':         entity_names,
+        'seuil_flux_exceptionnel': seuil,
     })
+
+
+@referential_bp.route('/api/config/seuil-exceptionnel', methods=['PUT'])
+@login_required
+@csrf_protect
+def save_seuil_exceptionnel():
+    """Montant a partir duquel un versement ou un retrait est exceptionnel :
+    hors du rythme d'epargne (objectif, projection, d'ou vient la hausse)."""
+    from services.contribution import CLE_SEUIL
+    v = (request.get_json(silent=True) or {}).get('seuil')
+    if v is None or isinstance(v, bool) or not validate_number(v) or parse_number(v) <= 0:
+        return jsonify({'error': 'Seuil invalide : un montant positif, en euros'}), 400
+    with get_db() as conn:
+        conn.execute('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)', (CLE_SEUIL, str(parse_number(v))))
+    return jsonify({'ok': True, 'seuil': parse_number(v)})
 
 
 # — Allocation cible —

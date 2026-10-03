@@ -88,10 +88,17 @@
   arrive sur un compte courant sans aucun flux. L'epargne nouvelle se mesure
   donc : variation des liquidites (comptes presents aux deux arretes) plus
   versements vers les placements (`services/contribution.py`, `PLACEMENT`).
-  « D'ou vient la hausse » decompose en quatre parts dont la somme redonne la
-  variation — epargne nouvelle, capital rembourse, comptes ajoutes ou retires,
-  performance — et la projection du patrimoine utilise la meme mesure. Par
-  compte (onglet Performance), un versement reste un apport.
+  « D'ou vient la hausse » decompose en cinq parts dont la somme redonne la
+  variation — epargne nouvelle, flux exceptionnels, capital rembourse, comptes
+  ajoutes ou retires, performance — et la projection du patrimoine utilise la
+  meme mesure. Par compte (onglet Performance), un versement reste un apport.
+- **Flux exceptionnel** : un versement ou un retrait d'au moins
+  `seuil_flux_exceptionnel` (config, 20 000 € par defaut, Reglages →
+  Preferences) — heritage, vente. Net de signe sur tous les comptes, donc un
+  transfert interne enregistre sur ses deux jambes s'annule. Il reste dans le
+  patrimoine mais sort de tout ce qui mesure un rythme : epargne nouvelle,
+  projection, date de l'objectif (variation hors comptes ajoutes et hors
+  exceptionnels, sur tout l'historique).
 - **Le capital rembourse est de l'epargne**, pas de la performance. Sauf pour
   un pret **in fine** (`prets.est_in_fine`) : rembourse d'un bloc sur des actifs
   deja comptes, il n'enrichit pas et sort du desendettement projete.

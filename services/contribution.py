@@ -6,7 +6,8 @@ appellent des decisions opposees, et aucun ecran ne les separait.
 
 Decomposition, entre deux arretes consecutifs :
 
-    variation du net = apports externes + comptes entres ou sortis + performance
+    variation du net = apports externes + apports exceptionnels
+                       + comptes entres ou sortis + performance
 
 d'ou `performance = Δnet − apports − hors suivi`. C'est un residu, pas une mesure : il
 absorbe tout ce qui n'est ni une variation de valeur ni un apport declare —
@@ -28,6 +29,45 @@ logger = logging.getLogger('financy.contribution')
 # Enveloppes dont un compte « Cash & dépôts » reste du financier (les especes
 # d'un PEA) : meme jeu que `ENVELOPPES_DE_PLACEMENT` cote navigateur.
 PLACEMENT = {'PEA', 'PEA-PME', 'Assurance-vie', 'PER', 'CTO', 'Crypto'}
+
+# Un versement ou un retrait de ce montant ou plus est EXCEPTIONNEL : un
+# heritage, une vente, un achat immobilier. Il reste dans le patrimoine, mais
+# pas dans ce qui mesure un rythme : 149 000 € recus en fevrier passaient pour
+# de l'epargne, et datait l'objectif a quinze jours. Reglable (cle de config).
+CLE_SEUIL = 'seuil_flux_exceptionnel'
+SEUIL_DEFAUT = 20000.0
+
+
+def seuil_exceptionnel(conn):
+    try:
+        r = conn.execute('SELECT value FROM config WHERE key=?', (CLE_SEUIL,)).fetchone()
+        v = float(r['value']) if r else SEUIL_DEFAUT
+    except (TypeError, ValueError):
+        v = SEUIL_DEFAUT
+    return v if v > 0 else SEUIL_DEFAUT
+
+
+def _exceptionnels(conn, debut, fin, owner=None, seuil=SEUIL_DEFAUT):
+    """Flux exceptionnels nets sur ]debut, fin], et leur detail.
+
+    Signes de `_flux_signed`, tous comptes : un transfert interne enregistre
+    sur ses deux jambes (retrait du livret, versement a l'assurance-vie)
+    s'annule ; seul reste l'argent venu d'ailleurs, ou parti ailleurs."""
+    from routes.performance import _flux_signed
+    q = 'SELECT date, type, amount, owner, envelope, establishment FROM flux WHERE date > ? AND date <= ?'
+    p = [debut, fin]
+    if owner:
+        q += ' AND owner = ?'
+        p.append(owner)
+    total, details = 0.0, []
+    for r in conn.execute(q, p):
+        f = ligne_en_euros('flux', r)
+        x = _flux_signed(f)
+        if x and abs(x) >= seuil:
+            total += x
+            details.append({'date': f['date'], 'montant': round(x, 2), 'owner': f['owner'],
+                            'compte': ' · '.join(v for v in (f['envelope'], f['establishment']) if v)})
+    return round(total, 2), details
 
 
 def _apports(conn, debut, fin, owner=None):
@@ -107,7 +147,7 @@ def _hors_suivi(conn, precedent, courant, owner=None):
     return round(total, 2), details
 
 
-CHAMPS = ('variation', 'epargne', 'versements', 'capital', 'performance', 'hors_suivi')
+CHAMPS = ('variation', 'epargne', 'versements', 'capital', 'performance', 'hors_suivi', 'exceptionnel')
 
 
 def _versements_placements(conn, debut, fin, owner=None):
@@ -161,8 +201,8 @@ def _par_trimestre(periodes):
         g = groupes.setdefault(cle, {
             'cle': cle, 'libelle': libelle, 'debut': p['debut'], 'fin': p['fin'],
             'variation': 0.0, 'epargne': 0.0, 'versements': 0.0, 'capital': 0.0,
-            'performance': 0.0, 'hors_suivi': 0.0,
-            'comptes_hors_suivi': [],
+            'performance': 0.0, 'hors_suivi': 0.0, 'exceptionnel': 0.0,
+            'comptes_hors_suivi': [], 'flux_exceptionnels': [],
         })
         # La periode la plus ancienne du trimestre en donne le debut, la plus
         # recente la fin : les bornes doivent couvrir tout ce qu'on additionne.
@@ -171,6 +211,7 @@ def _par_trimestre(periodes):
         for champ in CHAMPS:
             g[champ] += p.get(champ, 0.0)
         g['comptes_hors_suivi'] += p.get('comptes_hors_suivi', [])
+        g['flux_exceptionnels'] += p.get('flux_exceptionnels', [])
     for g in groupes.values():
         for champ in CHAMPS:
             g[champ] = round(g[champ], 2)
@@ -185,24 +226,29 @@ def decompose(conn, arretes, owner=None, limite=8):
         owner:   titulaire, ou None pour la famille
         limite:  nombre de periodes rendues, les plus recentes
 
-    Quatre parts, dont la somme redonne la variation :
+    Cinq parts, dont la somme redonne la variation :
     - epargne : l'argent qui entre — hausse des liquidites plus versements vers
       les placements. Un DCA depuis un livret n'y compte pas : il sort du livret
       et entre au PEA. Le salaire, qui arrive sans flux, y compte ;
     - capital : la baisse des dettes, du salaire transforme en patrimoine ;
+    - exceptionnel : les versements et retraits d'au moins le seuil
+      (`seuil_exceptionnel`), retires de l'epargne : ils ne disent rien du
+      rythme ;
     - hors_suivi : les comptes qui entrent dans le suivi ou en sortent ;
     - performance : le reste, rendement des placements et revalorisations.
     """
     net = (lambda h: (h.get('by_owner') or {}).get(owner, 0.0)) if owner \
         else (lambda h: h.get('family_net') or 0.0)
 
+    seuil = seuil_exceptionnel(conn)
     periodes = []
     for precedent, courant in zip(arretes, arretes[1:]):
         delta = round(net(courant) - net(precedent), 2)
         versements = _versements_placements(conn, precedent['date'], courant['date'], owner)
         epargne, capital = _epargne_et_capital(precedent, courant, owner)
         hors, comptes = _hors_suivi(conn, precedent, courant, owner)
-        epargne = round(epargne + versements, 2)
+        exceptionnel, flux_exc = _exceptionnels(conn, precedent['date'], courant['date'], owner, seuil)
+        epargne = round(epargne + versements - exceptionnel, 2)
         periodes.append({
             'debut':       precedent['date'],
             'fin':         courant['date'],
@@ -212,7 +258,9 @@ def decompose(conn, arretes, owner=None, limite=8):
             'capital':     capital,
             'hors_suivi':  hors,
             'comptes_hors_suivi': comptes,
-            'performance': round(delta - epargne - capital - hors, 2),
+            'exceptionnel': exceptionnel,
+            'flux_exceptionnels': flux_exc,
+            'performance': round(delta - epargne - capital - hors - exceptionnel, 2),
         })
 
     periodes = _par_trimestre(periodes)[-limite:]
@@ -222,6 +270,8 @@ def decompose(conn, arretes, owner=None, limite=8):
         'total_capital':     round(sum(p['capital'] for p in periodes), 2),
         'total_performance': round(sum(p['performance'] for p in periodes), 2),
         'total_hors_suivi':  round(sum(p['hors_suivi'] for p in periodes), 2),
+        'total_exceptionnel': round(sum(p['exceptionnel'] for p in periodes), 2),
+        'seuil_exceptionnel': seuil,
         'total_variation':   round(sum(p['variation'] for p in periodes), 2),
     }
 
@@ -278,8 +328,8 @@ def epargne_nouvelle(conn, fin, jours=183):
 
     La variation ne porte que sur les comptes presents aux deux arretes : un
     compte qui entre dans le suivi n'est pas de l'epargne. Le rythme retenu est
-    celui de toute la fenetre ; un versement exceptionnel s'y voit dans la
-    liste des periodes.
+    celui de toute la fenetre, flux exceptionnels (`seuil_exceptionnel`)
+    retires : projetes sur dix ans, ils feraient un rythme.
     """
     from datetime import date as _d, timedelta
     from routes.performance import _flux_signed
@@ -287,6 +337,7 @@ def epargne_nouvelle(conn, fin, jours=183):
     arretes = [r['date'] for r in conn.execute('SELECT DISTINCT date FROM positions ORDER BY date')]
     avant = [a for a in arretes if a <= debut]
     fenetre = ([avant[-1]] if avant else []) + [a for a in arretes if debut < a <= fin]
+    seuil = seuil_exceptionnel(conn)
     periodes = []
     precedent = None
     for a in fenetre:
@@ -297,11 +348,13 @@ def epargne_nouvelle(conn, fin, jours=183):
             vers = sum(_flux_signed(ligne_en_euros('flux', r)) for r in conn.execute(
                 'SELECT type, amount FROM flux WHERE date > ? AND date <= ? AND envelope IN (%s)'
                 % ','.join('?' * len(PLACEMENT)), (precedent[0], a, *PLACEMENT)))
+            exc, _ = _exceptionnels(conn, precedent[0], a, None, seuil)
             duree = (_d.fromisoformat(a) - _d.fromisoformat(precedent[0])).days
             if duree > 0:
                 periodes.append({'debut': precedent[0], 'fin': a, 'jours': duree,
-                                 'epargne': round(dliq + vers, 2), 'versements': round(vers, 2),
-                                 'par_mois': round((dliq + vers) / duree * 30.44, 2)})
+                                 'epargne': round(dliq + vers - exc, 2), 'versements': round(vers, 2),
+                                 'exceptionnel': exc,
+                                 'par_mois': round((dliq + vers - exc) / duree * 30.44, 2)})
         precedent = (a, courant)
     # Le rythme sur toute la fenetre : les periodes sont trop courtes et trop
     # irregulieres (un salaire tombe avant ou apres l'arrete) pour qu'une

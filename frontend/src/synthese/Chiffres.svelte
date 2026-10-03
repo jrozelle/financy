@@ -60,12 +60,12 @@
                                dates[debut] <= cible ? '1 an' : `depuis le ${fmtDate(dates[debut])}`);
     return out;
   });
-  // ── Rythme : la variation du net HORS comptes ajoutes ou retires (la
-  // decomposition de « D'ou vient la hausse »), sur les periodes les plus
-  // recentes couvrant au moins six mois. Depuis le premier arrete, un apport
-  // exceptionnel (149 000 € recus en quinze jours) passait pour un rythme, et
-  // l'arrivee d'un compte dans le suivi pour de l'enrichissement.
-  interface Periode { debut: string; fin: string; variation: number; hors_suivi?: number }
+  // ── Rythme : la variation du net sur tout l'historique, HORS comptes
+  // ajoutes ou retires et HORS flux exceptionnels (la decomposition de
+  // « D'ou vient la hausse »). La droite du premier au dernier arrete prenait
+  // un heritage recu en quinze jours pour un rythme, et l'arrivee d'un compte
+  // dans le suivi pour de l'enrichissement.
+  interface Periode { debut: string; fin: string; variation: number; hors_suivi?: number; exceptionnel?: number }
   let rythme = $state<{ parJour: number; mois: number } | null>(null);
   let jeton = 0;
   $effect(() => {
@@ -77,10 +77,9 @@
       .then(d => {
         if (j !== jeton) return;
         let jours = 0, gain = 0;
-        for (const x of [...(d?.periodes || [])].reverse()) {
+        for (const x of d?.periodes || []) {
           jours += (Date.parse(x.fin) - Date.parse(x.debut)) / 864e5;
-          gain += (x.variation || 0) - (x.hors_suivi || 0);
-          if (jours >= 182) break;
+          gain += (x.variation || 0) - (x.hors_suivi || 0) - (x.exceptionnel || 0);
         }
         rythme = jours > 30 ? { parJour: gain / jours, mois: Math.round(jours / 30.44) } : null;
       })

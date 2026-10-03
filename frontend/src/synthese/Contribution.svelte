@@ -17,10 +17,11 @@
   interface Periode {
     libelle: string; debut: string; fin: string; variation: number; epargne: number; capital: number;
     performance: number; hors_suivi?: number; versements?: number; comptes_hors_suivi?: Compte[];
+    exceptionnel?: number; flux_exceptionnels?: { date: string; montant: number; compte: string; owner: string }[];
   }
   interface Reponse {
     periodes?: Periode[]; total_variation: number; total_epargne: number; total_capital: number;
-    total_performance: number; total_hors_suivi?: number;
+    total_performance: number; total_hors_suivi?: number; total_exceptionnel?: number; seuil_exceptionnel?: number;
   }
 
   let { hote, masque = false }: { hote: HTMLElement; masque?: boolean } = $props();
@@ -50,14 +51,14 @@
   // Une periode sans mouvement ni apport n'apporte rien : elle occuperait une
   // colonne pour un trait a zero. Moins de deux periodes : rien a comparer.
   const periodes = $derived((donnees?.periodes || [])
-    .filter(p => [p.variation, p.epargne, p.capital, p.hors_suivi].some(v => Math.abs(v || 0) > 100)));
+    .filter(p => [p.variation, p.epargne, p.capital, p.hors_suivi, p.exceptionnel].some(v => Math.abs(v || 0) > 100)));
   const visible = $derived(periodes.length >= 2);
   $effect(() => { hote.style.display = visible ? '' : 'none'; });
 
   // ── Dessin, a la largeur reelle de la carte (echelle 1) ────────────────
   let largeurHote = $state(0);
   const H = 150, BAS = 30, MARGE = 26;
-  const parts3 = (p: Periode) => [p.epargne, p.capital, p.performance, p.hors_suivi || 0];
+  const parts3 = (p: Periode) => [p.epargne, p.capital, p.performance, p.hors_suivi || 0, p.exceptionnel || 0];
 
   /** « +12 k » au-dessus de mille, la valeur exacte en deca. Ecrit a la main,
    *  ce libelle doit suivre le mode discretion lui-meme. */
@@ -92,7 +93,8 @@
       };
       // Les segments d'abord : ce sont eux qui font monter le sommet.
       seg(p.performance, 'var(--chart-1)'); seg(p.capital, 'var(--chart-2)');
-      seg(p.epargne, 'var(--chart-4)'); seg(p.hors_suivi || 0, 'var(--text-muted)');
+      seg(p.epargne, 'var(--chart-4)'); seg(p.exceptionnel || 0, 'var(--chart-3)');
+      seg(p.hors_suivi || 0, 'var(--text-muted)');
       const total = parts3(p).reduce((t, v) => t + v, 0);
       return { cx, x, segs, total, yVal: Math.min(hautCumul, zero) - 7, pas };
     });
@@ -122,6 +124,9 @@
   const comptesHors = $derived((donnees?.periodes || []).flatMap(x => x.comptes_hors_suivi || []));
   const hors = $derived(donnees?.total_hors_suivi || 0);
   let horsOuvert = $state(false);
+  const fluxExc = $derived((donnees?.periodes || []).flatMap(x => x.flux_exceptionnels || []));
+  const exc = $derived(donnees?.total_exceptionnel || 0);
+  let excOuvert = $state(false);
   const SENS = { entree: 'apparu', sortie: 'disparu', deplace: 'changé d’enveloppe' };
 </script>
 
@@ -136,7 +141,7 @@
   <div id="contribution-chart" bind:clientWidth={largeurHote}>
     <div class="courbe-cadre" bind:this={cadre}>
       <svg class="contrib-svg" viewBox="0 0 {dessin.L} {H + BAS}" role="img"
-           aria-label="Décomposition de la variation par période : épargne, capital remboursé, performance"
+           aria-label="Décomposition de la variation par période : épargne, flux exceptionnels, capital remboursé, performance"
            onpointerleave={() => actif = null}>
         <line x1="10" y1={dessin.zero.toFixed(1)} x2={dessin.L - 10} y2={dessin.zero.toFixed(1)} class="contrib-zero"/>
         {#each dessin.colonnes as c, i (i)}
@@ -159,6 +164,7 @@
           <span class="courbe-bulle-d">{p.libelle} · du {fmtDate(p.debut)} au {fmtDate(p.fin)}</span>
           <span class="courbe-bulle-l"><i style:background="var(--chart-4)"></i>Épargne nouvelle<b>{signe(p.epargne)}</b></span>
           {#if Math.abs(p.versements || 0) >= 1}<span class="courbe-bulle-a">dont {fmt(p.versements)} versés sur les placements</span>{/if}
+          {#if Math.abs(p.exceptionnel || 0) >= 1}<span class="courbe-bulle-l"><i style:background="var(--chart-3)"></i>Flux exceptionnels<b>{signe(p.exceptionnel || 0)}</b></span>{/if}
           {#if Math.abs(p.capital || 0) >= 1}<span class="courbe-bulle-l"><i style:background="var(--chart-2)"></i>Capital remboursé<b>{signe(p.capital)}</b></span>{/if}
           <span class="courbe-bulle-l"><i style:background="var(--chart-1)"></i>Performance<b>{signe(p.performance)}</b></span>
           {#if Math.abs(hs) >= 1}<span class="courbe-bulle-l"><i style:background="var(--text-muted)"></i>Comptes ajoutés ou retirés<b>{signe(hs)}</b></span>{/if}
@@ -170,6 +176,13 @@
   <div class="stack-legend" id="contribution-legend">
     <span><i style:background="var(--chart-4)"></i>Épargne nouvelle
       <b class="num">{fmt(donnees.total_epargne)}</b></span>
+    {#if Math.abs(exc) >= 1}
+      <!-- Un heritage, une vente : dans le patrimoine, hors du rythme d'epargne. -->
+      <button type="button" class="contrib-hors" aria-expanded={excOuvert} aria-controls="contrib-exc-liste"
+              onclick={() => excOuvert = !excOuvert}>
+        <i style:background="var(--chart-3)"></i>Flux exceptionnels <b class="num">{fmt(exc)}</b>
+        <span class="contrib-hors-voir">{fluxExc.length} flux ▾</span></button>
+    {/if}
     {#if Math.abs(donnees.total_capital || 0) >= 1}<span><i style:background="var(--chart-2)"></i>Capital remboursé
       <b class="num">{fmt(donnees.total_capital)}</b></span>{/if}
     <span><i style:background="var(--chart-1)"></i>Performance
@@ -183,6 +196,15 @@
         <span class="contrib-hors-voir">{comptesHors.length} compte{comptesHors.length > 1 ? 's' : ''} ▾</span></button>
     {/if}
     {#if part !== null && donnees.total_variation > 0}<span class="contrib-part">{fmtPct(part, 0)} de la hausse vient des marchés</span>{/if}
+    {#if fluxExc.length}
+      <ul class="contrib-hors-liste" id="contrib-exc-liste" hidden={!excOuvert}>
+        {#each fluxExc as f, i (i)}
+          <li><span>{f.compte}{f.owner ? ` · ${f.owner}` : ''}</span><span class="contrib-hors-date">le {fmtDate(f.date)}</span><b class="num">{fmt(f.montant)}</b></li>
+        {/each}
+        <li class="contrib-hors-aide">Versements et retraits d'au moins {fmt(donnees.seuil_exceptionnel || 0)} :
+          ils restent dans le patrimoine, mais pas dans l'épargne nouvelle. Seuil réglable dans Réglages → Préférences.</li>
+      </ul>
+    {/if}
     {#if comptesHors.length}
       <ul class="contrib-hors-liste" id="contrib-hors-liste" hidden={!horsOuvert}>
         {#each comptesHors as c, i (i)}

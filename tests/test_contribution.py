@@ -243,6 +243,13 @@ class TestComptesHorsSuivi:
     LIVRET = ('Paul', 'Livret', 'Bourso', '', '')
     AV = ('Paul', 'Assurance-vie', 'CA31', '', '')
 
+    @pytest.fixture(autouse=True)
+    def _seuil_haut(self):
+        # Ces 100 000 € seraient des flux exceptionnels : ce n'est pas l'objet ici.
+        with get_db() as conn:
+            conn.execute("INSERT OR REPLACE INTO config (key, value) VALUES ('seuil_flux_exceptionnel', '1000000')")
+            conn.commit()
+
     def test_un_compte_apparu_sans_versement_n_est_pas_de_la_performance(self):
         with get_db() as conn:
             conn.execute("INSERT INTO flux (date, owner, envelope, establishment, type, amount) "
@@ -304,3 +311,56 @@ class TestEpargneEtCapital:
         assert p['capital'] == 1500
         assert p['performance'] == 300
         assert p['epargne'] + p['capital'] + p['hors_suivi'] + p['performance'] == p['variation']
+
+
+class TestFluxExceptionnels:
+    """Un heritage recu sur un livret, puis place : dans le patrimoine, hors de
+    l'epargne. Le transfert interne, enregistre sur ses deux jambes, s'annule."""
+
+    LIVRET = ('Paul', 'Livret A', 'Bourso', '', '')
+    AV = ('Paul', 'Assurance-vie', 'Assureur', '', '')
+
+    def _flux(self, conn, date, env, type_, montant):
+        conn.execute('INSERT INTO flux (date, owner, envelope, type, amount) VALUES (?,?,?,?,?)',
+                     (date, 'Paul', env, type_, centimes(montant)))
+
+    def _arretes(self, a, b):
+        def arr(d, comptes):
+            n = sum(c['net'] for c in comptes.values())
+            return {'date': d, 'family_net': n, 'by_owner': {'Paul': n}, 'comptes': comptes}
+        return [arr('2026-01-31', a), arr('2026-03-31', b)]
+
+    def test_heritage_hors_epargne_transfert_neutre(self):
+        with get_db() as conn:
+            self._flux(conn, '2026-02-10', 'Livret A', 'Versement', 100000)   # recu d'ailleurs
+            self._flux(conn, '2026-02-20', 'Livret A', 'Retrait', 60000)      # vers l'assurance-vie
+            self._flux(conn, '2026-02-21', 'Assurance-vie', 'Versement', 60000)
+            conn.commit()
+            avant = {self.LIVRET: {'net': 10000, 'liq': True}, self.AV: {'net': 50000}}
+            # Livret : +100 000 - 60 000 + 1 000 de salaire ; AV : +60 000 + 500.
+            apres = {self.LIVRET: {'net': 51000, 'liq': True}, self.AV: {'net': 110500}}
+            r = decompose(conn, self._arretes(avant, apres))
+        p = r['periodes'][0]
+        assert p['exceptionnel'] == 100000
+        assert p['epargne'] == 1000
+        assert p['performance'] == 500
+        assert p['epargne'] + p['capital'] + p['hors_suivi'] + p['exceptionnel'] + p['performance'] == p['variation']
+        assert r['total_exceptionnel'] == 100000
+
+    def test_seuil_reglable(self, client):
+        r = client.put('/api/config/seuil-exceptionnel', json={'seuil': '150 000'},
+                       headers={'X-CSRF-Token': 'test'})
+        assert r.status_code == 200 and r.get_json()['seuil'] == 150000
+        assert client.get('/api/config').get_json()['seuil_flux_exceptionnel'] == 150000
+        with get_db() as conn:
+            self._flux(conn, '2026-02-10', 'Livret A', 'Versement', 100000)
+            conn.commit()
+            avant = {self.LIVRET: {'net': 10000, 'liq': True}}
+            apres = {self.LIVRET: {'net': 110000, 'liq': True}}
+            p = decompose(conn, self._arretes(avant, apres))['periodes'][0]
+        assert p['exceptionnel'] == 0 and p['epargne'] == 100000
+
+    def test_seuil_invalide_refuse(self, client):
+        for v in (0, -5, 'abc', None, True):
+            r = client.put('/api/config/seuil-exceptionnel', json={'seuil': v}, headers={'X-CSRF-Token': 'test'})
+            assert r.status_code == 400, v

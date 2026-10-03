@@ -7,7 +7,7 @@ import { chargerPreferences, lirePref } from './preferences.js';
 import { etiqueter, dateCourte } from './select-etiquette.js';
 import { fmtDate, esc, applyChartTheme, refreshChartsTheme } from './utils.js';
 import { api, buildSelects } from './api.js';
-import { closeModal, openModal, trapModalFocus, installModalScrollLock } from './dialogs.js';
+import { closeModal, openModal, trapModalFocus, installModalScrollLock, toast } from './dialogs.js';
 import { wireDrilldownEvents, drilldownHistory } from './drilldown.js';
 import { wireTargetsEvents } from './targets.js';
 import { loadUserAlertsAsync, saveUserAlerts } from './alerts.js';
@@ -510,6 +510,20 @@ function wireEvents() {
     e.preventDefault();
     switchTab(btn.dataset.tabSwitch);
   });
+
+  // Seuil des flux exceptionnels : un reglage de calcul, partage par le foyer.
+  const champSeuil = document.getElementById('pref-seuil-exc');
+  if (champSeuil) {
+    champSeuil.value = String(S.config?.seuil_flux_exceptionnel ?? 20000).replace('.', ',');
+    document.getElementById('pref-seuil-form')?.addEventListener('submit', async e => {
+      e.preventDefault();
+      try {
+        const r = await api('PUT', '/api/config/seuil-exceptionnel', { seuil: champSeuil.value });
+        if (S.config) S.config.seuil_flux_exceptionnel = r.seuil;
+        toast('Seuil enregistré : les rythmes sont recalculés au prochain affichage');
+      } catch {}
+    });
+  }
 
   // Bouton d'aide raccourcis clavier
   document.getElementById('btn-keyboard-help')?.addEventListener('click', () => {

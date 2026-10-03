@@ -748,6 +748,17 @@
             <div><b>Actifs</b><p>Colonnes affichées dans le tableau des actifs</p></div>
             <div id="pref-col-actifs"><button type="button" class="settings-item" id="actifs-col-picker">Choisir</button></div>
           </div>
+          <h3>Calculs</h3>
+          <div class="pref-ligne">
+            <div><b>Flux exceptionnel</b><p>Un versement ou un retrait d'au moins ce montant (héritage, vente) reste
+              dans le patrimoine, mais sort du rythme d'épargne : objectif, projection, d'où vient la hausse</p></div>
+            <div><form id="pref-seuil-form" class="pref-seuil">
+              <label for="pref-seuil-exc" class="sr-only">Seuil en euros</label>
+              <input type="text" inputmode="decimal" id="pref-seuil-exc" autocomplete="off" size="8">
+              <span>€</span>
+              <button type="submit" class="settings-item">Enregistrer</button>
+            </form></div>
+          </div>
           <h3>Application</h3>
           <div class="pref-ligne">
             <div><b>Clés API</b><p>Nécessaires à l'analyse de l'onglet Conseil</p></div>
