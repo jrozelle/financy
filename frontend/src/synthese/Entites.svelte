@@ -10,7 +10,8 @@
   import { fmt, fmtPct } from '/static/modules/utils.js';
 
   interface Entite { name: string; type?: string | null; gross_assets: number; debt: number; net_assets: number }
-  interface Pos { owner: string; entity: string | null; net_attributed?: number; gross_attributed?: number;
+  interface Pos { owner: string; entity: string | null; value?: number; net_value?: number;
+                  net_attributed?: number; gross_attributed?: number;
                   debt_attributed?: number; ownership_pct?: number; debt_pct?: number | null }
   let { hote, entites = [], positions = [], owner = 'Famille', masque = false }: {
     hote: HTMLElement; entites?: Entite[]; positions?: Pos[]; owner?: string; masque?: boolean;
@@ -24,13 +25,19 @@
       const somme = (champ: keyof Pos, ps = liees) => ps.reduce((s, p) => s + ((p[champ] as number) || 0), 0);
       const brutFamille = somme('gross_attributed');
       const siennes = liees.filter(p => p.owner === owner);
+      // Valeur et dette a la date de l'arrete affiche, celles des positions :
+      // la fiche de l'entite garde sa derniere saisie, et la ligne melait
+      // deux dates (un brut ancien face a une quote-part du jour).
+      const ref = liees[0];
+      const brut = ref?.value ?? e.gross_assets;
+      const dette = ref && ref.value != null && ref.net_value != null ? ref.value - ref.net_value : e.debt;
       return {
-        e, netFamille: somme('net_attributed'),
-        pctFamille: e.gross_assets > 0 ? fmtPct(brutFamille / e.gross_assets * 100, 0) : '',
+        e, brut, dette, net: brut - dette, netFamille: somme('net_attributed'),
+        pctFamille: brut > 0 ? fmtPct(brutFamille / brut * 100, 0) : '',
         netTitulaire: famille ? null : somme('net_attributed', siennes),
-        pctTitulaire: !famille && e.gross_assets > 0 ? siennes.reduce((s, p) => s + (p.ownership_pct || 0), 0) : null,
+        pctTitulaire: !famille && brut > 0 ? siennes.reduce((s, p) => s + (p.ownership_pct || 0), 0) : null,
         // Le net suit aussi la part de DETTE, qui peut differer de la propriete.
-        pctDette: !famille && e.debt > 0 ? siennes.reduce((s, p) => s + (p.debt_pct ?? p.ownership_pct ?? 0), 0) : null,
+        pctDette: !famille && dette > 0 ? siennes.reduce((s, p) => s + (p.debt_pct ?? p.ownership_pct ?? 0), 0) : null,
       };
     });
   });
@@ -58,9 +65,9 @@
           <tr>
             <td><strong>{l.e.name}</strong></td>
             <td>{l.e.type || '—'}</td>
-            <td style="text-align:right">{fmt(l.e.gross_assets)}</td>
-            <td style="text-align:right">{l.e.debt > 0 ? fmt(l.e.debt) : '—'}</td>
-            <td style="text-align:right;font-weight:600" class={l.e.net_assets >= 0 ? 'pos' : 'neg'}>{fmt(l.e.net_assets)}</td>
+            <td style="text-align:right">{fmt(l.brut)}</td>
+            <td style="text-align:right">{l.dette > 0 ? fmt(l.dette) : '—'}</td>
+            <td style="text-align:right;font-weight:600" class={l.net >= 0 ? 'pos' : 'neg'}>{fmt(l.net)}</td>
             <td style="text-align:right">
               {fmt(l.netFamille)}
               <span style="font-size:var(--fs-2xs);color:var(--text-muted);margin-left:var(--esp-4)">{l.pctFamille}</span>
