@@ -1414,6 +1414,10 @@ def compute_position(pos, entity_map=None, ref=None, holdings_map=None):
         'mobilizable_pct':   mobilizable_pct,
         'mobilizable_value': mobilizable_val,
     }
+    if entity and entity_map and entity in entity_map and entity_map[entity].get('tresorerie'):
+        # Part de la valeur de l'entite qui est sa tresorerie : l'arbre separe
+        # les actifs (parts, participations) de l'argent en banque.
+        result['tresorerie_attribuee'] = entity_map[entity]['tresorerie'] * ownership_pct
     if holdings is not None:
         result['has_holdings']    = True
         result['holdings_count']  = len(holdings)
@@ -1600,7 +1604,8 @@ def get_entity_map(conn, date=None):
         rows = conn.execute('''
             SELECT e.name,
                    COALESCE(s.gross_assets, e.gross_assets) AS gross_assets,
-                   COALESCE(s.debt,         e.debt)         AS debt
+                   COALESCE(s.debt,         e.debt)         AS debt,
+                   s.tresorerie
             FROM entities e
             LEFT JOIN entity_snapshots s
               ON s.entity_name = e.name
@@ -1617,5 +1622,7 @@ def get_entity_map(conn, date=None):
     else:
         rows = conn.execute('SELECT name, gross_assets, debt FROM entities').fetchall()
     from services.montants import euros
-    return {r['name']: {'gross_assets': euros(r['gross_assets'] or 0), 'debt': euros(r['debt'] or 0)}
+    # La tresorerie comprise dans la valeur, quand l'arrete d'entite la retient.
+    return {r['name']: {'gross_assets': euros(r['gross_assets'] or 0), 'debt': euros(r['debt'] or 0),
+                        'tresorerie': euros(r['tresorerie']) if 'tresorerie' in r.keys() and r['tresorerie'] else 0.0}
             for r in rows}

@@ -3,6 +3,8 @@ export interface Position {
   id: number; date: string; owner: string; category: string; envelope: string | null;
   establishment: string | null; entity: string | null; label: string | null; notes: string | null;
   ownership_pct: number | null;
+  /** Part de la valeur de l entite qui est sa tresorerie (arrete d entite). */
+  tresorerie_attribuee?: number;
   gross_attributed: number; debt_attributed: number; net_attributed: number;
   gain_attributed: number | null; gain_pct: number | null; gain_lignes: number; holdings_count: number;
   has_holdings: boolean;

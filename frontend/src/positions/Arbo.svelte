@@ -234,7 +234,13 @@
         f.chip = '';
         parEntite.get(p.entity)!.enfants.push(f);
       });
-      parEntite.forEach(e => Object.assign(e, somme(e.enfants)));
+      parEntite.forEach(e => {
+        Object.assign(e, somme(e.enfants));
+        // La valeur d'une entite a releves comprend sa tresorerie : la dire,
+        // a cote de ce que valent ses actifs.
+        const treso = e.enfants.reduce((t, f) => t + (f.position?.tresorerie_attribuee || 0), 0);
+        if (treso) e.sous += ` · ${e.sous === 'Holding' ? 'participations' : 'actifs'} ${fmt(e.brut - treso)} · trésorerie ${fmt(treso)}`;
+      });
       comptes = parContrat(comptes, 1);
       comptes.sort((a, b) => b.brut - a.brut);
       return [{ cle: `n${n.id}`, niveau: 0, nom: n.nom, chip: '',
