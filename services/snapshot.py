@@ -8,7 +8,7 @@ Utilise par :
 """
 import logging
 from models import (compute_position, get_entity_map, get_holdings_map,
-                    load_referential, snapshot_holdings_to_date, validate_number, parse_number)
+                    _holding_decision, load_referential, snapshot_holdings_to_date, validate_number, parse_number)
 
 from services.montants import centimes, euros, ligne_en_euros, lignes_en_euros
 
@@ -281,6 +281,18 @@ def _dupliquer_avec_correspondance(conn, source_date, target_date):
     for r in rows:
         p = compute_position(ligne_en_euros('positions', r), entity_map, ref, holdings_map)
         override = {'value': p['value'], 'debt': euros(r['debt'])}
-        correspondance[r['id']] = duplicate_position(conn, r, target_date, value_override=override)
+        correspondance[r['id']] = nouveau = duplicate_position(conn, r, target_date, value_override=override)
+        # Les lignes aussi se figent a la valeur retenue. Recopiee telle
+        # quelle, la valeur enregistree d'une ligne cotee restait celle du
+        # jour de saisie : un bitcoin saisi en juillet valait encore son cours
+        # de juillet dans les arretes de septembre, et la hausse tombait d'un
+        # bloc, « inexpliquee », sur le premier arrete valorise au cours.
+        for h in holdings_map.get(r['id']) or []:
+            if not h.get('last_price') or h.get('is_priceable') is False:
+                continue
+            valeur, _ = _holding_decision(h)
+            if h.get('market_value') is None or abs(valeur - h['market_value']) > 0.005:
+                conn.execute('UPDATE holdings SET market_value=?, as_of_date=? WHERE position_id=? AND isin=?',
+                             (centimes(valeur), h.get('last_price_date') or target_date, nouveau, h['isin']))
     snapshot_holdings_to_date(conn, target_date)
     return correspondance

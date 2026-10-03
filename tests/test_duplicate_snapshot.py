@@ -113,3 +113,22 @@ class TestDuplicateSnapshot:
                         json={'source_date': D1, 'target_date': D2},
                         headers=CSRF_HEADERS)
         assert r.status_code == 404
+
+
+def test_ligne_cotee_figee_au_cours_a_la_copie(client):
+    """Une ligne cotee dont la valeur enregistree date de la saisie : la copie
+    la fige au cours retenu, sinon les arretes suivants gardent l'ancien."""
+    _seed_snapshot_with_holdings(client, D1)
+    with get_db() as c:
+        c.execute("UPDATE securities SET is_priceable=1, last_price=600, last_price_date='2026-05-31' "
+                  "WHERE isin='FR0010315770'")
+        # Saisie du 01/05, plus ancienne que le cours : c'est le cours qui vaut.
+        c.execute("UPDATE holdings SET as_of_date='2026-05-01' WHERE isin='FR0010315770'")
+        c.commit()
+    r = client.post('/api/snapshots/duplicate', json={'source_date': D1, 'target_date': D2},
+                    headers=CSRF_HEADERS)
+    assert r.status_code == 200, r.get_json()
+    with get_db() as c:
+        h = c.execute("SELECT h.market_value, h.as_of_date FROM holdings h JOIN positions p ON p.id=h.position_id "
+                      "WHERE p.date=? AND h.isin='FR0010315770'", (D2,)).fetchone()
+    assert h['market_value'] == 20 * 600 * 100 and h['as_of_date'] == '2026-05-31'
