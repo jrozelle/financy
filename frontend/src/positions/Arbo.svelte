@@ -181,12 +181,44 @@
     };
   }
 
+  /** Un contrat dont l'import a range chaque classe d'actif dans sa position
+   *  (PER fonds euros, PER actions) : une seule ligne a sa valeur totale, les
+   *  poches dessous. Meme titulaire, enveloppe, etablissement et libelle,
+   *  classes toutes differentes. */
+  function parContrat(fs: Noeud[], niveau: number, avecEtab = true): Noeud[] {
+    const groupes = new Map<string, Noeud[]>();
+    fs.forEach(f => {
+      const p = f.position;
+      const k = p ? `c${p.owner}|${p.envelope || p.category}|${p.establishment || ''}|${p.label || ''}` : f.cle;
+      groupes.set(k, [...(groupes.get(k) || []), f]);
+    });
+    return [...groupes].flatMap(([k, g]) => {
+      // Deux comptes de meme classe chez le meme etablissement sont deux
+      // contrats (les livrets A des enfants tenus au nom d'un parent) : ils
+      // restent distincts. Seules des classes differentes sont des poches.
+      if (g.length < 2 || new Set(g.map(f => f.position!.category)).size < g.length) return g;
+      const p = g[0].position!, chip = g[0].chip;
+      const descendre = (n: Noeud) => { n.niveau++; n.enfants.forEach(descendre); };
+      g.forEach(f => {
+        descendre(f);
+        f.nom = f.position!.category || '—';
+        f.sous = '';
+        f.chip = '';
+      });
+      g.sort((a, b) => b.brut - a.brut);
+      return { cle: k, niveau, nom: g[0].position!.envelope || p.category || '—',
+               sous: [p.label, avecEtab ? p.establishment : null, `${g.length} poches`].filter(Boolean).join(' · '),
+               chip, couleur: g[0].couleur, pastille: g[0].pastille,
+               visuel: g[0].visuel, poches: true, enfants: g, ...somme(g) };
+    });
+  }
+
   function parNature(ps: Position[]): Noeud[] {
     return NATURES.flatMap(n => {
       const dansN = ps.filter(p => natureDe(p.category, p.envelope) === n.id);
       if (!dansN.length) return [];
       const parEntite = new Map<string, Noeud>();
-      const comptes: Noeud[] = [];
+      let comptes: Noeud[] = [];
       dansN.forEach(p => {
         if (!p.entity) { comptes.push(feuille(p, 1)); return; }
         if (!parEntite.has(p.entity)) {
@@ -203,6 +235,7 @@
         parEntite.get(p.entity)!.enfants.push(f);
       });
       parEntite.forEach(e => Object.assign(e, somme(e.enfants)));
+      comptes = parContrat(comptes, 1);
       comptes.sort((a, b) => b.brut - a.brut);
       return [{ cle: `n${n.id}`, niveau: 0, nom: n.nom, chip: '',
                 sous: `${n.aide} · ${comptes.length} compte${comptes.length > 1 ? 's' : ''}`,
@@ -224,6 +257,7 @@
       });
       const liste = [...etabs.values()];
       liste.forEach(e => {
+        e.enfants = parContrat(e.enfants, 2, false);
         Object.assign(e, somme(e.enfants));
         e.enfants.sort((a, b) => b.brut - a.brut);
         e.sous = `${e.enfants.length} compte${e.enfants.length > 1 ? 's' : ''}`;
@@ -249,6 +283,7 @@
     });
     return [...etabs.values()].map(e => {
       const qui = new Set(e.enfants.map(f => f.position!.owner));
+      e.enfants = parContrat(e.enfants, 1, false);
       e.sous = `${e.enfants.length} compte${e.enfants.length > 1 ? 's' : ''}`
         + (qui.size > 1 ? ` · ${qui.size} titulaires` : '');
       // Un seul titulaire : « Ajouter » cree le compte a son nom ; plusieurs,
@@ -434,7 +469,7 @@
         class="arbo-pv-note">{p.gain_lignes}/{p.holdings_count} lignes</span>{/if}{/if}
   {:else if n.mesures}
     <span class={n.gain >= 0 ? 'pv-hausse' : 'pv-baisse'}>{signe(n.gain)}</span><span
-      class="arbo-pv-note">{n.mesures} compte{n.mesures > 1 ? 's' : ''} mesuré{n.mesures > 1 ? 's' : ''}</span>
+      class="arbo-pv-note">{n.mesures} {n.poches ? 'poche' : 'compte'}{n.mesures > 1 ? 's' : ''} mesuré{n.poches ? 'e' : ''}{n.mesures > 1 ? 's' : ''}</span>
   {/if}
 {/snippet}
 

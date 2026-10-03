@@ -23,6 +23,8 @@ export interface Noeud {
   couleur?: string; pastille?: boolean;
   brut: number; dette: number; gain: number; mesures: number; mob: number;
   enfants: Noeud[]; position?: Position; titres?: boolean;
+  /** Contrat range en plusieurs positions, une par classe d'actif. */
+  poches?: boolean;
   contexte?: { owner: string | null; establishment: string | null; entity: string | null };
   /** Ligne de titres : plus-value deja calculee (null = PRU inconnu). */
   gainTitre?: number | null;

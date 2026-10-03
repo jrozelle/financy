@@ -3413,7 +3413,7 @@ th[data-sort]:focus-visible { outline: 2px solid var(--primary); outline-offset:
 .arbo tr.arbo-l0 > td { background: var(--bg); font-weight: 600; }
 .arbo tr.arbo-l0 .arbo-titre { font-size: var(--fs-md); }
 .arbo tr.arbo-l1 .arbo-titre { font-weight: 500; }
-.arbo tr.arbo-l2 .arbo-titre, .arbo tr.arbo-l3 .arbo-titre { color: var(--text-muted); }
+.arbo tr.arbo-l2 .arbo-titre, .arbo tr.arbo-l3 .arbo-titre, .arbo tr.arbo-l4 .arbo-titre { color: var(--text-muted); }
 @media (hover: hover) { .arbo tbody tr:hover > td { background: var(--card-hover); } }
 
 .arbo-nom { min-width: 260px; }
