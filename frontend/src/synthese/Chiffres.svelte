@@ -39,16 +39,20 @@
   /** Deux pastilles sous le net : depuis le dernier arrete, et sur un an —
    *  ou depuis le premier arrete tant qu'un an manque. */
   const pastilles = $derived.by(() => {
-    const out: { sens: 'pos' | 'neg'; montant: string; pct: string; duree: string }[] = [];
-    const puce = (d: number | null | undefined, pc: number | null | undefined, du: string) => {
+    const out: { sens: 'pos' | 'neg'; montant: string; pct: string; duree: string; exc: string }[] = [];
+    // Une variation brute est juste mais trompeuse quand un heritage y est :
+    // la pastille dit la part des flux exceptionnels qu'elle contient.
+    const puce = (d: number | null | undefined, pc: number | null | undefined, du: string, depuis: string) => {
       if (d == null && pc == null) return;
+      const x = periodes.filter(q => q.debut >= depuis).reduce((t, q) => t + (q.exceptionnel || 0), 0);
       out.push({ sens: (d ?? pc)! >= 0 ? 'pos' : 'neg', duree: du,
                  montant: d != null ? `${d >= 0 ? '+' : '−'}${fmt(Math.abs(d))}` : '',
-                 pct: pc != null ? ` ${fmtPct(pc, 1, true)}` : '' });
+                 pct: pc != null ? ` ${fmtPct(pc, 1, true)}` : '',
+                 exc: Math.abs(x) >= 1 ? `dont ${x >= 0 ? '+' : '−'}${fmt(Math.abs(x))} de flux exceptionnels` : '' });
     };
     const { dates } = p, valeurs = p.series.net;
     const v = p.variation;
-    if (v?.prev_date) puce(v.net_delta, v.net_pct, duree(v.prev_date, p.date || dates[dates.length - 1]));
+    if (v?.prev_date) puce(v.net_delta, v.net_pct, duree(v.prev_date, p.date || dates[dates.length - 1]), v.prev_date);
     const i = dates.findIndex(d => d === (p.date || dates[dates.length - 1]));
     const fin = i >= 0 ? i : dates.length - 1;
     if (fin < 0) return out;
@@ -57,7 +61,7 @@
     if (debut < 0 || debut >= fin) debut = 0;
     const v0 = valeurs[debut], v1 = valeurs[fin];
     if (fin > debut && v0) puce(null, ((v1 ?? 0) - v0) / Math.abs(v0) * 100,
-                               dates[debut] <= cible ? '1 an' : `depuis le ${fmtDate(dates[debut])}`);
+                               dates[debut] <= cible ? '1 an' : `depuis le ${fmtDate(dates[debut])}`, dates[debut]);
     return out;
   });
   // ── Rythme : la variation du net sur tout l'historique, HORS comptes
@@ -67,15 +71,16 @@
   // dans le suivi pour de l'enrichissement.
   interface Periode { debut: string; fin: string; variation: number; hors_suivi?: number; exceptionnel?: number }
   let rythme = $state<{ parJour: number; mois: number } | null>(null);
+  let periodes = $state<Periode[]>([]);
   let jeton = 0;
   $effect(() => {
-    if (!p.objectif) { rythme = null; return; }
-    void p.date;
+    void p.date; void p.objectif;
     const j = ++jeton, q = new URLSearchParams({ limit: '40' });
     if (!p.famille && p.owner) q.set('owner', p.owner);
     api<{ periodes?: Periode[] }>('GET', `/api/contribution?${q}`, null, { silent: true })
       .then(d => {
         if (j !== jeton) return;
+        periodes = d?.periodes || [];
         let jours = 0, gain = 0;
         for (const x of d?.periodes || []) {
           jours += (Date.parse(x.fin) - Date.parse(x.debut)) / 864e5;
@@ -83,7 +88,7 @@
         }
         rythme = jours > 30 ? { parJour: gain / jours, mois: Math.round(jours / 30.44) } : null;
       })
-      .catch(() => { if (j === jeton) rythme = null; });
+      .catch(() => { if (j === jeton) { rythme = null; periodes = []; } });
   });
 
   // L'objectif est celui de la vue affichee (famille ou titulaire) : la jauge
@@ -112,7 +117,7 @@
 <div class="kpi-card clickable kpi-hero">
   <div class="kpi-label" id="kpi-net-label">{p.famille ? 'Patrimoine net famille' : `Patrimoine net — ${p.owner}`}</div>
   <div class="kpi-value" id="kpi-net">{fmt(p.kpi.net)}{#if pastilles.length}<div class="hero-puces">{#each pastilles as x, i (i)}<span
-    class="puce puce--{x.sens}">{x.montant}{x.pct}<small>{x.duree}</small></span>{/each}</div>{/if}</div>
+    class="puce puce--{x.sens}">{x.montant}{x.pct}<small>{x.duree}{#if x.exc}{' · '}{x.exc}{/if}</small></span>{/each}</div>{/if}</div>
   <div id="kpi-hero-goal" class={but ? 'hero-goal' : ''}>{#if but}
     <div class="g-track"><span class="g-fill" style:width="{but.pct.toFixed(1)}%"></span></div>
     <div class="g-foot">
