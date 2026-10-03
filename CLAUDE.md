@@ -36,6 +36,9 @@
   facultative sur un element deja explicite.
 - Un element ecarte d'un calcul ne disparait jamais sans explication : il figure
   dans un decompte, et le detail est consultable (statut, valeur, date).
+  Un compte clos (absent du dernier arrete : cloture, ou ancien classement
+  d'un bien reclasse depuis) n'est plus detenu : il n'est ni ecarte ni
+  decompte, il ne figure plus.
 - Un montant dit son perimetre. « Patrimoine financier » designe la poche de la
   synthese et elle seule ; un montant plus etroit porte son propre nom (« valeur
   mesuree », « lignes de titres », « arbitrable ») et se raccorde a elle quand
