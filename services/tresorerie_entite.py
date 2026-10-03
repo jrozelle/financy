@@ -28,7 +28,8 @@ NATURES = {
 # de cession. Les compter en revenus surestimerait le rendement.
 _EXCEPTIONNEL = re.compile(r'distrib\w* capital|plus-value', re.I)
 _REVENU = re.compile(r'scpi|dividende|distribution|activimmo|immorente|pierre europe|transitions europe', re.I)
-_ECHEANCE = re.compile(r'federal finance|pechean|echeance pret|remboursement pret', re.I)
+# « Ech Prêt 00002714416 05/05/26 Intérêts » : l'abreviation du Credit Agricole.
+_ECHEANCE = re.compile(r'federal finance|pechean|echeance pret|remboursement pret|\bech\.? pr[eê]t', re.I)
 _FRAIS = re.compile(r'qonto|abonnement|frais|cotisation|commission|honoraires|facture|fact-\d', re.I)
 # Fournisseurs propres a une entite (son cabinet comptable...) : ils se
 # reglent en base, cle `tresorerie_fournisseurs` (noms separes par des
@@ -303,8 +304,8 @@ def bilan(conn, entite, mois=12):
     valeur = euros(snap['gross_assets']) if snap else None
 
     revenus = tot['revenu']
-    echeances = -tot['echeance']
-    frais = -tot['frais']
+    echeances = -tot['echeance'] or 0.0     # jamais « -0 € »
+    frais = -tot['frais'] or 0.0
     apports = tot['apport']
     net = revenus + tot['revenu_exceptionnel'] - echeances - frais
     # Tresorerie reconstituee : tous comptes, solde d'ouverture du premier

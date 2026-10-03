@@ -332,3 +332,8 @@ def test_credit_agricole_libelle_finissant_par_un_nombre():
     assert [o.montant for o in rel.operations] == [500.0, -2072.55]
     assert rel.operations[1].libelle.endswith('Cca T1 20')
     assert rel.solde_final == 3427.45
+
+
+def test_echeance_abregee_credit_agricole():
+    from services.tresorerie_entite import classer
+    assert classer('Ech Prêt 00000000001 05/05/26 Intérêts', -500.0, 'Holding Exemple') == 'echeance'
