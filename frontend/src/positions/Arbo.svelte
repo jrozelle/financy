@@ -236,10 +236,26 @@
       });
       parEntite.forEach(e => {
         Object.assign(e, somme(e.enfants));
-        // La valeur d'une entite a releves comprend sa tresorerie : la dire,
-        // a cote de ce que valent ses actifs.
-        const treso = e.enfants.reduce((t, f) => t + (f.position?.tresorerie_attribuee || 0), 0);
-        if (treso) e.sous += ` · ${e.sous === 'Holding' ? 'participations' : 'actifs'} ${fmt(e.brut - treso)} · trésorerie ${fmt(treso)}`;
+        // La valeur d'une entite a releves comprend sa tresorerie : deux
+        // lignes, ce que valent ses actifs et l'argent en banque. Un seul
+        // titulaire : elles remplacent sa ligne ; plusieurs : sous chacune.
+        e.enfants.forEach(f => {
+          const treso = f.position?.tresorerie_attribuee || 0;
+          if (!treso) return;
+          const actifs = e.sous === 'Holding' ? 'Participations' : 'Parts';
+          f.enfants = [
+            { cle: `${f.cle}a`, niveau: f.niveau + 1, nom: actifs, sous: '', chip: '',
+              brut: f.brut - treso, dette: f.dette, gain: 0, mesures: 0, mob: 0, enfants: [] },
+            { cle: `${f.cle}t`, niveau: f.niveau + 1, nom: 'Trésorerie', sous: '', chip: '',
+              brut: treso, dette: 0, gain: 0, mesures: 0, mob: 0, enfants: [] },
+          ];
+        });
+        if (e.enfants.length === 1 && e.enfants[0].enfants.length) {
+          const seul = e.enfants[0];
+          e.sous += ` · ${seul.nom} ${seul.sous}`;
+          // Sa ligne disparue, ses actions (Editer, Historique) passent aux parts.
+          e.enfants = seul.enfants.map((x, k) => ({ ...x, niveau: x.niveau - 1, ...(k ? {} : { position: seul.position }) }));
+        }
       });
       comptes = parContrat(comptes, 1);
       comptes.sort((a, b) => b.brut - a.brut);
