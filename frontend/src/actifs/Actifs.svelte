@@ -165,6 +165,14 @@
 </div>
 
 <div class="card card-table">
+  {#if filtre.type && filtre.value}
+    <!-- Un filtre ne se fait jamais oublier : memorise, il revenait a
+         l'ouverture suivante sans rien dire, et des lignes semblaient perdues. -->
+    {@const total = donnees?.lines?.length || 0}
+    <p class="arbo-filtre-actif">Filtré : {filtre.type === 'envelope' ? 'enveloppe' : 'classe'} « {filtre.value} »
+      — {lignes.length} ligne{lignes.length > 1 ? 's' : ''} sur {total}
+      <button type="button" class="btn-link" onclick={() => filtrer(filtre.type!, null)}>Tout afficher</button></p>
+  {/if}
   <table class="data-table">
     <thead id="actifs-thead" bind:this={entete}>
       <tr>
