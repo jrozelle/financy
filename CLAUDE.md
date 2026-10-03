@@ -133,7 +133,8 @@
   retrouves), tableau d'amortissement (restant du precedent − capital = restant
   du, zero a la fin, premiere echeance partant du montant du credit). Une
   colonne debit/credit se lit a la POSITION des mots quand le texte ne la dit
-  pas (Credit Agricole). Releve de titres : somme des lignes = « TOTAL DU
+  pas (Credit Agricole) ; le montant aussi, sans quoi un libelle finissant
+  par un nombre (« T1 20 ») s'y colle. Releve de titres : somme des lignes = « TOTAL DU
   PORTEFEUILLE » imprime (jamais « TOTAL DE L'ACTIF », especes comprises),
   sinon `ReleveIncoherentError` et rien n'est importe — y compris par le
   lecteur generique (`verifier_total`), qui prenait un cours a trois decimales

@@ -287,3 +287,48 @@ class TestImpotSocietes:
             conn.execute("INSERT INTO entities (name, type) VALUES ('SCI T', 'SCI')")
         assert client.put('/api/entites/SCI T/exercices', headers=H,
                           json={'exercices': [{'fin': 'hier', 'resultat': 1}]}).status_code == 400
+
+
+def _releve_ca(lignes):
+    """Releve Credit Agricole fictif : chaque mot a sa place, les montants
+    alignes a droite sous leur colonne, comme sur le vrai document."""
+    import warnings
+    warnings.filterwarnings('ignore', category=DeprecationWarning)
+    from io import BytesIO
+    from fpdf import FPDF
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font('Helvetica', size=8)
+    def droite(x1, y, t):
+        pdf.text(x1 - pdf.get_string_width(t), y, t)
+    pdf.text(10, 10, "CREDIT AGRICOLE RELEVE DE COMPTES EN EUROS")
+    pdf.text(10, 15, "Date d'arrêté : 31 Mai 2026")
+    pdf.text(10, 20, "Compte Courant n° 12345678901")
+    pdf.text(10, 30, 'Date Date Libellé des opérations')
+    pdf.text(150, 30, 'Débit')
+    pdf.text(180, 30, 'Crédit')
+    y = 40
+    for libelle, debit, credit in lignes:
+        pdf.text(10, y, libelle)
+        if debit:
+            droite(158, y, debit)
+        if credit:
+            droite(189, y, credit)
+        y += 6
+    return BytesIO(bytes(pdf.output()))
+
+
+def test_credit_agricole_libelle_finissant_par_un_nombre():
+    """« Cca T1 20 » suivi de « 2 072,55 » : le nombre du libelle ne se colle
+    pas au montant (202 072,55), il se lit dans sa colonne."""
+    from services.parsers.releve_bancaire import lire_releve
+    rel = lire_releve(_releve_ca([
+        ('Ancien solde créditeur au 30.04.2026 5 000,00', None, None),
+        ('04.05 04.05 Virement Exemple loyer', None, '500,00'),
+        ('12.05 12.05 Virement Exemple Cca T1 20', '2 072,55', None),
+        ('Total des opérations', '2 072,55', '500,00'),
+        ('Nouveau solde créditeur au 31.05.2026 3 427,45', None, None),
+    ]))
+    assert [o.montant for o in rel.operations] == [500.0, -2072.55]
+    assert rel.operations[1].libelle.endswith('Cca T1 20')
+    assert rel.solde_final == 3427.45

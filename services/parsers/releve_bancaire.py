@@ -139,13 +139,13 @@ def _lignes_pdf(page):
     lignes = []
     for _, ws in rangs:
         ws.sort(key=lambda w: w['x0'])
-        lignes.append((' '.join(w['text'] for w in ws), ws[-1]['x1']))
+        lignes.append((' '.join(w['text'] for w in ws), ws[-1]['x1'], ws))
     return lignes
 
 
 def _credit_agricole(pages):
     lignes = [l for p in pages for l in _lignes_pdf(p)]
-    texte = '\n'.join(t for t, _ in lignes)
+    texte = '\n'.join(t for t, _, _ in lignes)
     # L'arrete est imprime a cote de son libelle mais pas sur la meme ligne
     # de base : le texte brut de la page, lui, les accole.
     arr = _CA_ARRETE.search('\n'.join(p.extract_text() or '' for p in pages))
@@ -154,11 +154,14 @@ def _credit_agricole(pages):
     fin = date(int(arr[3]), MOIS[_sans_accents(arr[2]).lower()], int(arr[1]))
     # La colonne Credit se repere a son en-tete ; les montants qui finissent
     # au-dela de son milieu sont des credits.
-    seuil = None
+    seuil = colonne = None
     for p in pages:
         for w in p.extract_words():
             if w['text'] == 'Débit':
                 seuil = w['x1'] + 30
+                # Les montants s'alignent a droite sous l'en-tete : un grand
+                # montant deborde a gauche, jamais jusqu'au libelle.
+                colonne = w['x0'] - 60
                 break
         if seuil:
             break
@@ -175,7 +178,7 @@ def _credit_agricole(pages):
                  soldes['Nouveau'][0], soldes['Ancien'][1], soldes['Nouveau'][1])
     derniere = None
     totaux = None
-    for t, x1 in lignes:
+    for t, x1, mots in lignes:
         tot = _CA_TOTAL.match(t)
         if tot:
             totaux = [_nombre_fr(v) for v in tot.groups() if v]
@@ -185,8 +188,15 @@ def _credit_agricole(pages):
         if m:
             mois = int(m[2])
             annee = fin.year if mois <= fin.month else fin.year - 1
-            montant = _nombre_fr(m[6]) * (1 if x1 > seuil else -1)
-            derniere = Operation(date(annee, mois, int(m[1])).isoformat(), m[5].strip(), montant)
+            # Le montant se lit dans sa colonne : un libelle qui finit par un
+            # nombre (« Cca T1 20 ») s'y collait, 2 072,55 devenait 202 072,55.
+            libelle, brut = m[5], m[6]
+            dans_colonne = [w['text'] for w in mots if w['x0'] >= colonne]
+            if dans_colonne and ' '.join(dans_colonne) != brut and brut.endswith(' '.join(dans_colonne)):
+                libelle = f"{m[5]} {brut[:-len(' '.join(dans_colonne))].strip()}"
+                brut = ' '.join(dans_colonne)
+            montant = _nombre_fr(brut) * (1 if x1 > seuil else -1)
+            derniere = Operation(date(annee, mois, int(m[1])).isoformat(), libelle.strip(), montant)
             rel.operations.append(derniere)
         elif derniere and re.search(r'[a-z]', t) and not t.startswith(('Nouveau solde', 'Les sommes')):
             # Motif sur la ligne suivante, precede d'une reference collee.
