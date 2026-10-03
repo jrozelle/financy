@@ -85,7 +85,7 @@
   // de la liste ; le decompte et le detail sont dans le panneau « hors calcul ».
   const CACHES = new Set(['non_measurable', 'negative', 'closed']);
   const LIBELLES: Record<string, string> = { insufficient: 'historique insuffisant', negative: 'capital négatif',
-    non_measurable: 'aucun rendement à mesurer', closed: 'compte clos' };
+    non_measurable: 'aucun rendement à mesurer' };
   const visibles = $derived((d?.groups || []).filter(g => !CACHES.has(g.status)));
   const lignes = $derived.by(() => {
     const cle = CLES[tri.col], sens = tri.dir === 'asc' ? 1 : -1;
@@ -99,7 +99,9 @@
     });
   });
   const alertes = $derived((d?.groups || []).flatMap(g => (g.price_warnings || []).map(a => [g.label, a] as const)));
-  const exclus = $derived((d?.groups || []).filter(g => g.status !== 'ok'));
+  // Un compte clos (absent du dernier arrete : cloture, ou ancien classement
+  // d'un bien reclasse depuis) n'est plus detenu : il ne figure nulle part.
+  const exclus = $derived((d?.groups || []).filter(g => g.status !== 'ok' && g.status !== 'closed'));
   const courant = $derived(focus ? visibles.find(g => g.key === focus) || d?.global : d?.global);
   const vide = $derived(!d || d.insufficient || !d.groups?.length);
 
@@ -242,16 +244,15 @@
         aria-pressed={groupe === 'envelope'} aria-describedby="perf-maille-aide" onclick={() => groupe = 'envelope'}>Par enveloppe</button>
     </div>
     {#if focus}<button type="button" class="btn btn-sm" id="perf-reset" onclick={() => focus = null}>↩ Tout afficher</button>{/if}
-    <span class="perf-meta">{d.dates.length} arrêtés · {fmtDate(d.first_date)} → {fmtDate(d.date)}{#if d.excluded?.length || alertes.length}{' · '}<button
+    <span class="perf-meta">{d.dates.length} arrêtés · {fmtDate(d.first_date)} → {fmtDate(d.date)}{#if exclus.length || alertes.length}{' · '}<button
       type="button" class="perf-excl-toggle" id="perf-excl" aria-expanded={exclusOuverts} aria-controls="perf-excl-panel"
-      onclick={basculerExclus}>{d.excluded.length} hors calcul{alertes.length ? ` · ${alertes.length} cours à vérifier` : ''} {exclusOuverts ? '▴' : '▾'}</button>{/if}</span>
+      onclick={basculerExclus}>{exclus.length} hors calcul{alertes.length ? ` · ${alertes.length} cours à vérifier` : ''} {exclusOuverts ? '▴' : '▾'}</button>{/if}</span>
     <!-- Deplie juste sous son bouton ; replie, il existe vide et masque, pour
          que `aria-controls` designe toujours un element. -->
     {#if alertes.length || exclus.length}
       {#if !exclusOuverts}
         <div class="card perf-excl-panel" id="perf-excl-panel" hidden></div>
       {:else}
-        {@const nClos = exclus.filter(x => x.status === 'closed').length}
         <div class="card perf-excl-panel" id="perf-excl-panel" style="flex-basis:100%" bind:this={panneau}>
           {#if alertes.length}
             <div class="perf-excluded">
@@ -269,13 +270,12 @@
           {#if exclus.length}
             <div class="perf-excluded">
               <div class="perf-excluded-head">Hors calcul — {exclus.length} compte{exclus.length > 1 ? 's' : ''}
-                sans rendement mesurable{nClos ? `, dont ${nClos} clos qui ne figure${nClos > 1 ? 'nt' : ''} plus dans la synthèse` : ''}</div>
+                sans rendement mesurable</div>
               {#each exclus as x (x.key)}
                 {@const sous = [x.establishment, x.owner].filter(Boolean).join(' · ')}
                 <div class="perf-excluded-row">
                   <span>{x.envelope || x.label}{x.account_label ? ` ${x.account_label}` : ''}{#if sous}<span class="perf-sub">{sous}</span>{/if}</span>
-                  <span class="perf-excl-why">{x.reason || LIBELLES[x.status] || x.status}{x.status === 'closed' && x.last_date
-                    ? ` · dernière valeur le ${fmtDate(x.last_date)}` : ''}</span>
+                  <span class="perf-excl-why">{x.reason || LIBELLES[x.status] || x.status}</span>
                   <span class="num">{fmt(x.value)}</span>
                 </div>
               {/each}
