@@ -479,7 +479,8 @@ async function onPdfSelected(e) {
   ];
   if (lowConf) parts.push(`<span style="color:var(--warning)">${lowConf} à faible confiance</span>`);
   if (data.warnings && data.warnings.length) {
-    parts.push(`<span style="color:var(--warning)">${esc(data.warnings[0])}</span>`);
+    // Tous les avertissements, pas le premier seul : chacun dit ce qui est ecarte ou garde.
+    data.warnings.forEach(w => parts.push(`<span style="color:var(--warning)">${esc(w)}</span>`));
   }
   if (status) {
     status.innerHTML = parts.join(' · ') +

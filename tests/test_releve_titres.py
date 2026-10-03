@@ -91,3 +91,34 @@ def test_route_renvoie_le_refus(client):
                     content_type='multipart/form-data', headers=CSRF_HEADERS)
     assert r.status_code == 422
     assert 'Rien n' in r.get_json()['error']
+
+
+def _apercu(client, pid, lignes):
+    pdf = _make_pdf(['BOURSOBANK', 'RELEVE COMPTE TITRES : JUIN 2026', *lignes])
+    return client.post(f'/api/envelope/{pid}/import-pdf?step=preview',
+                       data={'file': (BytesIO(pdf), 'pea.pdf')},
+                       content_type='multipart/form-data', headers=CSRF_HEADERS)
+
+
+def test_prix_de_revient_exact_garde_face_a_l_arrondi(client):
+    pid = _make_position(client, category='Actions', envelope='PEA', value=0, debt=0).get_json()['id']
+    # Cout exact : 1 000 titres a 9,5004 ; le releve imprime 9,500.
+    client.post(f'/api/positions/{pid}/holdings', json={
+        'isin': 'FR0010315770', 'quantity': 1000, 'cost_basis': 9500.40, 'market_value': 10000},
+        headers=CSRF_HEADERS)
+    r = _apercu(client, pid, ['1 000 ETF MONDE ACC (FR0010315770) * 10,125 10 125,00 100,00 9,500',
+                              'TOTAL DU PORTEFEUILLE 10 125,00 EUR'])
+    d = r.get_json()
+    assert d['lines'][0]['cost_basis'] == 9500.40
+    assert any('gardé' in w for w in d['warnings'])
+
+
+def test_prix_de_revient_tres_different_signale(client):
+    pid = _make_position(client, category='Actions', envelope='PEA', value=0, debt=0).get_json()['id']
+    client.post(f'/api/positions/{pid}/holdings', json={
+        'isin': 'FR0010315770', 'quantity': 1000, 'cost_basis': 8000, 'market_value': 10000},
+        headers=CSRF_HEADERS)
+    d = _apercu(client, pid, ['1 000 ETF MONDE ACC (FR0010315770) * 10,125 10 125,00 100,00 9,500',
+                              'TOTAL DU PORTEFEUILLE 10 125,00 EUR']).get_json()
+    assert d['lines'][0]['cost_basis'] == 9500.0
+    assert any('remplacera' in w for w in d['warnings'])

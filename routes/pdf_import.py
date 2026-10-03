@@ -13,9 +13,9 @@ from datetime import datetime
 
 from flask import Blueprint, jsonify, request
 from models import (get_db, validate_isin, validate_number, validate_date,
-                    parse_number, sync_position_value)
+                    parse_number, sync_position_value, get_holdings_map)
 from services.parsers import parse_pdf, parse_csv, parse_pasted_text
-from services.parsers.common import PdfEncryptedError, PdfImageScanError, ReleveIncoherentError
+from services.parsers.common import PdfEncryptedError, PdfImageScanError, ReleveIncoherentError, montant_fr
 from services.securities import upsert_security
 from auth import login_required, csrf_protect
 from services.montants import lignes_en_euros
@@ -185,11 +185,44 @@ def _preview(position_id):
     # Price lookup for formats without prices (e.g. attestation de detention)
     if result.needs_price_lookup:
         _enrich_with_prices(result)
+    _garder_prix_de_revient(position_id, result)
 
     return jsonify({
         'position_id': position_id,
         **result.to_dict(),
     })
+
+
+def _garder_prix_de_revient(position_id, result):
+    """Ne degrade pas en silence un prix de revient deja enregistre.
+
+    Un releve imprime le PRU arrondi (trois decimales) : multiplie par la
+    quantite, il s'ecarte du cout exact tire des avis d'operes. Meme titre, meme
+    quantite, ecart dans l'arrondi : le cout enregistre est garde. Au-dela, le
+    releve l'emporte mais l'apercu nomme chaque ligne, avant et apres."""
+    with get_db() as conn:
+        avant = {h['isin']: h for h in get_holdings_map(conn, [position_id]).get(position_id, [])}
+    gardes, changes = 0, []
+    for l in result.lines:
+        h = avant.get(l.isin)
+        if not h or l.cost_basis is None or h.get('cost_basis') is None:
+            continue
+        if abs((h.get('quantity') or 0) - (l.quantity or 0)) > 1e-9:
+            continue
+        ecart = abs(h['cost_basis'] - l.cost_basis)
+        if ecart < 0.01:
+            continue
+        if ecart <= (l.quantity or 0) * 0.0005 + 0.01:
+            l.cost_basis = h['cost_basis']
+            gardes += 1
+        else:
+            changes.append(f"{l.name or l.isin} {montant_fr(h['cost_basis'])} → {montant_fr(l.cost_basis)}")
+    if gardes:
+        result.warnings.append(f"Prix de revient enregistré gardé sur {gardes} ligne(s) : celui du "
+                               "relevé n'en diffère que par l'arrondi du prix unitaire.")
+    if changes:
+        result.warnings.append("Prix de revient différent de celui enregistré, le relevé le remplacera : "
+                               + ' ; '.join(changes) + '. Corrigez le tableau pour garder l\'ancien.')
 
 
 from services.holdings_split import split_holdings_by_category
