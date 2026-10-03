@@ -139,8 +139,6 @@
     <span><i class="treso-pastille treso-pastille--apport"></i>Apports des associés</span>
   </div>
   {:else}
-    <p class="text-muted">Holding : la trésorerie et les opérations seules. Loyers, échéances et effort des
-      associés lisent une société de placement ; ici, ils diraient faux.</p>
     <div class="treso-kpis" style="grid-template-columns:minmax(0, 16rem)">
       {@render kpi('Trésorerie', fmt(b.tresorerie), 'tous comptes')}
     </div>
