@@ -5,8 +5,9 @@
    * dans l'en-tete, sa tendance, et un sous-titre qui le situe.
    *
    * Sous le net, l'objectif de patrimoine de la vue (famille ou titulaire) : une jauge,
-   * et quand il tombe au rythme observe sur l'historique.
+   * et quand il tombe au rythme des derniers mois.
    */
+  import { api } from '/static/modules/api.js';
   import { fmt, fmtDate, fmtPct, kpiDelta, sparkline } from '/static/modules/utils.js';
 
   interface Variation { prev_date?: string; net_delta?: number | null; net_pct?: number | null; [k: string]: unknown }
@@ -59,27 +60,50 @@
                                dates[debut] <= cible ? '1 an' : `depuis le ${fmtDate(dates[debut])}`);
     return out;
   });
+  // ── Rythme : la variation du net HORS comptes ajoutes ou retires (la
+  // decomposition de « D'ou vient la hausse »), sur les periodes les plus
+  // recentes couvrant au moins six mois. Depuis le premier arrete, un apport
+  // exceptionnel (149 000 € recus en quinze jours) passait pour un rythme, et
+  // l'arrivee d'un compte dans le suivi pour de l'enrichissement.
+  interface Periode { debut: string; fin: string; variation: number; hors_suivi?: number }
+  let rythme = $state<{ parJour: number; mois: number } | null>(null);
+  let jeton = 0;
+  $effect(() => {
+    if (!p.objectif) { rythme = null; return; }
+    void p.date;
+    const j = ++jeton, q = new URLSearchParams({ limit: '40' });
+    if (!p.famille && p.owner) q.set('owner', p.owner);
+    api<{ periodes?: Periode[] }>('GET', `/api/contribution?${q}`, null, { silent: true })
+      .then(d => {
+        if (j !== jeton) return;
+        let jours = 0, gain = 0;
+        for (const x of [...(d?.periodes || [])].reverse()) {
+          jours += (Date.parse(x.fin) - Date.parse(x.debut)) / 864e5;
+          gain += (x.variation || 0) - (x.hors_suivi || 0);
+          if (jours >= 182) break;
+        }
+        rythme = jours > 30 ? { parJour: gain / jours, mois: Math.round(jours / 30.44) } : null;
+      })
+      .catch(() => { if (j === jeton) rythme = null; });
+  });
+
   // L'objectif est celui de la vue affichee (famille ou titulaire) : la jauge
   // compare le net de cette vue a son propre objectif.
   const but = $derived.by(() => {
     const cible = p.objectif, net = p.kpi.net;
     if (!cible) return null;
     const pct = cible > 0 ? Math.min((net / cible) * 100, 100) : 0;
-    let quand: { prefixe: string; date: string } | null = null, atteint = false;
-    const v = p.series.net, d = p.dates;
-    if (v.length >= 2 && net < cible) {
-      const jours = (Date.parse(d[d.length - 1]) - Date.parse(d[0])) / 864e5;
-      const progression = (v[v.length - 1] || 0) - (v[0] || 0);
-      if (jours > 30 && progression > 0) {
-        const restant = (cible - net) / (progression / jours);
-        if (restant < 3650) {
-          const date = new Date(Date.now() + restant * 864e5);
-          const cetteAnnee = date.getFullYear() === new Date().getFullYear();
-          quand = { prefixe: cetteAnnee ? 'Atteint le' : 'Atteint en',
-                    date: date.toLocaleDateString('fr-FR', cetteAnnee ? { day: 'numeric', month: 'short' } : { month: 'short', year: 'numeric' }) };
-        }
+    let quand: { prefixe: string; date: string; mois: number } | null = null, atteint = false;
+    if (net >= cible) atteint = true;
+    else if (rythme && rythme.parJour > 0) {
+      const restant = (cible - net) / rythme.parJour;
+      if (restant < 3650) {
+        const date = new Date(Date.now() + restant * 864e5);
+        const cetteAnnee = date.getFullYear() === new Date().getFullYear();
+        quand = { prefixe: cetteAnnee ? 'Atteint le' : 'Atteint en', mois: rythme.mois,
+                  date: date.toLocaleDateString('fr-FR', cetteAnnee ? { day: 'numeric', month: 'short' } : { month: 'short', year: 'numeric' }) };
       }
-    } else if (net >= cible) atteint = true;
+    }
     return { cible, pct, quand, atteint, reste: Math.max(cible - net, 0) };
   });
 
@@ -94,7 +118,7 @@
     <div class="g-track"><span class="g-fill" style:width="{but.pct.toFixed(1)}%"></span></div>
     <div class="g-foot">
       <span>Objectif <b>{fmt(but.cible)}</b></span>
-      <span>{#if but.atteint}<b>Objectif atteint</b>{:else if but.quand}{but.quand.prefixe} <b>{but.quand.date}</b> au rythme actuel{:else}Reste <b>{fmt(but.reste)}</b>{/if}</span>
+      <span>{#if but.atteint}<b>Objectif atteint</b>{:else if but.quand}{but.quand.prefixe} <b>{but.quand.date}</b> au rythme des {but.quand.mois} derniers mois{:else}Reste <b>{fmt(but.reste)}</b>{/if}</span>
     </div>{/if}</div>
   <div id="kpi-hero-spark">{#if !p.objectif}{@html spark(p.series.net)}{/if}</div>
 </div>
