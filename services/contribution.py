@@ -50,23 +50,44 @@ def seuil_exceptionnel(conn):
 def _exceptionnels(conn, debut, fin, owner=None, seuil=SEUIL_DEFAUT):
     """Flux exceptionnels nets sur ]debut, fin], et leur detail.
 
-    Signes de `_flux_signed`, tous comptes : un transfert interne enregistre
-    sur ses deux jambes (retrait du livret, versement a l'assurance-vie)
-    s'annule ; seul reste l'argent venu d'ailleurs, ou parti ailleurs."""
+    Les flux d'au moins `seuil` d'un meme titulaire, a `TOLERANCE_JOURS` les
+    uns des autres, se compensent : un transfert interne enregistre sur ses
+    deux jambes s'annule. Le solde d'un tel groupe n'est exceptionnel que s'il
+    atteint lui-meme le seuil — un transfert de 40 000 € passe en deux
+    virements (30 000 + 10 000 verses, 29 000 + 10 000 retires) laissait
+    1 000 € d'« exceptionnel », venus en fait du compte courant.
+    Signes de `_flux_signed` : seul reste l'argent venu d'ailleurs, ou parti
+    ailleurs."""
+    from datetime import date as _d
     from routes.performance import _flux_signed
+    from routes.movements_import import TOLERANCE_JOURS
     q = 'SELECT date, type, amount, owner, envelope, establishment FROM flux WHERE date > ? AND date <= ?'
     p = [debut, fin]
     if owner:
         q += ' AND owner = ?'
         p.append(owner)
-    total, details = 0.0, []
+    gros = []
     for r in conn.execute(q, p):
         f = ligne_en_euros('flux', r)
         x = _flux_signed(f)
         if x and abs(x) >= seuil:
-            total += x
-            details.append({'date': f['date'], 'montant': round(x, 2), 'owner': f['owner'],
-                            'compte': ' · '.join(v for v in (f['envelope'], f['establishment']) if v)})
+            gros.append({'date': f['date'], 'montant': round(x, 2), 'owner': f['owner'],
+                         'compte': ' · '.join(v for v in (f['envelope'], f['establishment']) if v)})
+    gros.sort(key=lambda g: (g['owner'] or '', g['date']))
+    groupes = []
+    for g in gros:
+        der = groupes[-1][-1] if groupes else None
+        if (der and der['owner'] == g['owner']
+                and (_d.fromisoformat(g['date'][:10]) - _d.fromisoformat(der['date'][:10])).days <= TOLERANCE_JOURS):
+            groupes[-1].append(g)
+        else:
+            groupes.append([g])
+    total, details = 0.0, []
+    for gr in groupes:
+        net = sum(g['montant'] for g in gr)
+        if abs(net) >= seuil:
+            total += net
+            details += gr
     return round(total, 2), details
 
 

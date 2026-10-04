@@ -364,3 +364,28 @@ class TestFluxExceptionnels:
         for v in (0, -5, 'abc', None, True):
             r = client.put('/api/config/seuil-exceptionnel', json={'seuil': v}, headers={'X-CSRF-Token': 'test'})
             assert r.status_code == 400, v
+
+    def test_transfert_en_morceaux_ne_laisse_pas_de_residu(self):
+        # 40 000 € du livret vers l'assurance-vie, en deux virements qui ne se
+        # correspondent pas un a un ; 1 000 € venus du compte courant.
+        with get_db() as conn:
+            for env, t, m in (('Assurance-vie', 'Versement', 30000), ('Assurance-vie', 'Versement', 10000),
+                              ('Livret A', 'Retrait', 29000), ('Livret A', 'Retrait', 10000)):
+                self._flux(conn, '2026-02-10', env, t, m)
+            conn.commit()
+            avant = {self.LIVRET: {'net': 50000, 'liq': True}, self.AV: {'net': 50000}}
+            apres = {self.LIVRET: {'net': 11000, 'liq': True}, self.AV: {'net': 90000}}
+            p = decompose(conn, self._arretes(avant, apres))['periodes'][0]
+        assert p['exceptionnel'] == 0 and not p['flux_exceptionnels']
+        assert p['epargne'] == 1000
+
+    def test_entree_et_sortie_eloignees_restent_exceptionnelles(self):
+        # Un heritage en fevrier, un achat en mars : deux evenements, chacun exceptionnel.
+        with get_db() as conn:
+            self._flux(conn, '2026-02-01', 'Livret A', 'Versement', 100000)
+            self._flux(conn, '2026-03-20', 'Livret A', 'Retrait', 90000)
+            conn.commit()
+            avant = {self.LIVRET: {'net': 10000, 'liq': True}}
+            apres = {self.LIVRET: {'net': 20000, 'liq': True}}
+            p = decompose(conn, self._arretes(avant, apres))['periodes'][0]
+        assert p['exceptionnel'] == 10000 and len(p['flux_exceptionnels']) == 2

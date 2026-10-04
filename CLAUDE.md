@@ -94,8 +94,10 @@
   meme mesure. Par compte (onglet Performance), un versement reste un apport.
 - **Flux exceptionnel** : un versement ou un retrait d'au moins
   `seuil_flux_exceptionnel` (config, 20 000 € par defaut, Reglages →
-  Preferences) — heritage, vente. Net de signe sur tous les comptes, donc un
-  transfert interne enregistre sur ses deux jambes s'annule. Il reste dans le
+  Preferences) — heritage, vente. Les gros flux d'un titulaire a
+  `TOLERANCE_JOURS` les uns des autres se compensent (un transfert interne
+  enregistre sur ses deux jambes s'annule, meme decoupe en morceaux) ; le
+  solde d'un groupe n'est exceptionnel que s'il atteint le seuil. Il reste dans le
   patrimoine mais sort de tout ce qui mesure un rythme : epargne nouvelle,
   projection, date de l'objectif (variation hors comptes ajoutes et hors
   exceptionnels, sur tout l'historique).
