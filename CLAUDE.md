@@ -99,8 +99,9 @@
   enregistre sur ses deux jambes s'annule, meme decoupe en morceaux) ; le
   solde d'un groupe n'est exceptionnel que s'il atteint le seuil. Il reste dans le
   patrimoine mais sort de tout ce qui mesure un rythme : epargne nouvelle,
-  projection, date de l'objectif (variation hors comptes ajoutes et hors
-  exceptionnels, sur tout l'historique).
+  projection, date de l'objectif. Cette date se tient au rythme de ce qui se
+  pilote — epargne nouvelle plus capital rembourse, sur tout l'historique —
+  jamais de la performance des marches ni des comptes ajoutes.
 - **Le capital rembourse est de l'epargne**, pas de la performance. Sauf pour
   un pret **in fine** (`prets.est_in_fine`) : rembourse d'un bloc sur des actifs
   deja comptes, il n'enrichit pas et sort du desendettement projete.

@@ -5,7 +5,7 @@
    * dans l'en-tete, sa tendance, et un sous-titre qui le situe.
    *
    * Sous le net, l'objectif de patrimoine de la vue (famille ou titulaire) : une jauge,
-   * et quand il tombe au rythme des derniers mois.
+   * et quand il tombe au rythme de l'epargne (hors performance des marches).
    */
   import { api } from '/static/modules/api.js';
   import { fmt, fmtDate, fmtPct, kpiDelta, sparkline } from '/static/modules/utils.js';
@@ -64,13 +64,14 @@
                                dates[debut] <= cible ? '1 an' : `depuis le ${fmtDate(dates[debut])}`, dates[debut]);
     return out;
   });
-  // ── Rythme : la variation du net sur tout l'historique, HORS comptes
-  // ajoutes ou retires et HORS flux exceptionnels (la decomposition de
-  // « D'ou vient la hausse »). La droite du premier au dernier arrete prenait
-  // un heritage recu en quinze jours pour un rythme, et l'arrivee d'un compte
-  // dans le suivi pour de l'enrichissement.
-  interface Periode { debut: string; fin: string; variation: number; hors_suivi?: number; exceptionnel?: number }
-  let rythme = $state<{ parJour: number; mois: number } | null>(null);
+  // ── Rythme : ce qui se pilote, l'epargne nouvelle plus le capital
+  // rembourse, sur tout l'historique (la decomposition de « D'ou vient la
+  // hausse », flux exceptionnels deja retires). Ni les comptes ajoutes, ni la
+  // performance : 19 700 € de hausse des marches en un trimestre, prolonges,
+  // datait l'objectif a deux mois quand l'epargne en demande six.
+  interface Periode { debut: string; fin: string; variation: number; epargne: number; capital: number;
+                      hors_suivi?: number; exceptionnel?: number }
+  let rythme = $state<{ parJour: number; mois: number; parMois: number } | null>(null);
   let periodes = $state<Periode[]>([]);
   let jeton = 0;
   $effect(() => {
@@ -84,9 +85,9 @@
         let jours = 0, gain = 0;
         for (const x of d?.periodes || []) {
           jours += (Date.parse(x.fin) - Date.parse(x.debut)) / 864e5;
-          gain += (x.variation || 0) - (x.hors_suivi || 0) - (x.exceptionnel || 0);
+          gain += (x.epargne || 0) + (x.capital || 0);
         }
-        rythme = jours > 30 ? { parJour: gain / jours, mois: Math.round(jours / 30.44) } : null;
+        rythme = jours > 30 ? { parJour: gain / jours, mois: Math.round(jours / 30.44), parMois: gain / jours * 30.44 } : null;
       })
       .catch(() => { if (j === jeton) { rythme = null; periodes = []; } });
   });
@@ -97,14 +98,14 @@
     const cible = p.objectif, net = p.kpi.net;
     if (!cible) return null;
     const pct = cible > 0 ? Math.min((net / cible) * 100, 100) : 0;
-    let quand: { prefixe: string; date: string; mois: number } | null = null, atteint = false;
+    let quand: { prefixe: string; date: string; parMois: number } | null = null, atteint = false;
     if (net >= cible) atteint = true;
     else if (rythme && rythme.parJour > 0) {
       const restant = (cible - net) / rythme.parJour;
       if (restant < 3650) {
         const date = new Date(Date.now() + restant * 864e5);
         const cetteAnnee = date.getFullYear() === new Date().getFullYear();
-        quand = { prefixe: cetteAnnee ? 'Atteint le' : 'Atteint en', mois: rythme.mois,
+        quand = { prefixe: cetteAnnee ? 'Atteint le' : 'Atteint en', parMois: rythme.parMois,
                   date: date.toLocaleDateString('fr-FR', cetteAnnee ? { day: 'numeric', month: 'short' } : { month: 'short', year: 'numeric' }) };
       }
     }
@@ -122,7 +123,7 @@
     <div class="g-track"><span class="g-fill" style:width="{but.pct.toFixed(1)}%"></span></div>
     <div class="g-foot">
       <span>Objectif <b>{fmt(but.cible)}</b></span>
-      <span>{#if but.atteint}<b>Objectif atteint</b>{:else if but.quand}{but.quand.prefixe} <b>{but.quand.date}</b> au rythme des {but.quand.mois} derniers mois{:else}Reste <b>{fmt(but.reste)}</b>{/if}</span>
+      <span>{#if but.atteint}<b>Objectif atteint</b>{:else if but.quand}{but.quand.prefixe} <b>{but.quand.date}</b> en épargnant {fmt(Math.round(but.quand.parMois))} par mois{:else}Reste <b>{fmt(but.reste)}</b>{/if}</span>
     </div>{/if}</div>
   <div id="kpi-hero-spark">{#if !p.objectif}{@html spark(p.series.net)}{/if}</div>
 </div>
